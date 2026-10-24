@@ -1,0 +1,9 @@
+{
+  "name": "tankcommand",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Static bundle ready'",
+    "start": "npx serve ."
+  }
+}
