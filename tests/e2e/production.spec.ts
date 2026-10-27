@@ -62,7 +62,7 @@ test('[HOOK-01] production build has no test hook marker or window hook', async 
     // instead of orphaning it on the port.
     server = spawn(
       process.execPath,
-      [join(root, 'node_modules/vite/bin/vite.js'), 'preview', '--outDir', outDir, '--port', String(port), '--strictPort'],
+      [join(root, 'node_modules/vite/bin/vite.js'), 'preview', '--outDir', outDir, '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
       { cwd: root, env, stdio: 'ignore' },
     );
     await waitForUrl(`http://127.0.0.1:${port}/`);
