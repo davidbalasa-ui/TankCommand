@@ -16,23 +16,32 @@ export class StorageFullError extends Error {
   }
 }
 
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(String(error));
+}
+
 export class MemoryKvStore implements KvStore {
   private readonly data = new Map<string, string>();
 
-  async get(key: string): Promise<string | null> {
-    return this.data.get(key) ?? null;
+  get(key: string): Promise<string | null> {
+    return Promise.resolve(this.data.get(key) ?? null);
   }
 
-  async set(key: string, value: string): Promise<void> {
+  set(key: string, value: string): Promise<void> {
     this.data.set(key, value);
+    return Promise.resolve();
   }
 
-  async remove(key: string): Promise<void> {
+  remove(key: string): Promise<void> {
     this.data.delete(key);
+    return Promise.resolve();
   }
 
-  async keys(): Promise<string[]> {
-    return [...this.data.keys()].sort();
+  keys(): Promise<string[]> {
+    return Promise.resolve([...this.data.keys()].sort());
   }
 }
 
@@ -55,34 +64,48 @@ export class WebKvStore implements KvStore {
     this.storage = storage ?? globalThis.localStorage;
   }
 
-  async get(key: string): Promise<string | null> {
-    return this.storage.getItem(key);
+  get(key: string): Promise<string | null> {
+    try {
+      return Promise.resolve(this.storage.getItem(key));
+    } catch (error) {
+      return Promise.reject(toError(error));
+    }
   }
 
-  async set(key: string, value: string): Promise<void> {
+  set(key: string, value: string): Promise<void> {
     try {
       this.storage.setItem(key, value);
+      return Promise.resolve();
     } catch (error) {
       if (isQuotaError(error)) {
-        throw new StorageFullError();
+        return Promise.reject(new StorageFullError());
       }
-      throw error;
+      return Promise.reject(toError(error));
     }
   }
 
-  async remove(key: string): Promise<void> {
-    this.storage.removeItem(key);
+  remove(key: string): Promise<void> {
+    try {
+      this.storage.removeItem(key);
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(toError(error));
+    }
   }
 
-  async keys(): Promise<string[]> {
-    const result: string[] = [];
-    for (let i = 0; i < this.storage.length; i += 1) {
-      const key = this.storage.key(i);
-      if (key !== null) {
-        result.push(key);
+  keys(): Promise<string[]> {
+    try {
+      const result: string[] = [];
+      for (let i = 0; i < this.storage.length; i += 1) {
+        const key = this.storage.key(i);
+        if (key !== null) {
+          result.push(key);
+        }
       }
+      return Promise.resolve(result);
+    } catch (error) {
+      return Promise.reject(toError(error));
     }
-    return result;
   }
 }
 

@@ -1,5 +1,5 @@
 import { button } from './controls';
-import type { ScreenContext, ScreenId, ScreenModule } from './router';
+import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
 
@@ -79,22 +79,48 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const canvas = document.createElement('canvas');
       canvas.className = 'game-canvas';
       root.append(canvas);
-      const handle = ctx.attachRenderer(canvas);
-      if (handle.error) {
+
+      let disposed = false;
+      let handle: RendererHandle | null = null;
+
+      const showError = (message: string): void => {
         canvas.remove();
-        const message = document.createElement('p');
-        message.textContent = handle.error;
-        root.append(message);
-      }
+        const errorEl = document.createElement('p');
+        errorEl.className = 'render-error';
+        errorEl.textContent = message;
+        root.prepend(errorEl);
+      };
+
+      void ctx
+        .attachRenderer(canvas)
+        .then((resolved) => {
+          if (disposed) {
+            resolved.dispose();
+            return;
+          }
+          handle = resolved;
+          if (resolved.error) {
+            showError(resolved.error);
+          }
+        })
+        .catch(() => {
+          if (!disposed) {
+            showError('3D rendering is unavailable on this device.');
+          }
+        });
+
       addButton(root, 'inGame', 'pause', 'Pause', () => {
         ctx.go('pause');
       });
+
       return () => {
-        handle.dispose();
+        disposed = true;
+        handle?.dispose();
       };
     }),
 
     pause: makeScreen('pause', 'Paused', (root, ctx) => {
+      ctx.pauseSim(true);
       addButton(root, 'pause', 'resume', 'Resume', () => {
         ctx.router.back();
       });
@@ -107,6 +133,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       addButton(root, 'pause', 'quit', 'Quit to title', () => {
         ctx.go('title');
       });
+      return () => {
+        ctx.pauseSim(false);
+      };
     }),
 
     settings: makeScreen('settings', 'Settings', (root, ctx) => {

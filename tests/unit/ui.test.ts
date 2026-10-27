@@ -3,7 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createScreens } from '../../src/ui/screens';
 import { ControlInventory } from '../../src/ui/controls';
-import { ScreenRouter, type ScreenContext, type ScreenId } from '../../src/ui/router';
+import {
+  ScreenRouter,
+  type RendererHandle,
+  type ScreenContext,
+  type ScreenId,
+} from '../../src/ui/router';
 
 function makeContext(router: ScreenRouter): ScreenContext {
   return {
@@ -11,7 +16,9 @@ function makeContext(router: ScreenRouter): ScreenContext {
     go: (id) => {
       router.go(id);
     },
-    attachRenderer: () => ({ error: null, dispose: () => undefined }),
+    pauseSim: () => undefined,
+    attachRenderer: () =>
+      Promise.resolve<RendererHandle>({ error: null, dispose: () => undefined }),
   };
 }
 

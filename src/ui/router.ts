@@ -23,7 +23,8 @@ export interface RendererHandle {
 export interface ScreenContext {
   router: ScreenRouter;
   go: (id: ScreenId) => void;
-  attachRenderer: (canvas: HTMLCanvasElement) => RendererHandle;
+  pauseSim: (paused: boolean) => void;
+  attachRenderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
 }
 
 export interface ScreenModule {

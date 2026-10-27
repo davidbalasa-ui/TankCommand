@@ -2,15 +2,14 @@ import rawManifest from '../public/assets/manifest.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
 import { createScreens } from './ui/screens';
-import { ScreenRouter, type RendererHandle, type ScreenContext, type ScreenId } from './ui/router';
+import { ScreenRouter, type RendererHandle, type ScreenContext } from './ui/router';
 import { createWorld, snapshot, step, type WorldState } from './sim/world';
 import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
-import { Watchdog } from './platform/watchdog';
-import { installGlobalErrorCapture } from './platform/watchdog';
+import { Watchdog, installGlobalErrorCapture } from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
-import { RenderView, type RenderStats } from './render/renderer';
+import type { RenderStats, RenderView } from './render/renderer';
 
 export class App {
   public readonly router: ScreenRouter;
@@ -25,6 +24,8 @@ export class App {
   private checkTimer = 0;
   private lastFrame = 0;
   private paused = false;
+  private uiPaused = false;
+  private lifecyclePaused = false;
   private freezeSimUntil = 0;
 
   constructor(root: HTMLElement) {
@@ -52,6 +53,9 @@ export class App {
       go: (id) => {
         router.go(id);
       },
+      pauseSim: (paused) => {
+        this.pauseSim(paused);
+      },
       attachRenderer: (canvas) => this.attachRenderer(canvas),
     }));
   }
@@ -60,10 +64,10 @@ export class App {
     this.router.start('title');
     this.lifecycle = bindLifecycleToBrowserAndCapacitor();
     this.lifecycle.on('pause', () => {
-      this.pause();
+      this.pauseLifecycle();
     });
     this.lifecycle.on('resume', () => {
-      this.resume();
+      this.resumeLifecycle();
     });
     this.lifecycle.on('back', () => {
       this.router.back();
@@ -98,27 +102,33 @@ export class App {
     this.freezeSimUntil = performance.now() + Math.max(0, ms);
   }
 
-  private attachRenderer(canvas: HTMLCanvasElement): RendererHandle {
-    try {
-      const view = new RenderView(canvas, this.registry);
-      this.renderView = view;
-      this.startLoop();
-      return {
-        error: null,
-        dispose: () => {
-          if (this.renderView === view) {
-            this.stopLoop();
-            view.dispose();
-            this.renderView = null;
-          }
-        },
-      };
-    } catch {
-      return {
+  pauseSim(paused: boolean): void {
+    this.uiPaused = paused;
+    this.applyPauseState();
+  }
+
+  private attachRenderer(canvas: HTMLCanvasElement): Promise<RendererHandle> {
+    return import('./render/renderer').then(
+      (mod) => {
+        const view = new mod.RenderView(canvas, this.registry);
+        this.renderView = view;
+        this.startLoop();
+        return {
+          error: null,
+          dispose: (): void => {
+            if (this.renderView === view) {
+              this.stopLoop();
+              view.dispose();
+              this.renderView = null;
+            }
+          },
+        };
+      },
+      () => ({
         error: '3D rendering is unavailable on this device.',
-        dispose: () => undefined,
-      };
-    }
+        dispose: (): void => undefined,
+      }),
+    );
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -127,22 +137,29 @@ export class App {
     }
   };
 
-  private pause(): void {
-    if (this.paused) {
-      return;
-    }
-    this.paused = true;
-    this.watchdog.setSuspended(true);
-    this.stopLoop();
+  private pauseLifecycle(): void {
+    this.lifecyclePaused = true;
+    this.applyPauseState();
   }
 
-  private resume(): void {
-    if (!this.paused) {
+  private resumeLifecycle(): void {
+    this.lifecyclePaused = false;
+    this.applyPauseState();
+  }
+
+  private applyPauseState(): void {
+    const next = this.uiPaused || this.lifecyclePaused;
+    if (next === this.paused) {
       return;
     }
-    this.paused = false;
-    this.watchdog.setSuspended(false);
-    this.startLoop();
+    this.paused = next;
+    if (next) {
+      this.watchdog.setSuspended(true);
+      this.stopLoop();
+    } else {
+      this.watchdog.setSuspended(false);
+      this.startLoop();
+    }
   }
 
   private startLoop(): void {
@@ -150,6 +167,8 @@ export class App {
       return;
     }
     this.lastFrame = performance.now();
+    this.watchdog.beat('sim');
+    this.watchdog.beat('render');
     this.checkTimer = window.setInterval(() => {
       this.watchdog.check();
     }, 250);

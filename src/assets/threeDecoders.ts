@@ -13,8 +13,8 @@ export function createThreeDecoders(): AssetDecoders<THREE.Object3D, THREE.Textu
           (gltf) => {
             resolve(gltf.scene);
           },
-          (error) => {
-            reject(error);
+          (error: unknown) => {
+            reject(error instanceof Error ? error : new Error(String(error)));
           },
         );
       });
@@ -25,7 +25,7 @@ export function createThreeDecoders(): AssetDecoders<THREE.Object3D, THREE.Textu
       texture.needsUpdate = true;
       return texture;
     },
-    audio: async (buffer) => buffer,
+    audio: (buffer) => Promise.resolve(buffer),
   };
 }
 

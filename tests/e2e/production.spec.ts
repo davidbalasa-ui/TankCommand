@@ -58,9 +58,11 @@ test('[HOOK-01] production build has no test hook marker or window hook', async 
       expect(readFileSync(file, 'utf8')).not.toContain('__TC_TEST__');
     }
 
+    // Spawn vite directly (not through npx) so killing `server` kills the preview server itself
+    // instead of orphaning it on the port.
     server = spawn(
-      'npx',
-      ['vite', 'preview', '--outDir', outDir, '--port', String(port), '--strictPort'],
+      process.execPath,
+      [join(root, 'node_modules/vite/bin/vite.js'), 'preview', '--outDir', outDir, '--port', String(port), '--strictPort'],
       { cwd: root, env, stdio: 'ignore' },
     );
     await waitForUrl(`http://127.0.0.1:${port}/`);
@@ -69,7 +71,11 @@ test('[HOOK-01] production build has no test hook marker or window hook', async 
     const hasHook = await page.evaluate(() => '__TC_TEST__' in window);
     expect(hasHook).toBe(false);
   } finally {
-    server?.kill('SIGTERM');
+    if (server && server.exitCode === null) {
+      const exited = new Promise((resolve) => server?.once('exit', resolve));
+      server.kill('SIGTERM');
+      await exited;
+    }
     rmSync(temp, { recursive: true, force: true });
   }
 });

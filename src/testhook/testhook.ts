@@ -10,6 +10,7 @@ export interface TestHook {
   screen(): string;
   renderStats(): RenderStats;
   freezeSim(ms: number): void;
+  pauseSim(paused: boolean): void;
   controls(): string[];
   go(screenId: string): void;
 }
@@ -22,6 +23,9 @@ export function installTestHook(app: App): void {
     renderStats: () => app.renderStats(),
     freezeSim: (ms) => {
       app.freezeSim(ms);
+    },
+    pauseSim: (paused) => {
+      app.pauseSim(paused);
     },
     controls: () => ControlInventory.all(),
     go: (screenId) => {

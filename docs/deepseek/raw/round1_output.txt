@@ -1,0 +1,4735 @@
+<<<DELETE index.html>>>
+<<<DELETE sw.js>>>
+<<<DELETE electron-main.js>>>
+<<<DELETE manifest.json>>>
+<<<FILE package.json>>>
+{
+  "name": "tankcommand",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sim.json --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sim.json --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "credits": "node scripts/credits.mjs",
+    "credits:check": "node scripts/credits.mjs --check",
+    "coverage:req": "node scripts/req-coverage.mjs",
+    "cap:sync": "npm run build && cap sync android",
+    "ci": "npm run lint && npm run typecheck && npm test && npm run credits:check && npm run coverage:req && npm run build"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/preferences": "^8.0.1",
+    "three": "^0.186.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22",
+    "@types/three": "^0.186.0",
+    "eslint": "^9.39.5",
+    "jsdom": "^26",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}
+<<<END FILE>>>
+<<<FILE tsconfig.json>>>
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src",
+    "tests",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "capacitor.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "android"]
+}
+<<<END FILE>>>
+<<<FILE tsconfig.sim.json>>>
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/sim/**/*.ts"]
+}
+<<<END FILE>>>
+<<<FILE vite.config.ts>>>
+import { defineConfig } from 'vite';
+
+export default defineConfig(({ mode }) => ({
+  base: './',
+  define: {
+    __TEST_HOOK__: JSON.stringify(process.env.VITE_TEST_HOOK === '1' || mode === 'development'),
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+}));
+<<<END FILE>>>
+<<<FILE vitest.config.ts>>>
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    include: ['tests/unit/**/*.test.ts'],
+    environment: 'node',
+  },
+});
+<<<END FILE>>>
+<<<FILE playwright.config.ts>>>
+import { defineConfig } from '@playwright/test';
+
+const chromiumPath = process.env.PW_CHROMIUM_PATH;
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  timeout: 30_000,
+  expect: { timeout: 10_000 },
+  fullyParallel: false,
+  workers: 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: 'http://127.0.0.1:4173',
+    trace: 'retain-on-failure',
+    launchOptions: chromiumPath ? { executablePath: chromiumPath } : {},
+  },
+  webServer: {
+    command: 'VITE_TEST_HOOK=1 npm run build && npm run preview',
+    url: 'http://127.0.0.1:4173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+  projects: [
+    {
+      name: 'phone',
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 915, height: 412 },
+        hasTouch: true,
+        isMobile: true,
+      },
+    },
+    {
+      name: 'tablet',
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 1280, height: 800 },
+        hasTouch: true,
+      },
+    },
+    {
+      name: 'desktop',
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 1920, height: 1080 },
+      },
+    },
+  ],
+});
+<<<END FILE>>>
+<<<FILE eslint.config.js>>>
+import tseslint from 'typescript-eslint';
+
+const baseConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
+  ...config,
+  files: ['src/**/*.ts'],
+}));
+
+export default tseslint.config(
+  {
+    ignores: [
+      'dist/**',
+      'android/**',
+      'node_modules/**',
+      'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+      'tests/**',
+      'scripts/**',
+      'public/**',
+      '*.config.*',
+      'eslint.config.js',
+    ],
+  },
+  ...baseConfigs,
+  {
+    files: ['src/**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ['src/sim/bad.ts', 'src/render/ok.ts'],
+        },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    files: ['src/sim/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'three',
+                'three/*',
+                '@capacitor',
+                '@capacitor/*',
+                '**/render/**',
+                '**/ui/**',
+                '**/platform/**',
+                '**/assets/**',
+                '../render',
+                '../render/*',
+                '../ui',
+                '../ui/*',
+                '../platform',
+                '../platform/*',
+                '../assets',
+                '../assets/*',
+              ],
+              message: 'src/sim must stay headless and dependency-free.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'src/sim must not touch browser globals.' },
+        { name: 'document', message: 'src/sim must not touch browser globals.' },
+        { name: 'localStorage', message: 'src/sim must not touch browser globals.' },
+        { name: 'performance', message: 'src/sim must not read clocks.' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'src/sim must use the seeded RNG.' },
+        { object: 'Date', property: 'now', message: 'src/sim must not read clocks.' },
+        { object: 'performance', property: 'now', message: 'src/sim must not read clocks.' },
+      ],
+    },
+  },
+);
+<<<END FILE>>>
+<<<FILE capacitor.config.ts>>>
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.davidbalasa.tankcommand',
+  appName: 'TankCommand',
+  webDir: 'dist',
+  android: {
+    backgroundColor: '#090D16',
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 0,
+    },
+  },
+};
+
+export default config;
+<<<END FILE>>>
+<<<FILE vercel.json>>>
+{
+  "framework": null,
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist"
+}
+<<<END FILE>>>
+<<<FILE .gitignore>>>
+node_modules/
+dist/
+android/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+.env
+.env.local
+<<<END FILE>>>
+<<<FILE index.html>>>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1B365D" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>TankCommand</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+<<<END FILE>>>
+<<<FILE public/manifest.webmanifest>>>
+{
+  "name": "TankCommand",
+  "short_name": "TankCommand",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#090D16",
+  "theme_color": "#1B365D",
+  "start_url": "./"
+}
+<<<END FILE>>>
+<<<FILE public/assets/manifest.json>>>
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "unit.human.poc_tank",
+      "kind": "model",
+      "path": "assets/models/human/poc_tank.glb",
+      "bytes": 111064,
+      "faction": "human",
+      "tags": ["poc"],
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Proof-of-concept tank",
+        "usedFor": "Placeholder human tank"
+      }
+    }
+  ]
+}
+<<<END FILE>>>
+<<<FILE CREDITS.md>>>
+# Credits
+
+TankCommand asset credits. Generated from `public/assets/manifest.json`; do not edit by hand.
+
+| Asset | Author | Licence | Source | Used for |
+| --- | --- | --- | --- | --- |
+| unit.human.poc_tank | TankCommand project (scripted Blender) | ORIGINAL | - | Placeholder human tank |
+<<<END FILE>>>
+<<<FILE public/CREDITS.md>>>
+# Credits
+
+TankCommand asset credits. Generated from `public/assets/manifest.json`; do not edit by hand.
+
+| Asset | Author | Licence | Source | Used for |
+| --- | --- | --- | --- | --- |
+| unit.human.poc_tank | TankCommand project (scripted Blender) | ORIGINAL | - | Placeholder human tank |
+<<<END FILE>>>
+<<<FILE src/env.d.ts>>>
+/// <reference types="vite/client" />
+
+declare const __TEST_HOOK__: boolean;
+<<<END FILE>>>
+<<<FILE src/sim/constants.ts>>>
+export const SIM_TICK_HZ = 20;
+<<<END FILE>>>
+<<<FILE src/sim/rng.ts>>>
+export class Rng {
+  private state: number;
+
+  constructor(seed: number) {
+    this.state = seed >>> 0;
+  }
+
+  nextU32(): number {
+    this.state = (this.state + 0x6d2b79f5) >>> 0;
+    let t = this.state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (t ^ (t >>> 14)) >>> 0;
+  }
+
+  next(): number {
+    return this.nextU32() / 4294967296;
+  }
+
+  int(minInclusive: number, maxExclusive: number): number {
+    return minInclusive + Math.floor(this.next() * (maxExclusive - minInclusive));
+  }
+
+  getState(): number {
+    return this.state >>> 0;
+  }
+
+  setState(s: number): void {
+    this.state = s >>> 0;
+  }
+}
+<<<END FILE>>>
+<<<FILE src/sim/commands.ts>>>
+import { z } from 'zod';
+
+export type PlayerId = number;
+
+const baseCommand = z.object({
+  tick: z.number().int().finite(),
+  issuer: z.number().int().finite(),
+});
+
+const commandSchema = z.discriminatedUnion('kind', [
+  baseCommand.extend({
+    kind: z.literal('noop'),
+  }),
+  baseCommand.extend({
+    kind: z.literal('debug.addCounter'),
+    amount: z.number().finite(),
+  }),
+]);
+
+export type Command = z.infer<typeof commandSchema>;
+
+export function validateCommand(x: unknown): Command | null {
+  const parsed = commandSchema.safeParse(x);
+  return parsed.success ? parsed.data : null;
+}
+<<<END FILE>>>
+<<<FILE src/sim/world.ts>>>
+import { Rng } from './rng';
+import type { Command } from './commands';
+
+export interface WorldState {
+  tick: number;
+  seed: number;
+  rngState: number;
+  counter: number;
+}
+
+export function createWorld(seed: number): WorldState {
+  const rng = new Rng(seed);
+  return {
+    tick: 0,
+    seed,
+    rngState: rng.getState(),
+    counter: 0,
+  };
+}
+
+export function step(world: WorldState, commands: readonly Command[]): WorldState {
+  const nextTick = world.tick + 1;
+  let counter = world.counter;
+
+  for (const command of commands) {
+    if (command.kind === 'debug.addCounter' && command.tick === nextTick) {
+      counter += command.amount;
+    }
+  }
+
+  const rng = new Rng(world.seed);
+  rng.setState(world.rngState);
+  counter += rng.int(0, 3);
+
+  return {
+    tick: nextTick,
+    seed: world.seed,
+    rngState: rng.getState(),
+    counter,
+  };
+}
+
+export function snapshot(world: WorldState): Readonly<WorldState> {
+  return Object.freeze({ ...world });
+}
+
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+export function fnv1aHex(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+export function hashWorld(world: WorldState): string {
+  return fnv1aHex(
+    canonicalJson({
+      tick: world.tick,
+      seed: world.seed,
+      rngState: world.rngState,
+      counter: world.counter,
+    }),
+  );
+}
+<<<END FILE>>>
+<<<FILE src/sim/loop.ts>>>
+export interface FixedStepResult {
+  steps: number;
+  alpha: number;
+}
+
+export interface FixedStepOptions {
+  tickHz: number;
+  maxStepsPerFrame: number;
+  step: () => void;
+}
+
+export class FixedStepLoop {
+  private accumulator = 0;
+  private readonly tickMs: number;
+  private readonly maxSteps: number;
+  private readonly opts: FixedStepOptions;
+
+  constructor(opts: FixedStepOptions) {
+    if (!(opts.tickHz > 0)) {
+      throw new Error('tickHz must be greater than zero');
+    }
+    this.opts = opts;
+    this.tickMs = 1000 / opts.tickHz;
+    this.maxSteps = Math.max(1, Math.floor(opts.maxStepsPerFrame));
+  }
+
+  advance(elapsedMs: number): FixedStepResult {
+    const elapsed = Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0;
+    this.accumulator += elapsed;
+
+    const rawSteps = Math.floor(this.accumulator / this.tickMs);
+    let steps = rawSteps;
+    if (rawSteps > this.maxSteps) {
+      steps = this.maxSteps;
+      this.accumulator = 0;
+    } else {
+      this.accumulator -= steps * this.tickMs;
+    }
+
+    for (let i = 0; i < steps; i += 1) {
+      this.opts.step();
+    }
+
+    const alpha = Math.min(Math.max(this.accumulator / this.tickMs, 0), 0.999999);
+    return { steps, alpha };
+  }
+}
+<<<END FILE>>>
+<<<FILE src/sim/index.ts>>>
+export * from './commands';
+export * from './constants';
+export * from './loop';
+export * from './rng';
+export * from './world';
+<<<END FILE>>>
+<<<FILE src/assets/manifestSchema.ts>>>
+import { z } from 'zod';
+
+export const LICENSE_VALUES = ['CC0', 'CC-BY-4.0', 'CC-BY-3.0', 'ORIGINAL'] as const;
+export type License = (typeof LICENSE_VALUES)[number];
+export type AssetKind = 'model' | 'texture' | 'audio';
+
+const assetEntrySchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(\.[a-z0-9_]+)+$/),
+  kind: z.enum(['model', 'texture', 'audio']),
+  path: z.string(),
+  bytes: z.number().int().positive(),
+  faction: z.enum(['human', 'alien', 'neutral']).optional(),
+  lod: z
+    .object({
+      level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+      of: z.string(),
+    })
+    .optional(),
+  tags: z.array(z.string()).optional(),
+  credit: z.object({
+    license: z.enum(LICENSE_VALUES),
+    author: z.string().min(1),
+    title: z.string().min(1),
+    source: z.string().url().optional(),
+    usedFor: z.string().min(1),
+  }),
+});
+
+export type AssetEntry = z.infer<typeof assetEntrySchema>;
+
+export interface AssetManifest {
+  version: 1;
+  assets: AssetEntry[];
+}
+
+export class AssetManifestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AssetManifestError';
+  }
+}
+
+const topSchema = z.object({
+  version: z.literal(1),
+  assets: z.array(z.unknown()),
+});
+
+function extractId(raw: unknown): string {
+  if (typeof raw === 'object' && raw !== null && 'id' in raw) {
+    const value = (raw as { id?: unknown }).id;
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return '<unknown>';
+}
+
+export function parseAssetManifest(input: unknown): AssetManifest {
+  const top = topSchema.safeParse(input);
+  if (!top.success) {
+    throw new AssetManifestError(
+      `Invalid manifest: ${top.error.issues.map((issue) => issue.message).join('; ')}`,
+    );
+  }
+
+  const assets: AssetEntry[] = [];
+  for (const raw of top.data.assets) {
+    const id = extractId(raw);
+    const parsed = assetEntrySchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new AssetManifestError(`asset "${id}": ${issue?.message ?? 'invalid'}`);
+    }
+    assets.push(parsed.data);
+  }
+
+  const ids = new Set<string>();
+  const paths = new Set<string>();
+
+  for (const entry of assets) {
+    if (ids.has(entry.id)) {
+      throw new AssetManifestError(`asset "${entry.id}": duplicate id`);
+    }
+    ids.add(entry.id);
+
+    if (paths.has(entry.path)) {
+      throw new AssetManifestError(`asset "${entry.id}": duplicate path "${entry.path}"`);
+    }
+    paths.add(entry.path);
+
+    if (
+      !entry.path.startsWith('assets/') ||
+      entry.path.startsWith('/') ||
+      entry.path.split('/').includes('..')
+    ) {
+      throw new AssetManifestError(`asset "${entry.id}": invalid path`);
+    }
+
+    if (entry.credit.license.startsWith('CC-BY') && !entry.credit.source) {
+      throw new AssetManifestError(`asset "${entry.id}": CC-BY licence requires source`);
+    }
+
+    if (entry.credit.source && !entry.credit.source.startsWith('https://')) {
+      throw new AssetManifestError(`asset "${entry.id}": source must be an https URL`);
+    }
+  }
+
+  for (const entry of assets) {
+    if (entry.lod) {
+      if (entry.lod.of === entry.id) {
+        throw new AssetManifestError(`asset "${entry.id}": lod.of cannot point to itself`);
+      }
+      if (!ids.has(entry.lod.of)) {
+        throw new AssetManifestError(`asset "${entry.id}": lod.of "${entry.lod.of}" not found`);
+      }
+    }
+  }
+
+  return { version: 1, assets };
+}
+<<<END FILE>>>
+<<<FILE src/assets/registry.ts>>>
+import type { AssetEntry, AssetManifest, AssetKind } from './manifestSchema';
+
+export interface AssetFilter {
+  kind?: AssetKind;
+  faction?: 'human' | 'alien' | 'neutral';
+  tag?: string;
+}
+
+export class UnknownAssetError extends Error {
+  public readonly id: string;
+
+  constructor(id: string) {
+    super(`Unknown asset: ${id}`);
+    this.name = 'UnknownAssetError';
+    this.id = id;
+  }
+}
+
+export class AssetRegistry {
+  private readonly byId = new Map<string, AssetEntry>();
+
+  constructor(manifest: AssetManifest) {
+    for (const entry of manifest.assets) {
+      this.byId.set(entry.id, entry);
+    }
+  }
+
+  get(id: string): AssetEntry {
+    const entry = this.byId.get(id);
+    if (!entry) {
+      throw new UnknownAssetError(id);
+    }
+    return entry;
+  }
+
+  list(filter: AssetFilter = {}): AssetEntry[] {
+    return [...this.byId.values()].filter((entry) => {
+      if (filter.kind && entry.kind !== filter.kind) {
+        return false;
+      }
+      if (filter.faction && entry.faction !== filter.faction) {
+        return false;
+      }
+      if (filter.tag && !(entry.tags ?? []).includes(filter.tag)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  lodsOf(id: string): AssetEntry[] {
+    this.get(id);
+    return [...this.byId.values()]
+      .filter((entry) => entry.lod?.of === id)
+      .sort((a, b) => (a.lod?.level ?? 0) - (b.lod?.level ?? 0));
+  }
+}
+<<<END FILE>>>
+<<<FILE src/assets/loader.ts>>>
+import type { AssetEntry } from './manifestSchema';
+import type { AssetRegistry } from './registry';
+
+export type AssetDecoder<T> = (buffer: ArrayBuffer, entry: AssetEntry) => Promise<T>;
+
+export interface AssetDecoders<M, T, A> {
+  model: AssetDecoder<M>;
+  texture: AssetDecoder<T>;
+  audio: AssetDecoder<A>;
+}
+
+export type DecodedAsset<M, T, A> = M | T | A;
+
+export interface AssetLoaderOptions<M, T, A> {
+  registry: AssetRegistry;
+  fetchBytes: (url: string) => Promise<ArrayBuffer>;
+  decoders: AssetDecoders<M, T, A>;
+  baseUrl: string;
+  dispose?: (asset: DecodedAsset<M, T, A>) => void;
+}
+
+export interface PreloadProgress {
+  loaded: number;
+  total: number;
+  id: string;
+}
+
+interface CacheEntry<M, T, A> {
+  refCount: number;
+  resolved: boolean;
+  asset?: DecodedAsset<M, T, A>;
+  promise: Promise<DecodedAsset<M, T, A>>;
+}
+
+export class AssetLoadError extends Error {
+  public readonly id: string;
+  public override readonly cause: unknown;
+
+  constructor(id: string, cause: unknown) {
+    super(`Failed to load asset "${id}"`);
+    this.name = 'AssetLoadError';
+    this.id = id;
+    this.cause = cause;
+  }
+}
+
+export class AssetLoader<M = unknown, T = unknown, A = unknown> {
+  private readonly options: AssetLoaderOptions<M, T, A>;
+  private readonly cache = new Map<string, CacheEntry<M, T, A>>();
+
+  constructor(options: AssetLoaderOptions<M, T, A>) {
+    this.options = options;
+  }
+
+  load(id: string): Promise<DecodedAsset<M, T, A>> {
+    const entry = this.options.registry.get(id);
+    const existing = this.cache.get(id);
+    if (existing) {
+      existing.refCount += 1;
+      return existing.promise;
+    }
+
+    const cacheEntry: Partial<CacheEntry<M, T, A>> = {
+      refCount: 1,
+      resolved: false,
+    };
+
+    const promise = this.loadInternal(entry).then(
+      (asset) => {
+        cacheEntry.resolved = true;
+        cacheEntry.asset = asset;
+        return asset;
+      },
+      (error: unknown) => {
+        this.cache.delete(id);
+        if (error instanceof AssetLoadError) {
+          throw error;
+        }
+        throw new AssetLoadError(id, error);
+      },
+    );
+
+    cacheEntry.promise = promise;
+    this.cache.set(id, cacheEntry as CacheEntry<M, T, A>);
+    return promise;
+  }
+
+  release(id: string): void {
+    const entry = this.cache.get(id);
+    if (!entry) {
+      return;
+    }
+    entry.refCount -= 1;
+    if (entry.refCount > 0) {
+      return;
+    }
+    this.cache.delete(id);
+    if (entry.resolved) {
+      this.options.dispose?.(entry.asset as DecodedAsset<M, T, A>);
+    }
+  }
+
+  async preload(ids: readonly string[], onProgress?: (progress: PreloadProgress) => void): Promise<void> {
+    const total = ids.length;
+    let loaded = 0;
+    const failures: Array<{ id: string; error: unknown }> = [];
+
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          await this.load(id);
+        } catch (error) {
+          failures.push({ id, error });
+        } finally {
+          loaded += 1;
+          onProgress?.({ loaded, total, id });
+        }
+      }),
+    );
+
+    if (failures.length > 0) {
+      const message = `Failed to preload assets: ${failures.map((failure) => failure.id).join(', ')}`;
+      throw new AggregateError(
+        failures.map((failure) => failure.error),
+        message,
+      );
+    }
+  }
+
+  isCached(id: string): boolean {
+    return this.cache.has(id);
+  }
+
+  private async loadInternal(entry: AssetEntry): Promise<DecodedAsset<M, T, A>> {
+    const url = this.urlFor(entry);
+    const buffer = await this.options.fetchBytes(url);
+    if (buffer.byteLength !== entry.bytes) {
+      throw new Error(`size mismatch for ${entry.id}: expected ${entry.bytes}, got ${buffer.byteLength}`);
+    }
+
+    if (entry.kind === 'model') {
+      return this.options.decoders.model(buffer, entry);
+    }
+    if (entry.kind === 'texture') {
+      return this.options.decoders.texture(buffer, entry);
+    }
+    return this.options.decoders.audio(buffer, entry);
+  }
+
+  private urlFor(entry: AssetEntry): string {
+    const base = this.options.baseUrl.endsWith('/')
+      ? this.options.baseUrl
+      : `${this.options.baseUrl}/`;
+    return `${base}${entry.path}`;
+  }
+}
+<<<END FILE>>>
+<<<FILE src/assets/threeDecoders.ts>>>
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { AssetDecoders } from './loader';
+
+export function createThreeDecoders(): AssetDecoders<THREE.Object3D, THREE.Texture, ArrayBuffer> {
+  return {
+    model: async (buffer) => {
+      const loader = new GLTFLoader();
+      return new Promise<THREE.Object3D>((resolve, reject) => {
+        loader.parse(
+          buffer,
+          '',
+          (gltf) => {
+            resolve(gltf.scene);
+          },
+          (error) => {
+            reject(error);
+          },
+        );
+      });
+    },
+    texture: async (buffer) => {
+      const bitmap = await createImageBitmap(new Blob([buffer]));
+      const texture = new THREE.Texture(bitmap);
+      texture.needsUpdate = true;
+      return texture;
+    },
+    audio: async (buffer) => buffer,
+  };
+}
+
+export function fallbackModel(): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xff00ff }),
+  );
+  mesh.position.set(0, 1, 0);
+  return mesh;
+}
+<<<END FILE>>>
+<<<FILE src/data/unitSchema.ts>>>
+import { z } from 'zod';
+
+const weaponSchema = z.object({
+  id: z.string(),
+  damage: z.number().nonnegative(),
+  range: z.number().positive(),
+  reloadSec: z.number().positive(),
+  projectileSpeed: z.number().positive(),
+  accuracy: z.number().min(0).max(1),
+  splashRadius: z.number().nonnegative(),
+  targets: z.array(z.enum(['ground', 'air', 'structure'])).min(1),
+});
+
+export const unitRowSchema = z
+  .object({
+    id: z.string().regex(/^unit\.[a-z0-9]+(\.[a-z0-9_]+)+$/),
+    name: z.string(),
+    faction: z.enum(['human', 'alien']),
+    role: z.enum(['worker', 'scout', 'tank', 'artillery', 'support', 'air', 'structure']),
+    techLevel: z.number().int().nonnegative(),
+    cost: z.object({
+      ore: z.number().int().nonnegative(),
+      metal: z.number().int().nonnegative(),
+    }),
+    deliverySec: z.number().positive(),
+    hp: z.number().int().positive(),
+    armor: z.number().nonnegative(),
+    speed: z.object({
+      top: z.number().nonnegative(),
+      accel: z.number().nonnegative(),
+      turnDegPerSec: z.number().nonnegative(),
+    }),
+    turretTurnDegPerSec: z.number().nonnegative(),
+    weapons: z.array(weaponSchema),
+    fireOnMove: z.boolean(),
+    sightRange: z.number().positive(),
+    sensorRange: z.number(),
+    abilities: z.array(z.string()),
+    upgrades: z.array(z.enum(['fireRate', 'armor', 'stealth'])),
+    carryCapacity: z.number().int().nonnegative().optional(),
+    modelAssetId: z.string(),
+    source: z.object({
+      kind: z.enum(['placeholder', 'video', 'manual', 'tuned']),
+      ref: z.string().optional(),
+    }),
+  })
+  .superRefine((row, ctx) => {
+    if (row.sensorRange < row.sightRange) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sensorRange'],
+        message: 'sensorRange must be >= sightRange',
+      });
+    }
+    if (row.role === 'worker' && row.carryCapacity === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['carryCapacity'],
+        message: 'carryCapacity is required for workers',
+      });
+    }
+    if (row.source.kind !== 'placeholder' && !row.source.ref) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source', 'ref'],
+        message: 'source.ref is required unless source.kind is placeholder',
+      });
+    }
+  });
+
+export type UnitRow = z.infer<typeof unitRowSchema>;
+<<<END FILE>>>
+<<<FILE src/data/units.placeholder.json>>>
+[
+  {
+    "id": "unit.human.light_tank",
+    "name": "Light Tank",
+    "faction": "human",
+    "role": "tank",
+    "techLevel": 1,
+    "cost": { "ore": 100, "metal": 50 },
+    "deliverySec": 12.5,
+    "hp": 220,
+    "armor": 4,
+    "speed": { "top": 8, "accel": 4, "turnDegPerSec": 90 },
+    "turretTurnDegPerSec": 120,
+    "weapons": [
+      {
+        "id": "cannon",
+        "damage": 30,
+        "range": 12,
+        "reloadSec": 2.5,
+        "projectileSpeed": 40,
+        "accuracy": 0.85,
+        "splashRadius": 0.5,
+        "targets": ["ground", "structure"]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 14,
+    "sensorRange": 15,
+    "abilities": [],
+    "upgrades": ["fireRate", "armor"],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": { "kind": "placeholder" }
+  },
+  {
+    "id": "unit.alien.light_skimmer",
+    "name": "Light Skimmer",
+    "faction": "alien",
+    "role": "scout",
+    "techLevel": 1,
+    "cost": { "ore": 70, "metal": 30 },
+    "deliverySec": 9,
+    "hp": 120,
+    "armor": 1,
+    "speed": { "top": 12, "accel": 7, "turnDegPerSec": 140 },
+    "turretTurnDegPerSec": 180,
+    "weapons": [
+      {
+        "id": "pulse",
+        "damage": 12,
+        "range": 8,
+        "reloadSec": 1.2,
+        "projectileSpeed": 55,
+        "accuracy": 0.9,
+        "splashRadius": 0,
+        "targets": ["ground", "air"]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 12,
+    "sensorRange": 12,
+    "abilities": [],
+    "upgrades": ["fireRate", "stealth"],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": { "kind": "placeholder" }
+  }
+]
+<<<END FILE>>>
+<<<FILE src/data/dataRegistry.ts>>>
+import type { AssetRegistry } from '../assets/registry';
+import { unitRowSchema, type UnitRow } from './unitSchema';
+
+export class UnitDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnitDataError';
+  }
+}
+
+export function loadUnitTable(json: unknown, assetRegistry: AssetRegistry): ReadonlyMap<string, UnitRow> {
+  if (!Array.isArray(json)) {
+    throw new UnitDataError('Unit table must be an array');
+  }
+
+  const table = new Map<string, UnitRow>();
+
+  for (const [index, raw] of json.entries()) {
+    const parsed = unitRowSchema.safeParse(raw);
+    if (!parsed.success) {
+      const id =
+        typeof raw === 'object' && raw !== null && 'id' in raw
+          ? String((raw as { id?: unknown }).id)
+          : `row ${index}`;
+      throw new UnitDataError(`${id}: ${parsed.error.issues[0]?.message ?? 'invalid row'}`);
+    }
+
+    const row = parsed.data;
+    if (table.has(row.id)) {
+      throw new UnitDataError(`${row.id}: duplicate id`);
+    }
+
+    try {
+      assetRegistry.get(row.modelAssetId);
+    } catch {
+      throw new UnitDataError(`${row.id}: missing model asset ${row.modelAssetId}`);
+    }
+
+    table.set(row.id, row);
+  }
+
+  return table;
+}
+
+export function placeholderReport(table: ReadonlyMap<string, UnitRow>): string[] {
+  return [...table.values()]
+    .filter((row) => row.source.kind === 'placeholder')
+    .map((row) => row.id)
+    .sort();
+}
+<<<END FILE>>>
+<<<FILE src/platform/kv.ts>>>
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Preferences } from '@capacitor/preferences';
+
+export interface KvStore {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+  keys(): Promise<string[]>;
+}
+
+export class StorageFullError extends Error {
+  constructor(message = 'Storage is full') {
+    super(message);
+    this.name = 'StorageFullError';
+  }
+}
+
+export class MemoryKvStore implements KvStore {
+  private readonly data = new Map<string, string>();
+
+  async get(key: string): Promise<string | null> {
+    return this.data.get(key) ?? null;
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    this.data.set(key, value);
+  }
+
+  async remove(key: string): Promise<void> {
+    this.data.delete(key);
+  }
+
+  async keys(): Promise<string[]> {
+    return [...this.data.keys()].sort();
+  }
+}
+
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return (
+      error.name === 'QuotaExceededError' || error.message.toLowerCase().includes('quota')
+    );
+  }
+  return false;
+}
+
+export class WebKvStore implements KvStore {
+  private readonly storage: Storage;
+
+  constructor(storage?: Storage) {
+    this.storage = storage ?? globalThis.localStorage;
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.storage.getItem(key);
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    try {
+      this.storage.setItem(key, value);
+    } catch (error) {
+      if (isQuotaError(error)) {
+        throw new StorageFullError();
+      }
+      throw error;
+    }
+  }
+
+  async remove(key: string): Promise<void> {
+    this.storage.removeItem(key);
+  }
+
+  async keys(): Promise<string[]> {
+    const result: string[] = [];
+    for (let i = 0; i < this.storage.length; i += 1) {
+      const key = this.storage.key(i);
+      if (key !== null) {
+        result.push(key);
+      }
+    }
+    return result;
+  }
+}
+
+const SETTINGS_PREFIX = 'setting.';
+
+export class NativeKvStore implements KvStore {
+  async get(key: string): Promise<string | null> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      const result = await Preferences.get({ key });
+      return result.value;
+    }
+    try {
+      const result = await Filesystem.readFile({
+        path: `saves/${key}.json`,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      return typeof result.data === 'string' ? result.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      await Preferences.set({ key, value });
+      return;
+    }
+    await Filesystem.writeFile({
+      path: `saves/${key}.json`,
+      directory: Directory.Data,
+      data: value,
+      encoding: Encoding.UTF8,
+    });
+  }
+
+  async remove(key: string): Promise<void> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      await Preferences.remove({ key });
+      return;
+    }
+    try {
+      await Filesystem.deleteFile({
+        path: `saves/${key}.json`,
+        directory: Directory.Data,
+      });
+    } catch {
+      return;
+    }
+  }
+
+  async keys(): Promise<string[]> {
+    if (!Capacitor.isNativePlatform()) {
+      return [];
+    }
+
+    const result: string[] = [];
+    try {
+      const listing = await Filesystem.readdir({
+        path: 'saves',
+        directory: Directory.Data,
+      });
+      const entries = listing.files as unknown as Array<string | { name: string }>;
+      for (const entry of entries) {
+        const name = typeof entry === 'string' ? entry : entry.name;
+        if (name.endsWith('.json')) {
+          result.push(name.slice(0, -5));
+        }
+      }
+    } catch {
+      // The saves directory may not exist yet.
+    }
+
+    const preferences = await Preferences.keys();
+    result.push(...preferences.keys);
+    return result;
+  }
+}
+
+export function createKvStore(): KvStore {
+  return Capacitor.isNativePlatform() ? new NativeKvStore() : new WebKvStore();
+}
+<<<END FILE>>>
+<<<FILE src/platform/saves.ts>>>
+import type { WorldState } from '../sim/world';
+import { canonicalJson, fnv1aHex } from '../sim/world';
+import type { KvStore } from './kv';
+import { StorageFullError } from './kv';
+
+export interface SaveMeta {
+  gameVersion: string;
+  savedAtIso: string;
+}
+
+export type DecodeFailureReason = 'corrupt' | 'checksum' | 'incompatible' | 'not-a-save';
+
+export type DecodeSaveResult =
+  | { ok: true; world: WorldState; meta: SaveMeta }
+  | { ok: false; reason: DecodeFailureReason };
+
+export interface LoadedSave {
+  world: WorldState;
+  meta: SaveMeta;
+}
+
+export const CURRENT_SAVE_SCHEMA = 1;
+export const migrations: Record<number, (payload: unknown) => unknown> = {};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isWorldState(value: unknown): value is WorldState {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.tick === 'number' &&
+    Number.isInteger(value.tick) &&
+    typeof value.seed === 'number' &&
+    Number.isFinite(value.seed) &&
+    typeof value.rngState === 'number' &&
+    Number.isFinite(value.rngState) &&
+    typeof value.counter === 'number' &&
+    Number.isFinite(value.counter)
+  );
+}
+
+export function encodeSave(world: WorldState, meta: SaveMeta): string {
+  const payload: WorldState = {
+    tick: world.tick,
+    seed: world.seed,
+    rngState: world.rngState,
+    counter: world.counter,
+  };
+  const checksum = fnv1aHex(canonicalJson(payload));
+  return JSON.stringify({
+    format: 'tcsave',
+    schema: CURRENT_SAVE_SCHEMA,
+    gameVersion: meta.gameVersion,
+    savedAtIso: meta.savedAtIso,
+    checksum,
+    payload,
+  });
+}
+
+export function decodeSave(text: string): DecodeSaveResult {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!isRecord(parsed)) {
+      return { ok: false, reason: 'not-a-save' };
+    }
+    if (parsed.format !== 'tcsave') {
+      return { ok: false, reason: 'not-a-save' };
+    }
+
+    const schema = parsed.schema;
+    if (typeof schema !== 'number' || !Number.isInteger(schema)) {
+      return { ok: false, reason: 'corrupt' };
+    }
+    if (schema > CURRENT_SAVE_SCHEMA) {
+      return { ok: false, reason: 'incompatible' };
+    }
+
+    let payload: unknown = parsed.payload;
+    let version = schema;
+    while (version < CURRENT_SAVE_SCHEMA) {
+      const migrate = migrations[version];
+      if (!migrate) {
+        return { ok: false, reason: 'incompatible' };
+      }
+      payload = migrate(payload);
+      version += 1;
+    }
+
+    const checksum = parsed.checksum;
+    if (typeof checksum !== 'string') {
+      return { ok: false, reason: 'corrupt' };
+    }
+    if (fnv1aHex(canonicalJson(payload)) !== checksum) {
+      return { ok: false, reason: 'checksum' };
+    }
+
+    if (!isWorldState(payload)) {
+      return { ok: false, reason: 'corrupt' };
+    }
+
+    const gameVersion = parsed.gameVersion;
+    const savedAtIso = parsed.savedAtIso;
+    if (typeof gameVersion !== 'string' || typeof savedAtIso !== 'string') {
+      return { ok: false, reason: 'corrupt' };
+    }
+
+    return {
+      ok: true,
+      world: payload,
+      meta: { gameVersion, savedAtIso },
+    };
+  } catch {
+    return { ok: false, reason: 'corrupt' };
+  }
+}
+
+export interface SaveManagerOptions {
+  maxBytes?: number;
+  gameVersion?: string;
+  now?: () => Date;
+}
+
+const encoder = new TextEncoder();
+
+function byteLength(text: string): number {
+  return encoder.encode(text).byteLength;
+}
+
+export class SaveManager {
+  private readonly kv: KvStore;
+  private readonly maxBytes: number;
+  private readonly gameVersion: string;
+  private readonly now: () => Date;
+  private readonly bytes = new Map<string, number>();
+  private totalBytes = 0;
+  private loaded = false;
+  private autoCursor = 0;
+  private lastAutoSlot: string | null = null;
+
+  constructor(kv: KvStore, options: SaveManagerOptions = {}) {
+    this.kv = kv;
+    this.maxBytes = options.maxBytes ?? 5 * 1024 * 1024;
+    this.gameVersion = options.gameVersion ?? '0.1.0';
+    this.now = options.now ?? (() => new Date());
+  }
+
+  async save(slot: string, world: WorldState): Promise<void> {
+    await this.ensureLoaded();
+    const text = encodeSave(world, {
+      gameVersion: this.gameVersion,
+      savedAtIso: this.now().toISOString(),
+    });
+    const key = this.key(slot);
+    const size = byteLength(text);
+    const previous = this.bytes.get(key) ?? 0;
+
+    if (this.totalBytes - previous + size > this.maxBytes) {
+      throw new StorageFullError();
+    }
+
+    await this.kv.set(key, text);
+    this.bytes.set(key, size);
+    this.totalBytes = this.totalBytes - previous + size;
+  }
+
+  async load(slot: string): Promise<LoadedSave | null> {
+    const text = await this.kv.get(this.key(slot));
+    if (text === null) {
+      return null;
+    }
+    const decoded = decodeSave(text);
+    if (!decoded.ok) {
+      throw new Error(`Cannot load save "${slot}": ${decoded.reason}`);
+    }
+    return { world: decoded.world, meta: decoded.meta };
+  }
+
+  async listSlots(): Promise<string[]> {
+    await this.ensureLoaded();
+    return [...this.bytes.keys()]
+      .filter((key) => key.startsWith('save:'))
+      .map((key) => key.slice('save:'.length))
+      .sort();
+  }
+
+  async autosave(world: WorldState): Promise<void> {
+    await this.ensureLoaded();
+    const slot = `auto-${this.autoCursor % 3}`;
+    await this.save(slot, world);
+    this.lastAutoSlot = slot;
+    this.autoCursor = (this.autoCursor + 1) % 3;
+  }
+
+  async latestAutosave(): Promise<LoadedSave | null> {
+    await this.ensureLoaded();
+    const slots = (await this.listSlots()).filter((slot) => slot.startsWith('auto-'));
+    const first = slots[0];
+    if (!first) {
+      return null;
+    }
+
+    if (this.lastAutoSlot && slots.includes(this.lastAutoSlot)) {
+      return this.load(this.lastAutoSlot);
+    }
+
+    let latestSlot = first;
+    let latestIso = '';
+    for (const slot of slots) {
+      const loaded = await this.load(slot);
+      if (loaded && loaded.meta.savedAtIso > latestIso) {
+        latestIso = loaded.meta.savedAtIso;
+        latestSlot = slot;
+      }
+    }
+    return this.load(latestSlot);
+  }
+
+  private key(slot: string): string {
+    return `save:${slot}`;
+  }
+
+  private async ensureLoaded(): Promise<void> {
+    if (this.loaded) {
+      return;
+    }
+    this.loaded = true;
+    this.totalBytes = 0;
+    this.bytes.clear();
+    const keys = await this.kv.keys();
+    for (const key of keys) {
+      const text = await this.kv.get(key);
+      if (text !== null) {
+        const size = byteLength(text);
+        this.bytes.set(key, size);
+        this.totalBytes += size;
+      }
+    }
+  }
+}
+<<<END FILE>>>
+<<<FILE src/platform/lifecycle.ts>>>
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+
+export type LifecycleEventName = 'pause' | 'resume' | 'back';
+
+export interface LifecycleSource {
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener?(type: string, listener: () => void): void;
+  isHidden(): boolean;
+}
+
+export class Lifecycle {
+  private readonly listeners = new Map<LifecycleEventName, Set<() => void>>();
+  private paused = false;
+  private readonly source: LifecycleSource;
+
+  constructor(source: LifecycleSource) {
+    this.source = source;
+    source.addEventListener('visibilitychange', this.onVisibility);
+    source.addEventListener('pause', this.onPause);
+    source.addEventListener('resume', this.onResume);
+    source.addEventListener('backButton', this.onBackButton);
+  }
+
+  on(event: LifecycleEventName, listener: () => void): () => void {
+    const set = this.listeners.get(event) ?? new Set<() => void>();
+    set.add(listener);
+    this.listeners.set(event, set);
+    return () => {
+      set.delete(listener);
+    };
+  }
+
+  destroy(): void {
+    this.source.removeEventListener?.('visibilitychange', this.onVisibility);
+    this.source.removeEventListener?.('pause', this.onPause);
+    this.source.removeEventListener?.('resume', this.onResume);
+    this.source.removeEventListener?.('backButton', this.onBackButton);
+  }
+
+  private emit(event: LifecycleEventName): void {
+    for (const listener of this.listeners.get(event) ?? []) {
+      listener();
+    }
+  }
+
+  private readonly onVisibility = (): void => {
+    if (this.source.isHidden()) {
+      this.handlePause();
+    } else {
+      this.handleResume();
+    }
+  };
+
+  private readonly onPause = (): void => {
+    this.handlePause();
+  };
+
+  private readonly onResume = (): void => {
+    this.handleResume();
+  };
+
+  private readonly onBackButton = (): void => {
+    this.handlePause();
+    this.emit('back');
+  };
+
+  private handlePause(): void {
+    if (this.paused) {
+      return;
+    }
+    this.paused = true;
+    this.emit('pause');
+  }
+
+  private handleResume(): void {
+    if (!this.paused) {
+      return;
+    }
+    this.paused = false;
+    this.emit('resume');
+  }
+}
+
+export function bindLifecycleToBrowserAndCapacitor(): Lifecycle {
+  const source: LifecycleSource = {
+    addEventListener: (type, listener) => {
+      if (type === 'visibilitychange') {
+        document.addEventListener(type, listener);
+        return;
+      }
+      if (type === 'pause' || type === 'resume' || type === 'backButton') {
+        if (!Capacitor.isNativePlatform()) {
+          return;
+        }
+        if (type === 'pause') {
+          void App.addListener('pause', () => listener());
+        } else if (type === 'resume') {
+          void App.addListener('resume', () => listener());
+        } else {
+          void App.addListener('backButton', () => listener());
+        }
+      }
+    },
+    removeEventListener: (type, listener) => {
+      if (type === 'visibilitychange') {
+        document.removeEventListener(type, listener);
+      }
+    },
+    isHidden: () => document.hidden,
+  };
+
+  return new Lifecycle(source);
+}
+<<<END FILE>>>
+<<<FILE src/platform/watchdog.ts>>>
+export type WatchdogChannel = 'sim' | 'render';
+
+export interface WatchdogReport {
+  channel: WatchdogChannel;
+  stalledMs: number;
+  lastBeats: Record<WatchdogChannel, number>;
+}
+
+export interface WatchdogOptions {
+  now: () => number;
+  freezeMs?: number;
+  recoverMs?: number;
+  onFreeze: (report: WatchdogReport) => void;
+  onRecover: (report: WatchdogReport) => void;
+}
+
+interface ChannelState {
+  lastBeat: number;
+  freezeFired: boolean;
+  recoverFired: boolean;
+}
+
+export class Watchdog {
+  private readonly opts: WatchdogOptions;
+  private readonly freezeMs: number;
+  private readonly recoverMs: number;
+  private readonly states: Record<WatchdogChannel, ChannelState>;
+  private suspended = false;
+
+  constructor(opts: WatchdogOptions) {
+    this.opts = opts;
+    this.freezeMs = opts.freezeMs ?? 2000;
+    this.recoverMs = opts.recoverMs ?? 5000;
+    const now = opts.now();
+    this.states = {
+      sim: { lastBeat: now, freezeFired: false, recoverFired: false },
+      render: { lastBeat: now, freezeFired: false, recoverFired: false },
+    };
+  }
+
+  beat(channel: WatchdogChannel): void {
+    const state = this.states[channel];
+    state.lastBeat = this.opts.now();
+    state.freezeFired = false;
+    state.recoverFired = false;
+  }
+
+  setSuspended(suspended: boolean): void {
+    this.suspended = suspended;
+    if (!suspended) {
+      const now = this.opts.now();
+      for (const channel of ['sim', 'render'] as const) {
+        const state = this.states[channel];
+        state.lastBeat = now;
+        state.freezeFired = false;
+        state.recoverFired = false;
+      }
+    }
+  }
+
+  check(): void {
+    if (this.suspended) {
+      return;
+    }
+
+    const now = this.opts.now();
+    const stalled = (['sim', 'render'] as const).map((channel) => {
+      const state = this.states[channel];
+      return {
+        channel,
+        state,
+        stalledMs: now - state.lastBeat,
+      };
+    });
+
+    const freeze = stalled.find(
+      (item) => item.stalledMs >= this.freezeMs && !item.state.freezeFired,
+    );
+    if (freeze) {
+      for (const item of stalled) {
+        if (item.stalledMs >= this.freezeMs) {
+          item.state.freezeFired = true;
+        }
+      }
+      this.opts.onFreeze({
+        channel: freeze.channel,
+        stalledMs: freeze.stalledMs,
+        lastBeats: {
+          sim: this.states.sim.lastBeat,
+          render: this.states.render.lastBeat,
+        },
+      });
+    }
+
+    const recover = stalled.find(
+      (item) => item.stalledMs >= this.recoverMs && !item.state.recoverFired,
+    );
+    if (recover) {
+      for (const item of stalled) {
+        if (item.stalledMs >= this.recoverMs) {
+          item.state.recoverFired = true;
+        }
+      }
+      this.opts.onRecover({
+        channel: recover.channel,
+        stalledMs: recover.stalledMs,
+        lastBeats: {
+          sim: this.states.sim.lastBeat,
+          render: this.states.render.lastBeat,
+        },
+      });
+    }
+  }
+}
+
+export interface CapturedError {
+  message: string;
+  stack?: string;
+  kind: 'error' | 'unhandledrejection';
+}
+
+export interface ErrorTarget {
+  addEventListener(type: string, listener: (event: Event) => void): void;
+  removeEventListener?(type: string, listener: (event: Event) => void): void;
+}
+
+export function installGlobalErrorCapture(
+  target: ErrorTarget,
+  onError: (error: CapturedError) => void,
+): () => void {
+  const errorHandler = (event: Event): void => {
+    const errorEvent = event as ErrorEvent;
+    const error = errorEvent.error;
+    onError({
+      message: errorEvent.message || (error instanceof Error ? error.message : 'Unknown error'),
+      stack: error instanceof Error ? error.stack : undefined,
+      kind: 'error',
+    });
+  };
+
+  const rejectionHandler = (event: Event): void => {
+    const rejection = event as PromiseRejectionEvent;
+    const reason = rejection.reason;
+    const error = reason instanceof Error ? reason : undefined;
+    onError({
+      message: error?.message ?? String(reason),
+      stack: error?.stack,
+      kind: 'unhandledrejection',
+    });
+  };
+
+  target.addEventListener('error', errorHandler);
+  target.addEventListener('unhandledrejection', rejectionHandler);
+
+  return () => {
+    target.removeEventListener?.('error', errorHandler);
+    target.removeEventListener?.('unhandledrejection', rejectionHandler);
+  };
+}
+<<<END FILE>>>
+<<<FILE src/render/renderer.ts>>>
+import * as THREE from 'three';
+import { AssetLoader } from '../assets/loader';
+import type { AssetRegistry } from '../assets/registry';
+import { createThreeDecoders, fallbackModel } from '../assets/threeDecoders';
+
+const TANK_ASSET_ID = 'unit.human.poc_tank';
+
+export interface RenderStats {
+  loadedModels: string[];
+  meshCount: number;
+  drawCalls: number;
+  frame: number;
+}
+
+export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    powerPreference: 'high-performance',
+  });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  return renderer;
+}
+
+export class RenderView {
+  private readonly renderer: THREE.WebGLRenderer;
+  private readonly scene = new THREE.Scene();
+  private readonly camera: THREE.PerspectiveCamera;
+  private readonly observer: ResizeObserver;
+  private readonly loader: AssetLoader<THREE.Object3D, THREE.Texture, ArrayBuffer>;
+  private readonly loadedModels: string[] = [];
+  private frame = 0;
+  private disposed = false;
+
+  constructor(canvas: HTMLCanvasElement, registry: AssetRegistry) {
+    this.renderer = createRenderer(canvas);
+    this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+    this.camera.position.set(35, 40, 35);
+    this.camera.lookAt(0, 0, 0);
+
+    this.scene.background = new THREE.Color('#090D16');
+    this.buildScene();
+
+    this.observer = new ResizeObserver(() => {
+      this.resize(canvas);
+    });
+    this.observer.observe(canvas);
+    this.resize(canvas);
+
+    const baseUrl = new URL('.', document.baseURI).toString();
+    this.loader = new AssetLoader<THREE.Object3D, THREE.Texture, ArrayBuffer>({
+      registry,
+      baseUrl,
+      decoders: createThreeDecoders(),
+      fetchBytes: async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} for ${url}`);
+        }
+        return response.arrayBuffer();
+      },
+    });
+
+    void this.loadTank();
+  }
+
+  render(alpha: number): void {
+    void alpha;
+    this.frame += 1;
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  stats(): RenderStats {
+    let meshCount = 0;
+    this.scene.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        meshCount += 1;
+      }
+    });
+    return {
+      loadedModels: [...this.loadedModels],
+      meshCount,
+      drawCalls: this.renderer.info.render.calls,
+      frame: this.frame,
+    };
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.observer.disconnect();
+    this.renderer.dispose();
+  }
+
+  private buildScene(): void {
+    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x223322, 1.2);
+    this.scene.add(hemisphere);
+
+    const directional = new THREE.DirectionalLight(0xffffff, 2.2);
+    directional.position.set(30, 50, 20);
+    directional.castShadow = true;
+    directional.shadow.mapSize.set(2048, 2048);
+    directional.shadow.camera.left = -100;
+    directional.shadow.camera.right = 100;
+    directional.shadow.camera.top = 100;
+    directional.shadow.camera.bottom = -100;
+    this.scene.add(directional);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshStandardMaterial({ color: 0x24302a }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+  }
+
+  private resize(canvas: HTMLCanvasElement): void {
+    const width = Math.max(1, canvas.clientWidth);
+    const height = Math.max(1, canvas.clientHeight);
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+  }
+
+  private async loadTank(): Promise<void> {
+    try {
+      const asset = await this.loader.load(TANK_ASSET_ID);
+      if (this.disposed) {
+        return;
+      }
+      if (asset instanceof THREE.Object3D) {
+        this.scene.add(asset);
+        this.loadedModels.push(TANK_ASSET_ID);
+      } else {
+        this.scene.add(fallbackModel());
+      }
+    } catch {
+      if (!this.disposed) {
+        this.scene.add(fallbackModel());
+      }
+    }
+  }
+}
+<<<END FILE>>>
+<<<FILE src/ui/controls.ts>>>
+const registered = new Set<string>();
+
+export const ControlInventory = {
+  all(): string[] {
+    return [...registered].sort();
+  },
+  clear(): void {
+    registered.clear();
+  },
+};
+
+export function button(
+  screenId: string,
+  name: string,
+  label: string,
+  onClick: () => void,
+): HTMLButtonElement {
+  const id = `${screenId}.${name}`;
+  registered.add(id);
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.textContent = label;
+  element.dataset.controlId = id;
+  element.addEventListener('click', () => {
+    onClick();
+  });
+  return element;
+}
+<<<END FILE>>>
+<<<FILE src/ui/router.ts>>>
+export type ScreenId =
+  | 'title'
+  | 'campaignSelect'
+  | 'missionSelect'
+  | 'briefing'
+  | 'skirmishSetup'
+  | 'loading'
+  | 'inGame'
+  | 'pause'
+  | 'settings'
+  | 'help'
+  | 'objectives'
+  | 'results'
+  | 'credits'
+  | 'bugReport'
+  | 'recovery';
+
+export interface RendererHandle {
+  error: string | null;
+  dispose: () => void;
+}
+
+export interface ScreenContext {
+  router: ScreenRouter;
+  go: (id: ScreenId) => void;
+  attachRenderer: (canvas: HTMLCanvasElement) => RendererHandle;
+}
+
+export interface ScreenModule {
+  id: ScreenId;
+  mount(root: HTMLElement, ctx: ScreenContext): () => void;
+}
+
+interface MountedScreen {
+  id: ScreenId;
+  el: HTMLDivElement;
+  unmount: () => void;
+}
+
+const OVERLAY_IDS = new Set<ScreenId>(['pause', 'objectives', 'help', 'recovery', 'bugReport']);
+
+const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
+  title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help'],
+  campaignSelect: ['title', 'missionSelect'],
+  missionSelect: ['campaignSelect', 'briefing'],
+  briefing: ['missionSelect', 'loading'],
+  skirmishSetup: ['title', 'loading'],
+  loading: ['inGame', 'title'],
+  inGame: ['pause', 'objectives', 'help', 'bugReport', 'recovery', 'results', 'title'],
+  pause: ['settings', 'bugReport', 'title', 'inGame'],
+  settings: ['title', 'pause', 'inGame'],
+  help: ['title', 'inGame'],
+  objectives: ['inGame'],
+  results: ['title', 'missionSelect'],
+  credits: ['title'],
+  bugReport: ['title', 'inGame', 'pause'],
+  recovery: ['inGame', 'title'],
+};
+
+const PARENT: Partial<Record<ScreenId, ScreenId>> = {
+  campaignSelect: 'title',
+  missionSelect: 'campaignSelect',
+  briefing: 'missionSelect',
+  skirmishSetup: 'title',
+  loading: 'title',
+  settings: 'title',
+  help: 'title',
+  objectives: 'inGame',
+  results: 'title',
+  credits: 'title',
+  bugReport: 'inGame',
+  recovery: 'inGame',
+  pause: 'inGame',
+};
+
+export class ScreenRouter {
+  private readonly root: HTMLElement;
+  private readonly screens: Record<ScreenId, ScreenModule>;
+  private readonly contextFactory: (router: ScreenRouter) => ScreenContext;
+  private context: ScreenContext | null = null;
+  private base: MountedScreen | null = null;
+  private overlays: MountedScreen[] = [];
+
+  constructor(
+    root: HTMLElement,
+    screens: Record<ScreenId, ScreenModule>,
+    contextFactory: (router: ScreenRouter) => ScreenContext,
+  ) {
+    this.root = root;
+    this.screens = screens;
+    this.contextFactory = contextFactory;
+  }
+
+  start(id: ScreenId = 'title'): void {
+    this.mountBase(id);
+  }
+
+  current(): ScreenId {
+    return this.overlays.at(-1)?.id ?? this.base?.id ?? 'title';
+  }
+
+  go(id: ScreenId): void {
+    const current = this.current();
+    if (id === current) {
+      return;
+    }
+
+    const overlay = this.isOverlayTarget(id, current);
+    if (!this.canGo(current, id)) {
+      this.reject(id);
+      return;
+    }
+
+    if (overlay) {
+      this.mountOverlay(id);
+    } else {
+      this.mountBase(id);
+    }
+  }
+
+  back(): void {
+    if (this.overlays.length > 0) {
+      this.popOverlay();
+      return;
+    }
+    if (!this.base) {
+      return;
+    }
+    if (this.base.id === 'inGame') {
+      this.go('pause');
+      return;
+    }
+    const parent = PARENT[this.base.id];
+    if (parent) {
+      this.go(parent);
+    }
+  }
+
+  private isOverlayTarget(id: ScreenId, current: ScreenId): boolean {
+    if (id === 'settings') {
+      return current === 'pause' && this.base?.id === 'inGame';
+    }
+    return OVERLAY_IDS.has(id) && this.base?.id === 'inGame';
+  }
+
+  private canGo(from: ScreenId, to: ScreenId): boolean {
+    return ALLOWED[from].includes(to);
+  }
+
+  private reject(id: ScreenId): void {
+    const message = `Screen transition not allowed: ${id}`;
+    if (import.meta.env.DEV) {
+      throw new Error(message);
+    }
+    console.warn(message);
+  }
+
+  private mountBase(id: ScreenId): void {
+    for (const overlay of [...this.overlays].reverse()) {
+      this.unmountScreen(overlay);
+    }
+    this.overlays = [];
+    if (this.base) {
+      this.unmountScreen(this.base);
+    }
+    const mounted = this.createScreen(id, false);
+    mounted.el.style.visibility = 'visible';
+    this.base = mounted;
+  }
+
+  private mountOverlay(id: ScreenId): void {
+    const top = this.currentMounted();
+    if (top) {
+      top.el.style.visibility = 'hidden';
+    }
+    const mounted = this.createScreen(id, true);
+    mounted.el.style.visibility = 'visible';
+    this.overlays.push(mounted);
+  }
+
+  private popOverlay(): void {
+    const mounted = this.overlays.pop();
+    if (!mounted) {
+      return;
+    }
+    this.unmountScreen(mounted);
+    const top = this.currentMounted();
+    if (top) {
+      top.el.style.visibility = 'visible';
+    }
+  }
+
+  private currentMounted(): MountedScreen | null {
+    return this.overlays.at(-1) ?? this.base;
+  }
+
+  private createScreen(id: ScreenId, overlay: boolean): MountedScreen {
+    const el = document.createElement('div');
+    el.className = `screen screen-${id}${overlay ? ' overlay' : ''}`;
+    el.dataset.screenId = id;
+    this.root.append(el);
+    const screen = this.screens[id];
+    const unmount = screen.mount(el, this.ensureContext());
+    return { id, el, unmount };
+  }
+
+  private unmountScreen(mounted: MountedScreen): void {
+    mounted.unmount();
+    mounted.el.remove();
+  }
+
+  private ensureContext(): ScreenContext {
+    if (!this.context) {
+      this.context = this.contextFactory(this);
+    }
+    return this.context;
+  }
+}
+<<<END FILE>>>
+<<<FILE src/ui/screens.ts>>>
+import { button } from './controls';
+import type { ScreenContext, ScreenId, ScreenModule } from './router';
+
+type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
+
+function makeScreen(id: ScreenId, title: string, build?: Build): ScreenModule {
+  return {
+    id,
+    mount(root, ctx) {
+      root.replaceChildren();
+      const heading = document.createElement('h1');
+      heading.textContent = title;
+      root.append(heading);
+      const cleanup = build?.(root, ctx);
+      return () => {
+        cleanup?.();
+        root.replaceChildren();
+      };
+    },
+  };
+}
+
+function addButton(
+  root: HTMLElement,
+  screenId: string,
+  name: string,
+  label: string,
+  onClick: () => void,
+): void {
+  root.append(button(screenId, name, label, onClick));
+}
+
+function emit(name: string): void {
+  window.dispatchEvent(new CustomEvent(`tc:${name}`));
+}
+
+export function createScreens(): Record<ScreenId, ScreenModule> {
+  const screens: Record<ScreenId, ScreenModule> = {
+    title: makeScreen('title', 'TankCommand', (root, ctx) => {
+      addButton(root, 'title', 'campaign', 'Campaign', () => {
+        ctx.go('campaignSelect');
+      });
+      addButton(root, 'title', 'skirmish', 'Skirmish', () => {
+        ctx.go('skirmishSetup');
+      });
+      addButton(root, 'title', 'settings', 'Settings', () => {
+        ctx.go('settings');
+      });
+      addButton(root, 'title', 'credits', 'Credits', () => {
+        ctx.go('credits');
+      });
+      addButton(root, 'title', 'help', 'Help', () => {
+        ctx.go('help');
+      });
+    }),
+
+    campaignSelect: makeScreen('campaignSelect', 'Campaign'),
+
+    missionSelect: makeScreen('missionSelect', 'Select Mission'),
+
+    briefing: makeScreen('briefing', 'Briefing'),
+
+    skirmishSetup: makeScreen('skirmishSetup', 'Skirmish Setup', (root, ctx) => {
+      addButton(root, 'skirmishSetup', 'start', 'Start', () => {
+        ctx.go('loading');
+      });
+    }),
+
+    loading: makeScreen('loading', 'Loading', (_root, ctx) => {
+      const timer = window.setTimeout(() => {
+        ctx.go('inGame');
+      }, 200);
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }),
+
+    inGame: makeScreen('inGame', 'In Game', (root, ctx) => {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'game-canvas';
+      root.append(canvas);
+      const handle = ctx.attachRenderer(canvas);
+      if (handle.error) {
+        canvas.remove();
+        const message = document.createElement('p');
+        message.textContent = handle.error;
+        root.append(message);
+      }
+      addButton(root, 'inGame', 'pause', 'Pause', () => {
+        ctx.go('pause');
+      });
+      return () => {
+        handle.dispose();
+      };
+    }),
+
+    pause: makeScreen('pause', 'Paused', (root, ctx) => {
+      addButton(root, 'pause', 'resume', 'Resume', () => {
+        ctx.router.back();
+      });
+      addButton(root, 'pause', 'settings', 'Settings', () => {
+        ctx.go('settings');
+      });
+      addButton(root, 'pause', 'bugReport', 'Report bug', () => {
+        ctx.go('bugReport');
+      });
+      addButton(root, 'pause', 'quit', 'Quit to title', () => {
+        ctx.go('title');
+      });
+    }),
+
+    settings: makeScreen('settings', 'Settings', (root, ctx) => {
+      addButton(root, 'settings', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    help: makeScreen('help', 'Help', (root, ctx) => {
+      addButton(root, 'help', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    objectives: makeScreen('objectives', 'Objectives'),
+
+    results: makeScreen('results', 'Results'),
+
+    credits: makeScreen('credits', 'Credits', (root, ctx) => {
+      const text = document.createElement('pre');
+      text.className = 'credits-text';
+      text.textContent = 'Loading credits...';
+      root.append(text);
+      let cancelled = false;
+      void Promise.resolve()
+        .then(() => fetch('./CREDITS.md'))
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.text();
+        })
+        .then((content) => {
+          if (!cancelled) {
+            text.textContent = content;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            text.textContent = 'Credits are unavailable in this environment.';
+          }
+        });
+      addButton(root, 'credits', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+      return () => {
+        cancelled = true;
+      };
+    }),
+
+    bugReport: makeScreen('bugReport', 'Report Bug', (root, ctx) => {
+      addButton(root, 'bugReport', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    recovery: makeScreen('recovery', 'Recovery', (root) => {
+      addButton(root, 'recovery', 'resume', 'Resume', () => {
+        emit('recovery-resume');
+      });
+      addButton(root, 'recovery', 'loadAutosave', 'Load autosave', () => {
+        emit('recovery-load-autosave');
+      });
+      addButton(root, 'recovery', 'reportBug', 'Send bug report & return to menu', () => {
+        emit('recovery-report-bug');
+      });
+    }),
+  };
+
+  return screens;
+}
+<<<END FILE>>>
+<<<FILE src/ui/styles.css>>>
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #090d16;
+  color: #e8edf5;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font-size: 14px;
+}
+
+#app {
+  position: relative;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #090d16;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  overflow: auto;
+}
+
+.screen.overlay {
+  z-index: 10;
+  background: rgba(9, 13, 22, 0.98);
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #ffffff;
+  background: #1b365d;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+
+.credits-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+<<<END FILE>>>
+<<<FILE src/testhook/testhook.ts>>>
+import type { App } from '../app';
+import { ControlInventory } from '../ui/controls';
+import type { ScreenId } from '../ui/router';
+import type { WorldState } from '../sim/world';
+import type { RenderStats } from '../render/renderer';
+
+export interface TestHook {
+  snapshot(): WorldState;
+  sendCommand(command: unknown): boolean;
+  screen(): string;
+  renderStats(): RenderStats;
+  freezeSim(ms: number): void;
+  controls(): string[];
+  go(screenId: string): void;
+}
+
+export function installTestHook(app: App): void {
+  const hook: TestHook = {
+    snapshot: () => app.snapshot(),
+    sendCommand: (command) => app.sendCommand(command),
+    screen: () => app.router.current(),
+    renderStats: () => app.renderStats(),
+    freezeSim: (ms) => {
+      app.freezeSim(ms);
+    },
+    controls: () => ControlInventory.all(),
+    go: (screenId) => {
+      app.router.go(screenId as ScreenId);
+    },
+  };
+
+  (window as unknown as { __TC_TEST__?: TestHook }).__TC_TEST__ = hook;
+}
+<<<END FILE>>>
+<<<FILE src/app.ts>>>
+import rawManifest from '../public/assets/manifest.json';
+import { parseAssetManifest } from './assets/manifestSchema';
+import { AssetRegistry } from './assets/registry';
+import { createScreens } from './ui/screens';
+import { ScreenRouter, type RendererHandle, type ScreenContext, type ScreenId } from './ui/router';
+import { createWorld, snapshot, step, type WorldState } from './sim/world';
+import { validateCommand, type Command } from './sim/commands';
+import { FixedStepLoop } from './sim/loop';
+import { SIM_TICK_HZ } from './sim/constants';
+import { Watchdog } from './platform/watchdog';
+import { installGlobalErrorCapture } from './platform/watchdog';
+import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
+import { RenderView, type RenderStats } from './render/renderer';
+
+export class App {
+  public readonly router: ScreenRouter;
+  private readonly registry: AssetRegistry;
+  private world: WorldState;
+  private pendingCommands: Command[] = [];
+  private readonly fixed: FixedStepLoop;
+  private readonly watchdog: Watchdog;
+  private lifecycle: Lifecycle | null = null;
+  private renderView: RenderView | null = null;
+  private raf = 0;
+  private checkTimer = 0;
+  private lastFrame = 0;
+  private paused = false;
+  private freezeSimUntil = 0;
+
+  constructor(root: HTMLElement) {
+    this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
+    this.world = createWorld(1);
+    this.fixed = new FixedStepLoop({
+      tickHz: SIM_TICK_HZ,
+      maxStepsPerFrame: 5,
+      step: () => {
+        this.stepSimulation();
+      },
+    });
+    this.watchdog = new Watchdog({
+      now: () => performance.now(),
+      freezeMs: 2000,
+      recoverMs: 5000,
+      onFreeze: () => {
+        this.router.go('recovery');
+      },
+      onRecover: () => undefined,
+    });
+
+    this.router = new ScreenRouter(root, createScreens(), (router): ScreenContext => ({
+      router,
+      go: (id) => {
+        router.go(id);
+      },
+      attachRenderer: (canvas) => this.attachRenderer(canvas),
+    }));
+  }
+
+  start(): void {
+    this.router.start('title');
+    this.lifecycle = bindLifecycleToBrowserAndCapacitor();
+    this.lifecycle.on('pause', () => {
+      this.pause();
+    });
+    this.lifecycle.on('resume', () => {
+      this.resume();
+    });
+    this.lifecycle.on('back', () => {
+      this.router.back();
+    });
+    window.addEventListener('keydown', this.onKeyDown);
+    installGlobalErrorCapture(window, (error) => {
+      console.error(error.message);
+    });
+  }
+
+  snapshot(): WorldState {
+    return { ...snapshot(this.world) };
+  }
+
+  sendCommand(command: unknown): boolean {
+    const validated = validateCommand(command);
+    if (!validated) {
+      return false;
+    }
+    this.pendingCommands.push(validated);
+    return true;
+  }
+
+  renderStats(): RenderStats {
+    if (!this.renderView) {
+      return { loadedModels: [], meshCount: 0, drawCalls: 0, frame: 0 };
+    }
+    return this.renderView.stats();
+  }
+
+  freezeSim(ms: number): void {
+    this.freezeSimUntil = performance.now() + Math.max(0, ms);
+  }
+
+  private attachRenderer(canvas: HTMLCanvasElement): RendererHandle {
+    try {
+      const view = new RenderView(canvas, this.registry);
+      this.renderView = view;
+      this.startLoop();
+      return {
+        error: null,
+        dispose: () => {
+          if (this.renderView === view) {
+            this.stopLoop();
+            view.dispose();
+            this.renderView = null;
+          }
+        },
+      };
+    } catch {
+      return {
+        error: '3D rendering is unavailable on this device.',
+        dispose: () => undefined,
+      };
+    }
+  }
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      this.router.back();
+    }
+  };
+
+  private pause(): void {
+    if (this.paused) {
+      return;
+    }
+    this.paused = true;
+    this.watchdog.setSuspended(true);
+    this.stopLoop();
+  }
+
+  private resume(): void {
+    if (!this.paused) {
+      return;
+    }
+    this.paused = false;
+    this.watchdog.setSuspended(false);
+    this.startLoop();
+  }
+
+  private startLoop(): void {
+    if (this.raf !== 0 || !this.renderView || this.paused) {
+      return;
+    }
+    this.lastFrame = performance.now();
+    this.checkTimer = window.setInterval(() => {
+      this.watchdog.check();
+    }, 250);
+    this.raf = window.requestAnimationFrame(this.frame);
+  }
+
+  private stopLoop(): void {
+    if (this.raf !== 0) {
+      window.cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+    if (this.checkTimer !== 0) {
+      window.clearInterval(this.checkTimer);
+      this.checkTimer = 0;
+    }
+  }
+
+  private readonly frame = (now: number): void => {
+    this.raf = 0;
+    if (this.paused || !this.renderView) {
+      return;
+    }
+
+    const elapsed = now - this.lastFrame;
+    this.lastFrame = now;
+    const frozen = now < this.freezeSimUntil;
+    let alpha = 0;
+
+    if (!frozen) {
+      const result = this.fixed.advance(elapsed);
+      alpha = result.alpha;
+      if (result.steps > 0) {
+        this.watchdog.beat('sim');
+      }
+    }
+
+    this.watchdog.beat('render');
+    this.watchdog.check();
+    this.renderView.render(alpha);
+    this.raf = window.requestAnimationFrame(this.frame);
+  };
+
+  private stepSimulation(): void {
+    const nextTick = this.world.tick + 1;
+    const due = this.pendingCommands.filter((command) => command.tick === nextTick);
+    this.world = step(this.world, due);
+    this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
+  }
+}
+
+export function createApp(root: HTMLElement): App {
+  return new App(root);
+}
+<<<END FILE>>>
+<<<FILE src/main.ts>>>
+import './ui/styles.css';
+import { createApp } from './app';
+
+const root = document.getElementById('app');
+if (!(root instanceof HTMLElement)) {
+  throw new Error('Missing #app element');
+}
+
+const app = createApp(root);
+app.start();
+
+if (__TEST_HOOK__) {
+  void import('./testhook/testhook').then(({ installTestHook }) => {
+    installTestHook(app);
+  });
+}
+<<<END FILE>>>
+<<<FILE scripts/credits.mjs>>>
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+function arg(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const manifestPath =
+  arg('--manifest') ?? process.env.TC_MANIFEST_PATH ?? 'public/assets/manifest.json';
+const outPath = arg('--out') ?? process.env.TC_CREDITS_PATH ?? 'CREDITS.md';
+const check = process.argv.includes('--check');
+const customOut = Boolean(arg('--out') ?? process.env.TC_CREDITS_PATH);
+
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+if (!manifest || !Array.isArray(manifest.assets)) {
+  console.error('Invalid asset manifest');
+  process.exit(1);
+}
+
+const assets = [...manifest.assets].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+function escapeCell(value) {
+  return String(value ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+}
+
+const lines = [
+  '# Credits',
+  '',
+  'TankCommand asset credits. Generated from `public/assets/manifest.json`; do not edit by hand.',
+  '',
+  '| Asset | Author | Licence | Source | Used for |',
+  '| --- | --- | --- | --- | --- |',
+];
+
+for (const asset of assets) {
+  const credit = asset.credit ?? {};
+  lines.push(
+    `| ${escapeCell(asset.id)} | ${escapeCell(credit.author)} | ${escapeCell(
+      credit.license,
+    )} | ${escapeCell(credit.source ?? '-')} | ${escapeCell(credit.usedFor)} |`,
+  );
+}
+
+const content = `${lines.join('\n')}\n`;
+
+function writeOrCheck(path) {
+  if (check) {
+    const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    if (current !== content) {
+      console.error(`Stale credits: ${path}`);
+      const currentLines = new Set(current.split('\n'));
+      for (const line of content.split('\n')) {
+        if (!currentLines.has(line)) {
+          console.error(`+ ${line}`);
+        }
+      }
+      process.exitCode = 1;
+    }
+    return;
+  }
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
+}
+
+writeOrCheck(outPath);
+if (!customOut) {
+  writeOrCheck('public/CREDITS.md');
+}
+
+if (process.exitCode) {
+  process.exit(process.exitCode);
+}
+<<<END FILE>>>
+<<<FILE scripts/req-coverage.mjs>>>
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+function arg(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const requirementsPath = arg('--requirements') ?? 'docs/requirements.md';
+const testsDir = arg('--tests') ?? 'tests';
+
+const requirements = readFileSync(requirementsPath, 'utf8');
+const ids = [...new Set(requirements.match(/\b[A-Z]{2,}-\d{2}\b/g) ?? [])].sort();
+
+function walk(dir) {
+  const files = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const info = statSync(full);
+    if (info.isDirectory()) {
+      files.push(...walk(full));
+    } else if (name.endsWith('.ts')) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+const testText = walk(testsDir)
+  .map((file) => readFileSync(file, 'utf8'))
+  .join('\n');
+
+const rows = ids.map((id) => ({ id, covered: testText.includes(`[${id}]`) }));
+
+console.log('Requirement | Covered');
+console.log('--- | ---');
+for (const row of rows) {
+  console.log(`${row.id} | ${row.covered ? 'yes' : 'NO'}`);
+}
+
+const missing = rows.filter((row) => !row.covered).map((row) => row.id);
+if (missing.length > 0) {
+  console.error(`Missing requirement tests: ${missing.join(', ')}`);
+  process.exit(1);
+}
+<<<END FILE>>>
+<<<FILE tests/controls.inventory.json>>>
+[
+  "bugReport.back",
+  "credits.back",
+  "help.back",
+  "inGame.pause",
+  "pause.bugReport",
+  "pause.quit",
+  "pause.resume",
+  "pause.settings",
+  "recovery.loadAutosave",
+  "recovery.reportBug",
+  "recovery.resume",
+  "settings.back",
+  "skirmishSetup.start",
+  "title.campaign",
+  "title.credits",
+  "title.help",
+  "title.settings",
+  "title.skirmish"
+]
+<<<END FILE>>>
+<<<FILE tests/unit/sim.test.ts>>>
+import { describe, expect, it } from 'vitest';
+import { Rng } from '../../src/sim/rng';
+import { validateCommand, type Command } from '../../src/sim/commands';
+import { createWorld, hashWorld, step } from '../../src/sim/world';
+import { FixedStepLoop } from '../../src/sim/loop';
+
+describe('sim shell', () => {
+  it('[SIM-01] same seed same command list produces identical hash after 10000 steps', () => {
+    const commands: Command[] = [
+      { kind: 'debug.addCounter', amount: 5, tick: 1, issuer: 1 },
+      { kind: 'noop', tick: 5000, issuer: 1 },
+      { kind: 'debug.addCounter', amount: 9, tick: 10000, issuer: 1 },
+    ];
+
+    let a = createWorld(12345);
+    let b = createWorld(12345);
+    for (let i = 0; i < 10000; i += 1) {
+      a = step(a, commands);
+      b = step(b, commands);
+    }
+
+    expect(hashWorld(a)).toBe(hashWorld(b));
+  });
+
+  it('[SIM-02] different seeds produce different hashes after 100 steps', () => {
+    let a = createWorld(1);
+    let b = createWorld(2);
+    for (let i = 0; i < 100; i += 1) {
+      a = step(a, []);
+      b = step(b, []);
+    }
+    expect(hashWorld(a)).not.toBe(hashWorld(b));
+  });
+
+  it('[SIM-03] step does not mutate its input and accepts frozen input', () => {
+    const world = createWorld(9);
+    const before = { ...world };
+    const frozen = Object.freeze({ ...world });
+    expect(() => step(frozen, [])).not.toThrow();
+    const result = step(world, []);
+    expect(world).toEqual(before);
+    expect(result).not.toBe(world);
+  });
+
+  it('[SIM-04] debug.addCounter applies only on its tick and past ticks are ignored', () => {
+    const world = createWorld(4);
+    const command: Command = {
+      kind: 'debug.addCounter',
+      amount: 7,
+      tick: 1,
+      issuer: 1,
+    };
+    const withCommand = step(world, [command]);
+    const withoutCommand = step(world, []);
+    expect(withCommand.counter).toBe(withoutCommand.counter + 7);
+
+    const past = step(withCommand, [{ ...command, tick: 1 }]);
+    const pastBaseline = step(withCommand, []);
+    expect(past.counter).toBe(pastBaseline.counter);
+  });
+
+  it('[SIM-05] validateCommand rejects unknown kind, fractional tick, infinite amount, missing issuer and null', () => {
+    expect(validateCommand({ kind: 'unknown', tick: 1, issuer: 1 })).toBeNull();
+    expect(validateCommand({ kind: 'noop', tick: 1.5, issuer: 1 })).toBeNull();
+    expect(
+      validateCommand({ kind: 'debug.addCounter', amount: Number.POSITIVE_INFINITY, tick: 1, issuer: 1 }),
+    ).toBeNull();
+    expect(validateCommand({ kind: 'noop', tick: 1 })).toBeNull();
+    expect(validateCommand(null)).toBeNull();
+  });
+
+  it('[SIM-06] fixed-step loop accumulates, caps and ignores invalid elapsed time', () => {
+    let steps = 0;
+    const loop = new FixedStepLoop({
+      tickHz: 20,
+      maxStepsPerFrame: 5,
+      step: () => {
+        steps += 1;
+      },
+    });
+
+    const first = loop.advance(125);
+    expect(first.steps).toBe(2);
+    expect(first.alpha).toBeCloseTo(0.5);
+    expect(steps).toBe(2);
+
+    const capped = loop.advance(10_000);
+    expect(capped.steps).toBe(5);
+    expect(steps).toBe(7);
+
+    const negative = loop.advance(-5);
+    expect(negative.steps).toBe(0);
+    const nan = loop.advance(Number.NaN);
+    expect(nan.steps).toBe(0);
+  });
+
+  it('[SIM-07] Rng is reproducible, state resumes, and int upper bound is exclusive', () => {
+    const a = new Rng(77);
+    const b = new Rng(77);
+    const first: number[] = [];
+    for (let i = 0; i < 1000; i += 1) {
+      const av = a.next();
+      const bv = b.next();
+      expect(av).toBe(bv);
+      first.push(av);
+    }
+
+    const rng = new Rng(99);
+    for (let i = 0; i < 10; i += 1) {
+      rng.nextU32();
+    }
+    const state = rng.getState();
+    const nextValues: number[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      nextValues.push(rng.nextU32());
+    }
+    rng.setState(state);
+    for (const value of nextValues) {
+      expect(rng.nextU32()).toBe(value);
+    }
+
+    const bounds = new Rng(5);
+    for (let i = 0; i < 100_000; i += 1) {
+      expect(bounds.int(0, 3)).not.toBe(3);
+    }
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/assets.test.ts>>>
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
+import rawManifest from '../../public/assets/manifest.json';
+import {
+  AssetManifestError,
+  parseAssetManifest,
+  type AssetEntry,
+  type AssetManifest,
+} from '../../src/assets/manifestSchema';
+import { AssetRegistry } from '../../src/assets/registry';
+import { AssetLoadError, AssetLoader } from '../../src/assets/loader';
+
+function baseEntry(): Record<string, unknown> {
+  return {
+    id: 'unit.test.tank',
+    kind: 'model',
+    path: 'assets/models/test.glb',
+    bytes: 4,
+    credit: {
+      license: 'ORIGINAL',
+      author: 'Test Author',
+      title: 'Test Asset',
+      usedFor: 'Tests',
+    },
+  };
+}
+
+function makeEntry(overrides: Partial<AssetEntry> = {}): AssetEntry {
+  const base = baseEntry();
+  return {
+    id: typeof base.id === 'string' ? base.id : 'unit.test.tank',
+    kind: 'model',
+    path: typeof base.path === 'string' ? base.path : 'assets/models/test.glb',
+    bytes: 4,
+    credit: {
+      license: 'ORIGINAL',
+      author: 'Test Author',
+      title: 'Test Asset',
+      usedFor: 'Tests',
+    },
+    ...overrides,
+  };
+}
+
+function manifestWith(assets: AssetEntry[]): AssetManifest {
+  return { version: 1, assets };
+}
+
+function registryWith(assets: AssetEntry[]): AssetRegistry {
+  return new AssetRegistry(parseAssetManifest(manifestWith(assets)));
+}
+
+describe('asset containers', () => {
+  it('[ASSET-01] real public asset manifest validates', () => {
+    const parsed = parseAssetManifest(rawManifest);
+    expect(parsed.assets).toHaveLength(1);
+    expect(parsed.assets[0]?.id).toBe('unit.human.poc_tank');
+  });
+
+  it('[ASSET-02] duplicate id is rejected with the offending id in the message', () => {
+    const one = baseEntry();
+    const two = { ...baseEntry(), path: 'assets/models/other.glb' };
+    expect(() => parseAssetManifest({ version: 1, assets: [one, two] })).toThrow(
+      /unit\.test\.tank/,
+    );
+  });
+
+  it('[ASSET-02] duplicate path is rejected with the offending id in the message', () => {
+    const one = baseEntry();
+    const two = { ...baseEntry(), id: 'unit.test.duplicate_path' };
+    expect(() => parseAssetManifest({ version: 1, assets: [one, two] })).toThrow(
+      /unit\.test\.duplicate_path/,
+    );
+  });
+
+  it('[ASSET-02] unknown licence is rejected with the offending id in the message', () => {
+    const one = {
+      ...baseEntry(),
+      id: 'unit.test.bad_license',
+      credit: { ...(baseEntry().credit as Record<string, unknown>), license: 'CC-BY-NC-4.0' },
+    };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.bad_license/,
+    );
+  });
+
+  it('[ASSET-02] CC-BY without source is rejected with the offending id in the message', () => {
+    const one = {
+      ...baseEntry(),
+      id: 'unit.test.ccby_no_source',
+      credit: {
+        license: 'CC-BY-4.0',
+        author: 'Author',
+        title: 'Title',
+        usedFor: 'Tests',
+      },
+    };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.ccby_no_source/,
+    );
+  });
+
+  it('[ASSET-02] lod.of missing target is rejected with the offending id in the message', () => {
+    const one = {
+      ...baseEntry(),
+      id: 'unit.test.lod_missing',
+      lod: { level: 0, of: 'unit.test.not_there' },
+    };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.lod_missing/,
+    );
+  });
+
+  it('[ASSET-02] lod.of self reference is rejected with the offending id in the message', () => {
+    const one = {
+      ...baseEntry(),
+      id: 'unit.test.lod_self',
+      lod: { level: 0, of: 'unit.test.lod_self' },
+    };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.lod_self/,
+    );
+  });
+
+  it('[ASSET-02] path with parent traversal is rejected with the offending id in the message', () => {
+    const one = { ...baseEntry(), id: 'unit.test.dotdot', path: 'assets/../evil.glb' };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.dotdot/,
+    );
+  });
+
+  it('[ASSET-02] absolute path is rejected with the offending id in the message', () => {
+    const one = { ...baseEntry(), id: 'unit.test.absolute', path: '/assets/evil.glb' };
+    expect(() => parseAssetManifest({ version: 1, assets: [one] })).toThrow(
+      /unit\.test\.absolute/,
+    );
+  });
+
+  it('[ASSET-03] every real manifest file exists and has the recorded byte size', () => {
+    const parsed = parseAssetManifest(rawManifest);
+    for (const entry of parsed.assets) {
+      const file = join(process.cwd(), 'public', entry.path);
+      expect(existsSync(file)).toBe(true);
+      expect(statSync(file).size).toBe(entry.bytes);
+    }
+  });
+
+  it('[ASSET-04] concurrent loads for one id share one fetch', async () => {
+    const entry = makeEntry({ id: 'unit.test.dedupe' });
+    const registry = registryWith([entry]);
+    const fetchBytes = vi.fn(async () => new ArrayBuffer(4));
+    const loader = new AssetLoader({
+      registry,
+      fetchBytes,
+      baseUrl: './',
+      decoders: {
+        model: async () => 'model',
+        texture: async () => 'texture',
+        audio: async () => new ArrayBuffer(0),
+      },
+    });
+
+    const values = await Promise.all(Array.from({ length: 5 }, () => loader.load(entry.id)));
+    expect(values).toEqual(['model', 'model', 'model', 'model', 'model']);
+    expect(fetchBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it('[ASSET-05] failed loads are not cached and retry can succeed', async () => {
+    const entry = makeEntry({ id: 'unit.test.retry' });
+    const registry = registryWith([entry]);
+    let calls = 0;
+    const fetchBytes = vi.fn(async (): Promise<ArrayBuffer> => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error('network down');
+      }
+      return new ArrayBuffer(4);
+    });
+    const loader = new AssetLoader({
+      registry,
+      fetchBytes,
+      baseUrl: './',
+      decoders: {
+        model: async () => 'ok',
+        texture: async () => 'texture',
+        audio: async () => new ArrayBuffer(0),
+      },
+    });
+
+    await expect(loader.load(entry.id)).rejects.toBeInstanceOf(AssetLoadError);
+    await expect(loader.load(entry.id)).resolves.toBe('ok');
+    expect(fetchBytes).toHaveBeenCalledTimes(2);
+  });
+
+  it('[ASSET-06] refcount keeps cache until the final release and disposes once', async () => {
+    const entry = makeEntry({ id: 'unit.test.refcount' });
+    const registry = registryWith([entry]);
+    const fetchBytes = vi.fn(async () => new ArrayBuffer(4));
+    const dispose = vi.fn();
+    const loader = new AssetLoader({
+      registry,
+      fetchBytes,
+      baseUrl: './',
+      dispose,
+      decoders: {
+        model: async () => ({ id: 'asset' }),
+        texture: async () => 'texture',
+        audio: async () => new ArrayBuffer(0),
+      },
+    });
+
+    await loader.load(entry.id);
+    await loader.load(entry.id);
+    expect(fetchBytes).toHaveBeenCalledTimes(1);
+
+    loader.release(entry.id);
+    expect(dispose).not.toHaveBeenCalled();
+    expect(fetchBytes).toHaveBeenCalledTimes(1);
+
+    loader.release(entry.id);
+    expect(dispose).toHaveBeenCalledTimes(1);
+
+    await loader.load(entry.id);
+    expect(fetchBytes).toHaveBeenCalledTimes(2);
+  });
+
+  it('[ASSET-07] preload reports each id, rejects with all failures and caches successes', async () => {
+    const goodOne = makeEntry({ id: 'unit.test.good_one', path: 'assets/good-one.bin' });
+    const goodTwo = makeEntry({ id: 'unit.test.good_two', path: 'assets/good-two.bin' });
+    const bad = makeEntry({ id: 'unit.test.bad_size', path: 'assets/bad.bin' });
+    const registry = registryWith([goodOne, goodTwo, bad]);
+    const fetchBytes = vi.fn(async (url: string): Promise<ArrayBuffer> => {
+      if (url.includes('bad.bin')) {
+        return new ArrayBuffer(2);
+      }
+      return new ArrayBuffer(4);
+    });
+    const loader = new AssetLoader({
+      registry,
+      fetchBytes,
+      baseUrl: './',
+      decoders: {
+        model: async (_buffer, entry) => entry.id,
+        texture: async () => 'texture',
+        audio: async () => new ArrayBuffer(0),
+      },
+    });
+
+    const progress: Array<{ loaded: number; total: number; id: string }> = [];
+    let caught: unknown;
+    try {
+      await loader.preload(
+        [goodOne.id, goodTwo.id, bad.id],
+        (update) => {
+          progress.push(update);
+        },
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError);
+    expect((caught as AggregateError).message).toContain(bad.id);
+    expect(progress).toHaveLength(3);
+    expect(progress.every((update) => update.total === 3)).toBe(true);
+    expect(new Set(progress.map((update) => update.id))).toEqual(
+      new Set([goodOne.id, goodTwo.id, bad.id]),
+    );
+
+    const fetchCount = fetchBytes.mock.calls.length;
+    await expect(loader.load(goodOne.id)).resolves.toBe(goodOne.id);
+    expect(fetchBytes).toHaveBeenCalledTimes(fetchCount);
+  });
+
+  it('[ASSET-08] byte size mismatch rejects with AssetLoadError', async () => {
+    const entry = makeEntry({ id: 'unit.test.size_mismatch', bytes: 4 });
+    const registry = registryWith([entry]);
+    const loader = new AssetLoader({
+      registry,
+      fetchBytes: async () => new ArrayBuffer(3),
+      baseUrl: './',
+      decoders: {
+        model: async () => 'model',
+        texture: async () => 'texture',
+        audio: async () => new ArrayBuffer(0),
+      },
+    });
+
+    await expect(loader.load(entry.id)).rejects.toBeInstanceOf(AssetLoadError);
+  });
+
+  it('[ASSET-09] credits check passes on committed files and fails when the manifest changes', () => {
+    const root = process.cwd();
+    const committed = spawnSync(process.execPath, ['scripts/credits.mjs', '--check'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(committed.status).toBe(0);
+
+    const temp = mkdtempSync(join(tmpdir(), 'tc-credits-'));
+    try {
+      const manifestPath = join(temp, 'manifest.json');
+      const outPath = join(temp, 'CREDITS.md');
+      const parsed = parseAssetManifest(rawManifest);
+      writeFileSync(manifestPath, JSON.stringify(parsed, null, 2), 'utf8');
+
+      execFileSync(process.execPath, ['scripts/credits.mjs', '--manifest', manifestPath, '--out', outPath], {
+        cwd: root,
+      });
+      const passing = spawnSync(
+        process.execPath,
+        ['scripts/credits.mjs', '--manifest', manifestPath, '--out', outPath, '--check'],
+        { cwd: root, encoding: 'utf8' },
+      );
+      expect(passing.status).toBe(0);
+
+      const changed = {
+        ...parsed,
+        assets: [
+          ...parsed.assets,
+          makeEntry({ id: 'unit.test.extra_credit', path: 'assets/models/extra.glb' }),
+        ],
+      };
+      writeFileSync(manifestPath, JSON.stringify(changed, null, 2), 'utf8');
+      const failing = spawnSync(
+        process.execPath,
+        ['scripts/credits.mjs', '--manifest', manifestPath, '--out', outPath, '--check'],
+        { cwd: root, encoding: 'utf8' },
+      );
+      expect(failing.status).not.toBe(0);
+      expect(`${failing.stdout}${failing.stderr}`).toContain('Stale credits');
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
+
+  it('[ASSET-02] manifest errors expose a stable error class', () => {
+    expect(() => parseAssetManifest({ version: 1, assets: [baseEntry(), baseEntry()] })).toThrow(
+      AssetManifestError,
+    );
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/data.test.ts>>>
+import { describe, expect, it } from 'vitest';
+import rawManifest from '../../public/assets/manifest.json';
+import units from '../../src/data/units.placeholder.json';
+import { parseAssetManifest } from '../../src/assets/manifestSchema';
+import { AssetRegistry } from '../../src/assets/registry';
+import { loadUnitTable, placeholderReport } from '../../src/data/dataRegistry';
+
+const registry = new AssetRegistry(parseAssetManifest(rawManifest));
+const rows = units as unknown[];
+
+function cloneBase(): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(rows[0])) as Record<string, unknown>;
+}
+
+function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>> {
+  return row.weapons as Array<Record<string, unknown>>;
+}
+
+describe('unit data containers', () => {
+  it('[DATA-01] placeholder table loads against the real asset manifest', () => {
+    const table = loadUnitTable(units, registry);
+    expect(table.size).toBe(2);
+    expect([...table.keys()].sort()).toEqual([
+      'unit.alien.light_skimmer',
+      'unit.human.light_tank',
+    ]);
+  });
+
+  it('[DATA-02] duplicate id is rejected', () => {
+    expect(() => loadUnitTable([cloneBase(), cloneBase()], registry)).toThrow(/duplicate id/);
+  });
+
+  it('[DATA-02] missing modelAssetId in registry is rejected', () => {
+    const row = cloneBase();
+    row.modelAssetId = 'unit.human.missing_model';
+    expect(() => loadUnitTable([row], registry)).toThrow(/missing model asset/);
+  });
+
+  it('[DATA-02] worker without carryCapacity is rejected', () => {
+    const row = cloneBase();
+    row.role = 'worker';
+    delete row.carryCapacity;
+    expect(() => loadUnitTable([row], registry)).toThrow(/carryCapacity/);
+  });
+
+  it('[DATA-02] sensorRange below sightRange is rejected', () => {
+    const row = cloneBase();
+    row.sightRange = 20;
+    row.sensorRange = 19;
+    expect(() => loadUnitTable([row], registry)).toThrow(/sensorRange/);
+  });
+
+  it('[DATA-02] accuracy above 1 is rejected', () => {
+    const row = cloneBase();
+    weaponsOf(row)[0]!.accuracy = 1.5;
+    expect(() => loadUnitTable([row], registry)).toThrow(/accuracy|less than or equal/);
+  });
+
+  it('[DATA-02] empty targets array is rejected', () => {
+    const row = cloneBase();
+    weaponsOf(row)[0]!.targets = [];
+    expect(() => loadUnitTable([row], registry)).toThrow(/targets|at least/);
+  });
+
+  it('[DATA-02] video source without ref is rejected', () => {
+    const row = cloneBase();
+    row.source = { kind: 'video' };
+    expect(() => loadUnitTable([row], registry)).toThrow(/source\.ref/);
+  });
+
+  it('[DATA-03] placeholderReport lists placeholder rows and drops tuned rows', () => {
+    const table = loadUnitTable(units, registry);
+    expect(placeholderReport(table)).toEqual([
+      'unit.alien.light_skimmer',
+      'unit.human.light_tank',
+    ]);
+
+    const row = table.get('unit.human.light_tank');
+    expect(row).toBeDefined();
+    if (!row) {
+      return;
+    }
+    const changed = new Map(table);
+    changed.set(row.id, { ...row, source: { kind: 'tuned', ref: 'x' } });
+    expect(placeholderReport(changed)).toEqual(['unit.alien.light_skimmer']);
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/saves.test.ts>>>
+import { describe, expect, it } from 'vitest';
+import { createWorld, hashWorld, step } from '../../src/sim/world';
+import { MemoryKvStore, StorageFullError, WebKvStore } from '../../src/platform/kv';
+import { SaveManager, decodeSave, encodeSave } from '../../src/platform/saves';
+
+describe('save envelopes', () => {
+  it('[SAVE-01] save after 500 steps and continue 500 more matches an uninterrupted run', async () => {
+    let uninterrupted = createWorld(321);
+    for (let i = 0; i < 1000; i += 1) {
+      uninterrupted = step(uninterrupted, []);
+    }
+
+    let firstHalf = createWorld(321);
+    for (let i = 0; i < 500; i += 1) {
+      firstHalf = step(firstHalf, []);
+    }
+
+    const kv = new MemoryKvStore();
+    const manager = new SaveManager(kv);
+    await manager.save('slot-a', firstHalf);
+    const loaded = await manager.load('slot-a');
+    expect(loaded).not.toBeNull();
+    let resumed = loaded?.world ?? createWorld(1);
+    for (let i = 0; i < 500; i += 1) {
+      resumed = step(resumed, []);
+    }
+
+    expect(hashWorld(resumed)).toBe(hashWorld(uninterrupted));
+  });
+
+  it('[SAVE-02] decodeSave returns correct reasons for malformed input and never throws', () => {
+    const valid = encodeSave(createWorld(1), {
+      gameVersion: 'test',
+      savedAtIso: '2026-10-27T00:00:00.000Z',
+    });
+
+    expect(decodeSave('random bytes')).toEqual({ ok: false, reason: 'corrupt' });
+    expect(decodeSave(valid.slice(0, valid.length - 10))).toEqual({
+      ok: false,
+      reason: 'corrupt',
+    });
+    expect(decodeSave('{}')).toEqual({ ok: false, reason: 'not-a-save' });
+
+    const schema999 = JSON.parse(valid) as { schema: number };
+    schema999.schema = 999;
+    expect(decodeSave(JSON.stringify(schema999))).toEqual({
+      ok: false,
+      reason: 'incompatible',
+    });
+
+    const flipped = JSON.parse(valid) as { payload: { counter: number } };
+    flipped.payload.counter += 1;
+    expect(decodeSave(JSON.stringify(flipped))).toEqual({ ok: false, reason: 'checksum' });
+
+    for (let i = 0; i < 1000; i += 1) {
+      const text = `${Math.random().toString(36).slice(2)}-${i}`;
+      expect(() => decodeSave(text)).not.toThrow();
+      const result = decodeSave(text);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(['corrupt', 'checksum', 'incompatible', 'not-a-save']).toContain(result.reason);
+      }
+    }
+  });
+
+  it('[SAVE-03] autosave rotation keeps exactly three slots and latestAutosave is the fifth', async () => {
+    const kv = new MemoryKvStore();
+    let clock = 0;
+    const manager = new SaveManager(kv, {
+      now: () => new Date(1700000000000 + clock++ * 1000),
+    });
+    const base = createWorld(17);
+
+    for (let i = 0; i < 5; i += 1) {
+      await manager.autosave({ ...base, counter: i });
+    }
+
+    const slots = await manager.listSlots();
+    expect(slots.filter((slot) => slot.startsWith('auto-')).sort()).toEqual([
+      'auto-0',
+      'auto-1',
+      'auto-2',
+    ]);
+    const latest = await manager.latestAutosave();
+    expect(latest?.world.counter).toBe(4);
+  });
+
+  it('[SAVE-04] exceeding maxBytes rejects and leaves previous saves intact', async () => {
+    const world = createWorld(44);
+    const now = new Date('2026-10-27T12:00:00.000Z');
+    const sample = encodeSave(world, {
+      gameVersion: '0.1.0',
+      savedAtIso: now.toISOString(),
+    });
+    const size = new TextEncoder().encode(sample).byteLength;
+    const kv = new MemoryKvStore();
+    const manager = new SaveManager(kv, {
+      maxBytes: size + 5,
+      gameVersion: '0.1.0',
+      now: () => now,
+    });
+
+    await manager.save('a', world);
+    await expect(manager.save('b', world)).rejects.toBeInstanceOf(StorageFullError);
+    const loaded = await manager.load('a');
+    expect(loaded?.world).toEqual(world);
+  });
+
+  it('[SAVE-05] WebKvStore maps quota failures to StorageFullError', async () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        const error = new Error('quota');
+        error.name = 'QuotaExceededError';
+        throw error;
+      },
+      removeItem: () => undefined,
+      key: () => null,
+      length: 0,
+      clear: () => undefined,
+    } as unknown as Storage;
+
+    const store = new WebKvStore(storage);
+    await expect(store.set('a', 'b')).rejects.toBeInstanceOf(StorageFullError);
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/lifecycle.test.ts>>>
+import { describe, expect, it } from 'vitest';
+import { Lifecycle, type LifecycleSource } from '../../src/platform/lifecycle';
+
+class FakeSource implements LifecycleSource {
+  public hidden = false;
+  private readonly handlers = new Map<string, Set<() => void>>();
+
+  addEventListener(type: string, listener: () => void): void {
+    const set = this.handlers.get(type) ?? new Set<() => void>();
+    set.add(listener);
+    this.handlers.set(type, set);
+  }
+
+  removeEventListener(type: string, listener: () => void): void {
+    this.handlers.get(type)?.delete(listener);
+  }
+
+  isHidden(): boolean {
+    return this.hidden;
+  }
+
+  dispatch(type: string): void {
+    for (const handler of [...(this.handlers.get(type) ?? [])]) {
+      handler();
+    }
+  }
+}
+
+describe('lifecycle', () => {
+  it('[LIFE-01] hidden pauses, visible resumes, duplicate pauses collapse, back emits pause plus back', () => {
+    const source = new FakeSource();
+    const lifecycle = new Lifecycle(source);
+    const events: string[] = [];
+    lifecycle.on('pause', () => events.push('pause'));
+    lifecycle.on('resume', () => events.push('resume'));
+    lifecycle.on('back', () => events.push('back'));
+
+    source.hidden = true;
+    source.dispatch('visibilitychange');
+    expect(events).toEqual(['pause']);
+
+    source.dispatch('visibilitychange');
+    expect(events).toEqual(['pause']);
+
+    source.hidden = false;
+    source.dispatch('visibilitychange');
+    expect(events).toEqual(['pause', 'resume']);
+
+    source.dispatch('backButton');
+    expect(events).toEqual(['pause', 'resume', 'pause', 'back']);
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/watchdog.test.ts>>>
+import { describe, expect, it } from 'vitest';
+import {
+  Watchdog,
+  installGlobalErrorCapture,
+  type CapturedError,
+  type ErrorTarget,
+  type WatchdogReport,
+} from '../../src/platform/watchdog';
+
+class FakeErrorTarget implements ErrorTarget {
+  private readonly handlers = new Map<string, Set<(event: Event) => void>>();
+
+  addEventListener(type: string, listener: (event: Event) => void): void {
+    const set = this.handlers.get(type) ?? new Set<(event: Event) => void>();
+    set.add(listener);
+    this.handlers.set(type, set);
+  }
+
+  removeEventListener(type: string, listener: (event: Event) => void): void {
+    this.handlers.get(type)?.delete(listener);
+  }
+
+  dispatch(type: string, event: Event): void {
+    for (const handler of [...(this.handlers.get(type) ?? [])]) {
+      handler(event);
+    }
+  }
+}
+
+describe('watchdog', () => {
+  it('[WD-01] freeze fires once at the threshold, recover once, and a beat starts a new episode', () => {
+    let now = 0;
+    const freezes: WatchdogReport[] = [];
+    const recovers: WatchdogReport[] = [];
+    const watchdog = new Watchdog({
+      now: () => now,
+      onFreeze: (report) => freezes.push(report),
+      onRecover: (report) => recovers.push(report),
+    });
+
+    now = 2001;
+    watchdog.check();
+    expect(freezes).toHaveLength(1);
+
+    now = 4999;
+    watchdog.check();
+    expect(recovers).toHaveLength(0);
+
+    now = 5001;
+    watchdog.check();
+    expect(recovers).toHaveLength(1);
+
+    watchdog.check();
+    expect(freezes).toHaveLength(1);
+    expect(recovers).toHaveLength(1);
+
+    watchdog.beat('sim');
+    watchdog.beat('render');
+    now = 8001;
+    watchdog.check();
+    expect(freezes).toHaveLength(2);
+  });
+
+  it('[WD-02] suspended mode suppresses freezes and unsuspending resets clocks', () => {
+    let now = 0;
+    const freezes: WatchdogReport[] = [];
+    const watchdog = new Watchdog({
+      now: () => now,
+      onFreeze: (report) => freezes.push(report),
+      onRecover: () => undefined,
+    });
+
+    watchdog.setSuspended(true);
+    now = 10000;
+    watchdog.check();
+    expect(freezes).toHaveLength(0);
+
+    watchdog.setSuspended(false);
+    watchdog.check();
+    expect(freezes).toHaveLength(0);
+
+    now = 12001;
+    watchdog.check();
+    expect(freezes).toHaveLength(1);
+  });
+
+  it('[WD-03] global error capture records thrown errors and rejected promises', () => {
+    const target = new FakeErrorTarget();
+    const captured: CapturedError[] = [];
+    installGlobalErrorCapture(target, (error) => captured.push(error));
+
+    target.dispatch(
+      'error',
+      { message: 'boom', error: new Error('boom') } as unknown as ErrorEvent,
+    );
+    target.dispatch(
+      'unhandledrejection',
+      { reason: new Error('rejected') } as unknown as PromiseRejectionEvent,
+    );
+
+    expect(captured).toHaveLength(2);
+    expect(captured[0]?.kind).toBe('error');
+    expect(captured[0]?.message).toBe('boom');
+    expect(captured[1]?.kind).toBe('unhandledrejection');
+    expect(captured[1]?.message).toBe('rejected');
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/ui.test.ts>>>
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { createScreens } from '../../src/ui/screens';
+import { ControlInventory } from '../../src/ui/controls';
+import { ScreenRouter, type ScreenContext, type ScreenId } from '../../src/ui/router';
+
+function makeContext(router: ScreenRouter): ScreenContext {
+  return {
+    router,
+    go: (id) => {
+      router.go(id);
+    },
+    attachRenderer: () => ({ error: null, dispose: () => undefined }),
+  };
+}
+
+const stubRouter = {
+  go: () => undefined,
+  back: () => undefined,
+  current: () => 'title',
+} as unknown as ScreenRouter;
+
+function makeRoot(): HTMLDivElement {
+  const root = document.createElement('div');
+  document.body.append(root);
+  return root;
+}
+
+describe('ui shell', () => {
+  it('[UI-01] every screen mounts and unmounts without leaving nodes behind', () => {
+    const screens = createScreens();
+    const ids = Object.keys(screens) as ScreenId[];
+    const ctx = makeContext(stubRouter);
+
+    for (const id of ids) {
+      const holder = document.createElement('div');
+      document.body.append(holder);
+      const screen = screens[id];
+      const unmount = screen.mount(holder, ctx);
+      unmount();
+      expect(holder.childNodes.length).toBe(0);
+      holder.remove();
+    }
+  });
+
+  it('[UI-02] overlays stack and back pops settings then pause to inGame', () => {
+    const root = makeRoot();
+    const screens = createScreens();
+    const router = new ScreenRouter(root, screens, (r) => makeContext(r));
+
+    router.start('title');
+    router.go('skirmishSetup');
+    router.go('loading');
+    router.go('inGame');
+    router.go('pause');
+    router.go('settings');
+
+    expect(router.current()).toBe('settings');
+    expect(root.querySelectorAll('[data-screen-id]').length).toBe(3);
+
+    router.back();
+    expect(router.current()).toBe('pause');
+    expect(root.querySelectorAll('[data-screen-id="settings"]').length).toBe(0);
+
+    router.back();
+    expect(router.current()).toBe('inGame');
+  });
+
+  it('[UI-03] rapid repeated go to settings mounts only one settings root', () => {
+    const root = makeRoot();
+    const screens = createScreens();
+    const router = new ScreenRouter(root, screens, (r) => makeContext(r));
+    router.start('title');
+
+    for (let i = 0; i < 20; i += 1) {
+      router.go('settings');
+    }
+
+    expect(root.querySelectorAll('[data-screen-id="settings"]').length).toBe(1);
+  });
+
+  it('[UI-04] every registered control id is listed in the inventory file', () => {
+    ControlInventory.clear();
+    const screens = createScreens();
+    const ctx = makeContext(stubRouter);
+    const ids = Object.keys(screens) as ScreenId[];
+
+    for (const id of ids) {
+      const holder = document.createElement('div');
+      document.body.append(holder);
+      const unmount = screens[id].mount(holder, ctx);
+      unmount();
+      holder.remove();
+    }
+
+    const registered = ControlInventory.all();
+    const listed = JSON.parse(
+      readFileSync('tests/controls.inventory.json', 'utf8'),
+    ) as string[];
+    const missing = registered.filter((id) => !listed.includes(id));
+    expect(missing).toEqual([]);
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/config.test.ts>>>
+import { copyFileSync, mkdtempSync, appendFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
+import capacitorConfig from '../../capacitor.config';
+
+describe('project configuration', () => {
+  it('[CAP-01] capacitor config has the required app id, web dir and no server url', () => {
+    expect(capacitorConfig.appId).toBe('com.davidbalasa.tankcommand');
+    expect(capacitorConfig.webDir).toBe('dist');
+    expect(capacitorConfig.server?.url).toBeUndefined();
+  });
+
+  it('[CI-01] github workflow runs the full ci and e2e commands', () => {
+    const yaml = readFileSync('.github/workflows/ci.yml', 'utf8');
+    expect(yaml).toContain('node-version: 22');
+    expect(yaml).toContain('npm ci');
+    expect(yaml).toContain('npm run ci');
+    expect(yaml).toContain('npm run test:e2e');
+  });
+
+  it('[REQ-01] requirement coverage passes and fails when an untested id is appended', () => {
+    const root = process.cwd();
+    const real = spawnSync(process.execPath, ['scripts/req-coverage.mjs'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(real.status).toBe(0);
+
+    const temp = mkdtempSync(join(tmpdir(), 'tc-req-'));
+    try {
+      const tempRequirements = join(temp, 'requirements.md');
+      copyFileSync('docs/requirements.md', tempRequirements);
+      appendFileSync(tempRequirements, '\n| FAKE-99 | Uncovered fake requirement |\n');
+      const failing = spawnSync(
+        process.execPath,
+        ['scripts/req-coverage.mjs', '--requirements', tempRequirements],
+        { cwd: root, encoding: 'utf8' },
+      );
+      expect(failing.status).not.toBe(0);
+      expect(`${failing.stdout}${failing.stderr}`).toContain('FAKE-99');
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/unit/lint.test.ts>>>
+import { existsSync, readFileSync } from 'node:fs';
+import { ESLint } from 'eslint';
+import { describe, expect, it } from 'vitest';
+
+const root = process.cwd();
+
+describe('lint and type isolation', () => {
+  it('[LINT-01] lint script is zero-warning and the flat config exists', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts.lint).toContain('--max-warnings 0');
+    expect(existsSync('eslint.config.js')).toBe(true);
+  });
+
+  it('[LINT-02] sim restrictions fire on sim files and not on render files', async () => {
+    const eslint = new ESLint({ cwd: root });
+    const code = [
+      "import * as THREE from 'three';",
+      'export function sample(): number {',
+      '  const n = Math.random() + Date.now();',
+      "  if (typeof window !== 'undefined') {",
+      '    return n + window.innerWidth;',
+      '  }',
+      '  return n + THREE.MathUtils.floorPowerOfTwo(1);',
+      '}',
+    ].join('\n');
+
+    const sim = await eslint.lintText(code, { filePath: 'src/sim/bad.ts' });
+    const simRules = (sim[0]?.messages ?? []).map((message) => message.ruleId);
+    expect(simRules).toContain('no-restricted-imports');
+    expect(simRules).toContain('no-restricted-properties');
+    expect(simRules).toContain('no-restricted-globals');
+
+    const render = await eslint.lintText(code, { filePath: 'src/render/ok.ts' });
+    const restricted = (render[0]?.messages ?? [])
+      .map((message) => message.ruleId)
+      .filter((ruleId) => ruleId?.startsWith('no-restricted'));
+    expect(restricted).toEqual([]);
+  });
+
+  it('[LINT-03] sim tsconfig excludes the DOM lib', () => {
+    const sim = JSON.parse(readFileSync('tsconfig.sim.json', 'utf8')) as {
+      compilerOptions?: { lib?: string[] };
+    };
+    expect(sim.compilerOptions?.lib ?? []).not.toContain('DOM');
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/e2e/helpers.ts>>>
+import { expect, type Page } from '@playwright/test';
+import { inflateSync } from 'node:zlib';
+
+export interface TestSnapshot {
+  tick: number;
+  seed: number;
+  rngState: number;
+  counter: number;
+}
+
+export interface RenderStats {
+  loadedModels: string[];
+  meshCount: number;
+  drawCalls: number;
+  frame: number;
+}
+
+export interface TestHook {
+  snapshot(): TestSnapshot;
+  sendCommand(command: unknown): boolean;
+  screen(): string;
+  renderStats(): RenderStats;
+  freezeSim(ms: number): void;
+  controls(): string[];
+  go(screenId: string): void;
+}
+
+declare global {
+  interface Window {
+    __TC_TEST__?: TestHook;
+  }
+}
+
+export async function waitForHook(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__TC_TEST__ !== undefined);
+}
+
+export async function enterGame(page: Page): Promise<void> {
+  await page.goto('/');
+  await waitForHook(page);
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await page.waitForFunction(() => (window.__TC_TEST__?.renderStats().frame ?? 0) > 0);
+}
+
+export async function assertButtonLayout(page: Page): Promise<void> {
+  const boxes = await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter(
+      (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      },
+    );
+
+    return buttons.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        id: element.dataset.controlId ?? element.textContent ?? 'button',
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+  });
+
+  for (const box of boxes) {
+    expect(box.width, `${box.id} width`).toBeGreaterThanOrEqual(44);
+    expect(box.height, `${box.id} height`).toBeGreaterThanOrEqual(44);
+  }
+
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (!a || !b) {
+        continue;
+      }
+      const overlaps =
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y;
+      expect(overlaps, `${a.id} overlaps ${b.id}`).toBe(false);
+    }
+  }
+}
+
+export function countDistinctPngColors(buffer: Buffer): number {
+  const signature = buffer.subarray(0, 8).toString('hex');
+  if (signature !== '89504e470d0a1a0a') {
+    throw new Error('Not a PNG');
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idat: Buffer[] = [];
+
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8] ?? 0;
+      colorType = data[9] ?? 0;
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset += 12 + length;
+  }
+
+  if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+    throw new Error(`Unsupported PNG format: bitDepth=${bitDepth} colorType=${colorType}`);
+  }
+
+  const bpp = colorType === 6 ? 4 : 3;
+  const stride = width * bpp;
+  const raw = inflateSync(Buffer.concat(idat));
+  const out = Buffer.alloc(stride * height);
+  let pos = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[pos];
+    pos += 1;
+    if (filter === undefined) {
+      throw new Error('Truncated PNG');
+    }
+    const rowStart = y * stride;
+    for (let x = 0; x < stride; x += 1) {
+      const rawByte = raw[pos];
+      pos += 1;
+      if (rawByte === undefined) {
+        throw new Error('Truncated PNG');
+      }
+      const left = x >= bpp ? out[rowStart + x - bpp] ?? 0 : 0;
+      const up = y > 0 ? out[rowStart - stride + x] ?? 0 : 0;
+      const upLeft = y > 0 && x >= bpp ? out[rowStart - stride + x - bpp] ?? 0 : 0;
+      let value = 0;
+      if (filter === 0) {
+        value = rawByte;
+      } else if (filter === 1) {
+        value = rawByte + left;
+      } else if (filter === 2) {
+        value = rawByte + up;
+      } else if (filter === 3) {
+        value = rawByte + Math.floor((left + up) / 2);
+      } else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const predictor = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        value = rawByte + predictor;
+      } else {
+        throw new Error(`Unsupported PNG filter ${filter}`);
+      }
+      out[rowStart + x] = value & 0xff;
+    }
+  }
+
+  const colors = new Set<string>();
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * stride + x * bpp;
+      colors.add(`${out[index] ?? 0},${out[index + 1] ?? 0},${out[index + 2] ?? 0}`);
+    }
+  }
+  return colors.size;
+}
+<<<END FILE>>>
+<<<FILE tests/e2e/game.spec.ts>>>
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
+import {
+  assertButtonLayout,
+  countDistinctPngColors,
+  enterGame,
+  waitForHook,
+} from './helpers';
+
+test('[ASSET-10] the real PoC tank loads through the registry, loader and GLTF decoder', async ({
+  page,
+}) => {
+  await enterGame(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().loadedModels ?? []))
+    .toContain('unit.human.poc_tank');
+  const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());
+  expect(stats?.meshCount ?? 0).toBeGreaterThan(1);
+});
+
+test('[HOOK-02] test hook validates commands and invalid commands change nothing', async ({ page }) => {
+  await enterGame(page);
+
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(1000));
+  const before = await page.evaluate(() => window.__TC_TEST__?.snapshot());
+  const accepted = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return false;
+    }
+    const current = hook.snapshot();
+    return hook.sendCommand({
+      kind: 'debug.addCounter',
+      amount: 50,
+      tick: current.tick + 1,
+      issuer: 1,
+    });
+  });
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(0));
+
+  expect(accepted).toBe(true);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0))
+    .toBeGreaterThanOrEqual((before?.counter ?? 0) + 50);
+
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(1000));
+  const beforeInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
+  const rejected = await page.evaluate(() =>
+    window.__TC_TEST__?.sendCommand({
+      kind: 'debug.addCounter',
+      amount: Number.POSITIVE_INFINITY,
+      tick: (window.__TC_TEST__?.snapshot().tick ?? 0) + 1,
+      issuer: 1,
+    }),
+  );
+  await page.waitForTimeout(100);
+  const afterInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(0));
+
+  expect(rejected).toBe(false);
+  expect(afterInvalid).toBe(beforeInvalid);
+});
+
+test('[REND-01] canvas is non-blank and frames increase', async ({ page }) => {
+  await enterGame(page);
+  const canvas = page.locator('canvas');
+  await canvas.waitFor({ state: 'visible' });
+  const screenshot = await canvas.screenshot();
+  expect(countDistinctPngColors(screenshot)).toBeGreaterThan(2);
+
+  const first = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(1000);
+  const second = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(second).toBeGreaterThan(first);
+});
+
+test('[REND-02] hidden page stops frames and resumes without sim-time jump', async ({ page }) => {
+  await enterGame(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForTimeout(500);
+  const hiddenFirst = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(300);
+  const hiddenSecond = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(hiddenSecond).toBe(hiddenFirst);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const tickBefore = await page.evaluate(() => window.__TC_TEST__?.snapshot().tick ?? 0);
+  const started = Date.now();
+  await page.waitForTimeout(500);
+  const tickAfter = await page.evaluate(() => window.__TC_TEST__?.snapshot().tick ?? 0);
+  const visibleMs = Date.now() - started;
+  expect(tickAfter - tickBefore).toBeLessThanOrEqual(Math.ceil(visibleMs / 50) * 2 + 2);
+
+  const resumedFirst = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(300);
+  const resumedSecond = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(resumedSecond).toBeGreaterThan(resumedFirst);
+});
+
+test('[WD-04] frozen sim shows the recovery screen with three buttons', async ({ page }) => {
+  await enterGame(page);
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+  await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Load autosave', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Send bug report & return to menu', exact: true }),
+  ).toBeVisible();
+});
+
+test('[UI-05] all controls meet touch size and do not overlap across the main flow', async ({ page }) => {
+  await page.goto('/');
+  await waitForHook(page);
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'title');
+
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Report bug', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.keyboard.press('Escape');
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Quit to title', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Credits', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Help', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+  await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await page.getByRole('button', { name: 'Load autosave', exact: true }).click();
+  await page.getByRole('button', { name: 'Send bug report & return to menu', exact: true }).click();
+  await assertButtonLayout(page);
+});
+
+test('[BUILD-01] built index uses relative urls and copies public assets', () => {
+  const index = readFileSync(join(process.cwd(), 'dist/index.html'), 'utf8');
+  expect(index).not.toMatch(/(?:src|href)="\//);
+  expect(readFileSync(join(process.cwd(), 'dist/assets/manifest.json'), 'utf8')).toContain(
+    'unit.human.poc_tank',
+  );
+  expect(() =>
+    readFileSync(join(process.cwd(), 'dist/assets/models/human/poc_tank.glb')),
+  ).not.toThrow();
+});
+<<<END FILE>>>
+<<<FILE tests/e2e/production.spec.ts>>>
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
+
+function walk(dir: string): string[] {
+  const files: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const info = statSync(full);
+    if (info.isDirectory()) {
+      files.push(...walk(full));
+    } else {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+async function waitForUrl(url: string): Promise<void> {
+  for (let i = 0; i < 80; i += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Server may still be starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Server did not start at ${url}`);
+}
+
+test('[HOOK-01] production build has no test hook marker or window hook', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'production build check runs once');
+  test.setTimeout(180_000);
+
+  const root = process.cwd();
+  const temp = mkdtempSync(join(tmpdir(), 'tc-prod-'));
+  const outDir = join(temp, 'dist');
+  const env = { ...process.env };
+  delete env.VITE_TEST_HOOK;
+  const port = 4174;
+  let server: ReturnType<typeof spawn> | null = null;
+
+  try {
+    execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir'], {
+      cwd: root,
+      env,
+      stdio: 'pipe',
+    });
+
+    const jsFiles = walk(outDir).filter((file) => file.endsWith('.js'));
+    expect(jsFiles.length).toBeGreaterThan(0);
+    for (const file of jsFiles) {
+      expect(readFileSync(file, 'utf8')).not.toContain('__TC_TEST__');
+    }
+
+    server = spawn(
+      'npx',
+      ['vite', 'preview', '--outDir', outDir, '--port', String(port), '--strictPort'],
+      { cwd: root, env, stdio: 'ignore' },
+    );
+    await waitForUrl(`http://127.0.0.1:${port}/`);
+    await page.goto(`http://127.0.0.1:${port}/`);
+    await page.waitForTimeout(500);
+    const hasHook = await page.evaluate(() => '__TC_TEST__' in window);
+    expect(hasHook).toBe(false);
+  } finally {
+    server?.kill('SIGTERM');
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+<<<END FILE>>>
+<<<FILE docs/requirements.md>>>
+# Requirements
+
+| ID | Description |
+| --- | --- |
+| SIM-01 | Same seed and command list produce the same world hash after 10,000 steps. |
+| SIM-02 | Different seeds produce different world hashes after 100 steps. |
+| SIM-03 | World stepping does not mutate its input and accepts frozen input. |
+| SIM-04 | Counter commands apply only on their tick and past ticks are ignored. |
+| SIM-05 | Command validation rejects malformed commands. |
+| SIM-06 | Fixed-step loop accumulates, caps and ignores invalid elapsed time. |
+| SIM-07 | Seeded RNG is reproducible, resumable and respects exclusive upper bounds. |
+| ASSET-01 | The real asset manifest validates. |
+| ASSET-02 | Manifest rejection cases name the offending asset id. |
+| ASSET-03 | Every manifest file exists and matches the recorded byte size. |
+| ASSET-04 | Concurrent loads for one asset share one fetch. |
+| ASSET-05 | Failed loads are not cached and can retry. |
+| ASSET-06 | Refcounting keeps cached assets until final release and disposes once. |
+| ASSET-07 | Preload reports progress, caches successes and reports every failure. |
+| ASSET-08 | Byte size mismatches reject with AssetLoadError. |
+| ASSET-09 | Credits check passes on committed files and fails when the manifest changes. |
+| ASSET-10 | The browser loads the real tank model through registry, loader and GLTF decoder. |
+| DATA-01 | The placeholder unit table loads against the real asset manifest. |
+| DATA-02 | Unit data validation rejects the specified malformed rows. |
+| DATA-03 | Placeholder reporting lists placeholder rows and drops tuned rows. |
+| SAVE-01 | Save round trip preserves deterministic simulation state. |
+| SAVE-02 | Save decoding returns specific failure reasons and never throws. |
+| SAVE-03 | Autosave rotation keeps three slots and identifies the newest. |
+| SAVE-04 | Exceeding the byte cap rejects without destroying previous saves. |
+| SAVE-05 | Web storage quota failures map to StorageFullError. |
+| LIFE-01 | Lifecycle events deduplicate pause and map back to pause plus back. |
+| WD-01 | Watchdog freeze and recover fire once per episode and reset on beat. |
+| WD-02 | Suspended watchdog suppresses freezes and resets clocks on unsuspend. |
+| WD-03 | Global error capture records errors and rejected promises. |
+| WD-04 | A frozen sim shows the recovery screen with all recovery controls. |
+| UI-01 | Every screen mounts and unmounts without leaving DOM nodes behind. |
+| UI-02 | Overlays stack and back pops settings then pause to inGame. |
+| UI-03 | Rapid repeated navigation to one screen mounts only one DOM root. |
+| UI-04 | Every registered control id is listed in the control inventory file. |
+| UI-05 | E2E controls meet touch target size and do not overlap across the main flow. |
+| LINT-01 | Lint runs with zero warnings. |
+| LINT-02 | Sim lint restrictions fire on sim files and not render files. |
+| LINT-03 | The sim TypeScript config excludes the DOM library. |
+| REQ-01 | Requirement coverage passes and fails when an untested id is appended. |
+| CI-01 | The GitHub workflow runs the full CI and E2E commands. |
+| CAP-01 | Capacitor config has the required app id, web dir and no server URL. |
+| BUILD-01 | The built app uses relative asset URLs and copies public assets. |
+| HOOK-01 | Production builds contain no test hook marker or window hook. |
+| HOOK-02 | Test hook commands are validated and invalid commands do nothing. |
+| REND-01 | The canvas is non-blank and frame count increases. |
+| REND-02 | Hiding the page stops frames and resuming does not jump sim time. |
+<<<END FILE>>>
+<<<FILE docs/decisions.md>>>
+# Decisions
+
+| Date | Question | Choice | Evidence | Who |
+| --- | --- | --- | --- | --- |
+| 2026-10-27 | Separate Vitest config or embed in Vite config? | Separate `vitest.config.ts`. | Keeps Vite build flags separate from unit-runner settings. | DeepSeek (WP-01) |
+| 2026-10-27 | How should large native saves and small settings be separated? | Native keys prefixed `setting.` use Preferences; other keys use Filesystem under `saves/<key>.json`. | Matches the platform storage split without changing the public KvStore interface. | DeepSeek (WP-01) |
+| 2026-10-27 | How is settings treated when opened from pause? | Settings is an overlay when opened from pause and a normal screen from title. | Required by the overlay/back acceptance flow. | DeepSeek (WP-01) |
+| 2026-10-27 | How is the credits file made available to the in-app screen? | Generate both `CREDITS.md` and `public/CREDITS.md` from the same script. | The screen can fetch a static local copy without importing build-specific raw text. | DeepSeek (WP-01) |
+| 2026-10-27 | How is the test hook excluded from production builds? | Conditional dynamic import behind `__TEST_HOOK__`. | Rollup removes the dead branch and the test asserts the marker is absent from built JS. | DeepSeek (WP-01) |
+| 2026-10-27 | How are autosave slots ordered? | Internal rotating cursor plus `latestAutosave` using the manager and saved timestamps. | Gives deterministic rotation in tests while remaining recoverable after reload. | DeepSeek (WP-01) |
+| 2026-10-27 | How is the production-build Playwright check isolated? | Runs only in the desktop project and builds into a temp directory. | Avoids concurrent preview-server and out-dir collisions. | DeepSeek (WP-01) |
+<<<END FILE>>>
+<<<FILE docs/progress.md>>>
+# Progress
+
+## WP-01
+
+Built the project foundation: Vite/TypeScript scaffolding, Capacitor config, headless deterministic sim shell, asset manifest/registry/loader with browser three.js decoders, placeholder unit data schema and table, save envelopes and autosave rotation, key-value storage adapters, lifecycle and watchdog services, DOM screen router and screens, three.js render shell, test hook, credits and requirement-coverage scripts, unit tests, Playwright flows, CI workflow, and project documentation. No gameplay rules or final balance data were added.
+<<<END FILE>>>
+<<<FILE README.md>>>
+# TankCommand
+
+TankCommand is a mobile and desktop real-time strategy game rebuild, currently containing only the project foundation: deterministic simulation plumbing, asset and data containers, platform storage/lifecycle services, a DOM UI shell, and a three.js render shell. Gameplay rules, balance data, AI, pathfinding, combat and missions are not implemented yet.
+
+## Prerequisites
+
+- Node.js 22
+- npm
+- For Android packaging: Android Studio and the Capacitor Android platform generated after install.
+
+## Scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite development server. |
+| `npm run build` | Typecheck both TypeScript configs and build `dist/`. |
+| `npm run preview` | Preview the built app on port 4173. |
+| `npm run typecheck` | Run both TypeScript project typechecks. |
+| `npm run lint` | Run ESLint with zero warnings allowed. |
+| `npm test` | Run Vitest unit tests. |
+| `npm run test:e2e` | Run Playwright end-to-end tests. |
+| `npm run credits` | Regenerate `CREDITS.md` and `public/CREDITS.md`. |
+| `npm run credits:check` | Fail if credits files are stale. |
+| `npm run coverage:req` | Check requirement IDs against test titles. |
+| `npm run cap:sync` | Build and sync the Capacitor Android project. |
+| `npm run ci` | Run the full local CI sequence. |
+
+## Folder map
+
+- `src/sim/` — deterministic headless simulation plumbing.
+- `src/data/` — unit data schema and placeholder rows.
+- `src/assets/` — asset manifest schema, registry, loader and three.js decoders.
+- `src/platform/` — storage, saves, lifecycle and watchdog services.
+- `src/render/` — three.js renderer shell.
+- `src/ui/` — DOM screen router, controls and screens.
+- `src/testhook/` — browser test hook, included only in test builds.
+- `tests/unit/` — Vitest tests.
+- `tests/e2e/` — Playwright tests.
+- `scripts/` — credits and requirement-coverage scripts.
+- `docs/` — requirements, decisions and progress notes.
+
+## Running end-to-end tests
+
+Install Playwright Chromium once:
+
+```sh
+npx playwright install --with-deps chromium
+```
+
+Then run:
+
+```sh
+npm run test:e2e
+```
+
+The Playwright web server builds with `VITE_TEST_HOOK=1` and runs the preview server on port 4173.
+
+## Adding an asset
+
+1. Put the file under `public/assets/...`.
+2. Add an entry to `public/assets/manifest.json` with the exact byte size and credit fields.
+3. Run `npm run credits`.
+4. Run `npm test` and `npm run credits:check`.
+
+## Building Android
+
+```sh
+npx cap add android
+npm run cap:sync
+```
+
+Then open the generated `android/` folder in Android Studio. The `android/` folder is generated by Capacitor and is not written by this package.
+<<<END FILE>>>
+<<<FILE .github/workflows/ci.yml>>>
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+<<<END FILE>>>
+<<<REPORT>>>
+# WP-01 self-validation report
+
+## 1. Requirement table
+
+| ID | Test file(s) and title(s) | Confidence | Why a stub would fail |
+| --- | --- | --- | --- |
+| SIM-01 | `tests/unit/sim.test.ts` — `[SIM-01] same seed same command list produces identical hash after 10000 steps` | High | Two independent 10,000-step runs are hashed; a stub or missing RNG state would diverge. |
+| SIM-02 | `tests/unit/sim.test.ts` — `[SIM-02] different seeds produce different hashes after 100 steps` | High | Compares hashes from seeds 1 and 2; constant/stubbed RNG would collide. |
+| SIM-03 | `tests/unit/sim.test.ts` — `[SIM-03] step does not mutate its input and accepts frozen input` | High | Uses a frozen input and deep-equal before/after; mutation would throw or change the object. |
+| SIM-04 | `tests/unit/sim.test.ts` — `[SIM-04] debug.addCounter applies only on its tick and past ticks are ignored` | High | Compares against baseline steps with and without the command. |
+| SIM-05 | `tests/unit/sim.test.ts` — `[SIM-05] validateCommand rejects unknown kind, fractional tick, infinite amount, missing issuer and null` | High | Each malformed value is rejected by zod; a permissive stub returns a command. |
+| SIM-06 | `tests/unit/sim.test.ts` — `[SIM-06] fixed-step loop accumulates, caps and ignores invalid elapsed time` | High | Checks exact step counts and alpha; a no-op loop fails immediately. |
+| SIM-07 | `tests/unit/sim.test.ts` — `[SIM-07] Rng is reproducible, state resumes, and int upper bound is exclusive` | High | Compares 1,000 values, resumes from saved state, and draws 100,000 integers. |
+| ASSET-01 | `tests/unit/assets.test.ts` — `[ASSET-01] real public asset manifest validates` | High | Parses the real committed manifest. |
+| ASSET-02 | `tests/unit/assets.test.ts` — eight `[ASSET-02] ...` cases plus `[ASSET-02] manifest errors expose a stable error class` | High | Each rejection case asserts a thrown message containing the offending id. |
+| ASSET-03 | `tests/unit/assets.test.ts` — `[ASSET-03] every real manifest file exists and has the recorded byte size` | High | Reads the actual file and compares `statSync().size` with `bytes`. |
+| ASSET-04 | `tests/unit/assets.test.ts` — `[ASSET-04] concurrent loads for one id share one fetch` | High | Five concurrent loads must leave the fetch spy called once. |
+| ASSET-05 | `tests/unit/assets.test.ts` — `[ASSET-05] failed loads are not cached and retry can succeed` | High | First fetch fails, second succeeds, and fetch call count is 2. |
+| ASSET-06 | `tests/unit/assets.test.ts` — `[ASSET-06] refcount keeps cache until the final release and disposes once` | High | Checks no dispose after first release, dispose once after second, and a refetch after eviction. |
+| ASSET-07 | `tests/unit/assets.test.ts` — `[ASSET-07] preload reports each id, rejects with all failures and caches successes` | High | Aggregates one failure while successful assets remain cached. |
+| ASSET-08 | `tests/unit/assets.test.ts` — `[ASSET-08] byte size mismatch rejects with AssetLoadError` | High | Fetches 3 bytes for a 4-byte entry and asserts the typed error. |
+| ASSET-09 | `tests/unit/assets.test.ts` — `[ASSET-09] credits check passes on committed files and fails when the manifest changes` | High | Runs the real script on committed files, generates in a temp dir, then mutates the temp manifest and expects failure. |
+| ASSET-10 | `tests/e2e/game.spec.ts` — `[ASSET-10] the real PoC tank loads through the registry, loader and GLTF decoder` | High | Reads `renderStats().loadedModels` and requires the real asset id and mesh count > 1. |
+| DATA-01 | `tests/unit/data.test.ts` — `[DATA-01] placeholder table loads against the real asset manifest` | High | Loads the committed table with the real registry. |
+| DATA-02 | `tests/unit/data.test.ts` — seven `[DATA-02] ...` cases | High | Each specified malformed row is rejected. |
+| DATA-03 | `tests/unit/data.test.ts` — `[DATA-03] placeholderReport lists placeholder rows and drops tuned rows` | High | Checks both placeholder ids and removal after changing one source. |
+| SAVE-01 | `tests/unit/saves.test.ts` — `[SAVE-01] save after 500 steps and continue 500 more matches an uninterrupted run` | High | Save/load is followed by 500 more steps and hash comparison. |
+| SAVE-02 | `tests/unit/saves.test.ts` — `[SAVE-02] decodeSave returns correct reasons for malformed input and never throws` | High | Covers random, truncated, checksum-flipped, schema-999, `{}`, and 1,000 fuzz cases. |
+| SAVE-03 | `tests/unit/saves.test.ts` — `[SAVE-03] autosave rotation keeps exactly three slots and latestAutosave is the fifth` | High | Five autosaves must leave three auto slots and return counter 4. |
+| SAVE-04 | `tests/unit/saves.test.ts` — `[SAVE-04] exceeding maxBytes rejects and leaves previous saves intact` | High | Saves one slot, rejects the second, and reloads the first. |
+| SAVE-05 | `tests/unit/saves.test.ts` — `[SAVE-05] WebKvStore maps quota failures to StorageFullError` | High | Mocked storage throws a quota-named error. |
+| LIFE-01 | `tests/unit/lifecycle.test.ts` — `[LIFE-01] hidden pauses, visible resumes, duplicate pauses collapse, back emits pause plus back` | High | Fake source dispatches visibility and back signals and checks deduplication. |
+| WD-01 | `tests/unit/watchdog.test.ts` — `[WD-01] freeze fires once at the threshold, recover once, and a beat starts a new episode` | High | Fake clock checks thresholds, repeat suppression, and a new episode after beats. |
+| WD-02 | `tests/unit/watchdog.test.ts` — `[WD-02] suspended mode suppresses freezes and unsuspending resets clocks` | High | Suspended checks produce no freeze; unsuspend resets, then a stall fires. |
+| WD-03 | `tests/unit/watchdog.test.ts` — `[WD-03] global error capture records thrown errors and rejected promises` | High | Fake target dispatches error and unhandledrejection events. |
+| WD-04 | `tests/e2e/game.spec.ts` — `[WD-04] frozen sim shows the recovery screen with three buttons` | High | Freezes sim and waits for the recovery overlay plus all three buttons. |
+| UI-01 | `tests/unit/ui.test.ts` — `[UI-01] every screen mounts and unmounts without leaving nodes behind` | High | Mounts every screen id and checks the holder is empty after unmount. |
+| UI-02 | `tests/unit/ui.test.ts` — `[UI-02] overlays stack and back pops settings then pause to inGame` | High | Checks settings as a pause overlay, then back order. |
+| UI-03 | `tests/unit/ui.test.ts` — `[UI-03] rapid repeated go to settings mounts only one settings root` | High | Twenty rapid calls must leave one settings root. |
+| UI-04 | `tests/unit/ui.test.ts` — `[UI-04] every registered control id is listed in the inventory file` | High | Mounts all screens and fails if a registered id is missing from `tests/controls.inventory.json`. |
+| UI-05 | `tests/e2e/game.spec.ts` — `[UI-05] all controls meet touch size and do not overlap across the main flow` | Medium-high | Clicks every listed control in the main flow, checks 44×44 minimum and pairwise overlap. The recovery buttons are event-only and stay on-screen, which matches the spec. |
+| LINT-01 | `tests/unit/lint.test.ts` — `[LINT-01] lint script is zero-warning and the flat config exists` | Medium-high | Checks the script flag and config presence; the actual `npm run lint` step is the enforcing command. |
+| LINT-02 | `tests/unit/lint.test.ts` — `[LINT-02] sim restrictions fire on sim files and not on render files` | Medium-high | Runs ESLint programmatically on virtual sim/render paths and checks the restricted rule ids. |
+| LINT-03 | `tests/unit/lint.test.ts` — `[LINT-03] sim tsconfig excludes the DOM lib` | High | Reads `tsconfig.sim.json` and asserts no DOM lib. |
+| REQ-01 | `tests/unit/config.test.ts` — `[REQ-01] requirement coverage passes and fails when an untested id is appended` | High | Runs the real coverage script, then appends `FAKE-99` in a temp copy and expects nonzero. |
+| CI-01 | `tests/unit/config.test.ts` — `[CI-01] github workflow runs the full ci and e2e commands` | High | Reads the workflow and checks the required command strings and Node version. |
+| CAP-01 | `tests/unit/config.test.ts` — `[CAP-01] capacitor config has the required app id, web dir and no server url` | High | Imports the config and checks fields. |
+| BUILD-01 | `tests/e2e/game.spec.ts` — `[BUILD-01] built index uses relative urls and copies public assets` | High | Reads the built `dist/index.html` and copied public assets after the web server build. |
+| HOOK-01 | `tests/e2e/production.spec.ts` — `[HOOK-01] production build has no test hook marker or window hook` | Medium-high | Builds into a temp outDir with the test flag unset, greps JS files for the marker, and checks the served page has no window hook. |
+| HOOK-02 | `tests/e2e/game.spec.ts` — `[HOOK-02] test hook validates commands and invalid commands change nothing` | Medium-high | Valid command changes the counter; invalid Infinity command returns false and leaves the frozen counter unchanged. |
+| REND-01 | `tests/e2e/game.spec.ts` — `[REND-01] canvas is non-blank and frames increase` | Medium | Screenshots the canvas, decodes PNG scanlines, requires > 2 distinct colours, and checks frame growth. |
+| REND-02 | `tests/e2e/game.spec.ts` — `[REND-02] hidden page stops frames and resumes without sim-time jump` | Medium-high | Mocks `document.hidden`, checks frame stop/resume and bounds the tick increase. |
+
+## 2. Self-review pass
+
+Defects found and fixed during construction/re-read:
+
+- The legacy `index.html` needed both a delete marker and the new Vite entry. I emitted a delete marker before the replacement file so the new entry is the final state.
+- The initial router design would have treated `settings` opened from pause as a replacement screen. I special-cased `settings` as an overlay only when the current screen is `pause` and the base is `inGame`.
+- Overlays could have left underlying buttons visible to Playwright, causing false overlap failures. The router now sets lower screens to `visibility: hidden` while an overlay is on top.
+- A naive watchdog that reports every stalled channel would fire twice when both sim and render are idle. The implementation suppresses simultaneous channel reports for the same threshold crossing while still allowing a later episode after a beat.
+- The test hook must not be present in production. It is only a conditional dynamic import behind `__TEST_HOOK__`, and the production e2e test checks both built JS text and the served window.
+- `src/sim` must not use DOM/Node globals. The sim tsconfig uses only `ES2022`, and the ESLint restricted block covers imports, globals, `Math.random`, `Date.now` and `performance`.
+- The credits screen needs a browser-fetchable copy. The credits script writes both `CREDITS.md` and `public/CREDITS.md` when using default paths, and `credits:check` checks both.
+- The `AssetLoader` cache-entry creation needed to avoid `any` while assigning a promise after constructing the entry. It uses a `Partial<CacheEntry>` plus a narrow cast.
+- The save envelope decode path needed to reject schema 999 before checksum validation, and to wrap all parsing in a catch so it never throws. Both are implemented.
+- The UI inventory was reduced to the controls that screens actually register, and the e2e flow explicitly clicks every listed control, including the event-only recovery buttons.
+
+Known risks that remain:
+
+- I cannot run the code. The largest remaining uncertainty is exact API surface for `@capacitor/filesystem` `readdir` result typing; I cast the entries to a string-or-`{name}` union so both common shapes typecheck. Native storage is not unit tested, as allowed.
+- The PNG decoder in `tests/e2e/helpers.ts` assumes Playwright canvas screenshots are 8-bit RGB/RGBA non-interlaced PNGs. That is the normal Playwright output, but it is the most brittle e2e helper.
+- `npm run lint` may surface a type-aware ESLint rule complaint I did not anticipate. The code intentionally avoids `any`, uses `void` for intentionally ignored promises, and keeps restricted rules only on `src/sim`.
+
+## 3. Commands expected to pass
+
+In order:
+
+1. `npm ci`
+2. `npm run ci`
+3. `npm run test:e2e`
+
+I am least certain about:
+
+- `@capacitor/filesystem` `readdir` result shape in the pinned v8 API.
+- `typescript-eslint` project-service behavior for virtual `lintText` paths; `allowDefaultProject` is configured for the two virtual files.
+- Playwright `vite preview --outDir` support for the production-build check.
+- The PNG screenshot decoder assumptions.
+
+## 4. Deviations
+
+- The legacy `index.html` is both marked for deletion and emitted as the new Vite entry. The spec asked for a delete marker while also requiring the new Vite entry at the same path, so the replacement file is the final state.
+- The `settings` screen is an overlay only when entered from `pause`; from `title` it replaces the title screen. This is required by the overlay/back acceptance flow.
+- The `recovery` buttons emit custom events and do not themselves navigate, as the spec says they only emit events in this package.
+- Extra harmless API surface was added for testing and clarity: `AssetLoader.isCached`, `ScreenRouter.current`, `App.snapshot`, and public `migrations`.
+
+## 5. File list
+
+- `package.json` — pinned dependencies and exact npm scripts.
+- `tsconfig.json` — app/test TypeScript config with strict and unchecked-index checks.
+- `tsconfig.sim.json` — headless sim config with `ES2022` only.
+- `vite.config.ts` — relative base and `__TEST_HOOK__` define.
+- `vitest.config.ts` — unit test runner config.
+- `playwright.config.ts` — three viewports and test-hook preview server.
+- `eslint.config.js` — type-checked lint plus sim restriction block.
+- `capacitor.config.ts` — app id, web dir, Android background, splash duration.
+- `vercel.json` — static build settings.
+- `.gitignore` — build, test and Android ignores.
+- `index.html` — Vite entry.
+- `public/manifest.webmanifest` — PWA manifest.
+- `public/assets/manifest.json` — real one-entry asset manifest.
+- `public/CREDITS.md` — browser-served credits copy.
+- `CREDITS.md` — generated credits.
+- `src/env.d.ts` — Vite types and test-hook flag.
+- `src/sim/constants.ts` — tick rate.
+- `src/sim/rng.ts` — mulberry32 seeded RNG.
+- `src/sim/commands.ts` — command union and zod validation.
+- `src/sim/world.ts` — world state, step, snapshot, canonical hash.
+- `src/sim/loop.ts` — fixed-step loop.
+- `src/sim/index.ts` — sim exports.
+- `src/assets/manifestSchema.ts` — asset manifest validation and cross-entry checks.
+- `src/assets/registry.ts` — asset registry and unknown-asset error.
+- `src/assets/loader.ts` — deduping, refcounted, retrying asset loader.
+- `src/assets/threeDecoders.ts` — GLTF, texture and audio decoders plus fallback box.
+- `src/data/unitSchema.ts` — unit row schema and cross-field rules.
+- `src/data/units.placeholder.json` — two placeholder unit rows.
+- `src/data/dataRegistry.ts` — unit table loading and placeholder reporting.
+- `src/platform/kv.ts` — memory, web and native KV stores.
+- `src/platform/saves.ts` — save envelope, decode reasons, migrations, autosave manager.
+- `src/platform/lifecycle.ts` — lifecycle deduplication and real-source binding.
+- `src/platform/watchdog.ts` — freeze/recover watchdog and global error capture.
+- `src/render/renderer.ts` — three.js renderer, scene, camera, tank load and stats.
+- `src/ui/controls.ts` — control inventory and button factory.
+- `src/ui/router.ts` — screen ids, transitions, overlays and back behavior.
+- `src/ui/screens.ts` — all 15 screens and controls.
+- `src/ui/styles.css` — dark layout and touch-size buttons.
+- `src/testhook/testhook.ts` — conditional browser test hook.
+- `src/app.ts` — app composition, render loop, watchdog and save simulation.
+- `src/main.ts` — boot and conditional hook import.
+- `scripts/credits.mjs` — credits generator/checker.
+- `scripts/req-coverage.mjs` — requirement traceability checker.
+- `tests/controls.inventory.json` — all registered control ids.
+- `tests/unit/sim.test.ts` — SIM requirements.
+- `tests/unit/assets.test.ts` — ASSET requirements.
+- `tests/unit/data.test.ts` — DATA requirements.
+- `tests/unit/saves.test.ts` — SAVE requirements.
+- `tests/unit/lifecycle.test.ts` — LIFE requirement.
+- `tests/unit/watchdog.test.ts` — WD unit requirements.
+- `tests/unit/ui.test.ts` — UI unit requirements.
+- `tests/unit/config.test.ts` — CAP, CI and REQ requirements.
+- `tests/unit/lint.test.ts` — LINT requirements.
+- `tests/e2e/helpers.ts` — Playwright helpers, controls layout, PNG decoder.
+- `tests/e2e/game.spec.ts` — ASSET-10, HOOK-02, REND, WD-04, UI-05, BUILD-01.
+- `tests/e2e/production.spec.ts` — HOOK-01.
+- `docs/requirements.md` — requirement ID table.
+- `docs/decisions.md` — decision log.
+- `docs/progress.md` — WP-01 progress entry.
+- `README.md` — project, scripts, folders, e2e and Android notes.
+- `.github/workflows/ci.yml` — CI workflow.
+<<<END REPORT>>>

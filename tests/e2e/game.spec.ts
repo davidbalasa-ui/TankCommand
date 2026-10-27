@@ -22,7 +22,7 @@ test('[ASSET-10] the real PoC tank loads through the registry, loader and GLTF d
 test('[HOOK-02] test hook validates commands and invalid commands change nothing', async ({ page }) => {
   await enterGame(page);
 
-  await page.evaluate(() => window.__TC_TEST__?.freezeSim(1000));
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
   const before = await page.evaluate(() => window.__TC_TEST__?.snapshot());
   const accepted = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
@@ -32,31 +32,35 @@ test('[HOOK-02] test hook validates commands and invalid commands change nothing
     const current = hook.snapshot();
     return hook.sendCommand({
       kind: 'debug.addCounter',
-      amount: 50,
+      amount: 1000,
       tick: current.tick + 1,
       issuer: 1,
     });
   });
-  await page.evaluate(() => window.__TC_TEST__?.freezeSim(0));
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
 
   expect(accepted).toBe(true);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0))
-    .toBeGreaterThanOrEqual((before?.counter ?? 0) + 50);
+    .toBeGreaterThanOrEqual((before?.counter ?? 0) + 1000);
 
-  await page.evaluate(() => window.__TC_TEST__?.freezeSim(1000));
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
   const beforeInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
-  const rejected = await page.evaluate(() =>
-    window.__TC_TEST__?.sendCommand({
+  const rejected = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return true;
+    }
+    return hook.sendCommand({
       kind: 'debug.addCounter',
-      amount: Number.POSITIVE_INFINITY,
-      tick: (window.__TC_TEST__?.snapshot().tick ?? 0) + 1,
+      amount: 1 / 0,
+      tick: hook.snapshot().tick + 1,
       issuer: 1,
-    }),
-  );
-  await page.waitForTimeout(100);
+    });
+  });
+  await page.waitForTimeout(150);
   const afterInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
-  await page.evaluate(() => window.__TC_TEST__?.freezeSim(0));
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
 
   expect(rejected).toBe(false);
   expect(afterInvalid).toBe(beforeInvalid);

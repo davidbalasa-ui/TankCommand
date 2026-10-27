@@ -130,17 +130,22 @@ export function installGlobalErrorCapture(
 ): () => void {
   const errorHandler = (event: Event): void => {
     const errorEvent = event as ErrorEvent;
-    const error = errorEvent.error;
+    const rawError: unknown = errorEvent.error;
+    const error = rawError instanceof Error ? rawError : undefined;
+    const message =
+      errorEvent.message ||
+      error?.message ||
+      (typeof rawError === 'string' ? rawError : 'Unknown error');
     onError({
-      message: errorEvent.message || (error instanceof Error ? error.message : 'Unknown error'),
-      stack: error instanceof Error ? error.stack : undefined,
+      message,
+      stack: error?.stack,
       kind: 'error',
     });
   };
 
   const rejectionHandler = (event: Event): void => {
     const rejection = event as PromiseRejectionEvent;
-    const reason = rejection.reason;
+    const reason: unknown = rejection.reason;
     const error = reason instanceof Error ? reason : undefined;
     onError({
       message: error?.message ?? String(reason),

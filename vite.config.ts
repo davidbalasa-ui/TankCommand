@@ -8,5 +8,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // three.js is lazily loaded at runtime; its standalone chunk (~700 kB minified) exceeds the default 500 kB limit.
+    chunkSizeWarningLimit: 1000,
   },
 }));

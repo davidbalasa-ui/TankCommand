@@ -21,6 +21,7 @@ export interface TestHook {
   screen(): string;
   renderStats(): RenderStats;
   freezeSim(ms: number): void;
+  pauseSim(paused: boolean): void;
   controls(): string[];
   go(screenId: string): void;
 }
