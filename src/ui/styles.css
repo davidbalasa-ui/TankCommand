@@ -1,0 +1,72 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #090d16;
+  color: #e8edf5;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font-size: 14px;
+}
+
+#app {
+  position: relative;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #090d16;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  overflow: auto;
+}
+
+.screen.overlay {
+  z-index: 10;
+  background: rgba(9, 13, 22, 0.98);
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #ffffff;
+  background: #1b365d;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+
+.credits-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}

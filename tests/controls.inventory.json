@@ -1,0 +1,20 @@
+[
+  "bugReport.back",
+  "credits.back",
+  "help.back",
+  "inGame.pause",
+  "pause.bugReport",
+  "pause.quit",
+  "pause.resume",
+  "pause.settings",
+  "recovery.loadAutosave",
+  "recovery.reportBug",
+  "recovery.resume",
+  "settings.back",
+  "skirmishSetup.start",
+  "title.campaign",
+  "title.credits",
+  "title.help",
+  "title.settings",
+  "title.skirmish"
+]
