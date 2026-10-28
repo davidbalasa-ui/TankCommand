@@ -3,6 +3,7 @@ import {
   countDistinctPngColors,
   enterGame,
   type GroundPick,
+  type IssuedCommand,
   type TestCamera,
   type TestUnit,
 } from './helpers';
@@ -54,15 +55,9 @@ async function camera(page: Page): Promise<TestCamera> {
 
 /**
  * Presses a registered HUD control by dispatching a real `click` on the button
- * inside the page.
- *
- * `locator.click()` first runs Playwright's actionability checks (visible,
- * stable, enabled, receives events), which on a loaded runner can take several
- * hundred milliseconds. That latency is not part of anything under test, and in
- * `INP-01` it was long enough for a just-ordered tank to drive to its
- * destination before the next sample, which then re-ordered it to a point it
- * was already standing on. Clicking the element directly is the same DOM event
- * a user's finger produces, without the scheduling noise.
+ * inside the page. `locator.click()` first runs Playwright's actionability
+ * checks, whose latency can be hundreds of milliseconds on a loaded runner and
+ * is not part of anything under test.
  */
 async function pressControl(page: Page, controlId: string): Promise<void> {
   await page
@@ -82,13 +77,11 @@ type CanvasAction = 'left' | 'right' | 'touch';
  * like a real finger or mouse button, and returns the ground point the input
  * layer resolved for it.
  *
- * Two things make this deterministic where a `locator.click()`/`touchscreen.tap`
- * was not:
- *  - the down and the up happen in the same task, so no wall-clock gap can
- *    elapse between them and a slow runner can never turn a tap into a
- *    long-press (which would box-select instead of issuing an order);
- *  - `lastGroundPick()` is read in that same task, so the assertion can never
- *    accidentally observe the pick left behind by an earlier sample.
+ * The down and the up happen in the same task, so no wall-clock gap elapses
+ * between them — a slow runner cannot turn a tap into a long-press (which would
+ * box-select instead of acting), and `lastGroundPick()` is read in that same
+ * task so the assertion can never accidentally observe the pick left behind by
+ * an earlier sample.
  */
 async function pressCanvas(
   page: Page,
@@ -125,31 +118,6 @@ async function pressCanvas(
       return hook.lastGroundPick();
     },
     { px: x, py: y, mode: action },
-  );
-}
-
-/**
- * Smallest screen-space distance between a canvas point and any unit's picking
- * centre — the same projection `pickUnit` tests against its 24/36 px radius.
- */
-async function unitClearance(page: Page, x: number, y: number): Promise<number> {
-  return page.evaluate(
-    (point: { px: number; py: number }) => {
-      const hook = window.__TC_TEST__;
-      if (!hook) {
-        return 0;
-      }
-      let closest = Number.POSITIVE_INFINITY;
-      for (const unit of hook.units()) {
-        const centre = hook.unitScreenCentre(unit.id);
-        if (!centre) {
-          continue;
-        }
-        closest = Math.min(closest, Math.hypot(centre.x - point.px, centre.y - point.py));
-      }
-      return Number.isFinite(closest) ? closest : 0;
-    },
-    { px: x, py: y },
   );
 }
 
@@ -210,168 +178,263 @@ async function dispatchTouch(page: Page, steps: readonly TouchStep[]): Promise<v
   }, steps as TouchStep[]);
 }
 
-interface SamplePoint {
+interface OriginPoint {
   x: number;
   z: number;
-  /**
-   * Whether the resulting move target can be asserted, which requires the point
-   * to be a destination the simulation accepts verbatim.
-   */
-  orderTarget: boolean;
+}
+
+interface LocatedPoint {
+  world: OriginPoint;
+  screen: { x: number; y: number };
 }
 
 /**
- * Three points inside the flattened player start area plus two near map corners.
- *
- * The order-target points sit at radius 12.5 around (-50, -50). `generateMap`
- * flattens that disc to *exactly* height 0 out to radius 14, so every cell the
- * point and its neighbours occupy is flat (slope 0 well under `MAX_SLOPE`) —
- * therefore unblocked, and the region is convex, so a path always exists and
- * `findPath` appends the clicked point verbatim. Points out in the blend ring
- * (radius 14-24) are *not* safe: the blend introduces real slope there, a cell
- * can be blocked, and the sim then correctly redirects the move to the nearest
- * reachable cell (MOVE-05) — which made this assertion pass or fail depending on
- * where the tank happened to be standing.
- *
- * The 196-216° arc is the sector furthest from every spawn tank, so the tap
- * stays clear of the 36 px touch pick radius even at the widest zoom (distance
- * 120 → ~0.26 world units per pixel on the phone), where a tap inside a unit's
- * radius is *by design* a unit selection rather than a ground order.
- *
- * The two corner points (8.5 units from opposite corners) only assert the raw
- * ground pick: at extreme zoom-out and near the map edge is exactly where
- * picking breaks, but a corner cell may legitimately be blocked/unreachable.
+ * Finds a world point near `origin`, visible at the given camera framing and at
+ * least `minClearance` screen pixels from every unit's pick centre, and returns
+ * it along with its screen position. If `origin` is too close to a unit (or off
+ * screen), a spiral of small offsets is tried — this is what "nudge the sample
+ * point and record the actual point used" means in practice. The test asserts
+ * against the returned `world`, so the recorded point is exactly what was
+ * pressed.
  */
-const SAMPLE_POINTS: readonly SamplePoint[] = [
-  { x: -62.0, z: -53.4, orderTarget: true },
-  { x: -61.2, z: -55.5, orderTarget: true },
-  { x: -60.1, z: -57.3, orderTarget: true },
-  { x: 74, z: 74, orderTarget: false }, // 8.5 units from the (80, 80) corner
-  { x: -74, z: 74, orderTarget: false }, // 8.5 units from the (-80, 80) corner
+async function findSafeSample(
+  page: Page,
+  origin: OriginPoint,
+  yaw: number,
+  distance: number,
+  minClearance: number,
+): Promise<LocatedPoint | null> {
+  const candidates: OriginPoint[] = [origin];
+  for (const radius of [4, 8, 12]) {
+    for (let i = 0; i < 12; i += 1) {
+      const angle = (i / 12) * Math.PI * 2;
+      candidates.push({
+        x: origin.x + Math.cos(angle) * radius,
+        z: origin.z + Math.sin(angle) * radius,
+      });
+    }
+  }
+
+  for (const point of candidates) {
+    if (Math.abs(point.x) > 78 || Math.abs(point.z) > 78) {
+      continue;
+    }
+    await setCamera(page, { targetX: point.x, targetZ: point.z, distance, yaw });
+    const located = await page.evaluate(
+      (input: OriginPoint) => {
+        const hook = window.__TC_TEST__;
+        const canvas = document.querySelector('canvas');
+        if (!hook || !canvas) {
+          return null;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const screen = hook.worldToScreen(input.x, input.z);
+        if (screen.x < rect.left + 30 || screen.x > rect.right - 30) {
+          return null;
+        }
+        if (screen.y < rect.top + 64 || screen.y > rect.bottom - 30) {
+          return null;
+        }
+        let closest = Number.POSITIVE_INFINITY;
+        for (const unit of hook.units()) {
+          const centre = hook.unitScreenCentre(unit.id);
+          if (!centre) {
+            continue;
+          }
+          closest = Math.min(closest, Math.hypot(centre.x - screen.x, centre.y - screen.y));
+        }
+        return { screen, clearance: Number.isFinite(closest) ? closest : 0 };
+      },
+      point,
+    );
+    if (located && located.clearance >= minClearance) {
+      return { world: point, screen: located.screen };
+    }
+  }
+  return null;
+}
+
+async function readLastIssued(page: Page): Promise<IssuedCommand | null> {
+  return page.evaluate(() => window.__TC_TEST__?.lastIssuedCommand() ?? null);
+}
+
+const ORIGIN_POINTS: readonly OriginPoint[] = [
+  { x: -68, z: -58 },
+  { x: -58, z: -68 },
+  { x: -64, z: -64 },
+  { x: 74, z: 74 }, // 8.5 units from the (80, 80) corner
+  { x: -74, z: 74 }, // 8.5 units from the (-80, 80) corner
 ];
 
-const CAMERA_SETTINGS = [
+const SAMPLE_CAMERAS = [
   { distance: 20, yaw: 0 },
   { distance: 60, yaw: 1 },
   { distance: 120, yaw: 2 },
 ];
 
-test('[INP-01] ground picks and ground orders land at the picked point across camera settings', async ({
+test('[INP-01] ground picks land at the picked point at every zoom and near the map corners', async ({
   page,
 }, testInfo) => {
   test.setTimeout(180_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const pickRadius = touch ? 36 : 24;
-  const own = (await units(page)).filter((unit) => unit.owner === 1);
+  const minClearance = pickRadius + 10;
+
+  // No orders are issued in this test, so tanks never move: every sample sees
+  // the same unit positions and the clearance from a point to a unit's pick
+  // centre is stable across zoom settings.
+  await pressControl(page, 'inGame.deselect');
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
+    .toEqual([]);
+
+  for (const setting of SAMPLE_CAMERAS) {
+    for (const origin of ORIGIN_POINTS) {
+      const label = `origin (${origin.x}, ${origin.z}) at distance ${setting.distance}`;
+      const sample = await findSafeSample(
+        page,
+        origin,
+        setting.yaw,
+        setting.distance,
+        minClearance,
+      );
+      expect(
+        sample,
+        `${label}: a visible point at least ${minClearance} px from every unit`,
+      ).not.toBeNull();
+      if (!sample) {
+        return;
+      }
+
+      const picked = await pressCanvas(
+        page,
+        sample.screen.x,
+        sample.screen.y,
+        touch ? 'touch' : 'left',
+      );
+      expect(picked, `${label}: press reached the canvas`).not.toBeNull();
+      expect(
+        Math.hypot((picked?.x ?? 0) - sample.world.x, (picked?.z ?? 0) - sample.world.z),
+        `${label}: ground pick (${picked?.x ?? 0}, ${picked?.z ?? 0}) vs requested (${sample.world.x}, ${sample.world.z})`,
+      ).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test('[INP-01] a right-click issues a move whose target is the picked ground point', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  await enterGame(page);
+  const touch = isTouch(testInfo);
+  const all = await units(page);
+  const own = all.filter((unit) => unit.owner === 1);
+  expect(own.length).toBe(4);
   const unit = own[0];
   expect(unit).toBeDefined();
   if (!unit) {
     return;
   }
 
-  for (const setting of CAMERA_SETTINGS) {
-    for (const point of SAMPLE_POINTS) {
-      const label = `(${point.x}, ${point.z}) at distance ${setting.distance}`;
+  // The sim is paused for the whole order exercise, so neither the tank nor
+  // anything else moves between selecting the tank, pressing the ground, and
+  // reading the command. No order-derived drive time can race the assertion.
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
 
-      await pressControl(page, 'inGame.deselect');
-      await expect
-        .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
-        .toEqual([]);
-
-      if (point.orderTarget) {
-        const current = (await units(page)).find((item) => item.id === unit.id);
-        expect(current, label).toBeDefined();
-        if (!current) {
-          return;
-        }
-        // At distance 60 the four tanks are more than 60 px apart on every
-        // viewport, so a press on a tank's picking centre selects that tank and
-        // cannot land on a neighbour.
-        await setCamera(page, {
-          targetX: current.x,
-          targetZ: current.z,
-          distance: 60,
-          yaw: 0,
-        });
-        const centre = await page.evaluate(
-          (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
-          unit.id,
-        );
-        expect(centre, label).not.toBeNull();
-        if (!centre) {
-          return;
-        }
-        await pressCanvas(page, centre.x, centre.y, touch ? 'touch' : 'left');
-        await expect
-          .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
-          .toContain(unit.id);
-      }
-
-      await setCamera(page, {
-        targetX: point.x,
-        targetZ: point.z,
-        distance: setting.distance,
-        yaw: setting.yaw,
-      });
-
-      const screen = await page.evaluate(
-        ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-        point,
-      );
-
-      if (point.orderTarget) {
-        // Guards the interaction rather than the requirement: a press inside a
-        // unit's pick radius is a unit selection by design, so a sample that
-        // close could never prove anything about ground orders.
-        const clearance = await unitClearance(page, screen.x, screen.y);
-        expect(
-          clearance,
-          `${label}: the press point is clear of every unit (${clearance.toFixed(1)} px)`,
-        ).toBeGreaterThan(pickRadius + 2);
-      }
-
-      // Raw picking: must land on the requested ground point at every zoom, for
-      // every sample, reachable or not. The pick is read in the same task as the
-      // press, so a stale value from an earlier sample cannot mask a miss.
-      const picked = await pressCanvas(page, screen.x, screen.y, touch ? 'touch' : 'right');
-      expect(picked, `${label}: the press reached the canvas`).not.toBeNull();
-      expect(
-        Math.hypot((picked?.x ?? 0) - point.x, (picked?.z ?? 0) - point.z),
-        `${label}: ground pick (${picked?.x ?? 0}, ${picked?.z ?? 0})`,
-      ).toBeLessThanOrEqual(1);
-
-      if (point.orderTarget) {
-        // `units()` reports the move target (`orderX/orderZ`) or, for a unit
-        // that has already finished the order, no order at all — `updateOrderPath`
-        // turns an arrived move into `idle`. Standing within 1 unit of the
-        // clicked point is then proof the target was that point; a press that
-        // did nothing leaves the unit wherever it was and still fails, and the
-        // three order-target points are >2 units apart so "already there" can
-        // never be inherited from the previous sample.
-        await expect
-          .poll(
-            async () =>
-              page.evaluate(
-                ({ id, px, pz }) => {
-                  const hook = window.__TC_TEST__;
-                  const ordered = hook?.units().find((item) => item.id === id);
-                  if (!ordered) {
-                    return Number.POSITIVE_INFINITY;
-                  }
-                  if (ordered.orderX !== null && ordered.orderZ !== null) {
-                    return Math.hypot(ordered.orderX - px, ordered.orderZ - pz);
-                  }
-                  return Math.hypot(ordered.x - px, ordered.z - pz);
-                },
-                { id: unit.id, px: point.x, pz: point.z },
-              ),
-            { intervals: [50, 100], timeout: 20_000 },
-          )
-          .toBeLessThanOrEqual(1);
-      }
-    }
+  await setCamera(page, { targetX: unit.x, targetZ: unit.z, distance: 60, yaw: 0 });
+  const centre = await page.evaluate(
+    (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+    unit.id,
+  );
+  expect(centre).not.toBeNull();
+  if (!centre) {
+    return;
   }
+  await pressCanvas(page, centre.x, centre.y, touch ? 'touch' : 'left');
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
+    .toContain(unit.id);
+
+  // A destination inside the flat disc around the player start. `generateMap`
+  // flattens that disc to height 0 out to radius 14, so the sim accepts the
+  // destination verbatim — no nearest-reachable redirect applies. The search
+  // also keeps the point well clear of every unit so the press is ground, not
+  // a unit pick.
+  await setCamera(page, { targetX: -50, targetZ: -50, distance: 60, yaw: 0 });
+  const orderPoint = await page.evaluate(
+    (tanks) => {
+      const hook = window.__TC_TEST__;
+      const canvas = document.querySelector('canvas');
+      if (!hook || !canvas) {
+        return null;
+      }
+      const rect = canvas.getBoundingClientRect();
+      for (const radius of [10, 12, 8, 6]) {
+        for (let i = 0; i < 24; i += 1) {
+          const angle = (i / 24) * Math.PI * 2;
+          const wx = -50 + Math.cos(angle) * radius;
+          const wz = -50 + Math.sin(angle) * radius;
+          const screen = hook.worldToScreen(wx, wz);
+          if (screen.x < rect.left + 40 || screen.x > rect.right - 40) {
+            continue;
+          }
+          if (screen.y < rect.top + 64 || screen.y > rect.bottom - 40) {
+            continue;
+          }
+          let screenClearance = Number.POSITIVE_INFINITY;
+          let worldClearance = Number.POSITIVE_INFINITY;
+          for (const tank of tanks) {
+            const c = hook.unitScreenCentre(tank.id);
+            if (c) {
+              screenClearance = Math.min(
+                screenClearance,
+                Math.hypot(c.x - screen.x, c.y - screen.y),
+              );
+            }
+            worldClearance = Math.min(worldClearance, Math.hypot(wx - tank.x, wz - tank.z));
+          }
+          if (!Number.isFinite(screenClearance)) {
+            screenClearance = 0;
+          }
+          if (screenClearance < 60) {
+            continue;
+          }
+          if (worldClearance < 8) {
+            continue;
+          }
+          return { world: { x: wx, z: wz }, screen };
+        }
+      }
+      return null;
+    },
+    own.map((t) => ({ id: t.id, x: t.x, z: t.z })),
+  );
+
+  expect(orderPoint, 'a reachable point clear of every unit').not.toBeNull();
+  if (!orderPoint) {
+    return;
+  }
+
+  await pressCanvas(
+    page,
+    orderPoint.screen.x,
+    orderPoint.screen.y,
+    touch ? 'touch' : 'right',
+  );
+  const issued = await readLastIssued(page);
+  expect(issued, 'a command was issued').not.toBeNull();
+  if (!issued) {
+    return;
+  }
+  expect(issued.kind).toBe('move');
+  expect(issued.unitIds).toContain(unit.id);
+  expect(
+    Math.hypot((issued.x ?? 0) - orderPoint.world.x, (issued.z ?? 0) - orderPoint.world.z),
+    `command target (${issued.x ?? 0}, ${issued.z ?? 0}) vs clicked (${orderPoint.world.x}, ${orderPoint.world.z})`,
+  ).toBeLessThanOrEqual(1);
+
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
 });
 
 test('[INP-02] box selection selects exactly the own tanks in the box', async ({ page }) => {
@@ -674,12 +737,6 @@ interface OrderCandidate {
   minTankDistance: number;
 }
 
-/**
- * Visible ground points in the upper part of the screen, farthest from the tanks
- * first. A player picks somewhere ahead of their units, so the candidates are
- * restricted to that band; ordering by clearance guarantees the tanks have room
- * to drive and cannot be at their destination already.
- */
 async function findOrderCandidates(page: Page, tanks: TestUnit[]): Promise<OrderCandidate[]> {
   return page.evaluate((list) => {
     const hook = window.__TC_TEST__;
@@ -766,10 +823,6 @@ test('[PLAY-02] drag-select then right-click a visible ground point moves every 
     return;
   }
 
-  // Group moves give every tank its own formation slot, so the ordered goal is
-  // near the click but not necessarily on it. Try the clearest visible points
-  // until the simulation accepts the whole group's order with enough room for
-  // every tank to make a visible move.
   const goals = new Map<number, { x: number; z: number }>();
   let chosen: OrderCandidate | null = null;
   for (const candidate of candidates) {

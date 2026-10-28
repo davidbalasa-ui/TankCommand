@@ -5,6 +5,19 @@ import { CAMERA_EDGE_BAND } from '../sim/tuning';
 const BOX_DRAG_THRESHOLD = 6;
 const LONG_PRESS_MS = 400;
 
+/**
+ * Observable form of the most recent command the input layer handed to the app.
+ * `unitIds` covers every field the tests care about; `x/z` are the ground target
+ * for a `move` and `null` otherwise.
+ */
+export interface IssuedCommand {
+  kind: 'move' | 'attack';
+  x: number | null;
+  z: number | null;
+  targetId: number | null;
+  unitIds: number[];
+}
+
 export interface InputHost {
   canvas: HTMLCanvasElement;
   renderView: RenderView;
@@ -57,6 +70,7 @@ export class InputController {
   private twoFingerStart = 0;
   private twoFingerMoved = 0;
   private lastGroundPick: { x: number; z: number } | null = null;
+  private lastIssued: IssuedCommand | null = null;
   private disposed = false;
 
   constructor(host: InputHost) {
@@ -88,6 +102,18 @@ export class InputController {
    */
   getLastGroundPick(): { x: number; z: number } | null {
     return this.lastGroundPick ? { ...this.lastGroundPick } : null;
+  }
+
+  /**
+   * The most recent command the input layer issued, or null before the first
+   * one. Read-only observability for acceptance tests: it lets a test assert the
+   * order that was queued, without depending on the sim having stepped.
+   */
+  getLastIssuedCommand(): IssuedCommand | null {
+    if (!this.lastIssued) {
+      return null;
+    }
+    return { ...this.lastIssued, unitIds: [...this.lastIssued.unitIds] };
   }
 
   update(elapsedMs: number): void {
@@ -296,8 +322,6 @@ export class InputController {
       if (info.downGround && total > BOX_DRAG_THRESHOLD) {
         this.panPointerId = event.pointerId;
         this.panGrab = info.downGround;
-        // The pan owns the gesture from here on; disarm the long press so it can
-        // never turn this same drag into a selection box.
         this.clearLongPress();
         this.longPressReady = false;
         this.panBy(event.clientX, event.clientY);
@@ -313,9 +337,6 @@ export class InputController {
       return;
     }
 
-    // A left drag box-selects regardless of what was under the press point: an
-    // RTS drag that starts on a tank must still rubber-band, otherwise a box
-    // whose corner happens to sit within the pick radius of a unit does nothing.
     if (info.button === 0 && total > BOX_DRAG_THRESHOLD) {
       if (!this.boxSelecting) {
         this.boxSelecting = true;
@@ -435,7 +456,6 @@ export class InputController {
     this.longPressReady = false;
     this.longPressTimer = window.setTimeout(() => {
       this.longPressTimer = null;
-      // A pan that started first owns the gesture.
       if (this.panPointerId === null) {
         this.longPressReady = true;
       }
@@ -487,12 +507,6 @@ export class InputController {
     this.selectionBox.style.height = `${height}px`;
   }
 
-  /**
-   * Box selection tests the same point that `pickUnit` uses for click selection,
-   * so a box drawn around a tank always selects it. Testing the ground base
-   * instead put the box a model-height away from the clickable point, and a
-   * tight box could then select three of four tanks.
-   */
   private finishBox(x: number, y: number): void {
     this.selectionBox.style.display = 'none';
     if (!this.boxStart) {
@@ -590,6 +604,9 @@ export class InputController {
   }
 
   private issueMove(ids: number[], x: number, z: number, queue: boolean): void {
+    // Record before sending: the acceptance test reads this synchronously after
+    // the press and must see the exact target the input layer resolved.
+    this.lastIssued = { kind: 'move', x, z, targetId: null, unitIds: [...ids] };
     const world = this.host.getWorld();
     this.host.sendCommand({
       kind: 'move',
@@ -603,6 +620,7 @@ export class InputController {
   }
 
   private issueAttack(ids: number[], targetId: number): void {
+    this.lastIssued = { kind: 'attack', x: null, z: null, targetId, unitIds: [...ids] };
     const world = this.host.getWorld();
     this.host.sendCommand({
       kind: 'attack',

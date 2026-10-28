@@ -6,7 +6,7 @@ import { loadUnitTable } from './data/dataRegistry';
 import type { UnitRow } from './data/unitSchema';
 import { createScreens } from './ui/screens';
 import { ScreenRouter, type RendererHandle, type ScreenContext, type ScreenId } from './ui/router';
-import { InputController } from './ui/input';
+import { InputController, type IssuedCommand } from './ui/input';
 import { createWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
 import type { PlayerId, SimUnitType, WorldState } from './sim/types';
 import { validateCommand, type Command } from './sim/commands';
@@ -15,6 +15,8 @@ import { SIM_TICK_HZ } from './sim/constants';
 import { Watchdog, installGlobalErrorCapture } from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import type { RenderStats, RenderView, ScreenBounds } from './render/renderer';
+
+export type { IssuedCommand } from './ui/input';
 
 export interface UnitView {
   id: number;
@@ -240,6 +242,11 @@ export class App {
    */
   lastGroundPick(): { x: number; z: number } | null {
     return this.input?.getLastGroundPick() ?? null;
+  }
+
+  /** The most recent command the input layer issued, or null before any. */
+  lastIssuedCommand(): IssuedCommand | null {
+    return this.input?.getLastIssuedCommand() ?? null;
   }
 
   /** Canvas-space projection of a unit's picking centre (matches `pickUnit`). */

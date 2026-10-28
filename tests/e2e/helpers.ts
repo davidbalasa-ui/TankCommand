@@ -39,6 +39,14 @@ export interface ScreenBounds {
   height: number;
 }
 
+export interface IssuedCommand {
+  kind: 'move' | 'attack';
+  x: number | null;
+  z: number | null;
+  targetId: number | null;
+  unitIds: number[];
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
@@ -59,6 +67,7 @@ export interface TestHook {
   units(): TestUnit[];
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): GroundPick | null;
+  lastIssuedCommand(): IssuedCommand | null;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];
