@@ -1,0 +1,4 @@
+Everything now passes. Attached are the phone screenshots (915x412, landscape) your screens test saved.
+Look at each one as a player on a phone would, against the package spec and COMMON rules: overlapping or clipped HUD elements, text under 12 px, touch targets under 44x44 px, things off-screen, blank or black areas, the map or units not visible, anything that looks broken.
+If something is wrong, fix it and return the changed files plus a REPORT. Keep every test passing.
+If nothing needs fixing, return ONLY a REPORT block whose first line is VISUAL OK, with no FILE blocks.
