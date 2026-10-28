@@ -2,7 +2,7 @@ import type { App, CameraView, UnitView } from '../app';
 import { ControlInventory } from '../ui/controls';
 import type { ScreenId } from '../ui/router';
 import type { WorldState } from '../sim/types';
-import type { RenderStats } from '../render/renderer';
+import type { RenderStats, ScreenBounds } from '../render/renderer';
 
 export interface TestHook {
   snapshot(): WorldState;
@@ -17,6 +17,7 @@ export interface TestHook {
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): { x: number; z: number } | null;
   unitScreenCentre(id: number): { x: number; y: number } | null;
+  unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];
   camera(): CameraView;
   setSimSpeed(multiplier: number): void;
@@ -43,6 +44,7 @@ export function installTestHook(app: App): void {
     worldToScreen: (x, z) => app.worldToScreen(x, z),
     lastGroundPick: () => app.lastGroundPick(),
     unitScreenCentre: (id) => app.unitScreenCentre(id),
+    unitScreenBounds: (id) => app.unitScreenBounds(id),
     selection: () => app.selection(),
     camera: () => app.camera(),
     setSimSpeed: (multiplier) => {

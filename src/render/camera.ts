@@ -1,9 +1,11 @@
 import {
+  CAMERA_DEFAULT_DISTANCE,
   CAMERA_MAX_DISTANCE,
   CAMERA_MAX_PITCH_DEG,
   CAMERA_MIN_DISTANCE,
   CAMERA_MIN_PITCH_DEG,
   CAMERA_MIN_TERRAIN_CLEARANCE,
+  CAMERA_PITCH_CURVE,
 } from '../sim/tuning';
 
 function clamp(value: number, min: number, max: number): number {
@@ -37,17 +39,26 @@ export class RtsCamera {
 
   constructor(mapSize: number) {
     this.mapSize = mapSize;
-    this.targetX = -50;
-    this.targetZ = -50;
-    this.distance = 60;
+    this.targetX = 0;
+    this.targetZ = 0;
+    this.distance = CAMERA_DEFAULT_DISTANCE;
     this.yaw = Math.PI / 4;
   }
 
+  /**
+   * Pitch rises from `CAMERA_MIN_PITCH_DEG` when fully zoomed in to
+   * `CAMERA_MAX_PITCH_DEG` when fully zoomed out. The interpolation is eased
+   * (`CAMERA_PITCH_CURVE`) rather than linear so the default zoom sits at a
+   * readable ~50 degrees instead of a flat, top-down-looking 45.
+   */
   get pitch(): number {
     const distance = clamp(this.distance, CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
     const t =
       (distance - CAMERA_MIN_DISTANCE) / (CAMERA_MAX_DISTANCE - CAMERA_MIN_DISTANCE);
-    return degToRad(CAMERA_MIN_PITCH_DEG + t * (CAMERA_MAX_PITCH_DEG - CAMERA_MIN_PITCH_DEG));
+    const eased = Math.pow(clamp(t, 0, 1), CAMERA_PITCH_CURVE);
+    return degToRad(
+      CAMERA_MIN_PITCH_DEG + eased * (CAMERA_MAX_PITCH_DEG - CAMERA_MIN_PITCH_DEG),
+    );
   }
 
   setDistance(distance: number): void {

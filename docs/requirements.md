@@ -30,7 +30,7 @@
 | LIFE-01 | Lifecycle events deduplicate pause and map back to pause plus back. |
 | WD-01 | Watchdog freeze and recover fire once per episode and reset on beat. |
 | WD-02 | Suspended watchdog suppresses freezes and resets clocks on unsuspend. |
-| WD-03 | Global error capture records errors and rejects promises. |
+| WD-03 | Global error capture records errors and rejected promises. |
 | WD-04 | A frozen sim shows the recovery screen with all recovery controls. |
 | UI-01 | Every screen mounts and unmounts without leaving DOM nodes behind. |
 | UI-02 | Overlays stack and back pops settings then pause to inGame. |
@@ -72,4 +72,6 @@
 | INP-04 | Camera pan, zoom, rotate and edge clamping work by keyboard, mouse and touch. |
 | INP-05 | HUD button presses never issue map orders. |
 | PLAY-01 | Full skirmish flow reaches results and Play again starts a fresh 4v4 match. |
+| PLAY-02 | A real drag-select then right-click on a visible ground point moves every selected tank. |
 | VIS-01 | The in-game view renders the 8-unit battlefield with many colours. |
+| VIS-02 | At the default camera a player tank projects to at least 30 px on its longer side. |

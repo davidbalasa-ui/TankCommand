@@ -142,9 +142,6 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
     for (const point of SAMPLE_POINTS) {
       const label = `(${point.x}, ${point.z}) at distance ${setting.distance}`;
 
-      // Every sample starts from a known selection state: an order tap can only
-      // be a move when something is selected, and a corner tap with no selection
-      // would deselect rather than pick.
       if (touch) {
         await deselect.tap();
       } else {
@@ -160,12 +157,6 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
         if (!current) {
           return;
         }
-        // Centre the camera on the tank at a comfortable zoom, then click at the
-        // unit's picking centre (the same projection `pickUnit` compares against
-        // its radius). Clicking at the ground base — what `worldToScreen` returns
-        // — is not the same thing: the pick centre sits UNIT_PICK_HEIGHT above
-        // the base, and at distance 20 that offset is over the 24 px pick radius
-        // on wide viewports.
         await setCamera(page, {
           targetX: current.x,
           targetZ: current.z,
@@ -200,8 +191,6 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
       await orderAt(page, screen.x, screen.y, touch);
       await freezeAfterNextStep(page);
 
-      // Raw picking: must land on the requested ground point at every zoom, for
-      // every sample, reachable or not.
       const picked = await page.evaluate(() => window.__TC_TEST__?.lastGroundPick() ?? null);
       expect(picked, label).not.toBeNull();
       expect(
@@ -233,14 +222,25 @@ test('[INP-02] box selection selects exactly the own tanks in the box', async ({
   await enterGame(page);
   const own = (await units(page)).filter((unit) => unit.owner === 1);
   expect(own.length).toBe(4);
+
+  // The box is built from the same screen point that clicking a tank tests
+  // (`unitScreenCentre`), because box selection and click selection must agree
+  // on where a tank is; `worldToScreen` returns the ground base, a model-height
+  // lower, and a tight box around it can miss the tank's pick centre.
   const screens = await page.evaluate(
-    (list) =>
-      list.map((unit) => ({
-        id: unit.id,
-        screen: window.__TC_TEST__?.worldToScreen(unit.x, unit.z) ?? { x: 0, y: 0 },
-      })),
-    own.map((unit) => ({ id: unit.id, x: unit.x, z: unit.z })),
+    (ids) =>
+      ids
+        .map((id) => ({
+          id,
+          screen: window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+        }))
+        .filter(
+          (entry): entry is { id: number; screen: { x: number; y: number } } =>
+            entry.screen !== null,
+        ),
+    own.map((unit) => unit.id),
   );
+  expect(screens.length).toBe(4);
 
   let chosen: { ids: number[]; start: { x: number; y: number }; end: { x: number; y: number } } | null =
     null;
@@ -503,6 +503,181 @@ test('[PLAY-01] full skirmish flow reaches results and Play again starts a fresh
   await expect.poll(async () => (await units(page)).length).toBe(8);
 });
 
+interface OrderCandidate {
+  screen: { x: number; y: number };
+  world: { x: number; z: number };
+  minTankDistance: number;
+}
+
+/**
+ * Visible ground points in the upper part of the screen, farthest from the tanks
+ * first. A player picks somewhere ahead of their units, so the candidates are
+ * restricted to that band; ordering by clearance guarantees the tanks have room
+ * to drive and cannot be at their destination already.
+ */
+async function findOrderCandidates(page: Page, tanks: TestUnit[]): Promise<OrderCandidate[]> {
+  return page.evaluate((list) => {
+    const hook = window.__TC_TEST__;
+    const canvas = document.querySelector('canvas');
+    if (!hook || !canvas) {
+      return [];
+    }
+    const rect = canvas.getBoundingClientRect();
+    const cam = hook.camera();
+    const candidates: OrderCandidate[] = [];
+    for (let dx = -48; dx <= 48; dx += 2) {
+      for (let dz = -48; dz <= 48; dz += 2) {
+        const wx = cam.targetX + dx;
+        const wz = cam.targetZ + dz;
+        if (Math.abs(wx) > 78 || Math.abs(wz) > 78) {
+          continue;
+        }
+        const screen = hook.worldToScreen(wx, wz);
+        if (screen.x < rect.left + 50 || screen.x > rect.right - 50) {
+          continue;
+        }
+        if (screen.y < rect.top + 58 || screen.y > rect.bottom - 40) {
+          continue;
+        }
+        if ((screen.y - rect.top) / rect.height > 0.45) {
+          continue;
+        }
+        let minDistance = Number.POSITIVE_INFINITY;
+        for (const tank of list) {
+          minDistance = Math.min(minDistance, Math.hypot(wx - tank.x, wz - tank.z));
+        }
+        if (minDistance < 9) {
+          continue;
+        }
+        candidates.push({ screen, world: { x: wx, z: wz }, minTankDistance: minDistance });
+      }
+    }
+    candidates.sort((a, b) => b.minTankDistance - a.minTankDistance);
+    return candidates.slice(0, 10);
+  }, tanks.map((tank) => ({ x: tank.x, z: tank.z })));
+}
+
+test('[PLAY-02] drag-select then right-click a visible ground point moves every tank', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await enterGame(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().units ?? 0))
+    .toBe(8);
+
+  const own = (await units(page)).filter((unit) => unit.owner === 1);
+  expect(own.length).toBe(4);
+
+  const centres = await page.evaluate(
+    (ids) => ids.map((id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null),
+    own.map((unit) => unit.id),
+  );
+  const points = centres.filter((entry): entry is { x: number; y: number } => entry !== null);
+  expect(points.length).toBe(4);
+  if (points.length !== 4) {
+    return;
+  }
+
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+
+  await page.mouse.move(minX - 18, minY - 18);
+  await page.mouse.down();
+  await page.mouse.move(maxX + 18, maxY + 18, { steps: 8 });
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).length)
+    .toBe(4);
+  const selected = await page.evaluate(() => window.__TC_TEST__?.selection() ?? []);
+  expect(selected).toHaveLength(4);
+
+  const candidates = await findOrderCandidates(page, own);
+  expect(candidates.length, 'a visible ground point clear of the tanks').toBeGreaterThan(0);
+  if (candidates.length === 0) {
+    return;
+  }
+
+  // Group moves give every tank its own formation slot, so the ordered goal is
+  // near the click but not necessarily on it. Try the clearest visible points
+  // until the simulation accepts the whole group's order with enough room for
+  // every tank to make a visible move.
+  const goals = new Map<number, { x: number; z: number }>();
+  let chosen: OrderCandidate | null = null;
+  for (const candidate of candidates) {
+    if (candidate.minTankDistance < 12) {
+      continue;
+    }
+    await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
+    await page.mouse.click(candidate.screen.x, candidate.screen.y, { button: 'right' });
+    await freezeAfterNextStep(page);
+    const snapshot = await units(page);
+    const attempt = new Map<number, { x: number; z: number }>();
+    let accepted = true;
+    for (const id of selected) {
+      const start = snapshot.find((unit) => unit.id === id);
+      if (!start || start.orderX === null || start.orderZ === null) {
+        accepted = false;
+        break;
+      }
+      const goal = { x: start.orderX, z: start.orderZ };
+      if (Math.hypot(goal.x - candidate.world.x, goal.z - candidate.world.z) > 8.5) {
+        accepted = false;
+        break;
+      }
+      if (Math.hypot(goal.x - start.x, goal.z - start.z) < 4.5) {
+        accepted = false;
+        break;
+      }
+      attempt.set(id, goal);
+    }
+    await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
+    if (accepted) {
+      chosen = candidate;
+      goals.clear();
+      for (const [id, goal] of attempt) {
+        goals.set(id, goal);
+      }
+      break;
+    }
+  }
+
+  expect(chosen, 'the right-click issued a move order for the whole group').not.toBeNull();
+  if (!chosen) {
+    return;
+  }
+
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(4));
+  const before = await units(page);
+  await page.waitForTimeout(3000);
+  const after = await units(page);
+
+  for (const id of selected) {
+    const start = before.find((unit) => unit.id === id);
+    const end = after.find((unit) => unit.id === id);
+    const goal = goals.get(id);
+    expect(start, `tank ${id} exists before`).toBeDefined();
+    expect(end, `tank ${id} exists after`).toBeDefined();
+    expect(goal, `tank ${id} was given a goal`).toBeDefined();
+    if (!start || !end || !goal) {
+      return;
+    }
+
+    const closedOnGoal =
+      Math.hypot(start.x - goal.x, start.z - goal.z) -
+      Math.hypot(end.x - goal.x, end.z - goal.z);
+    expect(closedOnGoal, `tank ${id} drove toward its ordered goal`).toBeGreaterThan(3);
+
+    const closedOnClick =
+      Math.hypot(start.x - chosen.world.x, start.z - chosen.world.z) -
+      Math.hypot(end.x - chosen.world.x, end.z - chosen.world.z);
+    expect(closedOnClick, `tank ${id} moved toward the clicked point`).toBeGreaterThan(3);
+  }
+});
+
 test('[VIS-01] in-game screenshot is non-blank, colourful and shows eight units', async ({ page }) => {
   await enterGame(page);
   await expect
@@ -516,4 +691,40 @@ test('[VIS-01] in-game screenshot is non-blank, colourful and shows eight units'
   expect(countDistinctPngColors(screenshot)).toBeGreaterThan(20);
   const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());
   expect(stats?.units).toBe(8);
+});
+
+test('[VIS-02] a player tank is at least 30 px on its longer side at the default camera', async ({
+  page,
+}) => {
+  await enterGame(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().loadedModels ?? []))
+    .toContain('unit.human.poc_tank');
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().units ?? 0))
+    .toBe(8);
+
+  const cam = await camera(page);
+  expect(cam.distance).toBeCloseTo(40, 0);
+  const pitchDeg = (cam.pitch * 180) / Math.PI;
+  expect(pitchDeg).toBeGreaterThan(45);
+  expect(pitchDeg).toBeLessThan(55);
+
+  const own = (await units(page)).filter((unit) => unit.owner === 1);
+  expect(own.length).toBe(4);
+  for (const unit of own) {
+    const bounds = await page.evaluate(
+      (id) => window.__TC_TEST__?.unitScreenBounds(id) ?? null,
+      unit.id,
+    );
+    expect(bounds, `bounds for tank ${unit.id}`).not.toBeNull();
+    if (!bounds) {
+      return;
+    }
+    const longerSide = Math.max(bounds.width, bounds.height);
+    expect(
+      longerSide,
+      `tank ${unit.id} projects to ${bounds.width.toFixed(1)}x${bounds.height.toFixed(1)} px`,
+    ).toBeGreaterThanOrEqual(30);
+  }
 });

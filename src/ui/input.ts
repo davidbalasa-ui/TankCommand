@@ -283,7 +283,11 @@ export class InputController {
         return;
       }
 
-      if (info.downUnit === null && info.downGround && total > BOX_DRAG_THRESHOLD) {
+      // One-finger drag always pans. It must not matter whether the press landed
+      // on a tank: a player who starts a drag on top of their own unit still
+      // expects the camera to follow, and gating on `downUnit === null` made the
+      // gesture silently do nothing whenever a tank was under the finger.
+      if (info.downGround && total > BOX_DRAG_THRESHOLD) {
         if (this.panPointerId === null) {
           this.panPointerId = event.pointerId;
           this.panGrab = info.downGround;
@@ -466,6 +470,12 @@ export class InputController {
     this.selectionBox.style.height = `${height}px`;
   }
 
+  /**
+   * Box selection tests the same point that `pickUnit` uses for click selection,
+   * so a box drawn around a tank always selects it. Testing the ground base
+   * instead put the box a model-height away from the clickable point, and a
+   * tight box could then select three of four tanks.
+   */
   private finishBox(x: number, y: number): void {
     this.selectionBox.style.display = 'none';
     if (!this.boxStart) {
@@ -481,7 +491,10 @@ export class InputController {
       if (unit.owner !== 1) {
         continue;
       }
-      const screen = this.host.renderView.worldToScreen(unit.x, unit.z);
+      const screen = this.host.renderView.unitScreenCentre(unit.id);
+      if (!screen) {
+        continue;
+      }
       if (screen.x >= left && screen.x <= right && screen.y >= top && screen.y <= bottom) {
         selected.push(unit.id);
       }

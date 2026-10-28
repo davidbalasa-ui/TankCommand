@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
-import { createThreeDecoders, fallbackModel } from '../assets/threeDecoders';
-import { heightAt, slopeAt, type MapDef } from '../sim/map';
-import { MAX_SLOPE, UNIT_RADIUS } from '../sim/tuning';
+import { createThreeDecoders } from '../assets/threeDecoders';
+import { heightAt, slopeAt } from '../sim/map';
+import { MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
 import type { UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 
@@ -19,9 +19,17 @@ const TURRET_NODES = [
   'Rack',
   'Antenna',
 ];
+const TURRET_PIVOT_X = -0.3;
+const UNIT_PICK_HEIGHT = 1.2;
+const CAMERA_FOV_DEG = 48;
+const SKIRT_DEPTH = 10;
+const SKY_ZENITH = '#16233a';
+const SKY_MID = '#4d6b8c';
+const SKY_HORIZON = '#b9a98d';
+const SKIRT_COLOR = 0x3c4234;
+const FAR_COLOR = 0x2f3529;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
-const UNIT_PICK_HEIGHT = 1.2;
 
 export interface RenderStats {
   loadedModels: string[];
@@ -29,6 +37,13 @@ export interface RenderStats {
   drawCalls: number;
   frame: number;
   units: number;
+}
+
+export interface ScreenBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -74,33 +89,31 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 /**
- * Height of the *rendered* terrain surface at (x, z).
+ * World-space bounds of the meshes under `root` that are actually drawn.
  *
- * `heightAt` interpolates the heightmap bilinearly, but the drawn mesh is two
- * triangles per cell, so its surface is piecewise linear across the cell
- * diagonal (a-c-b / b-c-d, i.e. the diagonal u + v = 1). Projecting a ground
- * point with the bilinear height while picking against the mesh leaves a
- * systematic offset that grows on steep cells, which is exactly the error ground
- * picking must not have. Reproducing the mesh interpolation here makes
- * `worldToScreen` and the pick raycast exact inverses of each other.
+ * The PoC glb ships with a 200x200 ground `Plane` used by its render setup, and
+ * `Box3.setFromObject` walks *every* child — including ones with
+ * `visible === false`. Measuring that plane made the model's footprint 200
+ * units instead of ~4, which collapsed the scale factor and drew the tanks as a
+ * couple of pixels inside their selection rings; the same inflated box also made
+ * `unitScreenBounds` report a huge rectangle, so a screen-size check could pass
+ * without ever looking at the tank itself. Measuring each visible mesh with
+ * `Box3.setFromObject` and unioning the results keeps both numbers honest.
  */
-function surfaceHeightAt(map: MapDef, x: number, z: number): number {
-  const half = map.size / 2;
-  const gx = clamp((x + half) / map.cellSize, 0, map.cols - 0.000001);
-  const gz = clamp((z + half) / map.cellSize, 0, map.rows - 0.000001);
-  const ix = Math.min(map.cols - 1, Math.floor(gx));
-  const iz = Math.min(map.rows - 1, Math.floor(gz));
-  const u = gx - ix;
-  const v = gz - iz;
-  const stride = map.cols + 1;
-  const h00 = map.heights[iz * stride + ix] ?? 0;
-  const h10 = map.heights[iz * stride + ix + 1] ?? 0;
-  const h01 = map.heights[(iz + 1) * stride + ix] ?? 0;
-  const h11 = map.heights[(iz + 1) * stride + ix + 1] ?? 0;
-  if (u + v <= 1) {
-    return h00 + (h10 - h00) * u + (h01 - h00) * v;
-  }
-  return h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
+function unitBounds(root: THREE.Object3D): THREE.Box3 {
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3();
+  const meshBounds = new THREE.Box3();
+  root.traverseVisible((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+    meshBounds.setFromObject(object);
+    if (!meshBounds.isEmpty()) {
+      bounds.union(meshBounds);
+    }
+  });
+  return bounds;
 }
 
 function tintMaterial(
@@ -108,8 +121,6 @@ function tintMaterial(
   tint: THREE.Color | null,
   darken: boolean,
 ): void {
-  // `'color' in material` narrows the property to `unknown`, so the check is
-  // type-safe without asserting a concrete material subclass.
   if (!('color' in material)) {
     return;
   }
@@ -163,6 +174,27 @@ function darkenMaterials(root: THREE.Object3D): void {
   remapMeshMaterials(root, (material) => cloneWithTint(material, null, true));
 }
 
+function createFallbackTank(): THREE.Group {
+  const group = new THREE.Group();
+  const hull = new THREE.Mesh(
+    new THREE.BoxGeometry(TANK_LENGTH, 1.1, 2.4),
+    new THREE.MeshStandardMaterial({ color: 0x5a7d3a, roughness: 0.9 }),
+  );
+  hull.position.y = 0.55;
+  const turret = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.7, 1.4),
+    new THREE.MeshStandardMaterial({ color: 0x46632e, roughness: 0.9 }),
+  );
+  turret.position.set(0, 1.4, 0);
+  const pivot = new THREE.Object3D();
+  pivot.name = 'TurretPivot';
+  pivot.position.set(TURRET_PIVOT_X, 0, 0);
+  pivot.add(turret);
+  group.add(hull);
+  group.add(pivot);
+  return group;
+}
+
 export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -198,6 +230,10 @@ export class RenderView {
   private readonly previousSnapshots = new Map<number, PositionSnapshot>();
   private readonly currentSnapshots = new Map<number, PositionSnapshot>();
   private terrain: THREE.Mesh | null = null;
+  private skirt: THREE.Mesh | null = null;
+  private farPlane: THREE.Mesh | null = null;
+  private pickTargets: THREE.Object3D[] = [];
+  private skyTexture: THREE.Texture | null = null;
   private templateRoot: THREE.Group | null = null;
   private directional: THREE.DirectionalLight;
   private lightTarget: THREE.Object3D;
@@ -211,17 +247,18 @@ export class RenderView {
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
     this.world = world;
     this.renderer = createRenderer(canvas);
-    this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 4000);
     this.rtsCamera = new RtsCamera(world.map.size);
-    const firstOwn = world.units.find((unit) => unit.owner === 1);
-    if (firstOwn) {
-      this.rtsCamera.setTarget(firstOwn.x, firstOwn.z);
+    const ownUnits = world.units.filter((unit) => unit.owner === 1);
+    if (ownUnits.length > 0) {
+      const centerX = ownUnits.reduce((sum, unit) => sum + unit.x, 0) / ownUnits.length;
+      const centerZ = ownUnits.reduce((sum, unit) => sum + unit.z, 0) / ownUnits.length;
+      this.rtsCamera.setTarget(centerX, centerZ);
     } else {
       this.rtsCamera.setTarget(0, 0);
     }
 
-    this.scene.background = new THREE.Color('#090D16');
-    this.directional = new THREE.DirectionalLight(0xffffff, 2.2);
+    this.directional = new THREE.DirectionalLight(0xfff3d6, 2.8);
     this.lightTarget = new THREE.Object3D();
     this.buildScene();
 
@@ -295,8 +332,13 @@ export class RenderView {
     this.camera.updateMatrixWorld();
   }
 
+  /**
+   * Raycasts the rendered terrain *and* the ground skirt that wraps the map, so
+   * a right-click on any visible ground issues an order. Points outside the map
+   * are clamped into it by the simulation.
+   */
   pickGround(clientX: number, clientY: number): { x: number; z: number } | null {
-    if (!this.terrain) {
+    if (this.pickTargets.length === 0) {
       return null;
     }
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -305,7 +347,7 @@ export class RenderView {
       -((clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.camera);
-    const hits = this.raycaster.intersectObject(this.terrain, false);
+    const hits = this.raycaster.intersectObjects(this.pickTargets, false);
     const first = hits[0];
     if (!first) {
       return null;
@@ -329,6 +371,42 @@ export class RenderView {
       heightAt(this.world.map, unit.x, unit.z) + UNIT_PICK_HEIGHT,
       unit.z,
     );
+  }
+
+  /** Canvas-space bounding box of a unit's *visible* rendered model. */
+  unitScreenBounds(id: number): ScreenBounds | null {
+    const visual = this.unitRoots.get(id);
+    if (!visual) {
+      return null;
+    }
+    this.camera.updateMatrixWorld();
+    const box = unitBounds(visual.root);
+    if (box.isEmpty()) {
+      return null;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let corner = 0; corner < 8; corner += 1) {
+      const point = new THREE.Vector3(
+        (corner & 1) === 1 ? box.max.x : box.min.x,
+        (corner & 2) === 2 ? box.max.y : box.min.y,
+        (corner & 4) === 4 ? box.max.z : box.min.z,
+      );
+      point.project(this.camera);
+      const x = rect.left + (point.x * 0.5 + 0.5) * rect.width;
+      const y = rect.top + (-point.y * 0.5 + 0.5) * rect.height;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      return null;
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
   pickUnit(
@@ -372,8 +450,18 @@ export class RenderView {
     return pool[0]?.id ?? null;
   }
 
+  /**
+   * Projection of the *rendered* terrain surface at (x, z).
+   *
+   * The drawn mesh is two triangles per cell, so its surface is piecewise linear
+   * across the cell diagonal (a-c-b / b-c-d), whereas `heightAt` interpolates
+   * bilinearly. Projecting with the bilinear height while picking against the
+   * mesh leaves a systematic offset that grows on steep cells, which is exactly
+   * the error ground picking must not have. Reproducing the mesh interpolation
+   * here makes `worldToScreen` and the pick raycast exact inverses.
+   */
   worldToScreen(x: number, z: number): { x: number; y: number } {
-    const screen = this.projectPoint(x, surfaceHeightAt(this.world.map, x, z), z);
+    const screen = this.projectPoint(x, this.surfaceHeightAt(x, z), z);
     return screen ?? { x: 0, y: 0 };
   }
 
@@ -438,29 +526,166 @@ export class RenderView {
     this.disposed = true;
     this.observer.disconnect();
     this.overlay.remove();
+    this.skyTexture?.dispose();
     this.loader.release(TANK_ASSET_ID);
     this.renderer.dispose();
   }
 
+  private surfaceHeightAt(x: number, z: number): number {
+    const map = this.world.map;
+    const half = map.size / 2;
+    const gx = clamp((x + half) / map.cellSize, 0, map.cols - 0.000001);
+    const gz = clamp((z + half) / map.cellSize, 0, map.rows - 0.000001);
+    const ix = Math.min(map.cols - 1, Math.floor(gx));
+    const iz = Math.min(map.rows - 1, Math.floor(gz));
+    const u = gx - ix;
+    const v = gz - iz;
+    const stride = map.cols + 1;
+    const h00 = map.heights[iz * stride + ix] ?? 0;
+    const h10 = map.heights[iz * stride + ix + 1] ?? 0;
+    const h01 = map.heights[(iz + 1) * stride + ix] ?? 0;
+    const h11 = map.heights[(iz + 1) * stride + ix + 1] ?? 0;
+    if (u + v <= 1) {
+      return h00 + (h10 - h00) * u + (h01 - h00) * v;
+    }
+    return h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
+  }
+
   private buildScene(): void {
-    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x223322, 1.2);
+    this.skyTexture = this.buildSky();
+    this.scene.background = this.skyTexture;
+
+    const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
     this.scene.add(hemisphere);
 
     this.directional.castShadow = true;
     this.directional.shadow.mapSize.set(1024, 1024);
+    this.directional.shadow.bias = -0.0008;
+    this.directional.shadow.normalBias = 0.6;
     this.directional.shadow.camera.left = -30;
     this.directional.shadow.camera.right = 30;
     this.directional.shadow.camera.top = 30;
     this.directional.shadow.camera.bottom = -30;
     this.directional.shadow.camera.near = 1;
-    this.directional.shadow.camera.far = 180;
+    this.directional.shadow.camera.far = 240;
     this.scene.add(this.directional);
     this.scene.add(this.lightTarget);
     this.directional.target = this.lightTarget;
 
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
+    this.skirt = this.buildSkirt();
+    if (this.skirt) {
+      this.scene.add(this.skirt);
+    }
+    this.farPlane = this.buildFarPlane();
+    if (this.farPlane) {
+      this.scene.add(this.farPlane);
+    }
     this.scene.add(this.buildBorder());
+
+    this.pickTargets = [this.terrain, this.skirt, this.farPlane].filter(
+      (mesh): mesh is THREE.Mesh => mesh !== null,
+    );
+  }
+
+  /** Vertical sky gradient so the screen never shows a flat void above or below. */
+  private buildSky(): THREE.Texture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 256;
+    const context = canvas.getContext('2d');
+    if (context) {
+      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, SKY_ZENITH);
+      gradient.addColorStop(0.55, SKY_MID);
+      gradient.addColorStop(1, SKY_HORIZON);
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private mapFloor(): number {
+    const heights = this.world.map.heights;
+    let minHeight = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < heights.length; index += 1) {
+      const value = heights[index] ?? 0;
+      if (value < minHeight) {
+        minHeight = value;
+      }
+    }
+    return (Number.isFinite(minHeight) ? minHeight : 0) - SKIRT_DEPTH;
+  }
+
+  /** Vertical curtain around the map edge so the terrain never meets a void. */
+  private buildSkirt(): THREE.Mesh | null {
+    const map = this.world.map;
+    const half = map.size / 2;
+    const stride = map.cols + 1;
+    const floor = this.mapFloor();
+
+    const read = (ix: number, iz: number): { x: number; y: number; z: number } => ({
+      x: -half + ix * map.cellSize,
+      y: map.heights[iz * stride + ix] ?? 0,
+      z: -half + iz * map.cellSize,
+    });
+
+    const loop: Array<{ x: number; y: number; z: number }> = [];
+    for (let ix = 0; ix <= map.cols; ix += 1) {
+      loop.push(read(ix, 0));
+    }
+    for (let iz = 1; iz <= map.rows; iz += 1) {
+      loop.push(read(map.cols, iz));
+    }
+    for (let ix = map.cols - 1; ix >= 0; ix -= 1) {
+      loop.push(read(ix, map.rows));
+    }
+    for (let iz = map.rows - 1; iz >= 1; iz -= 1) {
+      loop.push(read(0, iz));
+    }
+    if (loop.length < 2) {
+      return null;
+    }
+
+    const positions: number[] = [];
+    for (let index = 0; index < loop.length; index += 1) {
+      const a = loop[index];
+      const b = loop[(index + 1) % loop.length];
+      if (!a || !b) {
+        continue;
+      }
+      positions.push(a.x, a.y, a.z, a.x, floor, a.z, b.x, b.y, b.z);
+      positions.push(b.x, b.y, b.z, a.x, floor, a.z, b.x, floor, b.z);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.computeVertexNormals();
+    const material = new THREE.MeshStandardMaterial({
+      color: SKIRT_COLOR,
+      roughness: 1,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    return new THREE.Mesh(geometry, material);
+  }
+
+  private buildFarPlane(): THREE.Mesh {
+    const map = this.world.map;
+    const geometry = new THREE.PlaneGeometry(map.size * 12, map.size * 12);
+    const material = new THREE.MeshStandardMaterial({
+      color: FAR_COLOR,
+      roughness: 1,
+      metalness: 0,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = this.mapFloor() - 0.05;
+    return mesh;
   }
 
   private buildTerrain(): THREE.Mesh {
@@ -469,10 +694,26 @@ export class RenderView {
     const vertexCount = stride * (map.rows + 1);
     const positions = new Float32Array(vertexCount * 3);
     const colors = new Float32Array(vertexCount * 3);
-    const low = new THREE.Color(0x6b6b3a);
-    const high = new THREE.Color(0x8a8a8a);
-    const rock = new THREE.Color(0x3a3a3a);
     const half = map.size / 2;
+
+    let minHeight = Number.POSITIVE_INFINITY;
+    let maxHeight = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < map.heights.length; index += 1) {
+      const value = map.heights[index] ?? 0;
+      if (value < minHeight) {
+        minHeight = value;
+      }
+      if (value > maxHeight) {
+        maxHeight = value;
+      }
+    }
+    const heightSpan = Math.max(0.001, maxHeight - minHeight);
+
+    const valley = new THREE.Color(0x4c6b33);
+    const meadow = new THREE.Color(0x82904c);
+    const tan = new THREE.Color(0xb79b69);
+    const rock = new THREE.Color(0x93938f);
+    const blockedRock = new THREE.Color(0x2a2a29);
 
     for (let iz = 0; iz <= map.rows; iz += 1) {
       const z = -half + iz * map.cellSize;
@@ -484,12 +725,14 @@ export class RenderView {
         positions[index * 3 + 1] = y;
         positions[index * 3 + 2] = z;
 
-        const heightT = clamp((y + 4) / 12, 0, 1);
-        const color = low.clone().lerp(high, heightT);
+        const heightNorm = clamp((y - minHeight) / heightSpan, 0, 1);
         const slope = slopeAt(map, x, z);
-        color.lerp(rock, clamp(slope / (MAX_SLOPE * 0.85), 0, 1));
+        const slopeNorm = clamp(slope / MAX_SLOPE, 0, 1);
+        const color = valley.clone().lerp(meadow, clamp(heightNorm * 2.2, 0, 1));
+        color.lerp(tan, slopeNorm * 0.8);
+        color.lerp(rock, clamp((heightNorm - 0.45) / 0.55, 0, 1) * 0.85);
         if (slope > MAX_SLOPE) {
-          color.multiplyScalar(0.55);
+          color.lerp(blockedRock, 0.82);
         }
         colors[index * 3] = color.r;
         colors[index * 3 + 1] = color.g;
@@ -518,6 +761,7 @@ export class RenderView {
       vertexColors: true,
       roughness: 1,
       metalness: 0,
+      flatShading: true,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
@@ -534,7 +778,7 @@ export class RenderView {
       new THREE.Vector3(-half, heightAt(map, -half, half) + 0.25, half),
     ];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0x9fb6d6 });
+    const material = new THREE.LineBasicMaterial({ color: 0xdfe8f5 });
     return new THREE.LineLoop(geometry, material);
   }
 
@@ -543,7 +787,7 @@ export class RenderView {
     const targetZ = this.rtsCamera.targetZ;
     const targetY = heightAt(this.world.map, targetX, targetZ);
     this.lightTarget.position.set(targetX, targetY, targetZ);
-    this.directional.position.set(targetX + 30, targetY + 50, targetZ + 20);
+    this.directional.position.set(targetX + 42, targetY + 60, targetZ + 26);
     this.directional.shadow.camera.left = -30;
     this.directional.shadow.camera.right = 30;
     this.directional.shadow.camera.top = 30;
@@ -615,15 +859,20 @@ export class RenderView {
   }
 
   private prepareTemplate(model: THREE.Object3D): THREE.Group {
+    // The PoC glb contains a 200x200 ground plane used by its render setup. It
+    // must not render and must not contribute to the measured bounds: leaving it
+    // in the graph made the measured footprint 200 units instead of ~4, which
+    // collapsed the scale factor and drew tanks as a few pixels.
     const plane = model.getObjectByName('Plane');
     if (plane) {
       plane.visible = false;
+      plane.removeFromParent();
     }
 
     model.updateMatrixWorld(true);
     const pivot = new THREE.Object3D();
     pivot.name = 'TurretPivot';
-    pivot.position.set(-0.3, 0, 0);
+    pivot.position.set(TURRET_PIVOT_X, 0, 0);
     model.add(pivot);
     model.updateMatrixWorld(true);
     for (const name of TURRET_NODES) {
@@ -632,31 +881,33 @@ export class RenderView {
         pivot.attach(node);
       }
     }
-
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const maxDimension = Math.max(size.x, size.z, 0.001);
-    const targetLength = UNIT_RADIUS * 2.8;
-    const scale = targetLength / maxDimension;
-    model.scale.setScalar(scale);
     model.updateMatrixWorld(true);
 
-    const scaledBox = new THREE.Box3().setFromObject(model);
-    const center = new THREE.Vector3();
-    scaledBox.getCenter(center);
-    model.position.x -= center.x;
-    model.position.z -= center.z;
-    model.position.y -= scaledBox.min.y;
+    const bounds = unitBounds(model);
+    if (!bounds.isEmpty()) {
+      const size = new THREE.Vector3();
+      bounds.getSize(size);
+      const footprint = Math.max(size.x, size.z, 0.0001);
+      model.scale.multiplyScalar(TANK_LENGTH / footprint);
+      model.updateMatrixWorld(true);
+
+      const scaledBounds = unitBounds(model);
+      const centre = new THREE.Vector3();
+      scaledBounds.getCenter(centre);
+      model.position.x -= centre.x;
+      model.position.z -= centre.z;
+      model.position.y -= scaledBounds.min.y;
+    }
 
     const root = new THREE.Group();
     root.add(model);
+    root.updateMatrixWorld(true);
     return root;
   }
 
   private prepareFallback(): THREE.Group {
     const root = new THREE.Group();
-    root.add(fallbackModel());
+    root.add(createFallbackTank());
     return root;
   }
 
@@ -672,13 +923,10 @@ export class RenderView {
     let root: THREE.Object3D;
     if (this.templateRoot) {
       root = this.templateRoot.clone(true);
-      cloneMaterials(root, unit.owner === 2);
     } else {
-      root = new THREE.Group();
-      const mesh = fallbackModel();
-      root.add(mesh);
-      cloneMaterials(root, unit.owner === 2);
+      root = this.prepareFallback();
     }
+    cloneMaterials(root, unit.owner === 2);
     root.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.castShadow = true;
@@ -742,7 +990,7 @@ export class RenderView {
       }
       let ring = this.selectionRings.get(id);
       if (!ring) {
-        const geometry = new THREE.RingGeometry(1.9, 2.2, 32);
+        const geometry = new THREE.RingGeometry(2.6, 3.0, 32);
         const material = new THREE.MeshBasicMaterial({
           color: 0x6cf58a,
           side: THREE.DoubleSide,

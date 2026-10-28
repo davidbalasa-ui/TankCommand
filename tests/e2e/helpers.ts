@@ -32,6 +32,13 @@ export interface GroundPick {
   z: number;
 }
 
+export interface ScreenBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
@@ -53,6 +60,7 @@ export interface TestHook {
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): GroundPick | null;
   unitScreenCentre(id: number): { x: number; y: number } | null;
+  unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];
   camera(): TestCamera;
   setSimSpeed(multiplier: number): void;
