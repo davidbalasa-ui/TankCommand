@@ -3,6 +3,7 @@ import type { WorldState } from '../sim/types';
 import { CAMERA_EDGE_BAND } from '../sim/tuning';
 
 const BOX_DRAG_THRESHOLD = 6;
+const LONG_PRESS_MS = 400;
 
 export interface InputHost {
   canvas: HTMLCanvasElement;
@@ -272,6 +273,15 @@ export class InputController {
         return;
       }
 
+      // A gesture is classified exactly once. If the finger is already panning,
+      // it keeps panning even if the long-press timer fires afterwards: flipping
+      // a running drag into a box-select throws away the camera movement the
+      // player has already made and is never what they asked for.
+      if (this.panPointerId !== null) {
+        this.panBy(event.clientX, event.clientY);
+        return;
+      }
+
       if (this.longPressReady) {
         if (total > BOX_DRAG_THRESHOLD) {
           if (!this.boxSelecting) {
@@ -283,24 +293,14 @@ export class InputController {
         return;
       }
 
-      // One-finger drag always pans. It must not matter whether the press landed
-      // on a tank: a player who starts a drag on top of their own unit still
-      // expects the camera to follow, and gating on `downUnit === null` made the
-      // gesture silently do nothing whenever a tank was under the finger.
       if (info.downGround && total > BOX_DRAG_THRESHOLD) {
-        if (this.panPointerId === null) {
-          this.panPointerId = event.pointerId;
-          this.panGrab = info.downGround;
-        }
-        if (this.panPointerId === event.pointerId && this.panGrab) {
-          const current = this.host.renderView.pickGround(event.clientX, event.clientY);
-          if (current) {
-            const camera = this.host.renderView.getCamera();
-            camera.pan(this.panGrab.x - current.x, this.panGrab.z - current.z);
-            camera.clampTarget();
-            this.host.renderView.applyCamera();
-          }
-        }
+        this.panPointerId = event.pointerId;
+        this.panGrab = info.downGround;
+        // The pan owns the gesture from here on; disarm the long press so it can
+        // never turn this same drag into a selection box.
+        this.clearLongPress();
+        this.longPressReady = false;
+        this.panBy(event.clientX, event.clientY);
       }
       return;
     }
@@ -341,7 +341,7 @@ export class InputController {
       }
       if (this.pointers.size === 0 && this.twoFingerCandidate) {
         const elapsed = performance.now() - this.twoFingerStart;
-        if (this.twoFingerMoved < 10 && elapsed < 400) {
+        if (this.twoFingerMoved < 10 && elapsed < LONG_PRESS_MS) {
           this.host.setSelection([]);
         }
         this.twoFingerCandidate = false;
@@ -416,13 +416,30 @@ export class InputController {
     this.keys.delete(event.key.toLowerCase());
   };
 
+  private panBy(clientX: number, clientY: number): void {
+    if (!this.panGrab) {
+      return;
+    }
+    const current = this.host.renderView.pickGround(clientX, clientY);
+    if (!current) {
+      return;
+    }
+    const camera = this.host.renderView.getCamera();
+    camera.pan(this.panGrab.x - current.x, this.panGrab.z - current.z);
+    camera.clampTarget();
+    this.host.renderView.applyCamera();
+  }
+
   private startLongPress(): void {
     this.clearLongPress();
     this.longPressReady = false;
     this.longPressTimer = window.setTimeout(() => {
       this.longPressTimer = null;
-      this.longPressReady = true;
-    }, 400);
+      // A pan that started first owns the gesture.
+      if (this.panPointerId === null) {
+        this.longPressReady = true;
+      }
+    }, LONG_PRESS_MS);
   }
 
   private clearLongPress(): void {

@@ -2,6 +2,7 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import {
   countDistinctPngColors,
   enterGame,
+  type GroundPick,
   type TestCamera,
   type TestUnit,
 } from './helpers';
@@ -30,11 +31,15 @@ async function orderAt(page: Page, x: number, y: number, touch: boolean): Promis
   }
 }
 
+/**
+ * The camera hook applies the new view synchronously (`applyCamera` updates the
+ * camera matrices), so `worldToScreen` and the pick raycast are already valid on
+ * the next evaluate — no settle time is needed between them.
+ */
 async function setCamera(page: Page, info: Partial<TestCamera>): Promise<void> {
   await page.evaluate((camera) => {
     window.__TC_TEST__?.setCamera(camera);
   }, info);
-  await page.waitForTimeout(80);
 }
 
 async function camera(page: Page): Promise<TestCamera> {
@@ -45,6 +50,107 @@ async function camera(page: Page): Promise<TestCamera> {
     yaw: 0,
     pitch: 0,
   });
+}
+
+/**
+ * Presses a registered HUD control by dispatching a real `click` on the button
+ * inside the page.
+ *
+ * `locator.click()` first runs Playwright's actionability checks (visible,
+ * stable, enabled, receives events), which on a loaded runner can take several
+ * hundred milliseconds. That latency is not part of anything under test, and in
+ * `INP-01` it was long enough for a just-ordered tank to drive to its
+ * destination before the next sample, which then re-ordered it to a point it
+ * was already standing on. Clicking the element directly is the same DOM event
+ * a user's finger produces, without the scheduling noise.
+ */
+async function pressControl(page: Page, controlId: string): Promise<void> {
+  await page
+    .locator(`[data-control-id="${controlId}"]`)
+    .first()
+    .evaluate((element) => {
+      if (element instanceof HTMLElement) {
+        element.click();
+      }
+    });
+}
+
+type CanvasAction = 'left' | 'right' | 'touch';
+
+/**
+ * Delivers one complete press/release on the canvas in a single task, exactly
+ * like a real finger or mouse button, and returns the ground point the input
+ * layer resolved for it.
+ *
+ * Two things make this deterministic where a `locator.click()`/`touchscreen.tap`
+ * was not:
+ *  - the down and the up happen in the same task, so no wall-clock gap can
+ *    elapse between them and a slow runner can never turn a tap into a
+ *    long-press (which would box-select instead of issuing an order);
+ *  - `lastGroundPick()` is read in that same task, so the assertion can never
+ *    accidentally observe the pick left behind by an earlier sample.
+ */
+async function pressCanvas(
+  page: Page,
+  x: number,
+  y: number,
+  action: CanvasAction,
+): Promise<GroundPick | null> {
+  return page.evaluate(
+    (input: { px: number; py: number; mode: CanvasAction }) => {
+      const hook = window.__TC_TEST__;
+      const canvas = document.querySelector('canvas');
+      if (!hook || !canvas) {
+        return null;
+      }
+      const pointerType = input.mode === 'touch' ? 'touch' : 'mouse';
+      const button = input.mode === 'right' ? 2 : 0;
+      const fire = (type: string, buttons: number): void => {
+        canvas.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType,
+            isPrimary: true,
+            clientX: input.px,
+            clientY: input.py,
+            button,
+            buttons,
+          }),
+        );
+      };
+      fire('pointerdown', button === 2 ? 2 : 1);
+      fire('pointerup', 0);
+      return hook.lastGroundPick();
+    },
+    { px: x, py: y, mode: action },
+  );
+}
+
+/**
+ * Smallest screen-space distance between a canvas point and any unit's picking
+ * centre — the same projection `pickUnit` tests against its 24/36 px radius.
+ */
+async function unitClearance(page: Page, x: number, y: number): Promise<number> {
+  return page.evaluate(
+    (point: { px: number; py: number }) => {
+      const hook = window.__TC_TEST__;
+      if (!hook) {
+        return 0;
+      }
+      let closest = Number.POSITIVE_INFINITY;
+      for (const unit of hook.units()) {
+        const centre = hook.unitScreenCentre(unit.id);
+        if (!centre) {
+          continue;
+        }
+        closest = Math.min(closest, Math.hypot(centre.x - point.px, centre.y - point.py));
+      }
+      return Number.isFinite(closest) ? closest : 0;
+    },
+    { px: x, py: y },
+  );
 }
 
 /**
@@ -65,55 +171,83 @@ async function freezeAfterNextStep(page: Page): Promise<void> {
   });
 }
 
-async function dispatchPointer(
-  page: Page,
-  type: string,
-  id: number,
-  x: number,
-  y: number,
-): Promise<void> {
-  await page.evaluate(
-    ({ eventType, pointerId, clientX, clientY }) => {
-      const canvas = document.querySelector('canvas');
-      if (!canvas) {
-        return;
-      }
+interface TouchStep {
+  type: string;
+  id: number;
+  x: number;
+  y: number;
+}
+
+/**
+ * Delivers one complete touch gesture in a single task.
+ *
+ * The events of a real gesture arrive back to back; dispatching them through
+ * separate `page.evaluate` round trips inserts an uncontrolled amount of wall
+ * clock time between them, which on a loaded runner can exceed the 400 ms
+ * long-press threshold — turning a two-frame drag into a long-press box-select
+ * and making a camera test fail purely because the machine was busy.
+ */
+async function dispatchTouch(page: Page, steps: readonly TouchStep[]): Promise<void> {
+  await page.evaluate((events) => {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {
+      return;
+    }
+    for (const event of events) {
       canvas.dispatchEvent(
-        new PointerEvent(eventType, {
+        new PointerEvent(event.type, {
           bubbles: true,
           cancelable: true,
-          pointerId,
+          pointerId: event.id,
           pointerType: 'touch',
-          clientX,
-          clientY,
+          clientX: event.x,
+          clientY: event.y,
           button: 0,
-          buttons: eventType === 'pointerup' ? 0 : 1,
+          buttons: event.type === 'pointerup' ? 0 : 1,
         }),
       );
-    },
-    { eventType: type, pointerId: id, clientX: x, clientY: y },
-  );
+    }
+  }, steps as TouchStep[]);
 }
 
 interface SamplePoint {
   x: number;
   z: number;
-  reachable: boolean;
+  /**
+   * Whether the resulting move target can be asserted, which requires the point
+   * to be a destination the simulation accepts verbatim.
+   */
+  orderTarget: boolean;
 }
 
 /**
- * Two points sit within 10 world units of opposite map corners — the case where
- * ground picking is most likely to break (extreme zoom-out, camera far outside
- * the terrain bounds) — and three sit in the flattened start area at a known
- * distance from every tank, where the sim is guaranteed to accept the
- * destination exactly, so the resulting move order can be asserted too.
+ * Three points inside the flattened player start area plus two near map corners.
+ *
+ * The order-target points sit at radius 12.5 around (-50, -50). `generateMap`
+ * flattens that disc to *exactly* height 0 out to radius 14, so every cell the
+ * point and its neighbours occupy is flat (slope 0 well under `MAX_SLOPE`) —
+ * therefore unblocked, and the region is convex, so a path always exists and
+ * `findPath` appends the clicked point verbatim. Points out in the blend ring
+ * (radius 14-24) are *not* safe: the blend introduces real slope there, a cell
+ * can be blocked, and the sim then correctly redirects the move to the nearest
+ * reachable cell (MOVE-05) — which made this assertion pass or fail depending on
+ * where the tank happened to be standing.
+ *
+ * The 196-216° arc is the sector furthest from every spawn tank, so the tap
+ * stays clear of the 36 px touch pick radius even at the widest zoom (distance
+ * 120 → ~0.26 world units per pixel on the phone), where a tap inside a unit's
+ * radius is *by design* a unit selection rather than a ground order.
+ *
+ * The two corner points (8.5 units from opposite corners) only assert the raw
+ * ground pick: at extreme zoom-out and near the map edge is exactly where
+ * picking breaks, but a corner cell may legitimately be blocked/unreachable.
  */
 const SAMPLE_POINTS: readonly SamplePoint[] = [
-  { x: -68, z: -58, reachable: true },
-  { x: -58, z: -68, reachable: true },
-  { x: -64, z: -64, reachable: true },
-  { x: 74, z: 74, reachable: false }, // 8.5 units from the (80, 80) corner
-  { x: -74, z: 74, reachable: false }, // 8.5 units from the (-80, 80) corner
+  { x: -62.0, z: -53.4, orderTarget: true },
+  { x: -61.2, z: -55.5, orderTarget: true },
+  { x: -60.1, z: -57.3, orderTarget: true },
+  { x: 74, z: 74, orderTarget: false }, // 8.5 units from the (80, 80) corner
+  { x: -74, z: 74, orderTarget: false }, // 8.5 units from the (-80, 80) corner
 ];
 
 const CAMERA_SETTINGS = [
@@ -128,6 +262,7 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
   test.setTimeout(180_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
+  const pickRadius = touch ? 36 : 24;
   const own = (await units(page)).filter((unit) => unit.owner === 1);
   const unit = own[0];
   expect(unit).toBeDefined();
@@ -135,43 +270,39 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
     return;
   }
 
-  const deselect = page.getByRole('button', { name: 'Deselect', exact: true });
-  const stop = page.getByRole('button', { name: 'Stop', exact: true });
-
   for (const setting of CAMERA_SETTINGS) {
     for (const point of SAMPLE_POINTS) {
       const label = `(${point.x}, ${point.z}) at distance ${setting.distance}`;
 
-      if (touch) {
-        await deselect.tap();
-      } else {
-        await deselect.click();
-      }
+      await pressControl(page, 'inGame.deselect');
       await expect
         .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
         .toEqual([]);
 
-      if (point.reachable) {
+      if (point.orderTarget) {
         const current = (await units(page)).find((item) => item.id === unit.id);
         expect(current, label).toBeDefined();
         if (!current) {
           return;
         }
+        // At distance 60 the four tanks are more than 60 px apart on every
+        // viewport, so a press on a tank's picking centre selects that tank and
+        // cannot land on a neighbour.
         await setCamera(page, {
           targetX: current.x,
           targetZ: current.z,
           distance: 60,
           yaw: 0,
         });
-        const unitScreen = await page.evaluate(
+        const centre = await page.evaluate(
           (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
           unit.id,
         );
-        expect(unitScreen, label).not.toBeNull();
-        if (!unitScreen) {
+        expect(centre, label).not.toBeNull();
+        if (!centre) {
           return;
         }
-        await selectUnit(page, unitScreen.x, unitScreen.y, touch);
+        await pressCanvas(page, centre.x, centre.y, touch ? 'touch' : 'left');
         await expect
           .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
           .toContain(unit.id);
@@ -188,32 +319,57 @@ test('[INP-01] ground picks and ground orders land at the picked point across ca
         ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
         point,
       );
-      await orderAt(page, screen.x, screen.y, touch);
-      await freezeAfterNextStep(page);
 
-      const picked = await page.evaluate(() => window.__TC_TEST__?.lastGroundPick() ?? null);
-      expect(picked, label).not.toBeNull();
+      if (point.orderTarget) {
+        // Guards the interaction rather than the requirement: a press inside a
+        // unit's pick radius is a unit selection by design, so a sample that
+        // close could never prove anything about ground orders.
+        const clearance = await unitClearance(page, screen.x, screen.y);
+        expect(
+          clearance,
+          `${label}: the press point is clear of every unit (${clearance.toFixed(1)} px)`,
+        ).toBeGreaterThan(pickRadius + 2);
+      }
+
+      // Raw picking: must land on the requested ground point at every zoom, for
+      // every sample, reachable or not. The pick is read in the same task as the
+      // press, so a stale value from an earlier sample cannot mask a miss.
+      const picked = await pressCanvas(page, screen.x, screen.y, touch ? 'touch' : 'right');
+      expect(picked, `${label}: the press reached the canvas`).not.toBeNull();
       expect(
         Math.hypot((picked?.x ?? 0) - point.x, (picked?.z ?? 0) - point.z),
         `${label}: ground pick (${picked?.x ?? 0}, ${picked?.z ?? 0})`,
       ).toBeLessThanOrEqual(1);
 
-      if (point.reachable) {
-        const ordered = (await units(page)).find((item) => item.id === unit.id);
-        expect(ordered?.orderX, label).not.toBeNull();
-        expect(ordered?.orderZ, label).not.toBeNull();
-        expect(
-          Math.hypot((ordered?.orderX ?? 0) - point.x, (ordered?.orderZ ?? 0) - point.z),
-          `${label}: order (${ordered?.orderX ?? 0}, ${ordered?.orderZ ?? 0})`,
-        ).toBeLessThanOrEqual(1);
-        if (touch) {
-          await stop.tap();
-        } else {
-          await stop.click();
-        }
+      if (point.orderTarget) {
+        // `units()` reports the move target (`orderX/orderZ`) or, for a unit
+        // that has already finished the order, no order at all — `updateOrderPath`
+        // turns an arrived move into `idle`. Standing within 1 unit of the
+        // clicked point is then proof the target was that point; a press that
+        // did nothing leaves the unit wherever it was and still fails, and the
+        // three order-target points are >2 units apart so "already there" can
+        // never be inherited from the previous sample.
+        await expect
+          .poll(
+            async () =>
+              page.evaluate(
+                ({ id, px, pz }) => {
+                  const hook = window.__TC_TEST__;
+                  const ordered = hook?.units().find((item) => item.id === id);
+                  if (!ordered) {
+                    return Number.POSITIVE_INFINITY;
+                  }
+                  if (ordered.orderX !== null && ordered.orderZ !== null) {
+                    return Math.hypot(ordered.orderX - px, ordered.orderZ - pz);
+                  }
+                  return Math.hypot(ordered.x - px, ordered.z - pz);
+                },
+                { id: unit.id, px: point.x, pz: point.z },
+              ),
+            { intervals: [50, 100], timeout: 20_000 },
+          )
+          .toBeLessThanOrEqual(1);
       }
-
-      await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
     }
   }
 });
@@ -339,30 +495,36 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
   const start = await camera(page);
 
   if (touch) {
-    await dispatchPointer(page, 'pointerdown', 1, 400, 300);
-    await dispatchPointer(page, 'pointermove', 1, 500, 300);
-    await dispatchPointer(page, 'pointerup', 1, 500, 300);
+    await dispatchTouch(page, [
+      { type: 'pointerdown', id: 1, x: 400, y: 300 },
+      { type: 'pointermove', id: 1, x: 500, y: 300 },
+      { type: 'pointerup', id: 1, x: 500, y: 300 },
+    ]);
     await page.waitForTimeout(150);
     const panned = await camera(page);
     expect(Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ)).toBeGreaterThan(0.1);
 
     const beforeZoom = await camera(page);
-    await dispatchPointer(page, 'pointerdown', 2, 350, 300);
-    await dispatchPointer(page, 'pointerdown', 3, 450, 300);
-    await dispatchPointer(page, 'pointermove', 2, 300, 300);
-    await dispatchPointer(page, 'pointermove', 3, 500, 300);
-    await dispatchPointer(page, 'pointerup', 2, 300, 300);
-    await dispatchPointer(page, 'pointerup', 3, 500, 300);
+    await dispatchTouch(page, [
+      { type: 'pointerdown', id: 2, x: 350, y: 300 },
+      { type: 'pointerdown', id: 3, x: 450, y: 300 },
+      { type: 'pointermove', id: 2, x: 300, y: 300 },
+      { type: 'pointermove', id: 3, x: 500, y: 300 },
+      { type: 'pointerup', id: 2, x: 300, y: 300 },
+      { type: 'pointerup', id: 3, x: 500, y: 300 },
+    ]);
     await page.waitForTimeout(150);
     const zoomed = await camera(page);
     expect(Math.abs(zoomed.distance - beforeZoom.distance)).toBeGreaterThan(0.1);
 
     const beforeTwist = await camera(page);
-    await dispatchPointer(page, 'pointerdown', 4, 350, 300);
-    await dispatchPointer(page, 'pointerdown', 5, 450, 300);
-    await dispatchPointer(page, 'pointermove', 5, 400, 250);
-    await dispatchPointer(page, 'pointerup', 4, 350, 300);
-    await dispatchPointer(page, 'pointerup', 5, 400, 250);
+    await dispatchTouch(page, [
+      { type: 'pointerdown', id: 4, x: 350, y: 300 },
+      { type: 'pointerdown', id: 5, x: 450, y: 300 },
+      { type: 'pointermove', id: 5, x: 400, y: 250 },
+      { type: 'pointerup', id: 4, x: 350, y: 300 },
+      { type: 'pointerup', id: 5, x: 400, y: 250 },
+    ]);
     await page.waitForTimeout(150);
     const twisted = await camera(page);
     expect(Math.abs(twisted.yaw - beforeTwist.yaw)).toBeGreaterThan(0.01);
@@ -391,9 +553,12 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
   await setCamera(page, { targetX: -79, targetZ: -79, distance: 40, yaw: 0 });
   if (touch) {
     for (let i = 0; i < 4; i += 1) {
-      await dispatchPointer(page, 'pointerdown', 10 + i, 400, 300);
-      await dispatchPointer(page, 'pointermove', 10 + i, 100, 100);
-      await dispatchPointer(page, 'pointerup', 10 + i, 100, 100);
+      const id = 10 + i;
+      await dispatchTouch(page, [
+        { type: 'pointerdown', id, x: 400, y: 300 },
+        { type: 'pointermove', id, x: 100, y: 100 },
+        { type: 'pointerup', id, x: 100, y: 100 },
+      ]);
     }
   } else {
     await page.keyboard.down('a');
