@@ -6,6 +6,12 @@ import { heightAt, slopeAt } from '../sim/map';
 import { MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
 import type { UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
+import {
+  QualityController,
+  qualityStep,
+  qualityViewFor,
+  type QualityView,
+} from './quality';
 
 const TANK_ASSET_ID = 'unit.human.poc_tank';
 const TURRET_NODES = [
@@ -28,6 +34,14 @@ const SKY_MID = '#4d6b8c';
 const SKY_HORIZON = '#b9a98d';
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
+const SHADOW_MAP_SIZE = 1024;
+/**
+ * A gap this large between two rendered frames means frames stopped (tab hidden,
+ * simulation paused, page navigated away), not that a frame was slow. Feeding it
+ * to the quality controller would degrade quality for a reason that has nothing
+ * to do with rendering cost.
+ */
+const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
 
@@ -202,7 +216,6 @@ export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
     powerPreference: 'high-performance',
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   return renderer;
@@ -229,6 +242,7 @@ export class RenderView {
   private readonly selection: number[] = [];
   private readonly previousSnapshots = new Map<number, PositionSnapshot>();
   private readonly currentSnapshots = new Map<number, PositionSnapshot>();
+  private readonly qualityController = new QualityController();
   private terrain: THREE.Mesh | null = null;
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
@@ -241,12 +255,17 @@ export class RenderView {
   private markerTtl = 0;
   private world: WorldState;
   private lastTick = -1;
+  private lastRenderAt = 0;
+  private basePixelRatio = 1;
+  private shadowsEnabled = true;
   private frame = 0;
   private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
     this.world = world;
     this.renderer = createRenderer(canvas);
+    this.basePixelRatio = Math.min(globalThis.devicePixelRatio || 1, 2);
+    this.renderer.setPixelRatio(this.basePixelRatio);
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 4000);
     this.rtsCamera = new RtsCamera(world.map.size);
     const ownUnits = world.units.filter((unit) => unit.owner === 1);
@@ -322,6 +341,11 @@ export class RenderView {
 
   cameraInfo(): CameraInfo {
     return this.rtsCamera.info();
+  }
+
+  /** Current dynamic quality settings. Read-only. */
+  quality(): QualityView {
+    return qualityViewFor(this.qualityController.level, this.basePixelRatio);
   }
 
   applyCamera(): void {
@@ -489,6 +513,7 @@ export class RenderView {
 
   render(alpha: number, world: WorldState): void {
     this.world = world;
+    this.updateQuality();
     this.updateSnapshots(world);
     this.applyCamera();
     this.updateLight();
@@ -531,6 +556,68 @@ export class RenderView {
     this.renderer.dispose();
   }
 
+  /**
+   * Feeds the frame time to the quality controller and applies the result when
+   * the level changes. Started from `render`, so it runs once per rendered frame
+   * and measures exactly the cost this class is responsible for.
+   */
+  private updateQuality(): void {
+    const now = performance.now();
+    const previous = this.lastRenderAt;
+    this.lastRenderAt = now;
+    if (previous === 0) {
+      return;
+    }
+    const frameMs = now - previous;
+    if (frameMs <= 0 || frameMs > MAX_FRAME_SAMPLE_MS) {
+      // Frames stopped rather than running slowly; not a rendering-cost signal.
+      return;
+    }
+    if (this.qualityController.sample(frameMs)) {
+      this.applyQuality();
+    }
+  }
+
+  private applyQuality(): void {
+    const level = this.qualityController.level;
+    const view = qualityViewFor(level, this.basePixelRatio);
+    const step = qualityStep(level);
+
+    this.renderer.setPixelRatio(view.pixelRatio);
+
+    const shadowsChanged = view.shadows !== this.shadowsEnabled;
+    this.shadowsEnabled = view.shadows;
+    this.renderer.shadowMap.enabled = view.shadows;
+    this.directional.castShadow = view.shadows;
+
+    if (view.shadows) {
+      const size = Math.max(256, Math.round(SHADOW_MAP_SIZE * step.shadowMapScale));
+      this.directional.shadow.mapSize.set(size, size);
+      const map = this.directional.shadow.map;
+      if (map) {
+        // Force three to allocate a target of the new size on the next render.
+        map.dispose();
+        this.directional.shadow.map = null;
+      }
+    }
+
+    if (shadowsChanged) {
+      // Toggling shadow rendering changes the shader program, so every material
+      // that can receive or cast a shadow has to be recompiled once.
+      this.renderer.shadowMap.needsUpdate = true;
+      this.scene.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) {
+          return;
+        }
+        const host: MaterialHost = object;
+        const materials = Array.isArray(host.material) ? host.material : [host.material];
+        for (const material of materials) {
+          material.needsUpdate = true;
+        }
+      });
+    }
+  }
+
   private surfaceHeightAt(x: number, z: number): number {
     const map = this.world.map;
     const half = map.size / 2;
@@ -559,7 +646,7 @@ export class RenderView {
     this.scene.add(hemisphere);
 
     this.directional.castShadow = true;
-    this.directional.shadow.mapSize.set(1024, 1024);
+    this.directional.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     this.directional.shadow.bias = -0.0008;
     this.directional.shadow.normalBias = 0.6;
     this.directional.shadow.camera.left = -30;

@@ -41,6 +41,12 @@ export interface CameraView {
   pitch: number;
 }
 
+export interface QualityView {
+  level: number;
+  pixelRatio: number;
+  shadows: boolean;
+}
+
 function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string, SimUnitType> {
   const result = new Map<string, SimUnitType>();
   for (const row of table.values()) {
@@ -112,10 +118,10 @@ export class App {
       onFreeze: (report) => {
         // WP-01 §5.4: the 2 s freeze threshold *records* a report and nothing
         // else. Slow frames are not freezes — a software-rendered device can
-        // take seconds over a single frame — so navigating here (as this used
-        // to) opened the recovery overlay, which hides the in-game HUD, and
-        // made the game unplayable on exactly the hardware where frames are
-        // slowest. The recovery screen belongs to the 5 s recover threshold.
+        // take seconds over a single frame — so navigating here would open the
+        // recovery overlay, hide the in-game HUD, and make the game unplayable
+        // on exactly the hardware where frames are slowest. The recovery screen
+        // belongs to the 5 s recover threshold.
         this.lastFreeze = report;
       },
       onRecover: () => {
@@ -269,6 +275,11 @@ export class App {
    */
   lastFreezeReport(): WatchdogReport | null {
     return this.lastFreeze;
+  }
+
+  /** Current dynamic quality settings. Read-only. */
+  quality(): QualityView {
+    return this.renderView?.quality() ?? { level: 0, pixelRatio: 1, shadows: false };
   }
 
   /** Canvas-space projection of a unit's picking centre (matches `pickUnit`). */

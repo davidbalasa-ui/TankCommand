@@ -1,4 +1,4 @@
-import type { App, CameraView, IssuedCommand, UnitView } from '../app';
+import type { App, CameraView, IssuedCommand, QualityView, UnitView } from '../app';
 import { ControlInventory } from '../ui/controls';
 import type { ScreenId } from '../ui/router';
 import type { WorldState } from '../sim/types';
@@ -19,6 +19,7 @@ export interface TestHook {
   lastGroundPick(): { x: number; z: number } | null;
   lastIssuedCommand(): IssuedCommand | null;
   lastFreezeReport(): WatchdogReport | null;
+  quality(): QualityView;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];
@@ -48,6 +49,7 @@ export function installTestHook(app: App): void {
     lastGroundPick: () => app.lastGroundPick(),
     lastIssuedCommand: () => app.lastIssuedCommand(),
     lastFreezeReport: () => app.lastFreezeReport(),
+    quality: () => app.quality(),
     unitScreenCentre: (id) => app.unitScreenCentre(id),
     unitScreenBounds: (id) => app.unitScreenBounds(id),
     selection: () => app.selection(),

@@ -53,6 +53,12 @@ export interface FreezeReport {
   lastBeats: { sim: number; render: number };
 }
 
+export interface TestQuality {
+  level: number;
+  pixelRatio: number;
+  shadows: boolean;
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
@@ -75,6 +81,7 @@ export interface TestHook {
   lastGroundPick(): GroundPick | null;
   lastIssuedCommand(): IssuedCommand | null;
   lastFreezeReport(): FreezeReport | null;
+  quality(): TestQuality;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];

@@ -48,6 +48,7 @@
 | HOOK-02 | Test hook commands are validated and invalid commands do nothing. |
 | REND-01 | The canvas is non-blank and frame count increases. |
 | REND-02 | Hiding the page stops frames and resuming does not jump sim time. |
+| PERF-01 | Sustained slow frames step quality down in order, fast frames step it back up, and quality never changes more than once per second. |
 | MAP-01 | Same seed produces identical heights and different seeds differ. |
 | MAP-02 | Start areas are flat and connected by an A* path. |
 | MOVE-01 | A single tank ordered to a reachable point arrives within 0.5 units in time. |
