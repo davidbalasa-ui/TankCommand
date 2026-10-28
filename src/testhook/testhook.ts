@@ -1,7 +1,7 @@
-import type { App } from '../app';
+import type { App, CameraView, UnitView } from '../app';
 import { ControlInventory } from '../ui/controls';
 import type { ScreenId } from '../ui/router';
-import type { WorldState } from '../sim/world';
+import type { WorldState } from '../sim/types';
 import type { RenderStats } from '../render/renderer';
 
 export interface TestHook {
@@ -13,6 +13,12 @@ export interface TestHook {
   pauseSim(paused: boolean): void;
   controls(): string[];
   go(screenId: string): void;
+  units(): UnitView[];
+  worldToScreen(x: number, z: number): { x: number; y: number };
+  selection(): number[];
+  camera(): CameraView;
+  setSimSpeed(multiplier: number): void;
+  setCamera(info: Partial<CameraView>): void;
 }
 
 export function installTestHook(app: App): void {
@@ -29,7 +35,17 @@ export function installTestHook(app: App): void {
     },
     controls: () => ControlInventory.all(),
     go: (screenId) => {
-      app.router.go(screenId as ScreenId);
+      app.go(screenId as ScreenId);
+    },
+    units: () => app.units(),
+    worldToScreen: (x, z) => app.worldToScreen(x, z),
+    selection: () => app.selection(),
+    camera: () => app.camera(),
+    setSimSpeed: (multiplier) => {
+      app.setSimSpeed(multiplier);
+    },
+    setCamera: (info) => {
+      app.setCamera(info);
     },
   };
 

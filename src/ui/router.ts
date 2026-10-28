@@ -1,3 +1,5 @@
+import type { WorldState } from '../sim/types';
+
 export type ScreenId =
   | 'title'
   | 'campaignSelect'
@@ -25,6 +27,11 @@ export interface ScreenContext {
   go: (id: ScreenId) => void;
   pauseSim: (paused: boolean) => void;
   attachRenderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
+  getWorld?: () => WorldState;
+  selection?: () => number[];
+  setSelection?: (ids: number[]) => void;
+  issueStop?: () => void;
+  deselect?: () => void;
 }
 
 export interface ScreenModule {
@@ -52,7 +59,7 @@ const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
-  results: ['title', 'missionSelect'],
+  results: ['title', 'missionSelect', 'loading'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
   recovery: ['inGame', 'title'],

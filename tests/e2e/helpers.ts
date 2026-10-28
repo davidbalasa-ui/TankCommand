@@ -8,11 +8,31 @@ export interface TestSnapshot {
   counter: number;
 }
 
+export interface TestUnit {
+  id: number;
+  owner: number;
+  x: number;
+  z: number;
+  hp: number;
+  selected: boolean;
+  orderX: number | null;
+  orderZ: number | null;
+}
+
+export interface TestCamera {
+  targetX: number;
+  targetZ: number;
+  distance: number;
+  yaw: number;
+  pitch: number;
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
   drawCalls: number;
   frame: number;
+  units: number;
 }
 
 export interface TestHook {
@@ -24,6 +44,12 @@ export interface TestHook {
   pauseSim(paused: boolean): void;
   controls(): string[];
   go(screenId: string): void;
+  units(): TestUnit[];
+  worldToScreen(x: number, z: number): { x: number; y: number };
+  selection(): number[];
+  camera(): TestCamera;
+  setSimSpeed(multiplier: number): void;
+  setCamera(info: Partial<TestCamera>): void;
 }
 
 declare global {

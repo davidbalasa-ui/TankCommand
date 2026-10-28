@@ -20,6 +20,16 @@ function makeScreen(id: ScreenId, title: string, build?: Build): ScreenModule {
   };
 }
 
+function addButtonTo(
+  parent: HTMLElement,
+  screenId: string,
+  name: string,
+  label: string,
+  onClick: () => void,
+): void {
+  parent.append(button(screenId, name, label, onClick));
+}
+
 function addButton(
   root: HTMLElement,
   screenId: string,
@@ -27,7 +37,7 @@ function addButton(
   label: string,
   onClick: () => void,
 ): void {
-  root.append(button(screenId, name, label, onClick));
+  addButtonTo(root, screenId, name, label, onClick);
 }
 
 function emit(name: string): void {
@@ -75,13 +85,48 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       };
     }),
 
-    inGame: makeScreen('inGame', 'In Game', (root, ctx) => {
+    inGame: makeScreen('inGame', '', (root, ctx) => {
+      const heading = root.querySelector('h1');
+      heading?.remove();
+
       const canvas = document.createElement('canvas');
       canvas.className = 'game-canvas';
       root.append(canvas);
 
+      const hud = document.createElement('div');
+      hud.className = 'hud-top';
+      const status = document.createElement('div');
+      status.className = 'hud-status';
+      status.textContent = 'Your tanks: 0 · Enemy tanks: 0';
+      hud.append(status);
+      addButtonTo(hud, 'inGame', 'pause', 'Pause', () => {
+        ctx.go('pause');
+      });
+      addButtonTo(hud, 'inGame', 'stop', 'Stop', () => {
+        ctx.issueStop?.();
+      });
+      addButtonTo(hud, 'inGame', 'deselect', 'Deselect', () => {
+        ctx.deselect?.();
+      });
+      root.append(hud);
+
       let disposed = false;
       let handle: RendererHandle | null = null;
+      let resultShown = false;
+
+      const updateStatus = (): void => {
+        const world = ctx.getWorld?.();
+        if (!world) {
+          return;
+        }
+        const own = world.units.filter((unit) => unit.owner === 1).length;
+        const enemy = world.units.filter((unit) => unit.owner === 2).length;
+        status.textContent = `Your tanks: ${own} · Enemy tanks: ${enemy}`;
+        if (world.result && !resultShown) {
+          resultShown = true;
+          ctx.go('results');
+        }
+      };
 
       const showError = (message: string): void => {
         canvas.remove();
@@ -109,12 +154,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           }
         });
 
-      addButton(root, 'inGame', 'pause', 'Pause', () => {
-        ctx.go('pause');
-      });
+      updateStatus();
+      const timer = window.setInterval(updateStatus, 200);
 
       return () => {
         disposed = true;
+        window.clearInterval(timer);
         handle?.dispose();
       };
     }),
@@ -152,7 +197,20 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
 
     objectives: makeScreen('objectives', 'Objectives'),
 
-    results: makeScreen('results', 'Results'),
+    results: makeScreen('results', 'Results', (root, ctx) => {
+      const world = ctx.getWorld?.();
+      const winner = world?.result?.winner ?? null;
+      const heading = root.querySelector('h1');
+      if (heading) {
+        heading.textContent = winner === 1 ? 'Victory' : winner === 2 ? 'Defeat' : 'Draw';
+      }
+      addButton(root, 'results', 'playAgain', 'Play again', () => {
+        ctx.go('loading');
+      });
+      addButton(root, 'results', 'title', 'Title', () => {
+        ctx.go('title');
+      });
+    }),
 
     credits: makeScreen('credits', 'Credits', (root, ctx) => {
       const text = document.createElement('pre');

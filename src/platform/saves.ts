@@ -1,5 +1,10 @@
-import type { WorldState } from '../sim/world';
-import { canonicalJson, fnv1aHex } from '../sim/world';
+import type { WorldState } from '../sim/types';
+import {
+  canonicalJson,
+  fnv1aHex,
+  payloadToWorld,
+  worldToPayload,
+} from '../sim/world';
 import type { KvStore } from './kv';
 import { StorageFullError } from './kv';
 
@@ -26,29 +31,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isWorldState(value: unknown): value is WorldState {
-  if (!isRecord(value)) {
-    return false;
-  }
-  return (
-    typeof value.tick === 'number' &&
-    Number.isInteger(value.tick) &&
-    typeof value.seed === 'number' &&
-    Number.isFinite(value.seed) &&
-    typeof value.rngState === 'number' &&
-    Number.isFinite(value.rngState) &&
-    typeof value.counter === 'number' &&
-    Number.isFinite(value.counter)
-  );
-}
-
 export function encodeSave(world: WorldState, meta: SaveMeta): string {
-  const payload: WorldState = {
-    tick: world.tick,
-    seed: world.seed,
-    rngState: world.rngState,
-    counter: world.counter,
-  };
+  const payload = worldToPayload(world);
   const checksum = fnv1aHex(canonicalJson(payload));
   return JSON.stringify({
     format: 'tcsave',
@@ -97,7 +81,8 @@ export function decodeSave(text: string): DecodeSaveResult {
       return { ok: false, reason: 'checksum' };
     }
 
-    if (!isWorldState(payload)) {
+    const world = payloadToWorld(payload);
+    if (!world) {
       return { ok: false, reason: 'corrupt' };
     }
 
@@ -109,7 +94,7 @@ export function decodeSave(text: string): DecodeSaveResult {
 
     return {
       ok: true,
-      world: payload,
+      world,
       meta: { gameVersion, savedAtIso },
     };
   } catch {

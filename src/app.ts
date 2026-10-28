@@ -1,9 +1,14 @@
 import rawManifest from '../public/assets/manifest.json';
+import units from './data/units.placeholder.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
+import { loadUnitTable } from './data/dataRegistry';
+import type { UnitRow } from './data/unitSchema';
 import { createScreens } from './ui/screens';
-import { ScreenRouter, type RendererHandle, type ScreenContext } from './ui/router';
-import { createWorld, snapshot, step, type WorldState } from './sim/world';
+import { ScreenRouter, type RendererHandle, type ScreenContext, type ScreenId } from './ui/router';
+import { InputController } from './ui/input';
+import { createWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
+import type { PlayerId, SimUnitType, WorldState } from './sim/types';
 import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
@@ -11,15 +16,65 @@ import { Watchdog, installGlobalErrorCapture } from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import type { RenderStats, RenderView } from './render/renderer';
 
+export interface UnitView {
+  id: number;
+  owner: PlayerId;
+  x: number;
+  z: number;
+  hp: number;
+  selected: boolean;
+  orderX: number | null;
+  orderZ: number | null;
+}
+
+export interface CameraView {
+  targetX: number;
+  targetZ: number;
+  distance: number;
+  yaw: number;
+  pitch: number;
+}
+
+function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string, SimUnitType> {
+  const result = new Map<string, SimUnitType>();
+  for (const row of table.values()) {
+    const weapon = row.weapons[0];
+    result.set(row.id, {
+      id: row.id,
+      hp: row.hp,
+      armor: row.armor,
+      topSpeed: row.speed.top,
+      accel: row.speed.accel,
+      turnDegPerSec: row.speed.turnDegPerSec,
+      turretTurnDegPerSec: row.turretTurnDegPerSec,
+      fireOnMove: row.fireOnMove,
+      sightRange: row.sightRange,
+      weapon: weapon
+        ? {
+            damage: weapon.damage,
+            range: weapon.range,
+            reloadSec: weapon.reloadSec,
+            projectileSpeed: weapon.projectileSpeed,
+            accuracy: weapon.accuracy,
+            splashRadius: weapon.splashRadius,
+          }
+        : null,
+    });
+  }
+  return result;
+}
+
 export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
+  private readonly unitTypes: ReadonlyMap<string, SimUnitType>;
   private world: WorldState;
   private pendingCommands: Command[] = [];
   private readonly fixed: FixedStepLoop;
   private readonly watchdog: Watchdog;
   private lifecycle: Lifecycle | null = null;
   private renderView: RenderView | null = null;
+  private input: InputController | null = null;
   private raf = 0;
   private checkTimer = 0;
   private lastFrame = 0;
@@ -27,13 +82,18 @@ export class App {
   private uiPaused = false;
   private lifecyclePaused = false;
   private freezeSimUntil = 0;
+  private selectedIds: number[] = [];
+  private simSpeed = 1;
+  private nextSeed = 1;
 
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
-    this.world = createWorld(1);
+    const table = loadUnitTable(units, this.registry);
+    this.unitTypes = buildUnitTypes(table);
+    this.world = this.newSkirmish();
     this.fixed = new FixedStepLoop({
       tickHz: SIM_TICK_HZ,
-      maxStepsPerFrame: 5,
+      maxStepsPerFrame: 20,
       step: () => {
         this.stepSimulation();
       },
@@ -51,12 +111,23 @@ export class App {
     this.router = new ScreenRouter(root, createScreens(), (router): ScreenContext => ({
       router,
       go: (id) => {
-        router.go(id);
+        this.go(id);
       },
       pauseSim: (paused) => {
         this.pauseSim(paused);
       },
       attachRenderer: (canvas) => this.attachRenderer(canvas),
+      getWorld: () => this.snapshot(),
+      selection: () => this.selection(),
+      setSelection: (ids) => {
+        this.setSelection(ids);
+      },
+      issueStop: () => {
+        this.stopSelected();
+      },
+      deselect: () => {
+        this.setSelection([]);
+      },
     }));
   }
 
@@ -78,6 +149,13 @@ export class App {
     });
   }
 
+  go(id: ScreenId): void {
+    if (id === 'loading') {
+      this.startSkirmish();
+    }
+    this.router.go(id);
+  }
+
   snapshot(): WorldState {
     return { ...snapshot(this.world) };
   }
@@ -88,12 +166,85 @@ export class App {
       return false;
     }
     this.pendingCommands.push(validated);
+    if (validated.kind === 'move' && this.renderView) {
+      this.renderView.pulseMarker(validated.x, validated.z);
+    }
     return true;
+  }
+
+  units(): UnitView[] {
+    return this.world.units.map((unit) => {
+      let orderX: number | null = null;
+      let orderZ: number | null = null;
+      const order = unit.order;
+      if (order.kind === 'move') {
+        orderX = order.x;
+        orderZ = order.z;
+      } else if (order.kind === 'attack') {
+        const targetId = order.targetId;
+        const target = this.world.units.find((item) => item.id === targetId);
+        if (target) {
+          orderX = target.x;
+          orderZ = target.z;
+        }
+      }
+      return {
+        id: unit.id,
+        owner: unit.owner,
+        x: unit.x,
+        z: unit.z,
+        hp: unit.hp,
+        selected: this.selectedIds.includes(unit.id),
+        orderX,
+        orderZ,
+      };
+    });
+  }
+
+  selection(): number[] {
+    return [...this.selectedIds];
+  }
+
+  setSelection(ids: number[]): void {
+    const valid = new Set(
+      this.world.units.filter((unit) => unit.owner === 1).map((unit) => unit.id),
+    );
+    this.selectedIds = [...new Set(ids)].filter((id) => valid.has(id));
+  }
+
+  worldToScreen(x: number, z: number): { x: number; y: number } {
+    return this.renderView?.worldToScreen(x, z) ?? { x: 0, y: 0 };
+  }
+
+  camera(): CameraView {
+    const info = this.renderView?.cameraInfo();
+    if (info) {
+      return {
+        targetX: info.targetX,
+        targetZ: info.targetZ,
+        distance: info.distance,
+        yaw: info.yaw,
+        pitch: info.pitch,
+      };
+    }
+    return { targetX: 0, targetZ: 0, distance: 60, yaw: 0, pitch: 0 };
+  }
+
+  setSimSpeed(multiplier: number): void {
+    this.simSpeed = Math.min(8, Math.max(1, multiplier));
+  }
+
+  setCamera(info: Partial<CameraView>): void {
+    this.renderView?.setCamera(info);
+  }
+
+  setEdgeScroll(enabled: boolean): void {
+    this.input?.setEdgeScroll(enabled);
   }
 
   renderStats(): RenderStats {
     if (!this.renderView) {
-      return { loadedModels: [], meshCount: 0, drawCalls: 0, frame: 0 };
+      return { loadedModels: [], meshCount: 0, drawCalls: 0, frame: 0, units: 0 };
     }
     return this.renderView.stats();
   }
@@ -107,17 +258,55 @@ export class App {
     this.applyPauseState();
   }
 
+  private newSkirmish(): WorldState {
+    const options: CreateWorldOptions = { unitTypes: this.unitTypes };
+    const world = createWorld(this.nextSeed, options);
+    this.nextSeed += 1;
+    return world;
+  }
+
+  private startSkirmish(): void {
+    this.world = this.newSkirmish();
+    this.pendingCommands = [];
+    this.selectedIds = [];
+    this.fixed.reset();
+  }
+
+  private stopSelected(): void {
+    if (this.selectedIds.length === 0) {
+      return;
+    }
+    this.sendCommand({
+      kind: 'stop',
+      unitIds: [...this.selectedIds],
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
   private attachRenderer(canvas: HTMLCanvasElement): Promise<RendererHandle> {
     return import('./render/renderer').then(
       (mod) => {
-        const view = new mod.RenderView(canvas, this.registry);
+        const view = new mod.RenderView(canvas, this.registry, this.world);
         this.renderView = view;
+        this.input = new InputController({
+          canvas,
+          renderView: view,
+          getWorld: () => this.world,
+          getSelection: () => this.selectedIds,
+          setSelection: (ids) => {
+            this.setSelection(ids);
+          },
+          sendCommand: (command) => this.sendCommand(command),
+        });
         this.startLoop();
         return {
           error: null,
           dispose: (): void => {
             if (this.renderView === view) {
               this.stopLoop();
+              this.input?.dispose();
+              this.input = null;
               view.dispose();
               this.renderView = null;
             }
@@ -198,24 +387,34 @@ export class App {
     let alpha = 0;
 
     if (!frozen) {
-      const result = this.fixed.advance(elapsed);
+      const result = this.fixed.advance(elapsed * this.simSpeed);
       alpha = result.alpha;
       if (result.steps > 0) {
         this.watchdog.beat('sim');
       }
     }
 
+    this.input?.update(elapsed);
+    this.pruneSelection();
     this.watchdog.beat('render');
     this.watchdog.check();
-    this.renderView.render(alpha);
+    this.renderView.setSelection(this.selectedIds);
+    this.renderView.render(alpha, this.world);
     this.raf = window.requestAnimationFrame(this.frame);
   };
+
+  private pruneSelection(): void {
+    this.selectedIds = this.selectedIds.filter((id) =>
+      this.world.units.some((unit) => unit.id === id && unit.owner === 1),
+    );
+  }
 
   private stepSimulation(): void {
     const nextTick = this.world.tick + 1;
     const due = this.pendingCommands.filter((command) => command.tick === nextTick);
     this.world = step(this.world, due);
     this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
+    this.pruneSelection();
   }
 }
 

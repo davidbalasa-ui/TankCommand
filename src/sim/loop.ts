@@ -44,4 +44,8 @@ export class FixedStepLoop {
     const alpha = Math.min(Math.max(this.accumulator / this.tickMs, 0), 0.999999);
     return { steps, alpha };
   }
+
+  reset(): void {
+    this.accumulator = 0;
+  }
 }

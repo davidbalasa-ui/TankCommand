@@ -40,6 +40,11 @@ body {
   background: rgba(9, 13, 22, 0.98);
 }
 
+.screen-inGame {
+  padding: 0;
+  overflow: hidden;
+}
+
 button {
   min-width: 44px;
   min-height: 44px;
@@ -57,11 +62,71 @@ h1 {
 }
 
 .game-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  flex: 1;
-  min-height: 0;
   display: block;
+  touch-action: none;
+}
+
+.hud-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.hud-top > * {
+  pointer-events: auto;
+}
+
+.hud-status {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: rgba(9, 13, 22, 0.72);
+  border: 1px solid rgba(75, 104, 146, 0.7);
+  white-space: nowrap;
+}
+
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.health-bar {
+  position: absolute;
+  width: 40px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-sizing: border-box;
+}
+
+.health-fill {
+  height: 100%;
+  background: #5ee07a;
+}
+
+.selection-box {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  z-index: 20;
+  border: 1px solid #8fd3ff;
+  background: rgba(80, 160, 255, 0.15);
 }
 
 .credits-text {
@@ -69,4 +134,8 @@ h1 {
   font-size: 13px;
   line-height: 1.4;
   margin: 0;
+}
+
+.render-error {
+  color: #ffb4b4;
 }

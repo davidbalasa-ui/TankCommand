@@ -30,7 +30,7 @@
 | LIFE-01 | Lifecycle events deduplicate pause and map back to pause plus back. |
 | WD-01 | Watchdog freeze and recover fire once per episode and reset on beat. |
 | WD-02 | Suspended watchdog suppresses freezes and resets clocks on unsuspend. |
-| WD-03 | Global error capture records errors and rejected promises. |
+| WD-03 | Global error capture records errors and rejects promises. |
 | WD-04 | A frozen sim shows the recovery screen with all recovery controls. |
 | UI-01 | Every screen mounts and unmounts without leaving DOM nodes behind. |
 | UI-02 | Overlays stack and back pops settings then pause to inGame. |
@@ -48,3 +48,28 @@
 | HOOK-02 | Test hook commands are validated and invalid commands do nothing. |
 | REND-01 | The canvas is non-blank and frame count increases. |
 | REND-02 | Hiding the page stops frames and resuming does not jump sim time. |
+| MAP-01 | Same seed produces identical heights and different seeds differ. |
+| MAP-02 | Start areas are flat and connected by an A* path. |
+| MOVE-01 | A single tank ordered to a reachable point arrives within 0.5 units in time. |
+| MOVE-02 | A tank ordered behind the ridge routes around it and never enters a blocked cell. |
+| MOVE-03 | Orders outside the map are clamped and units never leave the map. |
+| MOVE-04 | Twelve tanks ordered to one point settle without overlaps or active orders. |
+| MOVE-05 | A destination inside a blocked area stops at the nearest reachable cell. |
+| MOVE-06 | Commands for units the issuer does not own change nothing. |
+| CMB-01 | Turrets turn at their turn rate independently of the hull. |
+| CMB-02 | A tank fires only when aligned and reloaded, with the configured reload interval. |
+| CMB-03 | Damage uses armor with a minimum of one, HP clamps and wrecks expire after ten seconds. |
+| CMB-04 | Terrain blocks direct fire while open ground does not. |
+| CMB-05 | Inaccuracy produces misses while perfect accuracy does not. |
+| CMB-06 | Splash damage hits every unit in range including friendly units. |
+| CMB-07 | A skirmish ends with a result, a wipe yields a winner and simultaneous last kills draw. |
+| DET-01 | Scripted battles are bit-identical across runs and save/load. |
+| CAM-01 | Camera target, distance and pitch clamp and interpolate. |
+| CAM-02 | The camera never goes below terrain plus three units. |
+| INP-01 | Ground orders land within one unit of the picked point at multiple camera settings. |
+| INP-02 | Box selection selects exactly the own tanks inside the box. |
+| INP-03 | Clicking an enemy with a selection lowers its HP. |
+| INP-04 | Camera pan, zoom, rotate and edge clamping work by keyboard, mouse and touch. |
+| INP-05 | HUD button presses never issue map orders. |
+| PLAY-01 | Full skirmish flow reaches results and Play again starts a fresh 4v4 match. |
+| VIS-01 | The in-game view renders the 8-unit battlefield with many colours. |
