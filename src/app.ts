@@ -12,7 +12,11 @@ import type { PlayerId, SimUnitType, WorldState } from './sim/types';
 import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
-import { Watchdog, installGlobalErrorCapture } from './platform/watchdog';
+import {
+  Watchdog,
+  installGlobalErrorCapture,
+  type WatchdogReport,
+} from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import type { RenderStats, RenderView, ScreenBounds } from './render/renderer';
 
@@ -74,6 +78,7 @@ export class App {
   private pendingCommands: Command[] = [];
   private readonly fixed: FixedStepLoop;
   private readonly watchdog: Watchdog;
+  private lastFreeze: WatchdogReport | null = null;
   private lifecycle: Lifecycle | null = null;
   private renderView: RenderView | null = null;
   private input: InputController | null = null;
@@ -104,10 +109,18 @@ export class App {
       now: () => performance.now(),
       freezeMs: 2000,
       recoverMs: 5000,
-      onFreeze: () => {
+      onFreeze: (report) => {
+        // WP-01 §5.4: the 2 s freeze threshold *records* a report and nothing
+        // else. Slow frames are not freezes — a software-rendered device can
+        // take seconds over a single frame — so navigating here (as this used
+        // to) opened the recovery overlay, which hides the in-game HUD, and
+        // made the game unplayable on exactly the hardware where frames are
+        // slowest. The recovery screen belongs to the 5 s recover threshold.
+        this.lastFreeze = report;
+      },
+      onRecover: () => {
         this.router.go('recovery');
       },
-      onRecover: () => undefined,
     });
 
     this.router = new ScreenRouter(root, createScreens(), (router): ScreenContext => ({
@@ -249,6 +262,15 @@ export class App {
     return this.input?.getLastIssuedCommand() ?? null;
   }
 
+  /**
+   * The most recent freeze report, or null before the first freeze threshold was
+   * crossed. Read-only: the watchdog records this at 2 s and only the 5 s
+   * recover threshold changes what the player sees.
+   */
+  lastFreezeReport(): WatchdogReport | null {
+    return this.lastFreeze;
+  }
+
   /** Canvas-space projection of a unit's picking centre (matches `pickUnit`). */
   unitScreenCentre(id: number): { x: number; y: number } | null {
     return this.renderView?.unitScreenCentre(id) ?? null;
@@ -324,6 +346,7 @@ export class App {
     this.pendingCommands = [];
     this.selectedIds = [];
     this.fixed.reset();
+    this.lastFreeze = null;
   }
 
   private stopSelected(): void {
@@ -435,6 +458,13 @@ export class App {
       return;
     }
 
+    // The render channel is judged by "time since the last frame *started*", so
+    // the beat is taken at the top of the frame, before the fixed steps and the
+    // draw. One long frame therefore shows up as at most `elapsed` of stall —
+    // well under the 5 s recover threshold on any hardware that is merely slow —
+    // and can never be mistaken for a freeze of the renderer.
+    this.watchdog.beat('render');
+
     const elapsed = now - this.lastFrame;
     this.lastFrame = now;
     const frozen = now < this.freezeSimUntil;
@@ -450,7 +480,6 @@ export class App {
 
     this.input?.update(elapsed);
     this.pruneSelection();
-    this.watchdog.beat('render');
     this.watchdog.check();
     this.renderView.setSelection(this.selectedIds);
     this.renderView.render(alpha, this.world);

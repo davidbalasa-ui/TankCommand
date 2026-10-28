@@ -2,6 +2,7 @@ import type { App, CameraView, IssuedCommand, UnitView } from '../app';
 import { ControlInventory } from '../ui/controls';
 import type { ScreenId } from '../ui/router';
 import type { WorldState } from '../sim/types';
+import type { WatchdogReport } from '../platform/watchdog';
 import type { RenderStats, ScreenBounds } from '../render/renderer';
 
 export interface TestHook {
@@ -17,6 +18,7 @@ export interface TestHook {
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): { x: number; z: number } | null;
   lastIssuedCommand(): IssuedCommand | null;
+  lastFreezeReport(): WatchdogReport | null;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];
@@ -45,6 +47,7 @@ export function installTestHook(app: App): void {
     worldToScreen: (x, z) => app.worldToScreen(x, z),
     lastGroundPick: () => app.lastGroundPick(),
     lastIssuedCommand: () => app.lastIssuedCommand(),
+    lastFreezeReport: () => app.lastFreezeReport(),
     unitScreenCentre: (id) => app.unitScreenCentre(id),
     unitScreenBounds: (id) => app.unitScreenBounds(id),
     selection: () => app.selection(),

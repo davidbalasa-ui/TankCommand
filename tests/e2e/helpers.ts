@@ -47,6 +47,12 @@ export interface IssuedCommand {
   unitIds: number[];
 }
 
+export interface FreezeReport {
+  channel: 'sim' | 'render';
+  stalledMs: number;
+  lastBeats: { sim: number; render: number };
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
@@ -68,6 +74,7 @@ export interface TestHook {
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): GroundPick | null;
   lastIssuedCommand(): IssuedCommand | null;
+  lastFreezeReport(): FreezeReport | null;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
   selection(): number[];

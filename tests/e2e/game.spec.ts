@@ -109,9 +109,25 @@ test('[REND-02] hidden page stops frames and resumes without sim-time jump', asy
   expect(resumedSecond).toBeGreaterThan(resumedFirst);
 });
 
-test('[WD-04] frozen sim shows the recovery screen with three buttons', async ({ page }) => {
+test('[WD-04] a frozen sim records a freeze report and only the 5 s recover mark shows recovery', async ({
+  page,
+}) => {
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+
+  // WP-01 §5.4: the 2 s freeze threshold records a report, and nothing else.
+  // Asserting the report first is what distinguishes the two thresholds; the
+  // recovery screen must not be what a merely slow frame produces.
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.lastFreezeReport() !== null), {
+      timeout: 4500,
+    })
+    .toBe(true);
+  const report = await page.evaluate(() => window.__TC_TEST__?.lastFreezeReport() ?? null);
+  expect(report, 'a freeze report was recorded').not.toBeNull();
+  expect(report?.stalledMs ?? 0).toBeGreaterThanOrEqual(2000);
+  expect(['sim', 'render']).toContain(report?.channel ?? '');
+
   await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
   await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Load autosave', exact: true })).toBeVisible();

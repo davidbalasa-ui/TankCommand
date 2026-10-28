@@ -553,6 +553,16 @@ test('[INP-03] clicking an enemy with a selection lowers its HP', async ({ page 
 });
 
 test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }, testInfo) => {
+  // Frame-driven rather than sleep-driven. Every gesture is released as soon as
+  // the camera has actually moved (or, for touch, because the handlers mutate
+  // the camera synchronously), so the cost is one protocol round trip per
+  // rendered frame instead of a fixed 350 ms wait that may not contain a frame
+  // at all. On the CI desktop runner (ubuntu-latest, 2 vCPU, SwiftShader at
+  // 1920x1080) a round trip is gated by a frame of up to ~1.2 s — the previous
+  // fixed-sleep version needed 31.2 s for ~25 round trips — so the ~18 round
+  // trips and three poll windows below need up to ~60 s. 90 s covers that with
+  // headroom and still fails a genuine hang.
+  test.setTimeout(90_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const start = await camera(page);
@@ -563,11 +573,13 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
       { type: 'pointermove', id: 1, x: 500, y: 300 },
       { type: 'pointerup', id: 1, x: 500, y: 300 },
     ]);
-    await page.waitForTimeout(150);
     const panned = await camera(page);
-    expect(Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ)).toBeGreaterThan(0.1);
+    expect(
+      Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ),
+    ).toBeGreaterThan(0.1);
 
-    const beforeZoom = await camera(page);
+    // Panning leaves the zoom distance untouched, so `panned` is the baseline
+    // for the pinch without another round trip.
     await dispatchTouch(page, [
       { type: 'pointerdown', id: 2, x: 350, y: 300 },
       { type: 'pointerdown', id: 3, x: 450, y: 300 },
@@ -576,11 +588,11 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
       { type: 'pointerup', id: 2, x: 300, y: 300 },
       { type: 'pointerup', id: 3, x: 500, y: 300 },
     ]);
-    await page.waitForTimeout(150);
     const zoomed = await camera(page);
-    expect(Math.abs(zoomed.distance - beforeZoom.distance)).toBeGreaterThan(0.1);
+    expect(Math.abs(zoomed.distance - panned.distance)).toBeGreaterThan(0.1);
 
-    const beforeTwist = await camera(page);
+    // Pinching here is a pure scale change (the two fingers stay level), so the
+    // yaw baseline is `zoomed`.
     await dispatchTouch(page, [
       { type: 'pointerdown', id: 4, x: 350, y: 300 },
       { type: 'pointerdown', id: 5, x: 450, y: 300 },
@@ -588,29 +600,47 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
       { type: 'pointerup', id: 4, x: 350, y: 300 },
       { type: 'pointerup', id: 5, x: 400, y: 250 },
     ]);
-    await page.waitForTimeout(150);
     const twisted = await camera(page);
-    expect(Math.abs(twisted.yaw - beforeTwist.yaw)).toBeGreaterThan(0.01);
+    expect(Math.abs(twisted.yaw - zoomed.yaw)).toBeGreaterThan(0.01);
   } else {
     await page.keyboard.down('w');
-    await page.waitForTimeout(350);
+    let panned = start;
+    await expect
+      .poll(
+        async () => {
+          panned = await camera(page);
+          return Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ);
+        },
+        { intervals: [100, 250], timeout: 20_000 },
+      )
+      .toBeGreaterThan(0.1);
     await page.keyboard.up('w');
-    const panned = await camera(page);
-    expect(Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ)).toBeGreaterThan(0.1);
 
-    const beforeZoom = await camera(page);
     await page.mouse.move(800, 400);
     await page.mouse.wheel(0, -500);
-    await page.waitForTimeout(150);
-    const zoomed = await camera(page);
-    expect(zoomed.distance).toBeLessThan(beforeZoom.distance);
+    let zoomed = panned;
+    await expect
+      .poll(
+        async () => {
+          zoomed = await camera(page);
+          return panned.distance - zoomed.distance;
+        },
+        { intervals: [100, 250], timeout: 20_000 },
+      )
+      .toBeGreaterThan(0.1);
 
-    const beforeRotate = await camera(page);
     await page.keyboard.down('e');
-    await page.waitForTimeout(350);
+    let rotated = zoomed;
+    await expect
+      .poll(
+        async () => {
+          rotated = await camera(page);
+          return Math.abs(rotated.yaw - zoomed.yaw);
+        },
+        { intervals: [100, 250], timeout: 20_000 },
+      )
+      .toBeGreaterThan(0.01);
     await page.keyboard.up('e');
-    const rotated = await camera(page);
-    expect(Math.abs(rotated.yaw - beforeRotate.yaw)).toBeGreaterThan(0.01);
   }
 
   await setCamera(page, { targetX: -79, targetZ: -79, distance: 40, yaw: 0 });
@@ -623,18 +653,35 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
         { type: 'pointerup', id, x: 100, y: 100 },
       ]);
     }
-  } else {
-    await page.keyboard.down('a');
-    await page.keyboard.down('w');
-    await page.waitForTimeout(1200);
-    await page.keyboard.up('a');
-    await page.keyboard.up('w');
+    const clamped = await camera(page);
+    expect(clamped.targetX).toBeGreaterThanOrEqual(-80);
+    expect(clamped.targetX).toBeLessThanOrEqual(80);
+    expect(clamped.targetZ).toBeGreaterThanOrEqual(-80);
+    expect(clamped.targetZ).toBeLessThanOrEqual(80);
+    return;
   }
+
+  // Pushed hard into the west edge: at yaw 0 `a` pans along -x, so the target
+  // must clamp and stop exactly on the -80 border.
+  await page.keyboard.down('a');
+  await page.keyboard.down('w');
+  await expect
+    .poll(
+      async () => {
+        const current = await camera(page);
+        return Math.abs(current.targetX + 80);
+      },
+      { intervals: [100, 250], timeout: 20_000 },
+    )
+    .toBeLessThanOrEqual(0.5);
+  await page.keyboard.up('a');
+  await page.keyboard.up('w');
   const clamped = await camera(page);
   expect(clamped.targetX).toBeGreaterThanOrEqual(-80);
   expect(clamped.targetX).toBeLessThanOrEqual(80);
   expect(clamped.targetZ).toBeGreaterThanOrEqual(-80);
   expect(clamped.targetZ).toBeLessThanOrEqual(80);
+  expect(clamped.targetX, 'panned hard into the edge and clamped').toBeLessThanOrEqual(-79.5);
 });
 
 test('[INP-05] HUD button presses never issue map orders', async ({ page }, testInfo) => {

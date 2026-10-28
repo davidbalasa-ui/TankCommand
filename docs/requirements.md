@@ -30,15 +30,15 @@
 | LIFE-01 | Lifecycle events deduplicate pause and map back to pause plus back. |
 | WD-01 | Watchdog freeze and recover fire once per episode and reset on beat. |
 | WD-02 | Suspended watchdog suppresses freezes and resets clocks on unsuspend. |
-| WD-03 | Global error capture records errors and rejected promises. |
-| WD-04 | A frozen sim shows the recovery screen with all recovery controls. |
+| WD-03 | Global error capture records errors and rejects promises. |
+| WD-04 | A frozen sim records a freeze report at the 2 s threshold and shows the recovery screen, with all recovery controls, at the 5 s recover mark. |
 | UI-01 | Every screen mounts and unmounts without leaving DOM nodes behind. |
 | UI-02 | Overlays stack and back pops settings then pause to inGame. |
 | UI-03 | Rapid repeated navigation to one screen mounts only one DOM root. |
 | UI-04 | Every registered control id is listed in the control inventory file. |
 | UI-05 | E2E controls meet touch target size and do not overlap across the main flow. |
 | LINT-01 | Lint runs with zero warnings. |
-| LINT-02 | Sim lint restrictions fire on sim files and not render files. |
+| LINT-02 | Sim lint restrictions fire on sim files and not on render files. |
 | LINT-03 | The sim TypeScript config excludes the DOM library. |
 | REQ-01 | Requirement coverage passes and fails when an untested id is appended. |
 | CI-01 | The GitHub workflow runs the full CI and E2E commands. |
@@ -66,7 +66,7 @@
 | DET-01 | Scripted battles are bit-identical across runs and save/load. |
 | CAM-01 | Camera target, distance and pitch clamp and interpolate. |
 | CAM-02 | The camera never goes below terrain plus three units. |
-| INP-01 | Ground orders land within one unit of the picked point at multiple camera settings. |
+| INP-01 | Ground picks land within one unit of the picked point at multiple camera settings, and a right-click issues a move whose target is that point. |
 | INP-02 | Box selection selects exactly the own tanks inside the box. |
 | INP-03 | Clicking an enemy with a selection lowers its HP. |
 | INP-04 | Camera pan, zoom, rotate and edge clamping work by keyboard, mouse and touch. |
