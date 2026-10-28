@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders, fallbackModel } from '../assets/threeDecoders';
-import { heightAt, slopeAt } from '../sim/map';
+import { heightAt, slopeAt, type MapDef } from '../sim/map';
 import { MAX_SLOPE, UNIT_RADIUS } from '../sim/tuning';
 import type { UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
@@ -21,6 +21,7 @@ const TURRET_NODES = [
 ];
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
+const UNIT_PICK_HEIGHT = 1.2;
 
 export interface RenderStats {
   loadedModels: string[];
@@ -70,6 +71,36 @@ function clamp(value: number, min: number, max: number): number {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/**
+ * Height of the *rendered* terrain surface at (x, z).
+ *
+ * `heightAt` interpolates the heightmap bilinearly, but the drawn mesh is two
+ * triangles per cell, so its surface is piecewise linear across the cell
+ * diagonal (a-c-b / b-c-d, i.e. the diagonal u + v = 1). Projecting a ground
+ * point with the bilinear height while picking against the mesh leaves a
+ * systematic offset that grows on steep cells, which is exactly the error ground
+ * picking must not have. Reproducing the mesh interpolation here makes
+ * `worldToScreen` and the pick raycast exact inverses of each other.
+ */
+function surfaceHeightAt(map: MapDef, x: number, z: number): number {
+  const half = map.size / 2;
+  const gx = clamp((x + half) / map.cellSize, 0, map.cols - 0.000001);
+  const gz = clamp((z + half) / map.cellSize, 0, map.rows - 0.000001);
+  const ix = Math.min(map.cols - 1, Math.floor(gx));
+  const iz = Math.min(map.rows - 1, Math.floor(gz));
+  const u = gx - ix;
+  const v = gz - iz;
+  const stride = map.cols + 1;
+  const h00 = map.heights[iz * stride + ix] ?? 0;
+  const h10 = map.heights[iz * stride + ix + 1] ?? 0;
+  const h01 = map.heights[(iz + 1) * stride + ix] ?? 0;
+  const h11 = map.heights[(iz + 1) * stride + ix + 1] ?? 0;
+  if (u + v <= 1) {
+    return h00 + (h10 - h00) * u + (h01 - h00) * v;
+  }
+  return h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
 }
 
 function tintMaterial(
@@ -282,6 +313,24 @@ export class RenderView {
     return { x: first.point.x, z: first.point.z };
   }
 
+  /**
+   * Canvas-space position of a unit's picking centre: the same projection
+   * `pickUnit` compares against the pick radius, and the point a caller has to
+   * click to be guaranteed within the radius. Read-only; does not perform a
+   * pick itself.
+   */
+  unitScreenCentre(id: number): { x: number; y: number } | null {
+    const unit = this.world.units.find((item) => item.id === id);
+    if (!unit) {
+      return null;
+    }
+    return this.projectPoint(
+      unit.x,
+      heightAt(this.world.map, unit.x, unit.z) + UNIT_PICK_HEIGHT,
+      unit.z,
+    );
+  }
+
   pickUnit(
     clientX: number,
     clientY: number,
@@ -293,7 +342,7 @@ export class RenderView {
     for (const unit of this.world.units) {
       const screen = this.projectPoint(
         unit.x,
-        heightAt(this.world.map, unit.x, unit.z) + 1.2,
+        heightAt(this.world.map, unit.x, unit.z) + UNIT_PICK_HEIGHT,
         unit.z,
       );
       if (!screen) {
@@ -324,7 +373,7 @@ export class RenderView {
   }
 
   worldToScreen(x: number, z: number): { x: number; y: number } {
-    const screen = this.projectPoint(x, heightAt(this.world.map, x, z) + 0.1, z);
+    const screen = this.projectPoint(x, surfaceHeightAt(this.world.map, x, z), z);
     return screen ?? { x: 0, y: 0 };
   }
 

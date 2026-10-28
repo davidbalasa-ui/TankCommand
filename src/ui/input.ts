@@ -55,6 +55,7 @@ export class InputController {
   private twoFingerCandidate = false;
   private twoFingerStart = 0;
   private twoFingerMoved = 0;
+  private lastGroundPick: { x: number; z: number } | null = null;
   private disposed = false;
 
   constructor(host: InputHost) {
@@ -76,6 +77,16 @@ export class InputController {
 
   setEdgeScroll(enabled: boolean): void {
     this.edgeScrollEnabled = enabled;
+  }
+
+  /**
+   * The ground point this controller resolved for the most recent click or tap,
+   * or null before the first one. Read-only observability for acceptance tests:
+   * it reports what picking produced, independently of whether that landing spot
+   * turned out to be a reachable destination.
+   */
+  getLastGroundPick(): { x: number; z: number } | null {
+    return this.lastGroundPick ? { ...this.lastGroundPick } : null;
   }
 
   update(elapsedMs: number): void {
@@ -479,6 +490,7 @@ export class InputController {
   }
 
   private handleLeftClick(x: number, y: number, shift: boolean): void {
+    this.lastGroundPick = this.host.renderView.pickGround(x, y);
     const unitId = this.host.renderView.pickUnit(x, y, true, false);
     const world = this.host.getWorld();
     const unit = unitId === null ? null : world.units.find((item) => item.id === unitId);
@@ -501,6 +513,9 @@ export class InputController {
   }
 
   private handleTap(x: number, y: number): void {
+    const ground = this.host.renderView.pickGround(x, y);
+    this.lastGroundPick = ground;
+
     const own = this.host.renderView.pickUnit(x, y, true, true);
     const world = this.host.getWorld();
     const ownUnit = own === null ? null : world.units.find((unit) => unit.id === own);
@@ -517,7 +532,6 @@ export class InputController {
       return;
     }
 
-    const ground = this.host.renderView.pickGround(x, y);
     if (ground && selection.length > 0) {
       this.issueMove(selection, ground.x, ground.z, false);
     } else if (!ground) {
@@ -526,6 +540,9 @@ export class InputController {
   }
 
   private handleOrder(x: number, y: number, queue: boolean): void {
+    const ground = this.host.renderView.pickGround(x, y);
+    this.lastGroundPick = ground;
+
     const selection = this.host.getSelection();
     if (selection.length === 0) {
       return;
@@ -537,7 +554,6 @@ export class InputController {
       this.issueAttack(selection, enemy.id);
       return;
     }
-    const ground = this.host.renderView.pickGround(x, y);
     if (ground) {
       this.issueMove(selection, ground.x, ground.z, queue);
     }

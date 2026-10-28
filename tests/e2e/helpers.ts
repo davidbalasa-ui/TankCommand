@@ -27,6 +27,11 @@ export interface TestCamera {
   pitch: number;
 }
 
+export interface GroundPick {
+  x: number;
+  z: number;
+}
+
 export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
@@ -46,6 +51,8 @@ export interface TestHook {
   go(screenId: string): void;
   units(): TestUnit[];
   worldToScreen(x: number, z: number): { x: number; y: number };
+  lastGroundPick(): GroundPick | null;
+  unitScreenCentre(id: number): { x: number; y: number } | null;
   selection(): number[];
   camera(): TestCamera;
   setSimSpeed(multiplier: number): void;

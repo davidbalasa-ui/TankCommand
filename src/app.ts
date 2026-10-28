@@ -205,6 +205,19 @@ export class App {
     return [...this.selectedIds];
   }
 
+  /**
+   * Ground point the input layer resolved for the most recent click or tap, or
+   * null before the first one. Read-only view of what picking produced.
+   */
+  lastGroundPick(): { x: number; z: number } | null {
+    return this.input?.getLastGroundPick() ?? null;
+  }
+
+  /** Canvas-space projection of a unit's picking centre (matches `pickUnit`). */
+  unitScreenCentre(id: number): { x: number; y: number } | null {
+    return this.renderView?.unitScreenCentre(id) ?? null;
+  }
+
   setSelection(ids: number[]): void {
     const valid = new Set(
       this.world.units.filter((unit) => unit.owner === 1).map((unit) => unit.id),

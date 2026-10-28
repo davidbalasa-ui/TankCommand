@@ -95,9 +95,37 @@ async function dispatchPointer(
   );
 }
 
-test('[INP-01] ground orders land at the picked point across camera settings', async ({
+interface SamplePoint {
+  x: number;
+  z: number;
+  reachable: boolean;
+}
+
+/**
+ * Two points sit within 10 world units of opposite map corners — the case where
+ * ground picking is most likely to break (extreme zoom-out, camera far outside
+ * the terrain bounds) — and three sit in the flattened start area at a known
+ * distance from every tank, where the sim is guaranteed to accept the
+ * destination exactly, so the resulting move order can be asserted too.
+ */
+const SAMPLE_POINTS: readonly SamplePoint[] = [
+  { x: -68, z: -58, reachable: true },
+  { x: -58, z: -68, reachable: true },
+  { x: -64, z: -64, reachable: true },
+  { x: 74, z: 74, reachable: false }, // 8.5 units from the (80, 80) corner
+  { x: -74, z: 74, reachable: false }, // 8.5 units from the (-80, 80) corner
+];
+
+const CAMERA_SETTINGS = [
+  { distance: 20, yaw: 0 },
+  { distance: 60, yaw: 1 },
+  { distance: 120, yaw: 2 },
+];
+
+test('[INP-01] ground picks and ground orders land at the picked point across camera settings', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(180_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const own = (await units(page)).filter((unit) => unit.owner === 1);
@@ -106,56 +134,98 @@ test('[INP-01] ground orders land at the picked point across camera settings', a
   if (!unit) {
     return;
   }
-  const unitScreen = await page.evaluate(
-    ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-    { x: unit.x, z: unit.z },
-  );
-  await selectUnit(page, unitScreen.x, unitScreen.y, touch);
-  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).toContain(unit.id);
 
-  // Sample points sit inside the flattened start areas (flat and reachable by
-  // construction, so the sim does not have to redirect them to "the nearest
-  // reachable cell") and stay clear of every tank, so a touch tap cannot land
-  // inside the 36 px unit pick radius at the zoom levels used below. A tap on a
-  // tank legitimately selects or attacks instead of issuing a move.
-  const points = [
-    { x: -62, z: -62 },
-    { x: -62, z: -38 },
-    { x: -38, z: -62 },
-    { x: 62, z: 62 },
-    { x: 38, z: 62 },
-  ];
-  const cameraSettings = [
-    { distance: 20, yaw: 0 },
-    { distance: 30, yaw: 1 },
-    { distance: 45, yaw: 0.5 },
-  ];
+  const deselect = page.getByRole('button', { name: 'Deselect', exact: true });
+  const stop = page.getByRole('button', { name: 'Stop', exact: true });
 
-  for (let i = 0; i < points.length; i += 1) {
-    const point = points[i];
-    const setting = cameraSettings[i % cameraSettings.length];
-    if (!point || !setting) {
-      continue;
+  for (const setting of CAMERA_SETTINGS) {
+    for (const point of SAMPLE_POINTS) {
+      const label = `(${point.x}, ${point.z}) at distance ${setting.distance}`;
+
+      // Every sample starts from a known selection state: an order tap can only
+      // be a move when something is selected, and a corner tap with no selection
+      // would deselect rather than pick.
+      if (touch) {
+        await deselect.tap();
+      } else {
+        await deselect.click();
+      }
+      await expect
+        .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
+        .toEqual([]);
+
+      if (point.reachable) {
+        const current = (await units(page)).find((item) => item.id === unit.id);
+        expect(current, label).toBeDefined();
+        if (!current) {
+          return;
+        }
+        // Centre the camera on the tank at a comfortable zoom, then click at the
+        // unit's picking centre (the same projection `pickUnit` compares against
+        // its radius). Clicking at the ground base — what `worldToScreen` returns
+        // — is not the same thing: the pick centre sits UNIT_PICK_HEIGHT above
+        // the base, and at distance 20 that offset is over the 24 px pick radius
+        // on wide viewports.
+        await setCamera(page, {
+          targetX: current.x,
+          targetZ: current.z,
+          distance: 60,
+          yaw: 0,
+        });
+        const unitScreen = await page.evaluate(
+          (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+          unit.id,
+        );
+        expect(unitScreen, label).not.toBeNull();
+        if (!unitScreen) {
+          return;
+        }
+        await selectUnit(page, unitScreen.x, unitScreen.y, touch);
+        await expect
+          .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
+          .toContain(unit.id);
+      }
+
+      await setCamera(page, {
+        targetX: point.x,
+        targetZ: point.z,
+        distance: setting.distance,
+        yaw: setting.yaw,
+      });
+
+      const screen = await page.evaluate(
+        ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
+        point,
+      );
+      await orderAt(page, screen.x, screen.y, touch);
+      await freezeAfterNextStep(page);
+
+      // Raw picking: must land on the requested ground point at every zoom, for
+      // every sample, reachable or not.
+      const picked = await page.evaluate(() => window.__TC_TEST__?.lastGroundPick() ?? null);
+      expect(picked, label).not.toBeNull();
+      expect(
+        Math.hypot((picked?.x ?? 0) - point.x, (picked?.z ?? 0) - point.z),
+        `${label}: ground pick (${picked?.x ?? 0}, ${picked?.z ?? 0})`,
+      ).toBeLessThanOrEqual(1);
+
+      if (point.reachable) {
+        const ordered = (await units(page)).find((item) => item.id === unit.id);
+        expect(ordered?.orderX, label).not.toBeNull();
+        expect(ordered?.orderZ, label).not.toBeNull();
+        expect(
+          Math.hypot((ordered?.orderX ?? 0) - point.x, (ordered?.orderZ ?? 0) - point.z),
+          `${label}: order (${ordered?.orderX ?? 0}, ${ordered?.orderZ ?? 0})`,
+        ).toBeLessThanOrEqual(1);
+        if (touch) {
+          await stop.tap();
+        } else {
+          await stop.click();
+        }
+      }
+
+      await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
     }
-    await setCamera(page, {
-      targetX: point.x,
-      targetZ: point.z,
-      distance: setting.distance,
-      yaw: setting.yaw,
-    });
-    const screen = await page.evaluate(
-      ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-      point,
-    );
-    await orderAt(page, screen.x, screen.y, touch);
-    await freezeAfterNextStep(page);
-    const ordered = (await units(page)).find((item) => item.id === unit.id);
-    expect(ordered?.orderX).not.toBeNull();
-    expect(ordered?.orderZ).not.toBeNull();
-    expect(
-      Math.hypot((ordered?.orderX ?? 0) - point.x, (ordered?.orderZ ?? 0) - point.z),
-    ).toBeLessThanOrEqual(1);
-    await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
   }
 });
 
@@ -229,9 +299,13 @@ test('[INP-03] clicking an enemy with a selection lowers its HP', async ({ page 
     return;
   }
   const unitScreen = await page.evaluate(
-    ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-    { x: unit.x, z: unit.z },
+    (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+    unit.id,
   );
+  expect(unitScreen).not.toBeNull();
+  if (!unitScreen) {
+    return;
+  }
   await selectUnit(page, unitScreen.x, unitScreen.y, touch);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).toContain(
     unit.id,
@@ -239,9 +313,13 @@ test('[INP-03] clicking an enemy with a selection lowers its HP', async ({ page 
 
   await setCamera(page, { targetX: enemy.x, targetZ: enemy.z, distance: 45, yaw: 0 });
   const enemyScreen = await page.evaluate(
-    ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-    { x: enemy.x, z: enemy.z },
+    (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+    enemy.id,
   );
+  expect(enemyScreen).not.toBeNull();
+  if (!enemyScreen) {
+    return;
+  }
   await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
   await orderAt(page, enemyScreen.x, enemyScreen.y, touch);
   await expect
@@ -340,11 +418,15 @@ test('[INP-05] HUD button presses never issue map orders', async ({ page }, test
   if (!unit) {
     return;
   }
-  const screen = await page.evaluate(
-    ({ x, z }) => window.__TC_TEST__?.worldToScreen(x, z) ?? { x: 0, y: 0 },
-    { x: unit.x, z: unit.z },
+  const unitScreen = await page.evaluate(
+    (id) => window.__TC_TEST__?.unitScreenCentre(id) ?? null,
+    unit.id,
   );
-  await selectUnit(page, screen.x, screen.y, touch);
+  expect(unitScreen).not.toBeNull();
+  if (!unitScreen) {
+    return;
+  }
+  await selectUnit(page, unitScreen.x, unitScreen.y, touch);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).toContain(
     unit.id,
   );
@@ -368,7 +450,7 @@ test('[INP-05] HUD button presses never issue map orders', async ({ page }, test
   }
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).toEqual([]);
 
-  await selectUnit(page, screen.x, screen.y, touch);
+  await selectUnit(page, unitScreen.x, unitScreen.y, touch);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).toContain(
     unit.id,
   );

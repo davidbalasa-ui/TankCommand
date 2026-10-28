@@ -15,6 +15,8 @@ export interface TestHook {
   go(screenId: string): void;
   units(): UnitView[];
   worldToScreen(x: number, z: number): { x: number; y: number };
+  lastGroundPick(): { x: number; z: number } | null;
+  unitScreenCentre(id: number): { x: number; y: number } | null;
   selection(): number[];
   camera(): CameraView;
   setSimSpeed(multiplier: number): void;
@@ -39,6 +41,8 @@ export function installTestHook(app: App): void {
     },
     units: () => app.units(),
     worldToScreen: (x, z) => app.worldToScreen(x, z),
+    lastGroundPick: () => app.lastGroundPick(),
+    unitScreenCentre: (id) => app.unitScreenCentre(id),
     selection: () => app.selection(),
     camera: () => app.camera(),
     setSimSpeed: (multiplier) => {
