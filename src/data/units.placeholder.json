@@ -1,0 +1,66 @@
+[
+  {
+    "id": "unit.human.light_tank",
+    "name": "Light Tank",
+    "faction": "human",
+    "role": "tank",
+    "techLevel": 1,
+    "cost": { "ore": 100, "metal": 50 },
+    "deliverySec": 12.5,
+    "hp": 220,
+    "armor": 4,
+    "speed": { "top": 8, "accel": 4, "turnDegPerSec": 90 },
+    "turretTurnDegPerSec": 120,
+    "weapons": [
+      {
+        "id": "cannon",
+        "damage": 30,
+        "range": 12,
+        "reloadSec": 2.5,
+        "projectileSpeed": 40,
+        "accuracy": 0.85,
+        "splashRadius": 0.5,
+        "targets": ["ground", "structure"]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 14,
+    "sensorRange": 15,
+    "abilities": [],
+    "upgrades": ["fireRate", "armor"],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": { "kind": "placeholder" }
+  },
+  {
+    "id": "unit.alien.light_skimmer",
+    "name": "Light Skimmer",
+    "faction": "alien",
+    "role": "scout",
+    "techLevel": 1,
+    "cost": { "ore": 70, "metal": 30 },
+    "deliverySec": 9,
+    "hp": 120,
+    "armor": 1,
+    "speed": { "top": 12, "accel": 7, "turnDegPerSec": 140 },
+    "turretTurnDegPerSec": 180,
+    "weapons": [
+      {
+        "id": "pulse",
+        "damage": 12,
+        "range": 8,
+        "reloadSec": 1.2,
+        "projectileSpeed": 55,
+        "accuracy": 0.9,
+        "splashRadius": 0,
+        "targets": ["ground", "air"]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 12,
+    "sensorRange": 12,
+    "abilities": [],
+    "upgrades": ["fireRate", "stealth"],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": { "kind": "placeholder" }
+  }
+]

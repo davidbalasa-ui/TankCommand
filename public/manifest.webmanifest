@@ -1,0 +1,9 @@
+{
+  "name": "TankCommand",
+  "short_name": "TankCommand",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#090D16",
+  "theme_color": "#1B365D",
+  "start_url": "./"
+}
