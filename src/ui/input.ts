@@ -1,21 +1,27 @@
 import type { RenderView } from '../render/renderer';
 import type { WorldState } from '../sim/types';
-import { CAMERA_EDGE_BAND } from '../sim/tuning';
+import { CAMERA_EDGE_BAND, CAMERA_FOV_DEG } from '../sim/tuning';
+import {
+  BOX_DRAG_THRESHOLD,
+  DOUBLE_TAP_DISTANCE,
+  DOUBLE_TAP_MS,
+  KEY_ROTATE_SPEED,
+  LONG_PRESS_MS,
+  MIN_PINCH_DISTANCE,
+  MOUSE_ROTATE_SPEED,
+  TAP_MAX_MOVE,
+  TAP_MAX_MS,
+  TWO_FINGER_TAP_MAX_MOVE,
+  TWO_FINGER_TAP_MS,
+} from './inputTuning';
 
-const BOX_DRAG_THRESHOLD = 6;
-const LONG_PRESS_MS = 400;
-
-/**
- * Observable form of the most recent command the input layer handed to the app.
- * `unitIds` covers every field the tests care about; `x/z` are the ground target
- * for a `move` and `null` otherwise.
- */
 export interface IssuedCommand {
-  kind: 'move' | 'attack';
+  kind: 'move' | 'attackMove' | 'attack' | 'hold' | 'stop';
   x: number | null;
   z: number | null;
   targetId: number | null;
   unitIds: number[];
+  queue: boolean;
 }
 
 export interface InputHost {
@@ -25,6 +31,14 @@ export interface InputHost {
   getSelection: () => number[];
   setSelection: (ids: number[]) => void;
   sendCommand: (command: unknown) => boolean;
+  getQueueMode?: () => boolean;
+  getAttackMoveArmed?: () => boolean;
+  clearAttackMove?: () => void;
+  setAttackMoveArmed?: (value: boolean) => void;
+  assignGroup?: (group: number) => void;
+  selectGroup?: (group: number) => void;
+  centerGroup?: (group: number) => void;
+  jumpToLatestAlert?: () => void;
 }
 
 interface PointerInfo {
@@ -38,6 +52,8 @@ interface PointerInfo {
   startTime: number;
   downUnit: number | null;
   downGround: { x: number; z: number } | null;
+  alt: boolean;
+  dragged: boolean;
 }
 
 function angleDiff(a: number, b: number): number {
@@ -56,7 +72,6 @@ export class InputController {
   private readonly selectionBox: HTMLDivElement;
   private readonly pointers = new Map<number, PointerInfo>();
   private readonly keys = new Set<string>();
-  private readonly groups = new Map<number, number[]>();
   private edgeScrollEnabled = true;
   private lastMouse: { x: number; y: number } | null = null;
   private boxStart: { x: number; y: number } | null = null;
@@ -65,10 +80,14 @@ export class InputController {
   private panGrab: { x: number; z: number } | null = null;
   private longPressTimer: number | null = null;
   private longPressReady = false;
-  private pinch: { distance: number; angle: number } | null = null;
-  private twoFingerCandidate = false;
+  private pinch: { distance: number; angle: number; midX: number; midY: number } | null = null;
+  private multiTouch = false;
+  private suppressSingleUntilAllUp = false;
   private twoFingerStart = 0;
   private twoFingerMoved = 0;
+  private lastTap: { time: number; x: number; y: number; unitId: number } | null = null;
+  private lastClick: { time: number; unitId: number } | null = null;
+  private lastGroupKey: { group: number; time: number } | null = null;
   private lastGroundPick: { x: number; z: number } | null = null;
   private lastIssued: IssuedCommand | null = null;
   private disposed = false;
@@ -88,32 +107,26 @@ export class InputController {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('contextmenu', this.onWindowContextMenu);
   }
 
   setEdgeScroll(enabled: boolean): void {
     this.edgeScrollEnabled = enabled;
   }
 
-  /**
-   * The ground point this controller resolved for the most recent click or tap,
-   * or null before the first one. Read-only observability for acceptance tests:
-   * it reports what picking produced, independently of whether that landing spot
-   * turned out to be a reachable destination.
-   */
   getLastGroundPick(): { x: number; z: number } | null {
     return this.lastGroundPick ? { ...this.lastGroundPick } : null;
   }
 
-  /**
-   * The most recent command the input layer issued, or null before the first
-   * one. Read-only observability for acceptance tests: it lets a test assert the
-   * order that was queued, without depending on the sim having stepped.
-   */
   getLastIssuedCommand(): IssuedCommand | null {
     if (!this.lastIssued) {
       return null;
     }
     return { ...this.lastIssued, unitIds: [...this.lastIssued.unitIds] };
+  }
+
+  isLongPressReady(): boolean {
+    return this.longPressReady;
   }
 
   update(elapsedMs: number): void {
@@ -180,10 +193,10 @@ export class InputController {
     }
 
     if (this.keys.has('q')) {
-      camera.rotate(1.2 * seconds);
+      camera.rotate(KEY_ROTATE_SPEED * seconds);
     }
     if (this.keys.has('e')) {
-      camera.rotate(-1.2 * seconds);
+      camera.rotate(-KEY_ROTATE_SPEED * seconds);
     }
 
     camera.clampTarget();
@@ -205,6 +218,7 @@ export class InputController {
     canvas.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('contextmenu', this.onWindowContextMenu);
     this.selectionBox.remove();
   }
 
@@ -212,19 +226,15 @@ export class InputController {
     event.preventDefault();
   };
 
+  private readonly onWindowContextMenu = (event: Event): void => {
+    event.preventDefault();
+  };
+
   private readonly onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    const view = this.host.renderView;
-    const before = view.pickGround(event.clientX, event.clientY);
-    const camera = view.getCamera();
-    camera.zoomBy(Math.exp(event.deltaY * 0.001));
-    view.applyCamera();
-    const after = view.pickGround(event.clientX, event.clientY);
-    if (before && after) {
-      camera.pan(before.x - after.x, before.z - after.z);
-    }
-    camera.clampTarget();
-    view.applyCamera();
+    this.zoomAt(event.clientX, event.clientY, Math.exp(event.deltaY * 0.001));
+    this.host.renderView.getCamera().clampTarget();
+    this.host.renderView.applyCamera();
   };
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -233,7 +243,7 @@ export class InputController {
     try {
       canvas.setPointerCapture(event.pointerId);
     } catch {
-      // Pointer capture is best-effort.
+      // Pointer capture is best-effort in synthetic environments.
     }
     const info: PointerInfo = {
       id: event.pointerId,
@@ -246,6 +256,8 @@ export class InputController {
       startTime: performance.now(),
       downUnit: null,
       downGround: null,
+      alt: event.altKey,
+      dragged: false,
     };
     this.pointers.set(event.pointerId, info);
     if (event.pointerType === 'mouse') {
@@ -253,27 +265,27 @@ export class InputController {
     }
 
     if (event.pointerType === 'touch') {
-      if (this.pointers.size === 2) {
-        this.clearLongPress();
-        this.panPointerId = null;
-        this.panGrab = null;
-        this.twoFingerCandidate = true;
+      if (this.pointers.size === 1) {
+        info.downUnit = this.host.renderView.pickUnit(event.clientX, event.clientY, true, true);
+        info.downGround = this.host.renderView.pickGround(event.clientX, event.clientY);
+        this.startLongPress();
+      } else if (this.pointers.size === 2) {
+        this.multiTouch = true;
+        this.suppressSingleUntilAllUp = true;
         this.twoFingerStart = performance.now();
         this.twoFingerMoved = 0;
+        this.clearLongPress();
+        this.longPressReady = false;
+        this.panPointerId = null;
+        this.panGrab = null;
         this.updatePinch();
-      } else if (this.pointers.size === 1) {
-        const unit = this.host.renderView.pickUnit(event.clientX, event.clientY, true, true);
-        info.downUnit = unit;
-        info.downGround = this.host.renderView.pickGround(event.clientX, event.clientY);
-        if (unit === null && info.downGround) {
-          this.startLongPress();
-        }
       }
       return;
     }
 
-    if (event.button === 2) {
-      this.handleOrder(event.clientX, event.clientY, event.shiftKey);
+    info.downGround = this.host.renderView.pickGround(event.clientX, event.clientY);
+    if (event.button === 2 || event.button === 1) {
+      event.preventDefault();
     }
   };
 
@@ -298,16 +310,14 @@ export class InputController {
         this.updatePinch();
         return;
       }
-
-      // A gesture is classified exactly once. If the finger is already panning,
-      // it keeps panning even if the long-press timer fires afterwards: flipping
-      // a running drag into a box-select throws away the camera movement the
-      // player has already made and is never what they asked for.
-      if (this.panPointerId !== null) {
-        this.panBy(event.clientX, event.clientY);
+      if (this.suppressSingleUntilAllUp) {
         return;
       }
-
+      if (this.panPointerId === event.pointerId) {
+        info.dragged = true;
+        this.panBy(event.clientX, event.clientY, dx, dy);
+        return;
+      }
       if (this.longPressReady) {
         if (total > BOX_DRAG_THRESHOLD) {
           if (!this.boxSelecting) {
@@ -318,20 +328,30 @@ export class InputController {
         }
         return;
       }
-
-      if (info.downGround && total > BOX_DRAG_THRESHOLD) {
+      if (total > BOX_DRAG_THRESHOLD) {
         this.panPointerId = event.pointerId;
         this.panGrab = info.downGround;
         this.clearLongPress();
         this.longPressReady = false;
-        this.panBy(event.clientX, event.clientY);
+        info.dragged = true;
+        this.panBy(event.clientX, event.clientY, dx, dy);
       }
       return;
     }
 
-    if (info.button === 1) {
+    if (
+      (info.button === 1 || info.button === 2) &&
+      total > BOX_DRAG_THRESHOLD
+    ) {
+      info.dragged = true;
+      this.panBy(event.clientX, event.clientY, dx, dy);
+      return;
+    }
+
+    if (info.button === 0 && info.alt && total > BOX_DRAG_THRESHOLD) {
+      info.dragged = true;
       const camera = this.host.renderView.getCamera();
-      camera.rotate(-dx * 0.005);
+      camera.rotate(-dx * MOUSE_ROTATE_SPEED);
       camera.clampTarget();
       this.host.renderView.applyCamera();
       return;
@@ -357,16 +377,23 @@ export class InputController {
     const duration = performance.now() - info.startTime;
 
     if (event.pointerType === 'touch') {
+      if (this.suppressSingleUntilAllUp && this.pointers.size > 0) {
+        return;
+      }
       if (this.pointers.size < 2) {
         this.pinch = null;
       }
-      if (this.pointers.size === 0 && this.twoFingerCandidate) {
+      if (this.pointers.size === 0 && this.multiTouch) {
         const elapsed = performance.now() - this.twoFingerStart;
-        if (this.twoFingerMoved < 10 && elapsed < LONG_PRESS_MS) {
+        if (this.twoFingerMoved < TWO_FINGER_TAP_MAX_MOVE && elapsed < TWO_FINGER_TAP_MS) {
           this.host.setSelection([]);
         }
-        this.twoFingerCandidate = false;
-        this.twoFingerMoved = 0;
+        this.multiTouch = false;
+        this.suppressSingleUntilAllUp = false;
+        this.clearLongPress();
+        this.longPressReady = false;
+        this.boxSelecting = false;
+        this.boxStart = null;
         return;
       }
       if (this.boxSelecting) {
@@ -374,7 +401,7 @@ export class InputController {
       } else if (this.panPointerId === event.pointerId) {
         this.panPointerId = null;
         this.panGrab = null;
-      } else if (!this.longPressReady && total < 8 && duration < 500) {
+      } else if (!this.longPressReady && total < TAP_MAX_MOVE && duration < TAP_MAX_MS) {
         this.handleTap(info.startX, info.startY);
       }
       this.clearLongPress();
@@ -391,23 +418,32 @@ export class InputController {
       return;
     }
 
-    if (info.button === 0 && total < BOX_DRAG_THRESHOLD) {
+    if (info.button === 2 && !info.dragged && total < BOX_DRAG_THRESHOLD) {
+      this.handleOrder(info.startX, info.startY, event.shiftKey);
+      return;
+    }
+
+    if (info.button === 0 && !info.dragged && total < BOX_DRAG_THRESHOLD) {
       this.handleLeftClick(info.startX, info.startY, event.shiftKey);
     }
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const key = event.key.toLowerCase();
-    if (key >= '1' && key <= '5') {
+    if (key >= '1' && key <= '9') {
       const group = Number(key);
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        this.groups.set(group, this.host.getSelection());
+        this.host.assignGroup?.(group);
         return;
       }
-      const ids = this.groups.get(group);
-      if (ids) {
-        this.host.setSelection(ids);
+      const now = performance.now();
+      if (this.lastGroupKey && this.lastGroupKey.group === group && now - this.lastGroupKey.time < 350) {
+        this.host.centerGroup?.(group);
+        this.lastGroupKey = null;
+      } else {
+        this.host.selectGroup?.(group);
+        this.lastGroupKey = { group, time: now };
       }
       return;
     }
@@ -417,6 +453,14 @@ export class InputController {
       const selection = this.host.getSelection();
       if (selection.length > 0) {
         const world = this.host.getWorld();
+        this.lastIssued = {
+          kind: 'stop',
+          x: null,
+          z: null,
+          targetId: null,
+          unitIds: [...selection],
+          queue: false,
+        };
         this.host.sendCommand({
           kind: 'stop',
           unitIds: selection,
@@ -424,6 +468,42 @@ export class InputController {
           issuer: 1,
         });
       }
+      return;
+    }
+
+    if (key === 'h') {
+      event.preventDefault();
+      const selection = this.host.getSelection();
+      if (selection.length > 0) {
+        const world = this.host.getWorld();
+        this.lastIssued = {
+          kind: 'hold',
+          x: null,
+          z: null,
+          targetId: null,
+          unitIds: [...selection],
+          queue: false,
+        };
+        this.host.sendCommand({
+          kind: 'hold',
+          unitIds: selection,
+          tick: world.tick + 1,
+          issuer: 1,
+        });
+      }
+      return;
+    }
+
+    if (key === ' ') {
+      event.preventDefault();
+      this.host.jumpToLatestAlert?.();
+      return;
+    }
+
+    if (key === 'a') {
+      event.preventDefault();
+      this.keys.add(key);
+      this.host.setAttackMoveArmed?.(true);
       return;
     }
 
@@ -437,18 +517,69 @@ export class InputController {
     this.keys.delete(event.key.toLowerCase());
   };
 
-  private panBy(clientX: number, clientY: number): void {
-    if (!this.panGrab) {
+  /**
+   * Zooms by `factor` while keeping the ground point under `(clientX, clientY)`
+   * where it was. The correction is iterated because `applyCamera` re-anchors
+   * the camera on the terrain height beneath the *new* target, so pan is not a
+   * pure translation on uneven ground; a single pass leaves a residual.
+   */
+  private zoomAt(clientX: number, clientY: number, factor: number): void {
+    if (!Number.isFinite(factor) || factor <= 0) {
       return;
     }
-    const current = this.host.renderView.pickGround(clientX, clientY);
-    if (!current) {
+    const view = this.host.renderView;
+    const camera = view.getCamera();
+    const before = view.pickGround(clientX, clientY);
+    camera.zoomBy(factor);
+    view.applyCamera();
+    if (!before) {
       return;
     }
-    const camera = this.host.renderView.getCamera();
-    camera.pan(this.panGrab.x - current.x, this.panGrab.z - current.z);
+    for (let i = 0; i < 4; i += 1) {
+      const after = view.pickGround(clientX, clientY);
+      if (!after) {
+        break;
+      }
+      const dx = before.x - after.x;
+      const dz = before.z - after.z;
+      if (Math.hypot(dx, dz) < 0.05) {
+        break;
+      }
+      camera.pan(dx, dz);
+      view.applyCamera();
+    }
+  }
+
+  private panBy(clientX: number, clientY: number, dx: number, dy: number): void {
+    const view = this.host.renderView;
+    const camera = view.getCamera();
+    const current = view.pickGround(clientX, clientY);
+    if (this.panGrab && current) {
+      camera.pan(this.panGrab.x - current.x, this.panGrab.z - current.z);
+    } else {
+      this.screenPan(dx, dy);
+    }
     camera.clampTarget();
-    this.host.renderView.applyCamera();
+    view.applyCamera();
+  }
+
+  private screenPan(dx: number, dy: number): void {
+    const view = this.host.renderView;
+    const camera = view.getCamera();
+    const rect = this.host.canvas.getBoundingClientRect();
+    if (rect.height <= 0) {
+      return;
+    }
+    const worldPerPixel =
+      (2 * camera.distance * Math.tan((CAMERA_FOV_DEG * Math.PI) / 360)) / rect.height;
+    const rightX = Math.cos(camera.yaw);
+    const rightZ = -Math.sin(camera.yaw);
+    const forwardX = Math.sin(camera.yaw);
+    const forwardZ = Math.cos(camera.yaw);
+    camera.pan(
+      -(rightX * dx + forwardX * dy) * worldPerPixel,
+      -(rightZ * dx + forwardZ * dy) * worldPerPixel,
+    );
   }
 
   private startLongPress(): void {
@@ -456,7 +587,7 @@ export class InputController {
     this.longPressReady = false;
     this.longPressTimer = window.setTimeout(() => {
       this.longPressTimer = null;
-      if (this.panPointerId === null) {
+      if (this.panPointerId === null && this.pointers.size === 1) {
         this.longPressReady = true;
       }
     }, LONG_PRESS_MS);
@@ -478,18 +609,21 @@ export class InputController {
     }
     const distance = Math.hypot(b.lastX - a.lastX, b.lastY - a.lastY);
     const angle = Math.atan2(b.lastY - a.lastY, b.lastX - a.lastX);
+    const midX = (a.lastX + b.lastX) / 2;
+    const midY = (a.lastY + b.lastY) / 2;
     if (!this.pinch) {
-      this.pinch = { distance, angle };
+      this.pinch = { distance, angle, midX, midY };
       return;
     }
-    if (distance > 0 && this.pinch.distance > 0) {
+
+    if (distance > MIN_PINCH_DISTANCE && this.pinch.distance > MIN_PINCH_DISTANCE) {
       const camera = this.host.renderView.getCamera();
-      camera.zoomBy(this.pinch.distance / distance);
+      this.zoomAt(midX, midY, this.pinch.distance / distance);
       camera.rotate(angleDiff(angle, this.pinch.angle));
       camera.clampTarget();
       this.host.renderView.applyCamera();
     }
-    this.pinch = { distance, angle };
+    this.pinch = { distance, angle, midX, midY };
   }
 
   private updateBox(x: number, y: number): void {
@@ -533,6 +667,23 @@ export class InputController {
     this.host.setSelection(selected);
   }
 
+  private selectSameTypeOnScreen(unitId: number): void {
+    const world = this.host.getWorld();
+    const original = world.units.find((unit) => unit.id === unitId);
+    if (!original) {
+      return;
+    }
+    const ids = world.units
+      .filter(
+        (unit) =>
+          unit.owner === 1 &&
+          unit.typeId === original.typeId &&
+          this.host.renderView.unitIsOnScreen(unit.id),
+      )
+      .map((unit) => unit.id);
+    this.host.setSelection(ids.length > 0 ? ids : [unitId]);
+  }
+
   private handleLeftClick(x: number, y: number, shift: boolean): void {
     this.lastGroundPick = this.host.renderView.pickGround(x, y);
     const unitId = this.host.renderView.pickUnit(x, y, true, false);
@@ -540,6 +691,17 @@ export class InputController {
     const unit = unitId === null ? null : world.units.find((item) => item.id === unitId);
     if (unit && unit.owner === 1) {
       const current = this.host.getSelection();
+      const now = performance.now();
+      if (
+        !shift &&
+        this.lastClick &&
+        this.lastClick.unitId === unit.id &&
+        now - this.lastClick.time < DOUBLE_TAP_MS
+      ) {
+        this.selectSameTypeOnScreen(unit.id);
+        this.lastClick = null;
+        return;
+      }
       if (shift) {
         if (current.includes(unit.id)) {
           this.host.setSelection(current.filter((id) => id !== unit.id));
@@ -549,9 +711,17 @@ export class InputController {
       } else {
         this.host.setSelection([unit.id]);
       }
+      this.lastClick = { time: now, unitId: unit.id };
       return;
     }
     if (!unit) {
+      const selection = this.host.getSelection();
+      const ground = this.lastGroundPick;
+      if (this.host.getAttackMoveArmed?.() && ground && selection.length > 0) {
+        this.issueMove(selection, ground.x, ground.z, false, 'attackMove');
+        this.host.clearAttackMove?.();
+        return;
+      }
       this.host.setSelection([]);
     }
   }
@@ -564,7 +734,19 @@ export class InputController {
     const world = this.host.getWorld();
     const ownUnit = own === null ? null : world.units.find((unit) => unit.id === own);
     if (ownUnit && ownUnit.owner === 1) {
+      const now = performance.now();
+      if (
+        this.lastTap &&
+        this.lastTap.unitId === ownUnit.id &&
+        now - this.lastTap.time < DOUBLE_TAP_MS &&
+        Math.hypot(x - this.lastTap.x, y - this.lastTap.y) < DOUBLE_TAP_DISTANCE
+      ) {
+        this.selectSameTypeOnScreen(ownUnit.id);
+        this.lastTap = null;
+        return;
+      }
       this.host.setSelection([ownUnit.id]);
+      this.lastTap = { time: now, x, y, unitId: ownUnit.id };
       return;
     }
 
@@ -576,8 +758,14 @@ export class InputController {
       return;
     }
 
+    const queue = this.host.getQueueMode?.() ?? false;
     if (ground && selection.length > 0) {
-      this.issueMove(selection, ground.x, ground.z, false);
+      if (this.host.getAttackMoveArmed?.()) {
+        this.issueMove(selection, ground.x, ground.z, queue, 'attackMove');
+        this.host.clearAttackMove?.();
+      } else {
+        this.issueMove(selection, ground.x, ground.z, queue, 'move');
+      }
     } else if (!ground) {
       this.host.setSelection([]);
     }
@@ -599,17 +787,27 @@ export class InputController {
       return;
     }
     if (ground) {
-      this.issueMove(selection, ground.x, ground.z, queue);
+      this.issueMove(
+        selection,
+        ground.x,
+        ground.z,
+        queue || (this.host.getQueueMode?.() ?? false),
+        'move',
+      );
     }
   }
 
-  private issueMove(ids: number[], x: number, z: number, queue: boolean): void {
-    // Record before sending: the acceptance test reads this synchronously after
-    // the press and must see the exact target the input layer resolved.
-    this.lastIssued = { kind: 'move', x, z, targetId: null, unitIds: [...ids] };
+  private issueMove(
+    ids: number[],
+    x: number,
+    z: number,
+    queue: boolean,
+    kind: 'move' | 'attackMove',
+  ): void {
+    this.lastIssued = { kind, x, z, targetId: null, unitIds: [...ids], queue };
     const world = this.host.getWorld();
     this.host.sendCommand({
-      kind: 'move',
+      kind,
       unitIds: ids,
       x,
       z,
@@ -620,7 +818,14 @@ export class InputController {
   }
 
   private issueAttack(ids: number[], targetId: number): void {
-    this.lastIssued = { kind: 'attack', x: null, z: null, targetId, unitIds: [...ids] };
+    this.lastIssued = {
+      kind: 'attack',
+      x: null,
+      z: null,
+      targetId,
+      unitIds: [...ids],
+      queue: false,
+    };
     const world = this.host.getWorld();
     this.host.sendCommand({
       kind: 'attack',

@@ -46,6 +46,8 @@ def main():
                         if dl.get("content"): txt.append(dl["content"])
                         if dl.get("reasoning_content"): rsn.append(dl["reasoning_content"])
                         if c.get("finish_reason"): finish = c["finish_reason"]
+            if not "".join(txt).strip():
+                raise RuntimeError("empty answer (stream cut off)")
             break
         except Exception as e:  # network hiccup: back off and retry
             print("retry", attempt + 1, type(e).__name__, file=sys.stderr)

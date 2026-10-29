@@ -1,4 +1,5 @@
 import { button } from './controls';
+import { Hud } from './hud';
 import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
@@ -93,35 +94,66 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       canvas.className = 'game-canvas';
       root.append(canvas);
 
-      const hud = document.createElement('div');
-      hud.className = 'hud-top';
-      const status = document.createElement('div');
-      status.className = 'hud-status';
-      status.textContent = 'Your tanks: 0 · Enemy tanks: 0';
-      hud.append(status);
-      addButtonTo(hud, 'inGame', 'pause', 'Pause', () => {
-        ctx.go('pause');
-      });
-      addButtonTo(hud, 'inGame', 'stop', 'Stop', () => {
-        ctx.issueStop?.();
-      });
-      addButtonTo(hud, 'inGame', 'deselect', 'Deselect', () => {
-        ctx.deselect?.();
-      });
-      root.append(hud);
+      const getWorld = ctx.getWorld;
+      let hud: Hud | null = null;
+      if (getWorld) {
+        hud = new Hud(root, {
+          getWorld,
+          getSelection: () => ctx.selection?.() ?? [],
+          setSelection: (ids) => {
+            ctx.setSelection?.(ids);
+          },
+          sendCommand: (command) => ctx.sendCommand?.(command) ?? false,
+          getCamera: () =>
+            ctx.getCamera?.() ?? {
+              targetX: 0,
+              targetZ: 0,
+              distance: 40,
+              yaw: 0,
+              pitch: 0,
+            },
+          cameraFootprint: () => ctx.cameraFootprint?.() ?? [],
+          setCameraTarget: (x, z) => {
+            ctx.setCameraTarget?.(x, z);
+          },
+          isLeftHanded: () => ctx.isLeftHanded?.() ?? false,
+          setLeftHanded: (value) => {
+            ctx.setLeftHanded?.(value);
+          },
+          isQueueMode: () => ctx.isQueueMode?.() ?? false,
+          setQueueMode: (value) => {
+            ctx.setQueueMode?.(value);
+          },
+          isAttackMoveArmed: () => ctx.isAttackMoveArmed?.() ?? false,
+          setAttackMoveArmed: (value) => {
+            ctx.setAttackMoveArmed?.(value);
+          },
+          assignGroup: (group) => {
+            ctx.assignGroup?.(group);
+          },
+          selectGroup: (group) => {
+            ctx.selectGroup?.(group);
+          },
+          centerGroup: (group) => {
+            ctx.centerGroup?.(group);
+          },
+          groupMembers: (group) => ctx.groupMembers?.(group) ?? [],
+          pause: () => {
+            ctx.go('pause');
+          },
+        });
+        ctx.registerHud?.(hud);
+      }
 
       let disposed = false;
       let handle: RendererHandle | null = null;
       let resultShown = false;
 
-      const updateStatus = (): void => {
+      const updateResult = (): void => {
         const world = ctx.getWorld?.();
         if (!world) {
           return;
         }
-        const own = world.units.filter((unit) => unit.owner === 1).length;
-        const enemy = world.units.filter((unit) => unit.owner === 2).length;
-        status.textContent = `Your tanks: ${own} · Enemy tanks: ${enemy}`;
         if (world.result && !resultShown) {
           resultShown = true;
           ctx.go('results');
@@ -154,12 +186,14 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           }
         });
 
-      updateStatus();
-      const timer = window.setInterval(updateStatus, 200);
+      updateResult();
+      const timer = window.setInterval(updateResult, 200);
 
       return () => {
         disposed = true;
         window.clearInterval(timer);
+        ctx.registerHud?.(null);
+        hud?.dispose();
         handle?.dispose();
       };
     }),
@@ -184,6 +218,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
     }),
 
     settings: makeScreen('settings', 'Settings', (root, ctx) => {
+      addButton(root, 'settings', 'leftHanded', 'Left-handed layout', () => {
+        ctx.setLeftHanded?.(!(ctx.isLeftHanded?.() ?? false));
+      });
       addButton(root, 'settings', 'back', 'Back', () => {
         ctx.router.back();
       });

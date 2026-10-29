@@ -1,6 +1,6 @@
 import type { App, CameraView, IssuedCommand, QualityView, UnitView } from '../app';
 import { ControlInventory } from '../ui/controls';
-import type { ScreenId } from '../ui/router';
+import type { HudSnapshot, ScreenId } from '../ui/router';
 import type { WorldState } from '../sim/types';
 import type { WatchdogReport } from '../platform/watchdog';
 import type { RenderStats, ScreenBounds } from '../render/renderer';
@@ -22,8 +22,16 @@ export interface TestHook {
   quality(): QualityView;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
+  unitIsOnScreen(id: number): boolean;
+  groundPickAt(x: number, y: number): { x: number; z: number } | null;
   selection(): number[];
+  setSelection(ids: number[]): void;
   camera(): CameraView;
+  cameraFootprint(): Array<{ x: number; z: number }>;
+  orderPaths(): Array<{ unitId: number; points: number; queued: boolean }>;
+  inputState(): { longPressReady: boolean };
+  hud(): HudSnapshot | null;
+  alerts(): Array<{ x: number; z: number }>;
   setSimSpeed(multiplier: number): void;
   setCamera(info: Partial<CameraView>): void;
 }
@@ -52,8 +60,18 @@ export function installTestHook(app: App): void {
     quality: () => app.quality(),
     unitScreenCentre: (id) => app.unitScreenCentre(id),
     unitScreenBounds: (id) => app.unitScreenBounds(id),
+    unitIsOnScreen: (id) => app.unitIsOnScreen(id),
+    groundPickAt: (x, y) => app.groundPickAt(x, y),
     selection: () => app.selection(),
+    setSelection: (ids) => {
+      app.setSelection(ids);
+    },
     camera: () => app.camera(),
+    cameraFootprint: () => app.cameraFootprint(),
+    orderPaths: () => app.orderPaths(),
+    inputState: () => app.inputState(),
+    hud: () => app.hudSnapshot(),
+    alerts: () => app.alerts(),
     setSimSpeed: (multiplier) => {
       app.setSimSpeed(multiplier);
     },

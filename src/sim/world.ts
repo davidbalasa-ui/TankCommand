@@ -11,6 +11,7 @@ import {
 } from './map';
 import { findPath } from './pathfinding';
 import {
+  ATTACK_MOVE_ENGAGE_FACTOR,
   ATTACK_REPATH_TICKS,
   FIRE_MOVE_SPEED_MAX,
   FORMATION_SPACING,
@@ -33,6 +34,7 @@ import type {
   Point,
   ProjectileState,
   SimUnitType,
+  Stance,
   StartUnit,
   UnitState,
   WeaponStats,
@@ -86,10 +88,17 @@ function cloneOrder(order: Order): Order {
   if (order.kind === 'move') {
     return { ...order };
   }
+  if (order.kind === 'attackMove') {
+    return { ...order };
+  }
   if (order.kind === 'attack') {
     return { ...order };
   }
   return { kind: 'idle' };
+}
+
+function normalizeStance(stance: Stance | undefined): Stance {
+  return stance === 'hold' ? 'hold' : 'free';
 }
 
 function cloneWorld(world: WorldState): WorldState {
@@ -162,6 +171,7 @@ function addUnit(world: WorldState, start: StartUnit): void {
     turretHeading,
     hp: type.hp,
     order: { kind: 'idle' },
+    stance: normalizeStance(start.stance),
     path: [],
     reloadLeft: 0,
     stuckTicks: 0,
@@ -218,7 +228,9 @@ function computePath(
   return path;
 }
 
-function adoptPath(unit: UnitState, path: Point[], queue: boolean): void {
+type MoveOrderKind = 'move' | 'attackMove';
+
+function adoptPath(unit: UnitState, path: Point[], queue: boolean, kind: MoveOrderKind): void {
   unit.path = path;
   const final = path[path.length - 1];
   if (!final) {
@@ -226,7 +238,10 @@ function adoptPath(unit: UnitState, path: Point[], queue: boolean): void {
     unit.speed = 0;
     return;
   }
-  unit.order = { kind: 'move', x: final.x, z: final.z, queue };
+  unit.order =
+    kind === 'move'
+      ? { kind: 'move', x: final.x, z: final.z, queue }
+      : { kind: 'attackMove', x: final.x, z: final.z, queue };
 }
 
 function planMove(
@@ -235,21 +250,40 @@ function planMove(
   goalX: number,
   goalZ: number,
   queue: boolean,
+  kind: MoveOrderKind,
 ): void {
-  if (queue && unit.order.kind === 'move' && unit.path.length > 0) {
-    const last = unit.path[unit.path.length - 1];
-    if (last) {
-      const appended = findPath(world.map, last.x, last.z, goalX, goalZ);
-      if (appended && appended.length > 0) {
-        const combined = [...unit.path, ...appended];
-        const final = combined[combined.length - 1];
-        if (final) {
-          unit.path = combined;
-          unit.order = { kind: 'move', x: final.x, z: final.z, queue: true };
-          unit.replans = 0;
-          unit.stuckTicks = 0;
-          return;
-        }
+  unit.stance = 'free';
+
+  if (queue) {
+    // Queueing appends to the pending order instead of replacing it.
+    //
+    // The anchor is the tail of the current path. If the unit still holds a move
+    // order but its path is momentarily empty — the simulation clears paths when
+    // it re-plans — the order's own destination is the anchor, so a queued
+    // waypoint is never silently dropped. Whatever `findPath` says, the queued
+    // waypoint is appended, so the flag on the resulting order always reports
+    // that the path is a queue rather than a fresh order.
+    const tail = unit.path.length > 0 ? unit.path[unit.path.length - 1] : undefined;
+    const pending =
+      unit.order.kind === 'move' || unit.order.kind === 'attackMove'
+        ? { x: unit.order.x, z: unit.order.z }
+        : undefined;
+    const anchor = tail ?? pending;
+    if (anchor) {
+      const appended = findPath(world.map, anchor.x, anchor.z, goalX, goalZ) ?? [
+        { x: goalX, z: goalZ },
+      ];
+      const combined = [...unit.path, ...appended];
+      const final = combined[combined.length - 1];
+      if (final) {
+        unit.path = combined;
+        unit.order =
+          kind === 'move'
+            ? { kind: 'move', x: final.x, z: final.z, queue: true }
+            : { kind: 'attackMove', x: final.x, z: final.z, queue: true };
+        unit.replans = 0;
+        unit.stuckTicks = 0;
+        return;
       }
     }
   }
@@ -263,7 +297,7 @@ function planMove(
     unit.replans = 0;
     return;
   }
-  adoptPath(unit, path, false);
+  adoptPath(unit, path, false, kind);
   unit.replans = 0;
   unit.stuckTicks = 0;
 }
@@ -290,7 +324,33 @@ function applyMoveCommand(
       clamped.z + offset.z,
       UNIT_RADIUS,
     );
-    planMove(world, unit, goal.x, goal.z, command.queue ?? false);
+    planMove(world, unit, goal.x, goal.z, command.queue ?? false, 'move');
+  }
+}
+
+function applyAttackMoveCommand(
+  world: WorldState,
+  command: Extract<Command, { kind: 'attackMove' }>,
+): void {
+  const units = ownedUnits(world, command.issuer, command.unitIds);
+  if (units.length === 0) {
+    return;
+  }
+  const clamped = clampToMap(world.map, command.x, command.z, UNIT_RADIUS);
+  const offsets = formationOffsets(units.length);
+  for (let i = 0; i < units.length; i += 1) {
+    const unit = units[i];
+    const offset = offsets[i];
+    if (!unit || !offset) {
+      continue;
+    }
+    const goal = clampToMap(
+      world.map,
+      clamped.x + offset.x,
+      clamped.z + offset.z,
+      UNIT_RADIUS,
+    );
+    planMove(world, unit, goal.x, goal.z, command.queue ?? false, 'attackMove');
   }
 }
 
@@ -299,6 +359,7 @@ function applyAttackCommand(
   command: Extract<Command, { kind: 'attack' }>,
 ): void {
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    unit.stance = 'free';
     unit.order = { kind: 'attack', targetId: command.targetId };
     unit.path = [];
     unit.speed = 0;
@@ -308,11 +369,26 @@ function applyAttackCommand(
   }
 }
 
+function applyHoldCommand(
+  world: WorldState,
+  command: Extract<Command, { kind: 'hold' }>,
+): void {
+  for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    unit.stance = 'hold';
+    unit.order = { kind: 'idle' };
+    unit.path = [];
+    unit.speed = 0;
+    unit.replans = 0;
+    unit.stuckTicks = 0;
+  }
+}
+
 function applyStopCommand(
   world: WorldState,
   command: Extract<Command, { kind: 'stop' }>,
 ): void {
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    unit.stance = 'free';
     unit.order = { kind: 'idle' };
     unit.path = [];
     unit.speed = 0;
@@ -380,7 +456,10 @@ function selectTarget(
     return nearestEnemy(world, unit);
   }
 
-  const range = type.weapon?.range ?? type.sightRange;
+  const range =
+    unit.order.kind === 'attackMove'
+      ? type.sightRange * ATTACK_MOVE_ENGAGE_FACTOR
+      : type.weapon?.range ?? type.sightRange;
   let best: UnitState | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
@@ -397,22 +476,19 @@ function selectTarget(
 }
 
 /**
- * True when an attack order is standing still on purpose: the selected target is
- * inside weapon range with clear line of sight, so `updateOrderPath` deliberately
- * clears the path and brakes to a halt to shoot.
+ * True when an attack or attack-move order is standing still on purpose: the
+ * selected target is inside weapon range with clear line of sight.
  *
  * The stuck rule must ignore these units. Otherwise a perfectly placed firing
  * tank counts "moved less than MOVE_EPS" every tick, burns through MAX_REPLANS,
- * and has its attack order cancelled to idle — after which it only auto-engages
- * inside weapon range and will never close on the survivors, so the skirmish
- * can never reach a result.
+ * and has its order cancelled to idle.
  */
 function isHoldingFirePosition(
   world: WorldState,
   unit: UnitState,
   type: SimUnitType,
 ): boolean {
-  if (unit.order.kind !== 'attack') {
+  if (unit.order.kind !== 'attack' && unit.order.kind !== 'attackMove') {
     return false;
   }
   const weapon = type.weapon;
@@ -438,7 +514,7 @@ function followPath(
   if (goalDistance <= STOP_DISTANCE) {
     unit.path = [];
     unit.speed = 0;
-    if (unit.order.kind === 'move') {
+    if (unit.order.kind === 'move' || unit.order.kind === 'attackMove') {
       unit.order = { kind: 'idle' };
     }
     return;
@@ -718,6 +794,12 @@ function updateOrderPath(
   type: SimUnitType,
   target: UnitState | null,
 ): void {
+  if (unit.stance === 'hold') {
+    unit.path = [];
+    unit.speed = approach(unit.speed, 0, type.accel * DT);
+    return;
+  }
+
   if (unit.order.kind === 'move') {
     if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
       unit.order = { kind: 'idle' };
@@ -732,9 +814,48 @@ function updateOrderPath(
         unit.speed = 0;
         return;
       }
-      adoptPath(unit, path, false);
+      // Re-planning the same order must not erase the fact that its path is a
+      // queue: the flag drives the "queued path" overlay and the acceptance
+      // test, so it follows the order rather than the individual path.
+      adoptPath(unit, path, unit.order.queue, 'move');
     }
     if (unit.order.kind === 'move') {
+      followPath(world, unit, type, { x: unit.order.x, z: unit.order.z });
+    }
+    return;
+  }
+
+  if (unit.order.kind === 'attackMove') {
+    const weapon = type.weapon;
+    const distance = target ? Math.hypot(target.x - unit.x, target.z - unit.z) : 0;
+    const inRange =
+      target !== null &&
+      weapon !== null &&
+      distance <= weapon.range &&
+      unitLineOfSight(world, unit, target);
+    if (inRange) {
+      unit.path = [];
+      unit.speed = approach(unit.speed, 0, type.accel * DT);
+      return;
+    }
+
+    if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
+      unit.order = { kind: 'idle' };
+      unit.path = [];
+      unit.speed = 0;
+      return;
+    }
+
+    if (unit.path.length === 0) {
+      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      if (!path) {
+        unit.order = { kind: 'idle' };
+        unit.speed = 0;
+        return;
+      }
+      adoptPath(unit, path, unit.order.queue, 'attackMove');
+    }
+    if (unit.order.kind === 'attackMove') {
       followPath(world, unit, type, { x: unit.order.x, z: unit.order.z });
     }
     return;
@@ -778,7 +899,11 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     if (!start) {
       continue;
     }
-    if (unit.order.kind !== 'move' && unit.order.kind !== 'attack') {
+    if (
+      unit.order.kind !== 'move' &&
+      unit.order.kind !== 'attackMove' &&
+      unit.order.kind !== 'attack'
+    ) {
       unit.stuckTicks = 0;
       unit.replans = 0;
       continue;
@@ -817,7 +942,17 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
-        unit.order = { kind: 'move', x: end.x, z: end.z, queue: false };
+        unit.order = { kind: 'move', x: end.x, z: end.z, queue: unit.order.queue };
+      }
+      continue;
+    }
+
+    if (unit.order.kind === 'attackMove') {
+      const path = findPath(world.map, unit.x, unit.z, unit.order.x, unit.order.z);
+      unit.path = path ?? [];
+      const end = path && path.length > 0 ? path[path.length - 1] : undefined;
+      if (end) {
+        unit.order = { kind: 'attackMove', x: end.x, z: end.z, queue: unit.order.queue };
       }
       continue;
     }
@@ -931,8 +1066,12 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
         next.counter += command.amount;
       } else if (command.kind === 'move') {
         applyMoveCommand(next, command);
+      } else if (command.kind === 'attackMove') {
+        applyAttackMoveCommand(next, command);
       } else if (command.kind === 'attack') {
         applyAttackCommand(next, command);
+      } else if (command.kind === 'hold') {
+        applyHoldCommand(next, command);
       } else if (command.kind === 'stop') {
         applyStopCommand(next, command);
       }
@@ -997,6 +1136,7 @@ export function hashWorld(world: WorldState): string {
         turretHeading: unit.turretHeading,
         hp: unit.hp,
         order: unit.order,
+        stance: unit.stance,
         path: unit.path,
         reloadLeft: unit.reloadLeft,
         stuckTicks: unit.stuckTicks,
@@ -1069,7 +1209,12 @@ export function payloadToWorld(input: unknown): WorldState | null {
     }
   }
 
-  const units: UnitState[] = Array.isArray(input.units) ? (input.units as UnitState[]) : [];
+  const units: UnitState[] = Array.isArray(input.units)
+    ? (input.units as UnitState[]).map((unit) => ({
+        ...unit,
+        stance: normalizeStance(unit.stance),
+      }))
+    : [];
   const projectiles: ProjectileState[] = Array.isArray(input.projectiles)
     ? (input.projectiles as ProjectileState[])
     : [];

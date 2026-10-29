@@ -3,7 +3,7 @@ import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
-import { MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
+import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
 import type { UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
@@ -27,7 +27,6 @@ const TURRET_NODES = [
 ];
 const TURRET_PIVOT_X = -0.3;
 const UNIT_PICK_HEIGHT = 1.2;
-const CAMERA_FOV_DEG = 48;
 const SKIRT_DEPTH = 10;
 const SKY_ZENITH = '#16233a';
 const SKY_MID = '#4d6b8c';
@@ -35,15 +34,11 @@ const SKY_HORIZON = '#b9a98d';
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
-/**
- * A gap this large between two rendered frames means frames stopped (tab hidden,
- * simulation paused, page navigated away), not that a frame was slow. Feeding it
- * to the quality controller would degrade quality for a reason that has nothing
- * to do with rendering cost.
- */
 const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
+const ORDER_LINE_COLOR = 0x8fd3ff;
+const ORDER_LINE_Y = 0.18;
 
 export interface RenderStats {
   loadedModels: string[];
@@ -60,13 +55,12 @@ export interface ScreenBounds {
   height: number;
 }
 
-/**
- * `Mesh`'s `material` property is declared as the generic type parameter
- * `TMaterial`. Narrowing a type parameter with `Array.isArray` does not filter
- * the union — it yields `TMaterial & any[]`, whose element type is `any`, which
- * turns every material access into an unsafe-any lint error. Reading and
- * writing the property through this concrete slot keeps the element type exact.
- */
+export interface OrderPathInfo {
+  unitId: number;
+  points: number;
+  queued: boolean;
+}
+
 interface MaterialHost {
   material: THREE.Material | THREE.Material[];
 }
@@ -102,18 +96,6 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/**
- * World-space bounds of the meshes under `root` that are actually drawn.
- *
- * The PoC glb ships with a 200x200 ground `Plane` used by its render setup, and
- * `Box3.setFromObject` walks *every* child — including ones with
- * `visible === false`. Measuring that plane made the model's footprint 200
- * units instead of ~4, which collapsed the scale factor and drew the tanks as a
- * couple of pixels inside their selection rings; the same inflated box also made
- * `unitScreenBounds` report a huge rectangle, so a screen-size check could pass
- * without ever looking at the tank itself. Measuring each visible mesh with
- * `Box3.setFromObject` and unioning the results keeps both numbers honest.
- */
 function unitBounds(root: THREE.Object3D): THREE.Box3 {
   root.updateMatrixWorld(true);
   const bounds = new THREE.Box3();
@@ -243,6 +225,7 @@ export class RenderView {
   private readonly previousSnapshots = new Map<number, PositionSnapshot>();
   private readonly currentSnapshots = new Map<number, PositionSnapshot>();
   private readonly qualityController = new QualityController();
+  private readonly orderLines = new Map<number, THREE.Line>();
   private terrain: THREE.Mesh | null = null;
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
@@ -343,7 +326,6 @@ export class RenderView {
     return this.rtsCamera.info();
   }
 
-  /** Current dynamic quality settings. Read-only. */
   quality(): QualityView {
     return qualityViewFor(this.qualityController.level, this.basePixelRatio);
   }
@@ -356,11 +338,6 @@ export class RenderView {
     this.camera.updateMatrixWorld();
   }
 
-  /**
-   * Raycasts the rendered terrain *and* the ground skirt that wraps the map, so
-   * a right-click on any visible ground issues an order. Points outside the map
-   * are clamped into it by the simulation.
-   */
   pickGround(clientX: number, clientY: number): { x: number; z: number } | null {
     if (this.pickTargets.length === 0) {
       return null;
@@ -380,11 +357,40 @@ export class RenderView {
   }
 
   /**
-   * Canvas-space position of a unit's picking centre: the same projection
-   * `pickUnit` compares against the pick radius, and the point a caller has to
-   * click to be guaranteed within the radius. Read-only; does not perform a
-   * pick itself.
+   * The four ground points under the corners of the view, in world space. The
+   * minimap draws this as the camera footprint.
    */
+  cameraFootprint(): Array<{ x: number; z: number }> {
+    if (this.pickTargets.length === 0) {
+      return [];
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return [];
+    }
+    const corners: Array<{ x: number; y: number }> = [
+      { x: rect.left, y: rect.top },
+      { x: rect.right, y: rect.top },
+      { x: rect.right, y: rect.bottom },
+      { x: rect.left, y: rect.bottom },
+    ];
+    const result: Array<{ x: number; z: number }> = [];
+    for (const corner of corners) {
+      const ndc = new THREE.Vector2(
+        ((corner.x - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+        -((corner.y - rect.top) / Math.max(1, rect.height)) * 2 + 1,
+      );
+      this.raycaster.setFromCamera(ndc, this.camera);
+      const hits = this.raycaster.intersectObjects(this.pickTargets, false);
+      const first = hits[0];
+      if (!first) {
+        return [];
+      }
+      result.push({ x: first.point.x, z: first.point.z });
+    }
+    return result;
+  }
+
   unitScreenCentre(id: number): { x: number; y: number } | null {
     const unit = this.world.units.find((item) => item.id === id);
     if (!unit) {
@@ -397,7 +403,20 @@ export class RenderView {
     );
   }
 
-  /** Canvas-space bounding box of a unit's *visible* rendered model. */
+  unitIsOnScreen(id: number): boolean {
+    const centre = this.unitScreenCentre(id);
+    if (!centre) {
+      return false;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return (
+      centre.x >= rect.left &&
+      centre.x <= rect.right &&
+      centre.y >= rect.top &&
+      centre.y <= rect.bottom
+    );
+  }
+
   unitScreenBounds(id: number): ScreenBounds | null {
     const visual = this.unitRoots.get(id);
     if (!visual) {
@@ -474,16 +493,6 @@ export class RenderView {
     return pool[0]?.id ?? null;
   }
 
-  /**
-   * Projection of the *rendered* terrain surface at (x, z).
-   *
-   * The drawn mesh is two triangles per cell, so its surface is piecewise linear
-   * across the cell diagonal (a-c-b / b-c-d), whereas `heightAt` interpolates
-   * bilinearly. Projecting with the bilinear height while picking against the
-   * mesh leaves a systematic offset that grows on steep cells, which is exactly
-   * the error ground picking must not have. Reproducing the mesh interpolation
-   * here makes `worldToScreen` and the pick raycast exact inverses.
-   */
   worldToScreen(x: number, z: number): { x: number; y: number } {
     const screen = this.projectPoint(x, this.surfaceHeightAt(x, z), z);
     return screen ?? { x: 0, y: 0 };
@@ -511,6 +520,21 @@ export class RenderView {
     }
   }
 
+  orderPaths(): OrderPathInfo[] {
+    const result: OrderPathInfo[] = [];
+    for (const id of this.selection) {
+      const unit = this.world.units.find((item) => item.id === id);
+      if (!unit || unit.path.length === 0) {
+        continue;
+      }
+      const queued =
+        (unit.order.kind === 'move' || unit.order.kind === 'attackMove') &&
+        unit.order.queue;
+      result.push({ unitId: id, points: unit.path.length + 1, queued });
+    }
+    return result;
+  }
+
   render(alpha: number, world: WorldState): void {
     this.world = world;
     this.updateQuality();
@@ -521,6 +545,7 @@ export class RenderView {
     this.syncProjectiles();
     this.syncWrecks();
     this.syncSelection();
+    this.syncOrderLines();
     this.syncHealthBars();
     this.updateMarker();
     this.updateFlashes();
@@ -556,11 +581,6 @@ export class RenderView {
     this.renderer.dispose();
   }
 
-  /**
-   * Feeds the frame time to the quality controller and applies the result when
-   * the level changes. Started from `render`, so it runs once per rendered frame
-   * and measures exactly the cost this class is responsible for.
-   */
   private updateQuality(): void {
     const now = performance.now();
     const previous = this.lastRenderAt;
@@ -570,7 +590,6 @@ export class RenderView {
     }
     const frameMs = now - previous;
     if (frameMs <= 0 || frameMs > MAX_FRAME_SAMPLE_MS) {
-      // Frames stopped rather than running slowly; not a rendering-cost signal.
       return;
     }
     if (this.qualityController.sample(frameMs)) {
@@ -595,15 +614,12 @@ export class RenderView {
       this.directional.shadow.mapSize.set(size, size);
       const map = this.directional.shadow.map;
       if (map) {
-        // Force three to allocate a target of the new size on the next render.
         map.dispose();
         this.directional.shadow.map = null;
       }
     }
 
     if (shadowsChanged) {
-      // Toggling shadow rendering changes the shader program, so every material
-      // that can receive or cast a shadow has to be recompiled once.
       this.renderer.shadowMap.needsUpdate = true;
       this.scene.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) {
@@ -676,7 +692,6 @@ export class RenderView {
     );
   }
 
-  /** Vertical sky gradient so the screen never shows a flat void above or below. */
   private buildSky(): THREE.Texture {
     const canvas = document.createElement('canvas');
     canvas.width = 4;
@@ -708,7 +723,6 @@ export class RenderView {
     return (Number.isFinite(minHeight) ? minHeight : 0) - SKIRT_DEPTH;
   }
 
-  /** Vertical curtain around the map edge so the terrain never meets a void. */
   private buildSkirt(): THREE.Mesh | null {
     const map = this.world.map;
     const half = map.size / 2;
@@ -800,7 +814,11 @@ export class RenderView {
     const meadow = new THREE.Color(0x82904c);
     const tan = new THREE.Color(0xb79b69);
     const rock = new THREE.Color(0x93938f);
-    const blockedRock = new THREE.Color(0x2a2a29);
+    // Impassable slopes. This used to be 0x2a2a29, which under flat shading and
+    // the near-horizontal sun read as a pure black bar across the map at
+    // strategic zoom (see wp03-2). A mid grey-brown keeps cliffs clearly darker
+    // and distinctly not-grass while still looking like rock.
+    const blockedRock = new THREE.Color(0x60594d);
 
     for (let iz = 0; iz <= map.rows; iz += 1) {
       const z = -half + iz * map.cellSize;
@@ -888,6 +906,7 @@ export class RenderView {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    this.rtsCamera.setViewport(this.camera.aspect, CAMERA_FOV_DEG);
     this.applyCamera();
   }
 
@@ -946,10 +965,6 @@ export class RenderView {
   }
 
   private prepareTemplate(model: THREE.Object3D): THREE.Group {
-    // The PoC glb contains a 200x200 ground plane used by its render setup. It
-    // must not render and must not contribute to the measured bounds: leaving it
-    // in the graph made the measured footprint 200 units instead of ~4, which
-    // collapsed the scale factor and drew tanks as a few pixels.
     const plane = model.getObjectByName('Plane');
     if (plane) {
       plane.visible = false;
@@ -1094,6 +1109,60 @@ export class RenderView {
         heightAt(this.world.map, unit.x, unit.z) + 0.06,
         unit.z,
       );
+    }
+  }
+
+  private syncOrderLines(): void {
+    const selected = new Set(this.selection);
+    for (const [id, line] of this.orderLines) {
+      if (!selected.has(id)) {
+        this.scene.remove(line);
+        line.geometry.dispose();
+        this.orderLines.delete(id);
+      }
+    }
+
+    for (const id of this.selection) {
+      const unit = this.world.units.find((item) => item.id === id);
+      if (!unit || unit.path.length === 0) {
+        const line = this.orderLines.get(id);
+        if (line) {
+          this.scene.remove(line);
+          line.geometry.dispose();
+          this.orderLines.delete(id);
+        }
+        continue;
+      }
+
+      const points = [
+        new THREE.Vector3(
+          unit.x,
+          heightAt(this.world.map, unit.x, unit.z) + ORDER_LINE_Y,
+          unit.z,
+        ),
+        ...unit.path.map((point) =>
+          new THREE.Vector3(
+            point.x,
+            heightAt(this.world.map, point.x, point.z) + ORDER_LINE_Y,
+            point.z,
+          ),
+        ),
+      ];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      let line = this.orderLines.get(id);
+      if (!line) {
+        const material = new THREE.LineBasicMaterial({
+          color: ORDER_LINE_COLOR,
+          transparent: true,
+          opacity: 0.85,
+        });
+        line = new THREE.Line(geometry, material);
+        this.scene.add(line);
+        this.orderLines.set(id, line);
+      } else {
+        line.geometry.dispose();
+        line.geometry = geometry;
+      }
     }
   }
 

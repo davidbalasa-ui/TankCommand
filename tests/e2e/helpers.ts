@@ -11,10 +11,15 @@ export interface TestSnapshot {
 export interface TestUnit {
   id: number;
   owner: number;
+  typeId: string;
   x: number;
   z: number;
   hp: number;
   selected: boolean;
+  stance: 'free' | 'hold';
+  orderKind: 'idle' | 'move' | 'attackMove' | 'attack';
+  pathPoints: number;
+  queued: boolean;
   orderX: number | null;
   orderZ: number | null;
 }
@@ -40,11 +45,12 @@ export interface ScreenBounds {
 }
 
 export interface IssuedCommand {
-  kind: 'move' | 'attack';
+  kind: 'move' | 'attackMove' | 'attack' | 'hold' | 'stop';
   x: number | null;
   z: number | null;
   targetId: number | null;
   unitIds: number[];
+  queue: boolean;
 }
 
 export interface FreezeReport {
@@ -67,6 +73,19 @@ export interface RenderStats {
   units: number;
 }
 
+export interface HudSnapshot {
+  leftHanded: boolean;
+  groupsOpen: boolean;
+  queueMode: boolean;
+  attackMoveArmed: boolean;
+  selectedCount: number;
+  ownUnits: number;
+  enemyUnits: number;
+  minimapFootprint: Array<{ x: number; z: number }>;
+  minimapRedraws: number;
+  commandButtonsDisabled: boolean;
+}
+
 export interface TestHook {
   snapshot(): TestSnapshot;
   sendCommand(command: unknown): boolean;
@@ -84,8 +103,16 @@ export interface TestHook {
   quality(): TestQuality;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
+  unitIsOnScreen(id: number): boolean;
+  groundPickAt(x: number, y: number): GroundPick | null;
   selection(): number[];
+  setSelection(ids: number[]): void;
   camera(): TestCamera;
+  cameraFootprint(): Array<{ x: number; z: number }>;
+  orderPaths(): Array<{ unitId: number; points: number; queued: boolean }>;
+  inputState(): { longPressReady: boolean };
+  hud(): HudSnapshot | null;
+  alerts(): Array<{ x: number; z: number }>;
   setSimSpeed(multiplier: number): void;
   setCamera(info: Partial<TestCamera>): void;
 }

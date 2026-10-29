@@ -22,6 +22,34 @@ export interface RendererHandle {
   dispose: () => void;
 }
 
+export interface CameraSnapshot {
+  targetX: number;
+  targetZ: number;
+  distance: number;
+  yaw: number;
+  pitch: number;
+}
+
+export interface HudSnapshot {
+  leftHanded: boolean;
+  groupsOpen: boolean;
+  queueMode: boolean;
+  attackMoveArmed: boolean;
+  selectedCount: number;
+  ownUnits: number;
+  enemyUnits: number;
+  minimapFootprint: Array<{ x: number; z: number }>;
+  minimapRedraws: number;
+  commandButtonsDisabled: boolean;
+}
+
+export interface HudHandle {
+  snapshot(): HudSnapshot;
+  /** Re-read the current selection and update the disabled state of the command bar. */
+  refresh(): void;
+  dispose(): void;
+}
+
 export interface ScreenContext {
   router: ScreenRouter;
   go: (id: ScreenId) => void;
@@ -32,6 +60,21 @@ export interface ScreenContext {
   setSelection?: (ids: number[]) => void;
   issueStop?: () => void;
   deselect?: () => void;
+  sendCommand?: (command: unknown) => boolean;
+  getCamera?: () => CameraSnapshot;
+  cameraFootprint?: () => Array<{ x: number; z: number }>;
+  setCameraTarget?: (x: number, z: number) => void;
+  isLeftHanded?: () => boolean;
+  setLeftHanded?: (value: boolean) => void;
+  isQueueMode?: () => boolean;
+  setQueueMode?: (value: boolean) => void;
+  isAttackMoveArmed?: () => boolean;
+  setAttackMoveArmed?: (value: boolean) => void;
+  assignGroup?: (group: number) => void;
+  selectGroup?: (group: number) => void;
+  centerGroup?: (group: number) => void;
+  groupMembers?: (group: number) => number[];
+  registerHud?: (hud: HudHandle | null) => void;
 }
 
 export interface ScreenModule {

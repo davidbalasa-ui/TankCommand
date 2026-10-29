@@ -1,6 +1,7 @@
 import type { MapDef } from './map';
 
 export type PlayerId = number;
+export type Stance = 'free' | 'hold';
 
 export interface Point {
   x: number;
@@ -10,6 +11,7 @@ export interface Point {
 export type Order =
   | { kind: 'idle' }
   | { kind: 'move'; x: number; z: number; queue: boolean }
+  | { kind: 'attackMove'; x: number; z: number; queue: boolean }
   | { kind: 'attack'; targetId: number };
 
 export interface UnitState {
@@ -22,6 +24,7 @@ export interface UnitState {
   turretHeading: number;
   hp: number;
   order: Order;
+  stance: Stance;
   path: Point[];
   reloadLeft: number;
   stuckTicks: number;
@@ -83,6 +86,7 @@ export interface StartUnit {
   z: number;
   heading?: number;
   turretHeading?: number;
+  stance?: Stance;
 }
 
 export interface WorldState {

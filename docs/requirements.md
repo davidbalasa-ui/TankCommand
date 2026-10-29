@@ -67,6 +67,8 @@
 | DET-01 | Scripted battles are bit-identical across runs and save/load. |
 | CAM-01 | Camera target, distance and pitch clamp and interpolate. |
 | CAM-02 | The camera never goes below terrain plus three units. |
+| CAM-03 | Fully zoomed out on the phone viewport, all four map corners are on screen. |
+| CAM-04 | Every map corner can be brought into the centre half of the screen at min and max zoom; the view never leaves more than a quarter screen of empty space. |
 | INP-01 | Ground picks land within one unit of the picked point at multiple camera settings, and a right-click issues a move whose target is that point. |
 | INP-02 | Box selection selects exactly the own tanks inside the box. |
 | INP-03 | Clicking an enemy with a selection lowers its HP. |
@@ -76,3 +78,18 @@
 | PLAY-02 | A real drag-select then right-click on a visible ground point moves every selected tank. |
 | VIS-01 | The in-game view renders the 8-unit battlefield with many colours. |
 | VIS-02 | At the default camera a player tank projects to at least 30 px on its longer side. |
+| TCH-01 | One-finger drag pans the camera from any start point (ground, unit, sky, map edge); ground under the finger moves with it when pickable. |
+| TCH-02 | Pinch zooms around the midpoint; twist rotates; both in one gesture; lifting a finger never issues an order. |
+| TCH-03 | Two-finger tap deselects; double-tap selects same-type units on screen; long-press-drag box-selects. |
+| TCH-04 | No page scroll, browser zoom, text selection or context menu during any gesture. |
+| MM-01 | Minimap shows terrain, own and visible enemy units, and the camera footprint, and updates as the camera moves. |
+| MM-02 | Tapping/clicking or dragging the minimap moves the camera target to that map point; right click orders a move. |
+| HUD-01 | Command bar buttons (attack-move, hold, stop, queue, groups) work by touch and are disabled with no selection. |
+| HUD-02 | On phone, tablet and desktop, no two HUD elements overlap, touch targets are ≥ 44×44 px and text is ≥ 12 px (measured from bounding boxes in e2e). |
+| HUD-03 | Left-handed layout mirrors minimap and command bar and persists across reload. |
+| HUD-04 | Selection panel shows selected units and narrows selection on tap. |
+| ORD-01 | Hold: unit fires at enemies in range and never moves, even when attacked. |
+| ORD-02 | Attack-move: unit moves to the point but engages enemies met on the way, then continues. |
+| ORD-03 | Queued waypoints are followed in order and shown on screen. |
+| GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
+| DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |

@@ -82,6 +82,10 @@ type CanvasAction = 'left' | 'right' | 'touch';
  * box-select instead of acting), and `lastGroundPick()` is read in that same
  * task so the assertion can never accidentally observe the pick left behind by
  * an earlier sample.
+ *
+ * `document.querySelector('canvas')` deliberately targets the game canvas: the
+ * in-game screen appends it before it builds the HUD, so it is the first canvas
+ * in document order.
  */
 async function pressCanvas(
   page: Page,
@@ -951,7 +955,9 @@ test('[VIS-01] in-game screenshot is non-blank, colourful and shows eight units'
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().units ?? 0))
     .toBe(8);
-  const canvas = page.locator('canvas');
+  // The minimap is a second canvas on screen; the 3D surface is the one with the
+  // `game-canvas` class.
+  const canvas = page.locator('canvas.game-canvas');
   const screenshot = await canvas.screenshot();
   expect(countDistinctPngColors(screenshot)).toBeGreaterThan(20);
   const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());

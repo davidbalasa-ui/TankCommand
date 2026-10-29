@@ -68,7 +68,11 @@ test('[HOOK-02] test hook validates commands and invalid commands change nothing
 
 test('[REND-01] canvas is non-blank and frames increase', async ({ page }) => {
   await enterGame(page);
-  const canvas = page.locator('canvas');
+  // The in-game HUD owns a second canvas (the minimap), so the 3D surface has to
+  // be addressed by class rather than by tag. `document.querySelector('canvas')`
+  // still resolves to the game canvas inside `page.evaluate` because the in-game
+  // screen appends it before it builds the HUD.
+  const canvas = page.locator('canvas.game-canvas');
   await canvas.waitFor({ state: 'visible' });
   const screenshot = await canvas.screenshot();
   expect(countDistinctPngColors(screenshot)).toBeGreaterThan(2);
