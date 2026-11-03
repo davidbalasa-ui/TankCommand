@@ -32,6 +32,46 @@ export interface CameraSnapshot {
   pitch: number;
 }
 
+export interface DropQueueView {
+  id: number;
+  itemId: string;
+  name: string;
+  remainingSec: number;
+  totalSec: number;
+  progress: number;
+}
+
+export interface KitView {
+  id: number;
+  structureTypeId: string;
+  name: string;
+}
+
+export interface BuildItemView {
+  id: string;
+  name: string;
+  kind: 'unit' | 'structure';
+  ore: number;
+  metal: number;
+  deliverySec: number;
+  disabledReason: string | null;
+}
+
+export interface PlacementView {
+  kitId: number;
+  structureTypeId: string;
+  name: string;
+  x: number;
+  z: number;
+  valid: boolean;
+}
+
+export interface WorkerActions {
+  canMine: boolean;
+  canAssign: boolean;
+  canSalvage: boolean;
+}
+
 export interface HudSnapshot {
   leftHanded: boolean;
   groupsOpen: boolean;
@@ -43,6 +83,16 @@ export interface HudSnapshot {
   minimapFootprint: Array<{ x: number; z: number }>;
   minimapRedraws: number;
   commandButtonsDisabled: boolean;
+  buildMenuOpen: boolean;
+  ore: number;
+  metal: number;
+  workers: number;
+  unitCount: number;
+  unitCap: number;
+  queue: DropQueueView[];
+  kits: KitView[];
+  selectedPadId: number | null;
+  placementActive: boolean;
 }
 
 export interface HudHandle {
@@ -78,6 +128,20 @@ export interface ScreenContext {
   centerGroup?: (group: number) => void;
   groupMembers?: (group: number) => number[];
   registerHud?: (hud: HudHandle | null) => void;
+  getBuildItems?: () => BuildItemView[];
+  getOwnPads?: () => Array<{ id: number; x: number; z: number }>;
+  getSelectedPadId?: () => number | null;
+  setSelectedPad?: (id: number) => void;
+  buyItem?: (itemId: string) => boolean;
+  getDropQueue?: () => DropQueueView[];
+  cancelOrder?: (orderId: number) => void;
+  getKits?: () => KitView[];
+  startPlacement?: (kitId: number) => boolean;
+  getPlacement?: () => PlacementView | null;
+  confirmPlacement?: () => boolean;
+  cancelPlacement?: () => void;
+  getWorkerActions?: () => WorkerActions;
+  salvageSelected?: () => void;
 }
 
 export interface ScreenModule {

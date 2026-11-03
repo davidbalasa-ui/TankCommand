@@ -6,6 +6,7 @@ export interface TestSnapshot {
   seed: number;
   rngState: number;
   counter: number;
+  result: { winner: number | null } | null;
 }
 
 export interface TestUnit {
@@ -22,6 +23,82 @@ export interface TestUnit {
   queued: boolean;
   orderX: number | null;
   orderZ: number | null;
+  jobKind: string | null;
+  jobStage: string | null;
+  load: number;
+  workerKind: string | null;
+}
+
+export interface TestStructure {
+  id: number;
+  owner: number;
+  typeId: string;
+  kind: string;
+  x: number;
+  z: number;
+  hp: number;
+  maxHp: number;
+}
+
+export interface TestDeposit {
+  id: number;
+  kind: 'ore' | 'metal';
+  x: number;
+  z: number;
+  amount: number;
+  maxAmount: number;
+}
+
+export interface TestResources {
+  player: number;
+  ore: number;
+  metal: number;
+  oreGathered: number;
+  metalGathered: number;
+  unitsBuilt: number;
+  unitsLost: number;
+}
+
+export interface TestDropQueue {
+  id: number;
+  itemId: string;
+  name: string;
+  remainingSec: number;
+  totalSec: number;
+  progress: number;
+}
+
+export interface TestKit {
+  id: number;
+  structureTypeId: string;
+  name: string;
+}
+
+export interface TestPlacement {
+  kitId: number;
+  structureTypeId: string;
+  name: string;
+  x: number;
+  z: number;
+  valid: boolean;
+}
+
+export interface TestBuildItem {
+  id: string;
+  name: string;
+  kind: 'unit' | 'structure';
+  ore: number;
+  metal: number;
+  deliverySec: number;
+  disabledReason: string | null;
+}
+
+export interface TestDropState {
+  queue: TestDropQueue[];
+  kits: TestKit[];
+  selectedPadId: number | null;
+  unitCount: number;
+  unitCap: number;
 }
 
 export interface TestCamera {
@@ -84,6 +161,16 @@ export interface HudSnapshot {
   minimapFootprint: Array<{ x: number; z: number }>;
   minimapRedraws: number;
   commandButtonsDisabled: boolean;
+  buildMenuOpen: boolean;
+  ore: number;
+  metal: number;
+  workers: number;
+  unitCount: number;
+  unitCap: number;
+  queue: TestDropQueue[];
+  kits: TestKit[];
+  selectedPadId: number | null;
+  placementActive: boolean;
 }
 
 export interface TestSettings {
@@ -142,10 +229,19 @@ export interface TestHook {
   controls(): string[];
   go(screenId: string): void;
   units(): TestUnit[];
+  structures(): TestStructure[];
+  deposits(): TestDeposit[];
+  resources(): TestResources[];
   worldToScreen(x: number, z: number): { x: number; y: number };
   lastGroundPick(): GroundPick | null;
   lastIssuedCommand(): IssuedCommand | null;
   lastFreezeReport(): FreezeReport | null;
+  lastCommandOutcome(): {
+    tick: number;
+    kind: string;
+    ok: boolean;
+    reason: string;
+  } | null;
   quality(): TestQuality;
   unitScreenCentre(id: number): { x: number; y: number } | null;
   unitScreenBounds(id: number): ScreenBounds | null;
@@ -158,6 +254,13 @@ export interface TestHook {
   orderPaths(): Array<{ unitId: number; points: number; queued: boolean }>;
   inputState(): { longPressReady: boolean };
   hud(): HudSnapshot | null;
+  buildItems(): TestBuildItem[];
+  dropState(): TestDropState;
+  placement(): TestPlacement | null;
+  startPlacement(kitId: number): boolean;
+  previewPlacement(x: number, z: number): void;
+  confirmPlacement(): boolean;
+  cancelPlacement(): void;
   alerts(): Array<{ x: number; z: number }>;
   setSimSpeed(multiplier: number): void;
   setCamera(info: Partial<TestCamera>): void;
@@ -244,6 +347,123 @@ export async function assertButtonLayout(page: Page): Promise<void> {
       expect(overlaps, `${a.id} overlaps ${b.id}`).toBe(false);
     }
   }
+}
+
+export async function winSkirmish(page: Page): Promise<void> {
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
+  const padId = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return null;
+    }
+    return hook
+      .structures()
+      .find((structure) => structure.owner === 1 && structure.kind === 'pad')?.id ?? null;
+  });
+  if (padId === null) {
+    throw new Error('No own landing pad');
+  }
+  await page.evaluate((id) => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return;
+    }
+    for (let i = 0; i < 10; i += 1) {
+      hook.sendCommand({
+        kind: 'buy',
+        itemId: 'unit.human.scout',
+        padId: id,
+        tick: hook.snapshot().tick + 1,
+        issuer: 1,
+      });
+    }
+  }, padId);
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const hook = window.__TC_TEST__;
+          if (!hook) {
+            return 0;
+          }
+          return hook.units().filter((unit) => unit.owner === 1 && unit.typeId === 'unit.human.scout').length;
+        }),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThanOrEqual(10);
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const hasResult = await page.evaluate(() => window.__TC_TEST__?.snapshot().result !== null);
+    if (hasResult) {
+      break;
+    }
+    const targetId = await page.evaluate(() => {
+      const hook = window.__TC_TEST__;
+      if (!hook) {
+        return null;
+      }
+      const enemyUnit = hook.units().find((unit) => unit.owner !== 1 && unit.hp > 0);
+      if (enemyUnit) {
+        return enemyUnit.id;
+      }
+      const enemyPad = hook
+        .structures()
+        .find((structure) => structure.owner !== 1 && structure.kind === 'pad' && structure.hp > 0);
+      return enemyPad?.id ?? null;
+    });
+    if (targetId === null) {
+      await expect
+        .poll(async () => page.evaluate(() => window.__TC_TEST__?.snapshot().result !== null), {
+          timeout: 10_000,
+        })
+        .toBe(true);
+      break;
+    }
+    await page.evaluate((id) => {
+      const hook = window.__TC_TEST__;
+      if (!hook) {
+        return;
+      }
+      const combat = hook
+        .units()
+        .filter(
+          (unit) =>
+            unit.owner === 1 &&
+            (unit.typeId === 'unit.human.light_tank' || unit.typeId === 'unit.human.scout'),
+        )
+        .map((unit) => unit.id);
+      if (combat.length === 0) {
+        return;
+      }
+      hook.sendCommand({
+        kind: 'attack',
+        unitIds: combat,
+        targetId: id,
+        tick: hook.snapshot().tick + 1,
+        issuer: 1,
+      });
+    }, targetId);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate((id) => {
+            const hook = window.__TC_TEST__;
+            if (!hook) {
+              return true;
+            }
+            const unitAlive = hook.units().some((unit) => unit.id === id && unit.hp > 0);
+            const structureAlive = hook
+              .structures()
+              .some((structure) => structure.id === id && structure.hp > 0);
+            return !unitAlive && !structureAlive ? true : hook.snapshot().result !== null;
+          }, targetId),
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+  }
+
+  await expect(page.locator('[data-screen-id="results"]')).toBeVisible({ timeout: 60_000 });
 }
 
 export function countDistinctPngColors(buffer: Buffer): number {

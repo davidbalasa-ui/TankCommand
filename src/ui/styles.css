@@ -86,6 +86,10 @@ h1 {
   margin: 0;
 }
 
+p {
+  margin: 0;
+}
+
 .game-canvas {
   position: absolute;
   inset: 0;
@@ -147,7 +151,6 @@ h1 {
   -webkit-user-select: none;
 }
 
-/* Border-box so a declared 44 px target is 44 px after padding and border. */
 .hud-shell button {
   box-sizing: border-box;
   min-width: 44px;
@@ -168,12 +171,14 @@ h1 {
 }
 
 .hud-resources,
+.hud-workers,
+.hud-units,
 .hud-clock {
   box-sizing: border-box;
   height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 6px;
   background: rgba(9, 13, 22, 0.78);
   border: 1px solid rgba(75, 104, 146, 0.7);
@@ -181,12 +186,19 @@ h1 {
   white-space: nowrap;
 }
 
-/* Compact pill, not a full-width dark band across the battlefield. */
 .hud-resources {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 60%;
+  max-width: 28%;
   overflow: hidden;
+}
+
+.hud-workers {
+  flex: 0 0 auto;
+}
+
+.hud-units {
+  flex: 0 0 auto;
 }
 
 .hud-clock {
@@ -242,7 +254,6 @@ h1 {
   line-height: 1.15;
 }
 
-/* Bottom-centre, compact, and only shown while something is selected. */
 .hud-selection {
   position: absolute;
   left: 50%;
@@ -338,6 +349,184 @@ h1 {
 
 .hud-group-button.assigned {
   border-color: #6cf58a;
+}
+
+.hud-build-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 220px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  border-radius: 8px 8px 0 0;
+  background: rgba(9, 13, 22, 0.96);
+  border: 1px solid rgba(75, 104, 146, 0.9);
+  pointer-events: auto;
+  z-index: 6;
+}
+
+.hud-shell.build-open .hud-build-panel {
+  display: flex;
+}
+
+.build-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(9, 13, 22, 0.98);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.build-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.build-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.build-section-title {
+  font-size: 12px;
+  color: #9fb6d8;
+}
+
+.build-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px;
+}
+
+.build-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: auto;
+  min-height: 44px;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.build-item-name {
+  font-size: 12px;
+}
+
+.build-item-cost,
+.build-reason,
+.build-empty {
+  font-size: 12px;
+  color: #b9c8df;
+}
+
+.build-reason {
+  color: #ffb4b4;
+}
+
+.build-pad-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.build-pad {
+  min-height: 44px;
+}
+
+.build-pad.active {
+  background: #2e6aa6;
+  border-color: #8fd3ff;
+}
+
+.build-queue-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(80px, 2fr) 68px;
+  gap: 6px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.build-queue-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: #16243a;
+  border: 1px solid #3d5f8f;
+  overflow: hidden;
+}
+
+.queue-fill {
+  display: block;
+  height: 100%;
+  background: #8fd3ff;
+}
+
+.build-cancel {
+  width: 68px;
+  height: 44px;
+  padding: 2px;
+}
+
+.build-place {
+  min-height: 44px;
+  width: 100%;
+}
+
+.hud-placement {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  display: none;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 6px;
+  transform: translateX(-50%);
+  background: rgba(9, 13, 22, 0.94);
+  border: 1px solid rgba(75, 104, 146, 0.9);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+.hud-placement.open {
+  display: flex;
+}
+
+/* A placement ghost is a focused mode: hide competing HUD blocks. */
+.hud-shell.placing .hud-minimap,
+.hud-shell.placing .hud-commandbar,
+.hud-shell.placing .hud-groups,
+.hud-shell.placing .hud-selection,
+.hud-shell.placing .hud-build-panel {
+  display: none;
+}
+
+/* Build sheet is modal: hide the underlying bottom HUD blocks. */
+.hud-shell.build-open .hud-minimap,
+.hud-shell.build-open .hud-commandbar,
+.hud-shell.build-open .hud-groups,
+.hud-shell.build-open .hud-selection {
+  display: none;
 }
 
 .hud-shell.left-handed .hud-minimap {
@@ -586,5 +775,13 @@ h1 {
   .hud-minimap {
     width: 180px;
     height: 180px;
+  }
+  .hud-build-panel {
+    left: auto;
+    right: 0;
+    bottom: 0;
+    width: min(520px, 48vw);
+    max-height: min(520px, calc(100vh - 60px));
+    border-radius: 8px;
   }
 }

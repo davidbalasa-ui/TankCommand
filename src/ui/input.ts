@@ -24,6 +24,17 @@ export interface IssuedCommand {
   queue: boolean;
 }
 
+export interface DepositHit {
+  id: number;
+  kind: 'ore' | 'metal';
+}
+
+export interface StructureHit {
+  id: number;
+  owner: number;
+  kind: string;
+}
+
 export interface InputHost {
   canvas: HTMLCanvasElement;
   renderView: RenderView;
@@ -39,6 +50,13 @@ export interface InputHost {
   selectGroup?: (group: number) => void;
   centerGroup?: (group: number) => void;
   jumpToLatestAlert?: () => void;
+  getDepositAt?: (x: number, z: number) => DepositHit | null;
+  getStructureAt?: (x: number, z: number) => StructureHit | null;
+  onMineOrder?: (depositId: number) => boolean;
+  onAssignOrder?: (stationId: number) => boolean;
+  onAttackStructure?: (structureId: number) => boolean;
+  isPlacementActive?: () => boolean;
+  previewPlacement?: (x: number, z: number) => void;
 }
 
 interface PointerInfo {
@@ -90,6 +108,7 @@ export class InputController {
   private lastGroupKey: { group: number; time: number } | null = null;
   private lastGroundPick: { x: number; z: number } | null = null;
   private lastIssued: IssuedCommand | null = null;
+  private placementPointerId: number | null = null;
   private disposed = false;
 
   constructor(host: InputHost) {
@@ -238,6 +257,15 @@ export class InputController {
   };
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (this.host.isPlacementActive?.()) {
+      event.preventDefault();
+      this.placementPointerId = event.pointerId;
+      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
+      if (ground) {
+        this.host.previewPlacement?.(ground.x, ground.z);
+      }
+      return;
+    }
     event.preventDefault();
     const canvas = this.host.canvas;
     try {
@@ -290,6 +318,14 @@ export class InputController {
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.placementPointerId === event.pointerId) {
+      event.preventDefault();
+      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
+      if (ground) {
+        this.host.previewPlacement?.(ground.x, ground.z);
+      }
+      return;
+    }
     const info = this.pointers.get(event.pointerId);
     if (event.pointerType === 'mouse') {
       this.lastMouse = { x: event.clientX, y: event.clientY };
@@ -367,6 +403,15 @@ export class InputController {
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
+    if (this.placementPointerId === event.pointerId) {
+      event.preventDefault();
+      this.placementPointerId = null;
+      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
+      if (ground) {
+        this.host.previewPlacement?.(ground.x, ground.z);
+      }
+      return;
+    }
     const info = this.pointers.get(event.pointerId);
     this.pointers.delete(event.pointerId);
     if (!info) {
@@ -684,6 +729,46 @@ export class InputController {
     this.host.setSelection(ids.length > 0 ? ids : [unitId]);
   }
 
+  private selectionHasWorker(workerKind: 'oreMiner' | 'tug'): boolean {
+    const world = this.host.getWorld();
+    for (const id of this.host.getSelection()) {
+      const unit = world.units.find((item) => item.id === id);
+      if (!unit) {
+        continue;
+      }
+      const type = world.unitTypes.get(unit.typeId);
+      if (type?.workerKind === workerKind) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private tryDepositOrStructure(ground: { x: number; z: number } | null): boolean {
+    if (!ground) {
+      return false;
+    }
+    const selection = this.host.getSelection();
+    if (selection.length === 0) {
+      return false;
+    }
+    const deposit = this.host.getDepositAt?.(ground.x, ground.z) ?? null;
+    if (deposit && deposit.kind === 'ore' && this.selectionHasWorker('oreMiner')) {
+      return this.host.onMineOrder?.(deposit.id) ?? false;
+    }
+    const structure = this.host.getStructureAt?.(ground.x, ground.z) ?? null;
+    if (!structure) {
+      return false;
+    }
+    if (structure.owner !== 1) {
+      return this.host.onAttackStructure?.(structure.id) ?? false;
+    }
+    if (structure.kind === 'metalStation' && this.selectionHasWorker('tug')) {
+      return this.host.onAssignOrder?.(structure.id) ?? false;
+    }
+    return false;
+  }
+
   private handleLeftClick(x: number, y: number, shift: boolean): void {
     this.lastGroundPick = this.host.renderView.pickGround(x, y);
     const unitId = this.host.renderView.pickUnit(x, y, true, false);
@@ -722,6 +807,9 @@ export class InputController {
         this.host.clearAttackMove?.();
         return;
       }
+      if (this.tryDepositOrStructure(ground)) {
+        return;
+      }
       this.host.setSelection([]);
     }
   }
@@ -758,6 +846,10 @@ export class InputController {
       return;
     }
 
+    if (selection.length > 0 && this.tryDepositOrStructure(ground)) {
+      return;
+    }
+
     const queue = this.host.getQueueMode?.() ?? false;
     if (ground && selection.length > 0) {
       if (this.host.getAttackMoveArmed?.()) {
@@ -784,6 +876,9 @@ export class InputController {
     const enemy = enemyId === null ? null : world.units.find((unit) => unit.id === enemyId);
     if (enemy && enemy.owner !== 1) {
       this.issueAttack(selection, enemy.id);
+      return;
+    }
+    if (this.tryDepositOrStructure(ground)) {
       return;
     }
     if (ground) {

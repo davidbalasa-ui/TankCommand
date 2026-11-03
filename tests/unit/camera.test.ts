@@ -43,3 +43,23 @@ describe('camera', () => {
     }
   });
 });
+
+describe('camera sensitivity setting', () => {
+  it('[SET-01] camera sensitivity scales rotate and zoom, not pan', () => {
+    const normal = new RtsCamera(256);
+    const fast = new RtsCamera(256);
+    fast.setSensitivity(2);
+    normal.rotate(0.2);
+    fast.rotate(0.2);
+    expect(fast.info().yaw - normal.info().yaw).toBeCloseTo(0.2, 5);
+    const startNormal = normal.info().distance;
+    normal.zoomBy(0.9);
+    fast.zoomBy(0.9);
+    expect(normal.info().distance).toBeCloseTo(startNormal * 0.9, 5);
+    expect(fast.info().distance).toBeCloseTo(startNormal * 0.81, 5);
+    normal.pan(3, 4);
+    fast.pan(3, 4);
+    expect(fast.info().targetX).toBeCloseTo(normal.info().targetX, 5);
+    expect(fast.info().targetZ).toBeCloseTo(normal.info().targetZ, 5);
+  });
+});

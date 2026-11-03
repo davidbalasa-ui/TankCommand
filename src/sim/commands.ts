@@ -11,6 +11,8 @@ const unitIds = z
   .min(1)
   .max(MAX_COMMAND_IDS);
 
+const entityId = z.number().int().finite();
+
 const commandSchema = z.discriminatedUnion('kind', [
   baseCommand.extend({
     kind: z.literal('noop'),
@@ -36,7 +38,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   baseCommand.extend({
     kind: z.literal('attack'),
     unitIds,
-    targetId: z.number().int().finite(),
+    targetId: entityId,
   }),
   baseCommand.extend({
     kind: z.literal('hold'),
@@ -44,6 +46,35 @@ const commandSchema = z.discriminatedUnion('kind', [
   }),
   baseCommand.extend({
     kind: z.literal('stop'),
+    unitIds,
+  }),
+  baseCommand.extend({
+    kind: z.literal('buy'),
+    itemId: z.string().min(1),
+    padId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('cancel'),
+    orderId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('placeKit'),
+    kitId: entityId,
+    x: z.number().finite(),
+    z: z.number().finite(),
+  }),
+  baseCommand.extend({
+    kind: z.literal('mine'),
+    unitIds,
+    depositId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('assign'),
+    unitIds,
+    stationId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('salvage'),
     unitIds,
   }),
 ]);

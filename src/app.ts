@@ -1,24 +1,49 @@
 import rawManifest from '../public/assets/manifest.json';
 import units from './data/units.placeholder.json';
+import structures from './data/structures.placeholder.json';
+import maps from './data/maps.placeholder.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
-import { loadUnitTable } from './data/dataRegistry';
+import {
+  loadMapTable,
+  loadStructureTable,
+  loadUnitTable,
+} from './data/dataRegistry';
+import type { MapRow } from './data/mapSchema';
+import type { StructureRow } from './data/structureSchema';
 import type { UnitRow } from './data/unitSchema';
 import { createScreens } from './ui/screens';
 import {
   ScreenRouter,
+  type BuildItemView,
+  type DropQueueView,
   type HudHandle,
   type HudSnapshot,
+  type KitView,
+  type PlacementView,
   type RendererHandle,
   type ScreenContext,
   type ScreenId,
+  type WorkerActions,
 } from './ui/router';
 import { InputController, type IssuedCommand } from './ui/input';
 import { createWorld, hashWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
-import type { PlayerId, SimUnitType, Stance, WorldState } from './sim/types';
+import type {
+  CommandOutcome,
+  DepositState,
+  PlayerId,
+  SimStructureType,
+  SimUnitType,
+  Stance,
+  WorldState,
+} from './sim/types';
 import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
+import {
+  DEPOSIT_PICK_RADIUS,
+  UNIT_CAP,
+} from './sim/tuning';
 import {
   Watchdog,
   installGlobalErrorCapture,
@@ -40,6 +65,8 @@ import type {
   SaveSlotSummary,
 } from './game/api';
 import { GameServices } from './game/services';
+import { buildSkirmishSetup } from './sim/skirmishSetup';
+import { placementValidity, structureAtPoint } from './sim/spawn';
 
 export type { IssuedCommand } from './ui/input';
 
@@ -57,6 +84,10 @@ export interface UnitView {
   queued: boolean;
   orderX: number | null;
   orderZ: number | null;
+  jobKind: string | null;
+  jobStage: string | null;
+  load: number;
+  workerKind: string | null;
 }
 
 export interface CameraView {
@@ -73,12 +104,34 @@ export interface QualityView {
   shadows: boolean;
 }
 
+export interface StructureView {
+  id: number;
+  owner: PlayerId;
+  typeId: string;
+  kind: string;
+  x: number;
+  z: number;
+  hp: number;
+  maxHp: number;
+}
+
+interface PlacementState {
+  kitId: number;
+  structureTypeId: string;
+  name: string;
+  x: number;
+  z: number;
+  valid: boolean;
+}
+
 function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string, SimUnitType> {
   const result = new Map<string, SimUnitType>();
   for (const row of table.values()) {
     const weapon = row.weapons[0];
     result.set(row.id, {
       id: row.id,
+      faction: row.faction,
+      role: row.role,
       hp: row.hp,
       armor: row.armor,
       topSpeed: row.speed.top,
@@ -97,6 +150,39 @@ function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string
             splashRadius: weapon.splashRadius,
           }
         : null,
+      oreCost: row.cost.ore,
+      metalCost: row.cost.metal,
+      deliverySec: row.deliverySec,
+      workerKind: row.workerKind ?? null,
+      miningRatePerSec: row.miningRatePerSec ?? 0,
+      carryCapacity: row.carryCapacity ?? 0,
+      salvageRefundPercent: row.salvageRefundPercent ?? 0,
+    });
+  }
+  return result;
+}
+
+function buildStructureTypes(
+  table: ReadonlyMap<string, StructureRow>,
+): ReadonlyMap<string, SimStructureType> {
+  const result = new Map<string, SimStructureType>();
+  for (const row of table.values()) {
+    result.set(row.id, {
+      id: row.id,
+      name: row.name,
+      faction: row.faction,
+      kind: row.kind,
+      cost: { ore: row.cost.ore, metal: row.cost.metal },
+      deliverySec: row.deliverySec,
+      hp: row.hp,
+      armor: row.armor,
+      footprint: { cellsX: row.footprint.cellsX, cellsZ: row.footprint.cellsZ },
+      sightRange: row.sightRange,
+      modelId: row.modelId,
+      buildOnMetalDeposit: row.buildOnMetalDeposit,
+      metalRatePerSec: row.metalRatePerSec ?? 0,
+      containerSize: row.containerSize ?? 0,
+      maxContainers: row.maxContainers ?? 0,
     });
   }
   return result;
@@ -115,6 +201,10 @@ export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
   private readonly unitTypes: ReadonlyMap<string, SimUnitType>;
+  private readonly structureTypes: ReadonlyMap<string, SimStructureType>;
+  private readonly unitRows: UnitRow[];
+  private readonly structureRows: StructureRow[];
+  private readonly mapData: MapRow;
   private world: WorldState;
   private pendingCommands: Command[] = [];
   private readonly fixed: FixedStepLoop;
@@ -138,6 +228,8 @@ export class App {
   private attackMoveArmedValue = false;
   private leftHandedValue = false;
   private matchActive = false;
+  private dropPadId: number | null = null;
+  private placementState: PlacementState | null = null;
   private readonly controlGroups = new Map<number, number[]>();
   private hud: HudHandle | null = null;
   private services: GameServices | null = null;
@@ -145,7 +237,17 @@ export class App {
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
     const table = loadUnitTable(units, this.registry);
+    const structureTable = loadStructureTable(structures);
+    const mapTable = loadMapTable(maps);
+    const map = mapTable[0];
+    if (!map) {
+      throw new Error('No map data available');
+    }
+    this.mapData = map;
     this.unitTypes = buildUnitTypes(table);
+    this.structureTypes = buildStructureTypes(structureTable);
+    this.unitRows = [...table.values()];
+    this.structureRows = [...structureTable.values()];
     this.world = this.newSkirmish();
     try {
       this.leftHandedValue = window.localStorage.getItem('setting.leftHanded') === 'true';
@@ -222,6 +324,28 @@ export class App {
       groupMembers: (group) => this.groupMembers(group),
       registerHud: (hud) => {
         this.hud = hud;
+      },
+      getBuildItems: () => this.buildItems(),
+      getOwnPads: () => this.ownPads(),
+      getSelectedPadId: () => this.currentDropPadId(),
+      setSelectedPad: (id) => {
+        this.setSelectedPad(id);
+      },
+      buyItem: (itemId) => this.buyItem(itemId),
+      getDropQueue: () => this.dropQueue(),
+      cancelOrder: (orderId) => {
+        this.cancelOrder(orderId);
+      },
+      getKits: () => this.kits(),
+      startPlacement: (kitId) => this.startPlacement(kitId),
+      getPlacement: () => this.placement(),
+      confirmPlacement: () => this.confirmPlacement(),
+      cancelPlacement: () => {
+        this.cancelPlacement();
+      },
+      getWorkerActions: () => this.workerActions(),
+      salvageSelected: () => {
+        this.salvageSelected();
       },
     }));
 
@@ -330,6 +454,18 @@ export class App {
         return { ...command, tick: earliest };
       case 'stop':
         return { ...command, tick: earliest };
+      case 'buy':
+        return { ...command, tick: earliest };
+      case 'cancel':
+        return { ...command, tick: earliest };
+      case 'placeKit':
+        return { ...command, tick: earliest };
+      case 'mine':
+        return { ...command, tick: earliest };
+      case 'assign':
+        return { ...command, tick: earliest };
+      case 'salvage':
+        return { ...command, tick: earliest };
     }
   }
 
@@ -342,13 +478,17 @@ export class App {
         orderX = order.x;
         orderZ = order.z;
       } else if (order.kind === 'attack') {
-        const targetId = order.targetId;
-        const target = this.world.units.find((item) => item.id === targetId);
-        if (target) {
-          orderX = target.x;
-          orderZ = target.z;
+        const targetUnit = this.world.units.find((item) => item.id === order.targetId);
+        const targetStructure = this.world.structures.find((item) => item.id === order.targetId);
+        if (targetUnit) {
+          orderX = targetUnit.x;
+          orderZ = targetUnit.z;
+        } else if (targetStructure) {
+          orderX = targetStructure.x;
+          orderZ = targetStructure.z;
         }
       }
+      const type = this.world.unitTypes.get(unit.typeId);
       return {
         id: unit.id,
         owner: unit.owner,
@@ -364,8 +504,44 @@ export class App {
           (order.kind === 'move' || order.kind === 'attackMove') && order.queue,
         orderX,
         orderZ,
+        jobKind: unit.job?.kind ?? null,
+        jobStage: unit.job?.stage ?? null,
+        load: unit.job?.load ?? 0,
+        workerKind: type?.workerKind ?? null,
       };
     });
+  }
+
+  structures(): StructureView[] {
+    return this.world.structures.map((structure) => {
+      const type = this.world.structureTypes.get(structure.typeId);
+      return {
+        id: structure.id,
+        owner: structure.owner,
+        typeId: structure.typeId,
+        kind: type?.kind ?? 'pad',
+        x: structure.x,
+        z: structure.z,
+        hp: structure.hp,
+        maxHp: type?.hp ?? Math.max(1, structure.hp),
+      };
+    });
+  }
+
+  deposits(): DepositState[] {
+    return this.world.deposits.map((deposit) => ({ ...deposit }));
+  }
+
+  resources(): Array<{
+    player: PlayerId;
+    ore: number;
+    metal: number;
+    oreGathered: number;
+    metalGathered: number;
+    unitsBuilt: number;
+    unitsLost: number;
+  }> {
+    return this.world.resources.map((stats) => ({ ...stats }));
   }
 
   selection(): number[] {
@@ -382,6 +558,10 @@ export class App {
 
   lastFreezeReport(): WatchdogReport | null {
     return this.lastFreeze;
+  }
+
+  lastCommandOutcome(): CommandOutcome | null {
+    return this.world.lastCommandOutcome;
   }
 
   quality(): QualityView {
@@ -479,6 +659,338 @@ export class App {
       effectsVolume: 0,
       played: [],
     };
+  }
+
+  buildItems(): BuildItemView[] {
+    const faction = this.factionFor(1);
+    const pads = this.ownPads();
+    const stats = this.sideStats(1);
+    const ownUnits = this.world.units.filter((unit) => unit.owner === 1 && unit.hp > 0).length;
+    const queuedUnits = this.world.dropQueue.filter(
+      (order) => order.owner === 1 && order.itemKind === 'unit',
+    ).length;
+    const disabled = (kind: 'unit' | 'structure', ore: number, metal: number): string | null => {
+      if (pads.length === 0) {
+        return 'No landing pad';
+      }
+      if (kind === 'unit' && ownUnits + queuedUnits >= UNIT_CAP) {
+        return 'Unit cap reached';
+      }
+      if (!stats || stats.ore < ore || stats.metal < metal) {
+        return 'Cannot afford';
+      }
+      return null;
+    };
+    const items: BuildItemView[] = [];
+    for (const row of this.unitRows) {
+      if (row.faction !== faction) {
+        continue;
+      }
+      items.push({
+        id: row.id,
+        name: row.name,
+        kind: 'unit',
+        ore: row.cost.ore,
+        metal: row.cost.metal,
+        deliverySec: row.deliverySec,
+        disabledReason: disabled('unit', row.cost.ore, row.cost.metal),
+      });
+    }
+    for (const row of this.structureRows) {
+      if (row.faction !== faction) {
+        continue;
+      }
+      items.push({
+        id: row.id,
+        name: row.name,
+        kind: 'structure',
+        ore: row.cost.ore,
+        metal: row.cost.metal,
+        deliverySec: row.deliverySec,
+        disabledReason: disabled('structure', row.cost.ore, row.cost.metal),
+      });
+    }
+    return items;
+  }
+
+  dropQueue(): DropQueueView[] {
+    return this.world.dropQueue
+      .filter((order) => order.owner === 1)
+      .sort((a, b) => a.id - b.id)
+      .map((order) => ({
+        id: order.id,
+        itemId: order.itemId,
+        name: this.itemName(order.itemId),
+        remainingSec: order.remainingSec,
+        totalSec: order.totalSec,
+        progress: order.totalSec > 0 ? 1 - order.remainingSec / order.totalSec : 1,
+      }));
+  }
+
+  dropState(): {
+    queue: DropQueueView[];
+    kits: KitView[];
+    selectedPadId: number | null;
+    unitCount: number;
+    unitCap: number;
+  } {
+    return {
+      queue: this.dropQueue(),
+      kits: this.kits(),
+      selectedPadId: this.currentDropPadId(),
+      unitCount: this.world.units.filter((unit) => unit.owner === 1 && unit.hp > 0).length,
+      unitCap: UNIT_CAP,
+    };
+  }
+
+  kits(): KitView[] {
+    return this.world.pendingKits
+      .filter((kit) => kit.owner === 1)
+      .map((kit) => ({
+        id: kit.id,
+        structureTypeId: kit.structureTypeId,
+        name: this.world.structureTypes.get(kit.structureTypeId)?.name ?? kit.structureTypeId,
+      }));
+  }
+
+  ownPads(): Array<{ id: number; x: number; z: number }> {
+    return this.world.structures
+      .filter((structure) => {
+        if (structure.owner !== 1 || structure.hp <= 0) {
+          return false;
+        }
+        return this.world.structureTypes.get(structure.typeId)?.kind === 'pad';
+      })
+      .map((structure) => ({ id: structure.id, x: structure.x, z: structure.z }));
+  }
+
+  setSelectedPad(id: number): void {
+    if (this.ownPads().some((pad) => pad.id === id)) {
+      this.dropPadId = id;
+      this.hud?.refresh();
+    }
+  }
+
+  currentDropPadId(): number | null {
+    const pads = this.ownPads();
+    if (this.dropPadId !== null && pads.some((pad) => pad.id === this.dropPadId)) {
+      return this.dropPadId;
+    }
+    return pads[0]?.id ?? null;
+  }
+
+  buyItem(itemId: string): boolean {
+    const padId = this.currentDropPadId();
+    if (padId === null) {
+      return false;
+    }
+    const ok = this.sendCommand({
+      kind: 'buy',
+      itemId,
+      padId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+    if (ok) {
+      this.dropPadId = padId;
+    }
+    return ok;
+  }
+
+  cancelOrder(orderId: number): void {
+    this.sendCommand({
+      kind: 'cancel',
+      orderId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
+  startPlacement(kitId: number): boolean {
+    const kit = this.world.pendingKits.find((item) => item.id === kitId && item.owner === 1);
+    if (!kit) {
+      return false;
+    }
+    const type = this.world.structureTypes.get(kit.structureTypeId);
+    if (!type) {
+      return false;
+    }
+    const pad = this.ownPads()[0];
+    const x = pad ? pad.x + 8 : 0;
+    const z = pad ? pad.z - 8 : 0;
+    this.placementState = {
+      kitId,
+      structureTypeId: type.id,
+      name: type.name,
+      x,
+      z,
+      valid: false,
+    };
+    this.previewPlacement(x, z);
+    this.hud?.refresh();
+    return true;
+  }
+
+  previewPlacement(x: number, z: number): void {
+    const placement = this.placementState;
+    if (!placement) {
+      return;
+    }
+    const type = this.world.structureTypes.get(placement.structureTypeId);
+    if (!type) {
+      return;
+    }
+    const validity = placementValidity(this.world, 1, type, x, z);
+    let px = x;
+    let pz = z;
+    if (validity.valid && type.buildOnMetalDeposit && validity.depositId !== null) {
+      const deposit = this.world.deposits.find((item) => item.id === validity.depositId);
+      if (deposit) {
+        px = deposit.x;
+        pz = deposit.z;
+      }
+    }
+    this.placementState = { ...placement, x: px, z: pz, valid: validity.valid };
+    this.renderView?.showPlacement(type.id, px, pz, validity.valid);
+  }
+
+  confirmPlacement(): boolean {
+    const placement = this.placementState;
+    if (!placement || !placement.valid) {
+      return false;
+    }
+    const ok = this.sendCommand({
+      kind: 'placeKit',
+      kitId: placement.kitId,
+      x: placement.x,
+      z: placement.z,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+    if (ok) {
+      this.cancelPlacement();
+    }
+    return ok;
+  }
+
+  cancelPlacement(): void {
+    this.placementState = null;
+    this.renderView?.clearPlacement();
+    this.hud?.refresh();
+  }
+
+  placement(): PlacementView | null {
+    if (!this.placementState) {
+      return null;
+    }
+    return { ...this.placementState };
+  }
+
+  workerActions(): WorkerActions {
+    let canMine = false;
+    let canAssign = false;
+    let canSalvage = false;
+    for (const id of this.selectedIds) {
+      const unit = this.world.units.find((item) => item.id === id);
+      if (!unit) {
+        continue;
+      }
+      const type = this.world.unitTypes.get(unit.typeId);
+      if (type?.workerKind === 'oreMiner') {
+        canMine = true;
+      }
+      if (type?.workerKind === 'tug') {
+        canAssign = true;
+      }
+      if (type && type.workerKind && type.salvageRefundPercent > 0) {
+        canSalvage = true;
+      }
+    }
+    return { canMine, canAssign, canSalvage };
+  }
+
+  mineAt(depositId: number): boolean {
+    const ids = this.selectedIds.filter((id) => {
+      const unit = this.world.units.find((item) => item.id === id);
+      const type = unit ? this.world.unitTypes.get(unit.typeId) : undefined;
+      return type?.workerKind === 'oreMiner';
+    });
+    if (ids.length === 0) {
+      return false;
+    }
+    return this.sendCommand({
+      kind: 'mine',
+      unitIds: ids,
+      depositId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
+  assignAt(stationId: number): boolean {
+    const ids = this.selectedIds.filter((id) => {
+      const unit = this.world.units.find((item) => item.id === id);
+      const type = unit ? this.world.unitTypes.get(unit.typeId) : undefined;
+      return type?.workerKind === 'tug';
+    });
+    if (ids.length === 0) {
+      return false;
+    }
+    return this.sendCommand({
+      kind: 'assign',
+      unitIds: ids,
+      stationId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
+  attackStructure(structureId: number): boolean {
+    if (this.selectedIds.length === 0) {
+      return false;
+    }
+    return this.sendCommand({
+      kind: 'attack',
+      unitIds: this.selectedIds,
+      targetId: structureId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
+  salvageSelected(): void {
+    const ids = this.selectedIds.filter((id) => {
+      const unit = this.world.units.find((item) => item.id === id);
+      const type = unit ? this.world.unitTypes.get(unit.typeId) : undefined;
+      return type !== undefined && type.workerKind !== null && type.salvageRefundPercent > 0;
+    });
+    if (ids.length === 0) {
+      return;
+    }
+    this.sendCommand({
+      kind: 'salvage',
+      unitIds: ids,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
+  depositAt(x: number, z: number): { id: number; kind: 'ore' | 'metal' } | null {
+    for (const deposit of this.world.deposits) {
+      if (Math.hypot(deposit.x - x, deposit.z - z) <= DEPOSIT_PICK_RADIUS) {
+        return { id: deposit.id, kind: deposit.kind };
+      }
+    }
+    return null;
+  }
+
+  structureAt(x: number, z: number): { id: number; owner: PlayerId; kind: string } | null {
+    const structure = structureAtPoint(this.world, x, z);
+    if (!structure) {
+      return null;
+    }
+    const type = this.world.structureTypes.get(structure.typeId);
+    return { id: structure.id, owner: structure.owner, kind: type?.kind ?? 'pad' };
   }
 
   setSimSpeed(multiplier: number): void {
@@ -620,10 +1132,60 @@ export class App {
     this.services?.unlockAudio();
   }
 
+  private itemName(itemId: string): string {
+    // Units only carry their id on `SimUnitType`, so the display name comes from
+    // the raw data sheet. Structure types carry their own name. The previous
+    // implementation used `unitTypes.get(id)?.id`, which returned the raw id
+    // (e.g. `unit.human.scout`) for any unit entry, so the queue row showed the
+    // internal id instead of the friendly "Scout".
+    return (
+      this.unitRows.find((row) => row.id === itemId)?.name ??
+      this.world.structureTypes.get(itemId)?.name ??
+      itemId
+    );
+  }
+
+  private factionFor(player: PlayerId): 'human' | 'alien' {
+    return (
+      this.world.factions.find((entry) => entry.player === player)?.faction ??
+      (player === 1 ? 'human' : 'alien')
+    );
+  }
+
+  private sideStats(player: PlayerId) {
+    return this.world.resources.find((stats) => stats.player === player);
+  }
+
   private newSkirmish(): WorldState {
-    const options: CreateWorldOptions = { unitTypes: this.unitTypes };
+    const setup = buildSkirmishSetup(
+      this.unitTypes,
+      this.structureTypes,
+      {
+        size: this.mapData.size,
+        cellSize: this.mapData.cellSize,
+        starts: this.mapData.starts,
+        deposits: this.mapData.deposits,
+      },
+      [
+        { player: 1, faction: 'human' },
+        { player: 2, faction: 'alien' },
+      ],
+    );
+    const options: CreateWorldOptions = {
+      unitTypes: this.unitTypes,
+      structureTypes: this.structureTypes,
+      startUnits: setup.startUnits,
+      startStructures: setup.startStructures,
+      deposits: setup.deposits,
+      factions: setup.factions,
+      startResources: setup.resources,
+      size: setup.size,
+      cellSize: setup.cellSize,
+    };
     const world = createWorld(this.nextSeed, options);
     this.nextSeed += 1;
+    this.dropPadId = null;
+    this.placementState = null;
     return world;
   }
 
@@ -633,6 +1195,7 @@ export class App {
     this.selectedIds = [];
     this.fixed.reset();
     this.lastFreeze = null;
+    this.renderView?.clearPlacement();
     this.matchActive = true;
     this.services?.resetAlerts(this.world);
     this.services?.setMatchActive(true);
@@ -644,6 +1207,9 @@ export class App {
     this.selectedIds = [];
     this.fixed.reset();
     this.lastFreeze = null;
+    this.dropPadId = null;
+    this.placementState = null;
+    this.renderView?.clearPlacement();
     this.services?.resetAlerts(world);
     if (startMatch) {
       this.matchActive = true;
@@ -702,6 +1268,15 @@ export class App {
             if (latest) {
               this.setCamera({ targetX: latest.x, targetZ: latest.z });
             }
+          },
+          getDepositAt: (x, z) => this.depositAt(x, z),
+          getStructureAt: (x, z) => this.structureAt(x, z),
+          onMineOrder: (depositId) => this.mineAt(depositId),
+          onAssignOrder: (stationId) => this.assignAt(stationId),
+          onAttackStructure: (structureId) => this.attackStructure(structureId),
+          isPlacementActive: () => this.placementState !== null,
+          previewPlacement: (x, z) => {
+            this.previewPlacement(x, z);
           },
         });
         if (this.services) {
@@ -798,6 +1373,7 @@ export class App {
     this.renderView?.setQualityPreference(settings.graphicsQuality);
     this.renderView?.setHealthBarsMode(settings.healthBars);
     this.renderView?.setColorBlindMode(settings.colourBlind);
+    this.renderView?.getCamera().setSensitivity(settings.cameraSensitivity);
     this.hud?.refresh();
   }
 
@@ -867,6 +1443,10 @@ export class App {
     this.world = step(this.world, due);
     this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
     this.pruneSelection();
+    if (this.placementState && !this.world.pendingKits.some((kit) => kit.id === this.placementState?.kitId)) {
+      this.placementState = null;
+      this.renderView?.clearPlacement();
+    }
   }
 }
 

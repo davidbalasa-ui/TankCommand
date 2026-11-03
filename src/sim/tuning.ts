@@ -46,3 +46,25 @@ export const ALERT_RATE_LIMIT_MS = 2_000; // placeholder until Stage 0
 export const ALERT_TOAST_TTL_MS = 6_000; // placeholder until Stage 0
 export const ALERT_MAX_TOASTS = 3; // placeholder until Stage 0
 export const AUDIO_MUSIC_CROSSFADE_SEC = 0.25; // placeholder until Stage 0
+export const UNIT_CAP = 200; // placeholder until Stage 0
+export const DEPOSIT_REACH = 2; // placeholder until Stage 0
+export const PAD_REACH = 4; // placeholder until Stage 0
+export const STATION_REACH = 4; // placeholder until Stage 0
+export const DEPOSIT_PICK_RADIUS = 3; // placeholder until Stage 0
+export const STRUCTURE_PICK_PADDING = 1; // placeholder until Stage 0
+export const DROP_SPAWN_RADIUS = 6; // placeholder until Stage 0
+export const DROP_SPAWN_TRIES = 32; // placeholder until Stage 0
+export const PLACEMENT_CLEARANCE = 0.25; // placeholder until Stage 0
+export const PLACEMENT_SAMPLE_STEPS = 3; // placeholder until Stage 0
+export const ALERT_TTL_SEC = 6; // placeholder until Stage 0
+export const DROP_BEAM_TTL_SEC = 1; // placeholder until Stage 0
+export const SKIRMISH_ORE = 500; // placeholder until Stage 0
+export const SKIRMISH_METAL = 100; // placeholder until Stage 0
+
+export const SKIRMISH_TANK_OFFSETS: ReadonlyArray<{ x: number; z: number }> = [
+  { x: 0, z: 5 },
+  { x: 0, z: 8 },
+]; // placeholder until Stage 0
+export const SKIRMISH_MINER_OFFSET = { x: -6, z: 0 }; // placeholder until Stage 0
+export const SKIRMISH_TUG_OFFSET = { x: 6, z: 0 }; // placeholder until Stage 0
+export const SKIRMISH_TANK_HEADING = Math.PI / 4; // placeholder until Stage 0

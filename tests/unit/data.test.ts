@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import rawManifest from '../../public/assets/manifest.json';
 import units from '../../src/data/units.placeholder.json';
+import structures from '../../src/data/structures.placeholder.json';
+import maps from '../../src/data/maps.placeholder.json';
 import { parseAssetManifest } from '../../src/assets/manifestSchema';
 import { AssetRegistry } from '../../src/assets/registry';
-import { loadUnitTable, placeholderReport } from '../../src/data/dataRegistry';
+import {
+  loadMapTable,
+  loadStructureTable,
+  loadUnitTable,
+  placeholderReport,
+} from '../../src/data/dataRegistry';
 
 const registry = new AssetRegistry(parseAssetManifest(rawManifest));
 const rows = units as unknown[];
@@ -19,11 +26,23 @@ function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>>
 describe('unit data containers', () => {
   it('[DATA-01] placeholder table loads against the real asset manifest', () => {
     const table = loadUnitTable(units, registry);
-    expect(table.size).toBe(2);
+    expect(table.size).toBe(8);
     expect([...table.keys()].sort()).toEqual([
       'unit.alien.light_skimmer',
+      'unit.alien.light_tank',
+      'unit.alien.ore_miner',
+      'unit.alien.tug',
       'unit.human.light_tank',
+      'unit.human.ore_miner',
+      'unit.human.scout',
+      'unit.human.tug',
     ]);
+    const structureTable = loadStructureTable(structures);
+    expect(structureTable.size).toBe(4);
+    const mapTable = loadMapTable(maps);
+    expect(mapTable).toHaveLength(1);
+    expect(mapTable[0]?.deposits.filter((d) => d.kind === 'ore')).toHaveLength(8);
+    expect(mapTable[0]?.deposits.filter((d) => d.kind === 'metal')).toHaveLength(4);
   });
 
   it('[DATA-02] duplicate id is rejected', () => {
@@ -41,6 +60,15 @@ describe('unit data containers', () => {
     row.role = 'worker';
     delete row.carryCapacity;
     expect(() => loadUnitTable([row], registry)).toThrow(/carryCapacity/);
+  });
+
+  it('[DATA-02] ore miner without mining rate is rejected', () => {
+    const row = cloneBase();
+    row.workerKind = 'oreMiner';
+    row.role = 'worker';
+    row.carryCapacity = 10;
+    delete row.miningRatePerSec;
+    expect(() => loadUnitTable([row], registry)).toThrow(/miningRatePerSec/);
   });
 
   it('[DATA-02] sensorRange below sightRange is rejected', () => {
@@ -72,7 +100,13 @@ describe('unit data containers', () => {
     const table = loadUnitTable(units, registry);
     expect(placeholderReport(table)).toEqual([
       'unit.alien.light_skimmer',
+      'unit.alien.light_tank',
+      'unit.alien.ore_miner',
+      'unit.alien.tug',
       'unit.human.light_tank',
+      'unit.human.ore_miner',
+      'unit.human.scout',
+      'unit.human.tug',
     ]);
 
     const row = table.get('unit.human.light_tank');
@@ -82,6 +116,14 @@ describe('unit data containers', () => {
     }
     const changed = new Map(table);
     changed.set(row.id, { ...row, source: { kind: 'tuned', ref: 'x' } });
-    expect(placeholderReport(changed)).toEqual(['unit.alien.light_skimmer']);
+    expect(placeholderReport(changed)).toEqual([
+      'unit.alien.light_skimmer',
+      'unit.alien.light_tank',
+      'unit.alien.ore_miner',
+      'unit.alien.tug',
+      'unit.human.ore_miner',
+      'unit.human.scout',
+      'unit.human.tug',
+    ]);
   });
 });

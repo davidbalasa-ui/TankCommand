@@ -298,7 +298,22 @@ test('[AUD-01] selection and orders play audio acknowledgements', async ({ page 
   const ground = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
     if (!hook) return null;
-    return hook.worldToScreen(hook.camera().targetX + 8, hook.camera().targetZ);
+    // Since WP-04 the start area holds a pad, workers and deposits, so pick a
+    // ground point on screen that is clear of all of them (a tap there is an order, not a selection).
+    const cam = hook.camera();
+    const things = [
+      ...hook.units().map((item) => ({ x: item.x, z: item.z })),
+      ...hook.structures().map((item) => ({ x: item.x, z: item.z })),
+      ...hook.deposits().map((item) => ({ x: item.x, z: item.z })),
+    ];
+    for (const [dx, dz] of [[8, 0], [-8, 0], [0, 8], [0, -8], [8, 8], [-8, -8], [8, -8], [-8, 8], [12, 0], [-12, 0]]) {
+      const x = cam.targetX + (dx ?? 0);
+      const z = cam.targetZ + (dz ?? 0);
+      if (things.every((item) => Math.hypot(item.x - x, item.z - z) > 6)) {
+        return hook.worldToScreen(x, z);
+      }
+    }
+    return null;
   });
   expect(ground).not.toBeNull();
   if (!ground) return;

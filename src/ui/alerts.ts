@@ -1,5 +1,13 @@
-import type { WorldState } from '../sim/types';
-import { ALERT_MAX_TOASTS, ALERT_RATE_LIMIT_MS, ALERT_TOAST_TTL_MS } from '../sim/tuning';
+import type { CommandOutcome, WorldState } from '../sim/types';
+import { SIM_TICK_HZ } from '../sim/constants';
+import {
+  ALERT_MAX_TOASTS,
+  ALERT_RATE_LIMIT_MS,
+  ALERT_TOAST_TTL_MS,
+  ALERT_TTL_SEC,
+} from '../sim/tuning';
+
+const SIM_DT = 1 / SIM_TICK_HZ;
 
 export type AlertKind =
   | 'underAttack'
@@ -36,6 +44,13 @@ interface PreviousUnit {
   z: number;
 }
 
+interface PreviousStructure extends PreviousUnit {
+  pad: boolean;
+}
+
+/** Sim alert kinds (src/sim/economy.ts addAlert) that the toast layer shows as-is. */
+const SIM_ALERT_KINDS: ReadonlySet<string> = new Set(['depositEmpty', 'dropArrived']);
+
 function defaultMessage(kind: AlertKind): string {
   switch (kind) {
     case 'underAttack':
@@ -67,6 +82,9 @@ export class AlertCenter {
   private readonly rateLimitMs: number;
   private readonly ttlMs: number;
   private readonly previous = new Map<number, PreviousUnit>();
+  private readonly previousStructures = new Map<number, PreviousStructure>();
+  private readonly seenSimAlerts = new Set<string>();
+  private lastOutcome: CommandOutcome | null = null;
   private readonly lastRaised = new Map<AlertKind, number>();
   private readonly history: AlertSnapshot[] = [];
   private readonly visible = new Map<number, { element: HTMLButtonElement; timer: number }>();
@@ -94,6 +112,9 @@ export class AlertCenter {
 
   reset(world?: WorldState): void {
     this.previous.clear();
+    this.previousStructures.clear();
+    this.seenSimAlerts.clear();
+    this.lastOutcome = world?.lastCommandOutcome ?? null;
     this.initialized = false;
     for (const id of [...this.visible.keys()]) {
       this.dismiss(id);
@@ -133,7 +154,86 @@ export class AlertCenter {
     for (const [id, unit] of current) {
       this.previous.set(id, unit);
     }
+    this.updateStructures(world);
+    this.updateSimAlerts(world);
+    this.updateOutcome(world);
     this.initialized = true;
+  }
+
+  /** Structure hits, structure lost and pad lost, from own structures between frames. */
+  private updateStructures(world: WorldState): void {
+    const current = new Map<number, PreviousStructure>();
+    for (const structure of world.structures ?? []) {
+      if (structure.owner !== 1 || structure.hp <= 0) {
+        continue;
+      }
+      const pad = world.structureTypes.get(structure.typeId)?.kind === 'pad';
+      current.set(structure.id, { hp: structure.hp, x: structure.x, z: structure.z, pad });
+    }
+    if (this.initialized && this.enabled) {
+      for (const [id, now] of current) {
+        const previous = this.previousStructures.get(id);
+        if (previous && now.hp < previous.hp) {
+          this.raiseAlert('underAttack', now.x, now.z, 'Base under attack');
+        }
+      }
+      for (const [id, previous] of this.previousStructures) {
+        if (!current.has(id)) {
+          this.raiseAlert(previous.pad ? 'padLost' : 'structureLost', previous.x, previous.z);
+        }
+      }
+    }
+    this.previousStructures.clear();
+    for (const [id, structure] of current) {
+      this.previousStructures.set(id, structure);
+    }
+  }
+
+  /**
+   * Alerts the sim itself raises (deposit empty, drop arrived). Sim alerts carry
+   * no id, so each is keyed by kind, place and the tick it was raised on.
+   */
+  private updateSimAlerts(world: WorldState): void {
+    const live = new Set<string>();
+    for (const alert of world.alerts ?? []) {
+      if (alert.owner !== 1 || !SIM_ALERT_KINDS.has(alert.kind)) {
+        continue;
+      }
+      const raisedTick = world.tick - Math.round((ALERT_TTL_SEC - alert.ttl) / SIM_DT);
+      const key = `${alert.kind}:${raisedTick}:${alert.x.toFixed(2)}:${alert.z.toFixed(2)}`;
+      live.add(key);
+      if (this.seenSimAlerts.has(key)) {
+        continue;
+      }
+      if (this.initialized && this.enabled) {
+        this.raiseAlert(alert.kind, alert.x, alert.z);
+      }
+    }
+    this.seenSimAlerts.clear();
+    for (const key of live) {
+      this.seenSimAlerts.add(key);
+    }
+  }
+
+  /**
+   * "Not enough resources" when a buy is refused as unaffordable. Only the
+   * player issues buy commands today; once the enemy AI (WP-07) buys too, the
+   * outcome needs an issuer field to filter on.
+   */
+  private updateOutcome(world: WorldState): void {
+    const outcome = world.lastCommandOutcome ?? null;
+    const previous = this.lastOutcome;
+    this.lastOutcome = outcome;
+    if (!outcome || !this.initialized || !this.enabled) {
+      return;
+    }
+    if (previous && previous.tick === outcome.tick && previous.kind === outcome.kind) {
+      return;
+    }
+    if (!outcome.ok && outcome.reason === 'unaffordable') {
+      const unit = world.units.find((entry) => entry.owner === 1 && entry.hp > 0);
+      this.raiseAlert('notEnoughResources', unit?.x ?? 0, unit?.z ?? 0);
+    }
   }
 
   raiseAlert(kind: AlertKind, x: number, z: number, message?: string): AlertSnapshot | null {

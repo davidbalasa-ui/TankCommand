@@ -1,0 +1,27 @@
+[
+  {
+    "id": "map.wp02_skirmish",
+    "name": "Utopia Basin",
+    "size": 160,
+    "cellSize": 2,
+    "starts": [
+      { "player": 1, "x": -50, "z": -50 },
+      { "player": 2, "x": 50, "z": 50 }
+    ],
+    "deposits": [
+      { "kind": "ore", "x": -57, "z": -44, "amount": 500 },
+      { "kind": "ore", "x": -44, "z": -57, "amount": 500 },
+      { "kind": "ore", "x": -60, "z": -50, "amount": 500 },
+      { "kind": "ore", "x": -50, "z": -60, "amount": 500 },
+      { "kind": "metal", "x": -58, "z": -52, "amount": 250 },
+      { "kind": "metal", "x": -52, "z": -58, "amount": 250 },
+      { "kind": "ore", "x": 57, "z": 44, "amount": 500 },
+      { "kind": "ore", "x": 44, "z": 57, "amount": 500 },
+      { "kind": "ore", "x": 60, "z": 50, "amount": 500 },
+      { "kind": "ore", "x": 50, "z": 60, "amount": 500 },
+      { "kind": "metal", "x": 58, "z": 52, "amount": 250 },
+      { "kind": "metal", "x": 52, "z": 58, "amount": 250 }
+    ],
+    "placeholder": true
+  }
+]

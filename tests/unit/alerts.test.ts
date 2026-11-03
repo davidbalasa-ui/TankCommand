@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { AlertCenter } from '../../src/ui/alerts';
-import { makeWorld } from './simHelpers';
+import type { StructureState, WorldState } from '../../src/sim/types';
+import { ALERT_TTL_SEC } from '../../src/sim/tuning';
+import { makeWorld, metalStationType, padType } from './simHelpers';
 
 describe('alerts', () => {
   let center: AlertCenter | null = null;
@@ -56,5 +58,72 @@ describe('alerts', () => {
     expect(button).not.toBeNull();
     button?.click();
     expect(jumps.at(-1)).toEqual({ x: 10, z: -10 });
+  });
+
+  it('[ALRT-01] pad lost, structure lost, deposit empty, drop arrived and not enough resources fire from the economy state', () => {
+    let now = 0;
+    center = new AlertCenter({
+      host: document.body,
+      now: () => now,
+      rateLimitMs: 1000,
+      ttlMs: 100000,
+      onJump: () => undefined,
+    });
+    center.setEnabled(true);
+
+    const base = makeWorld(1, [{ owner: 1, typeId: 'unit.test.tank', x: -50, z: -50 }]);
+    const pad: StructureState = {
+      id: 900, owner: 1, typeId: padType().id, x: 5, z: 6, hp: 200, containers: 0, fill: 0, depositId: null,
+    };
+    const station: StructureState = {
+      ...pad, id: 901, typeId: metalStationType().id, x: 20, z: 21, hp: 100,
+    };
+    const world: WorldState = {
+      ...base,
+      structureTypes: new Map([
+        [padType().id, padType()],
+        [metalStationType().id, metalStationType()],
+      ]),
+      structures: [pad, station],
+      alerts: [],
+      lastCommandOutcome: null,
+    };
+    center.update(world);
+    expect(center.list()).toEqual([]);
+
+    center.update({ ...world, structures: [station] });
+    expect(center.list().at(-1)).toMatchObject({ kind: 'padLost', x: 5, z: 6 });
+
+    now = 1100;
+    center.update({ ...world, structures: [] });
+    expect(center.list().at(-1)).toMatchObject({ kind: 'structureLost', x: 20, z: 21 });
+
+    now = 2200;
+    const withAlerts: WorldState = {
+      ...world,
+      structures: [],
+      alerts: [
+        { kind: 'depositEmpty', owner: 1, x: 1, z: 2, ttl: ALERT_TTL_SEC },
+        { kind: 'dropArrived', owner: 1, x: 3, z: 4, ttl: ALERT_TTL_SEC },
+        { kind: 'dropArrived', owner: 2, x: 9, z: 9, ttl: ALERT_TTL_SEC },
+      ],
+    };
+    center.update(withAlerts);
+    const kinds = center.list().map((alert) => alert.kind);
+    expect(kinds).toContain('depositEmpty');
+    expect(kinds).toContain('dropArrived');
+    expect(center.list().filter((alert) => alert.kind === 'dropArrived')).toHaveLength(1);
+
+    // The same sim alerts seen on a later frame are not raised again.
+    now = 4000;
+    const count = center.list().length;
+    center.update(withAlerts);
+    expect(center.list()).toHaveLength(count);
+
+    center.update({
+      ...withAlerts,
+      lastCommandOutcome: { tick: world.tick, kind: 'buy', ok: false, reason: 'unaffordable' },
+    });
+    expect(center.list().at(-1)?.kind).toBe('notEnoughResources');
   });
 });
