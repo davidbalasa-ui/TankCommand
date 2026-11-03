@@ -42,7 +42,7 @@
 | LINT-03 | The sim TypeScript config excludes the DOM library. |
 | REQ-01 | Requirement coverage passes and fails when an untested id is appended. |
 | CI-01 | The GitHub workflow runs the full CI and E2E commands. |
-| CAP-01 | Capacitor config has the required app id, web dir and no server URL. |
+| CAP-01 | Capacitor config has the required app id, web dir and no server url. |
 | BUILD-01 | The built app uses relative asset URLs and copies public assets. |
 | HOOK-01 | Production builds contain no test hook marker or window hook. |
 | HOOK-02 | Test hook commands are validated and invalid commands do nothing. |
@@ -93,3 +93,17 @@
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
+| ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
+| ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
+| ECO-03 | Metal is credited only when a tug delivers a container to a pad; killing the tug loses the load. |
+| ECO-04 | Income stops entirely when every miner and tug is dead. |
+| ECO-05 | Resources never go negative under any command sequence (property test with random commands). |
+| ECO-06 | Miner salvage refunds exactly the data-sheet percentage. |
+| DROP-01 | Buying deducts the full cost at order time; unaffordable, unknown, over-cap and no-pad orders are refused with a reason. |
+| DROP-02 | Cancelling a queued item refunds the full cost; delivered items can't be cancelled. |
+| DROP-03 | Units are delivered beside the chosen pad after the delivery time; with no pad they wait. |
+| DROP-04 | Structure kits are placed only on valid ground; metal stations only on metal deposits. |
+| MATCH-01 | Destroying every enemy pad and fighting unit triggers victory; losing your own triggers defeat. |
+| MATCH-02 | Results screen shows outcome, time, units built/lost and resources gathered. |
+| HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
+| DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |

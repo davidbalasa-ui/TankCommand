@@ -1,8 +1,17 @@
 import { heightAt } from '../sim/map';
 import { SIM_TICK_HZ } from '../sim/constants';
+import { UNIT_CAP } from '../sim/tuning';
 import type { WorldState } from '../sim/types';
 import { button } from './controls';
-import type { HudHandle, HudSnapshot } from './router';
+import type {
+  BuildItemView,
+  DropQueueView,
+  HudHandle,
+  HudSnapshot,
+  KitView,
+  PlacementView,
+  WorkerActions,
+} from './router';
 
 export interface HudCamera {
   targetX: number;
@@ -31,6 +40,20 @@ export interface HudContext {
   centerGroup: (group: number) => void;
   groupMembers: (group: number) => number[];
   pause: () => void;
+  getBuildItems?: () => BuildItemView[];
+  getOwnPads?: () => Array<{ id: number; x: number; z: number }>;
+  getSelectedPadId?: () => number | null;
+  setSelectedPad?: (id: number) => void;
+  buyItem?: (itemId: string) => boolean;
+  getDropQueue?: () => DropQueueView[];
+  cancelOrder?: (orderId: number) => void;
+  getKits?: () => KitView[];
+  startPlacement?: (kitId: number) => boolean;
+  getPlacement?: () => PlacementView | null;
+  confirmPlacement?: () => boolean;
+  cancelPlacement?: () => void;
+  getWorkerActions?: () => WorkerActions;
+  salvageSelected?: () => void;
 }
 
 const MINIMAP_SIZE = 240;
@@ -112,16 +135,6 @@ function clipAlongZ(polygon: readonly WorldPoint[], limit: number, keepGreater: 
   return result;
 }
 
-/**
- * Sutherland–Hodgman against the map square.
- *
- * The camera footprint is the ground under the four corners of the view, which
- * at anything past mid zoom runs well off the map. Clamping each corner
- * independently (the WP-03 first pass) collapses the quadrilateral onto the map
- * border — at full zoom-out, with the view yawed 45°, it degenerated into a
- * single diagonal slash across the minimap. Clipping keeps the *visible* part of
- * the footprint, which is what the minimap is actually meant to outline.
- */
 function clipToMapSquare(points: readonly WorldPoint[], half: number): WorldPoint[] {
   let polygon: WorldPoint[] = points.map((point) => ({ x: point.x, z: point.z }));
   polygon = clipAlongX(polygon, -half, true);
@@ -134,6 +147,9 @@ function clipToMapSquare(points: readonly WorldPoint[], half: number): WorldPoin
 export class Hud implements HudHandle {
   private readonly root: HTMLDivElement;
   private readonly ctx: HudContext;
+  private readonly resources: HTMLSpanElement;
+  private readonly workers: HTMLSpanElement;
+  private readonly unitsLabel: HTMLSpanElement;
   private readonly clock: HTMLSpanElement;
   private readonly minimap: HTMLCanvasElement;
   private readonly selectionPanel: HTMLDivElement;
@@ -143,9 +159,21 @@ export class Hud implements HudHandle {
   private readonly stopButton: HTMLButtonElement;
   private readonly queueButton: HTMLButtonElement;
   private readonly groupsButton: HTMLButtonElement;
+  private readonly buildButton: HTMLButtonElement;
+  private readonly mineButton: HTMLButtonElement;
+  private readonly assignButton: HTMLButtonElement;
+  private readonly salvageButton: HTMLButtonElement;
+  private readonly buildPanel: HTMLDivElement;
+  private readonly buildContent: HTMLDivElement;
+  private readonly placementBar: HTMLDivElement;
+  private readonly confirmPlacement: HTMLButtonElement;
+  private readonly cancelPlacement: HTMLButtonElement;
   private readonly groupButtons: HTMLButtonElement[] = [];
+  private readonly queueProgressRefs = new Map<number, HTMLSpanElement>();
   private readonly timer: number;
   private groupsOpen = false;
+  private buildMenuOpen = false;
+  private lastBuildSignature = '';
   private minimapRedraws = 0;
   private lastFootprint: Array<{ x: number; z: number }> = [];
   private minimapPointer: number | null = null;
@@ -154,20 +182,26 @@ export class Hud implements HudHandle {
   constructor(host: HTMLElement, ctx: HudContext) {
     this.ctx = ctx;
     this.root = document.createElement('div');
-    this.root.className = `hud-shell${ctx.isLeftHanded() ? ' left-handed' : ''}`;
+    this.root.className = 'hud-shell';
     this.root.dataset.hudShell = 'true';
 
     const topbar = document.createElement('div');
     topbar.className = 'hud-topbar';
     topbar.dataset.hudItem = 'topbar';
 
-    const resources = document.createElement('span');
-    resources.className = 'hud-resources';
-    resources.textContent = 'Ore — · Metal —';
+    this.resources = document.createElement('span');
+    this.resources.className = 'hud-resources';
+    this.resources.textContent = 'O 0 · M 0';
+    this.workers = document.createElement('span');
+    this.workers.className = 'hud-workers';
+    this.workers.textContent = 'W 0';
+    this.unitsLabel = document.createElement('span');
+    this.unitsLabel.className = 'hud-units';
+    this.unitsLabel.textContent = `U 0/${UNIT_CAP}`;
     this.clock = document.createElement('span');
     this.clock.className = 'hud-clock';
     this.clock.textContent = '00:00';
-    topbar.append(resources, this.clock);
+    topbar.append(this.resources, this.workers, this.unitsLabel, this.clock);
 
     const deselect = button('inGame', 'deselect', 'Deselect', () => {
       ctx.setSelection([]);
@@ -218,12 +252,29 @@ export class Hud implements HudHandle {
       this.groupsStrip.classList.toggle('open', this.groupsOpen);
       this.refresh();
     });
+    this.buildButton = button('inGame', 'buildMenu', 'Build', () => {
+      this.setBuildMenu(!this.buildMenuOpen);
+    });
+    this.mineButton = button('inGame', 'mine', 'Mine', () => {
+      this.refresh();
+    });
+    this.assignButton = button('inGame', 'assign', 'Assign', () => {
+      this.refresh();
+    });
+    this.salvageButton = button('inGame', 'salvage', 'Salvage', () => {
+      ctx.salvageSelected?.();
+      this.refresh();
+    });
     commandBar.append(
+      this.buildButton,
       this.attackButton,
       this.holdButton,
       this.stopButton,
       this.queueButton,
       this.groupsButton,
+      this.mineButton,
+      this.assignButton,
+      this.salvageButton,
     );
 
     this.groupsStrip = document.createElement('div');
@@ -245,7 +296,43 @@ export class Hud implements HudHandle {
     this.selectionPanel.className = 'hud-selection';
     this.selectionPanel.dataset.hudItem = 'selection';
 
-    this.root.append(topbar, minimapWrap, commandBar, this.groupsStrip, this.selectionPanel);
+    this.buildPanel = document.createElement('div');
+    this.buildPanel.className = 'hud-build-panel';
+    this.buildPanel.dataset.hudItem = 'buildPanel';
+    const buildHeader = document.createElement('div');
+    buildHeader.className = 'build-header';
+    const buildTitle = document.createElement('span');
+    buildTitle.textContent = 'Orbital Drops';
+    const buildClose = button('inGame', 'buildClose', 'Close', () => {
+      this.setBuildMenu(false);
+    });
+    buildHeader.append(buildTitle, buildClose);
+    this.buildContent = document.createElement('div');
+    this.buildContent.className = 'build-content';
+    this.buildPanel.append(buildHeader, this.buildContent);
+
+    this.placementBar = document.createElement('div');
+    this.placementBar.className = 'hud-placement';
+    this.placementBar.dataset.hudItem = 'placementBar';
+    this.confirmPlacement = button('inGame', 'placeConfirm', 'Confirm', () => {
+      this.ctx.confirmPlacement?.();
+      this.refresh();
+    });
+    this.cancelPlacement = button('inGame', 'placeCancel', 'Cancel', () => {
+      this.ctx.cancelPlacement?.();
+      this.refresh();
+    });
+    this.placementBar.append(this.confirmPlacement, this.cancelPlacement);
+
+    this.root.append(
+      topbar,
+      minimapWrap,
+      commandBar,
+      this.groupsStrip,
+      this.selectionPanel,
+      this.buildPanel,
+      this.placementBar,
+    );
     host.append(this.root);
 
     this.update();
@@ -257,21 +344,33 @@ export class Hud implements HudHandle {
   snapshot(): HudSnapshot {
     const world = this.ctx.getWorld();
     const selection = this.ctx.getSelection();
+    const stats = world.resources.find((item) => item.player === 1);
+    const ownUnits = world.units.filter((unit) => unit.owner === 1 && unit.hp > 0);
+    const workerCount = ownUnits.filter((unit) => {
+      const type = world.unitTypes.get(unit.typeId);
+      return type?.workerKind !== null && type?.workerKind !== undefined;
+    }).length;
     return {
       leftHanded: this.ctx.isLeftHanded(),
       groupsOpen: this.groupsOpen,
       queueMode: this.ctx.isQueueMode(),
       attackMoveArmed: this.ctx.isAttackMoveArmed(),
       selectedCount: selection.length,
-      ownUnits: world.units.filter((unit) => unit.owner === 1).length,
-      enemyUnits: world.units.filter((unit) => unit.owner !== 1).length,
+      ownUnits: ownUnits.length,
+      enemyUnits: world.units.filter((unit) => unit.owner !== 1 && unit.hp > 0).length,
       minimapFootprint: this.lastFootprint.map((point) => ({ x: point.x, z: point.z })),
       minimapRedraws: this.minimapRedraws,
-      // Reflect the DOM state rather than "was the selection empty at snapshot
-      // time": a slow tick would otherwise let the snapshot report true while
-      // the buttons were still enabled, which is exactly what HUD-01 does not
-      // want.
       commandButtonsDisabled: this.attackButton.disabled,
+      buildMenuOpen: this.buildMenuOpen,
+      ore: stats?.ore ?? 0,
+      metal: stats?.metal ?? 0,
+      workers: workerCount,
+      unitCount: ownUnits.length,
+      unitCap: UNIT_CAP,
+      queue: this.ctx.getDropQueue?.() ?? [],
+      kits: this.ctx.getKits?.() ?? [],
+      selectedPadId: this.ctx.getSelectedPadId?.() ?? null,
+      placementActive: this.ctx.getPlacement?.() !== null,
     };
   }
 
@@ -280,19 +379,31 @@ export class Hud implements HudHandle {
     this.root.remove();
   }
 
-  /** Refresh the disabled state of the command bar from the current selection. */
   refresh(): void {
     const selection = this.ctx.getSelection();
     const hasSelection = selection.length > 0;
+    const actions: WorkerActions = this.ctx.getWorkerActions?.() ?? {
+      canMine: false,
+      canAssign: false,
+      canSalvage: false,
+    };
     this.attackButton.disabled = !hasSelection;
     this.holdButton.disabled = !hasSelection;
     this.stopButton.disabled = !hasSelection;
     this.queueButton.disabled = !hasSelection;
     this.groupsButton.disabled = !hasSelection;
+    this.buildButton.disabled = false;
+    this.mineButton.disabled = !actions.canMine;
+    this.assignButton.disabled = !actions.canAssign;
+    this.salvageButton.disabled = !actions.canSalvage;
     this.queueButton.classList.toggle('active', this.ctx.isQueueMode());
     this.attackButton.classList.toggle('active', this.ctx.isAttackMoveArmed());
     this.groupsButton.classList.toggle('active', this.groupsOpen);
     this.root.classList.toggle('left-handed', this.ctx.isLeftHanded());
+    this.root.classList.toggle('build-open', this.buildMenuOpen);
+    const placing = this.ctx.getPlacement?.() !== null;
+    this.root.classList.toggle('placing', placing);
+    this.placementBar.classList.toggle('open', placing);
     this.groupsStrip.classList.toggle('open', this.groupsOpen);
     if (!hasSelection) {
       this.groupsOpen = false;
@@ -309,20 +420,238 @@ export class Hud implements HudHandle {
         members.every((id, index) => id === selected[index]);
       element.classList.toggle('selected', same);
     }
+    this.renderBuildMenu();
   }
 
   private update(): void {
     const world = this.ctx.getWorld();
     this.clock.textContent = formatClock(world.tick / SIM_TICK_HZ);
     const selection = this.ctx.getSelection();
+    const stats = world.resources.find((item) => item.player === 1);
+    const ownUnits = world.units.filter((unit) => unit.owner === 1 && unit.hp > 0);
+    const workers = ownUnits.filter((unit) => {
+      const type = world.unitTypes.get(unit.typeId);
+      return type?.workerKind !== null && type?.workerKind !== undefined;
+    }).length;
+    this.resources.textContent = `O ${stats?.ore ?? 0} · M ${stats?.metal ?? 0}`;
+    this.workers.textContent = `W ${workers}`;
+    this.unitsLabel.textContent = `U ${ownUnits.length}/${UNIT_CAP}`;
     this.refresh();
     this.renderSelection(world, selection);
     this.drawMinimap(world);
   }
 
+  private setBuildMenu(open: boolean): void {
+    this.buildMenuOpen = open;
+    this.groupsOpen = false;
+    this.groupsStrip.classList.remove('open');
+    this.root.classList.toggle('build-open', open);
+    this.refresh();
+  }
+
+  /**
+   * Structural signature of the build menu: everything that requires the panel
+   * to be rebuilt. Live values that only need in-place updates (queue progress)
+   * are intentionally excluded.
+   *
+   * The panel used to be torn down and rebuilt on every 200 ms HUD tick, which
+   * detached every button a few times per second. Playwright's `locator.tap()`
+   * performs actionability checks across multiple frames; if the button was
+   * detached mid-check the tap was retried forever and the test hung on
+   * `build.item.*` and `build.place.*` clicks. Rebuilding only when the sig-
+   * nature changes keeps the buttons stable across ticks.
+   */
+  private computeBuildSignature(): string {
+    const items = this.ctx.getBuildItems?.() ?? [];
+    const pads = this.ctx.getOwnPads?.() ?? [];
+    const queue = this.ctx.getDropQueue?.() ?? [];
+    const kits = this.ctx.getKits?.() ?? [];
+    const selectedPad = this.ctx.getSelectedPadId?.() ?? null;
+    const parts: string[] = [selectedPad === null ? 'pad:' : `pad:${selectedPad}`];
+    parts.push(pads.map((pad) => pad.id).join(','));
+    for (const item of items) {
+      parts.push(
+        `${item.id}|${item.name}|${item.kind}|${item.ore}|${item.metal}|${item.deliverySec}|${item.disabledReason ?? ''}`,
+      );
+    }
+    parts.push('::queue::');
+    for (const order of queue) {
+      parts.push(`${order.id}|${order.itemId}|${order.name}`);
+    }
+    parts.push('::kits::');
+    for (const kit of kits) {
+      parts.push(`${kit.id}|${kit.name}`);
+    }
+    return parts.join(';');
+  }
+
+  /**
+   * Section order (top to bottom) inside the bottom sheet:
+   *   1. "Receive at" pad row — cheap context.
+   *   2. "Ready to place" (only when a kit is waiting) — a delivered kit is the
+   *      most urgent action; putting it above the catalogue means the Place
+   *      button lands in the visible first screenful.
+   *   3. "Queue" (only when non-empty) — a placed order needs a visible
+   *      progress bar and Cancel button, again without scrolling.
+   *   4. "Units" / "Structures" catalogue — scroll target for new buys.
+   *
+   * The previous layout pushed both "Queue" and "Ready to place" below the item
+   * list, so on a 220 px phone sheet a purchase or a delivered kit left the
+   * player staring at the top of the catalogue.
+   */
+  private renderBuildMenu(): void {
+    if (!this.buildMenuOpen) {
+      if (this.lastBuildSignature !== '') {
+        this.buildContent.replaceChildren();
+        this.queueProgressRefs.clear();
+        this.lastBuildSignature = '';
+      }
+      return;
+    }
+    const signature = this.computeBuildSignature();
+    if (signature === this.lastBuildSignature) {
+      const queue = this.ctx.getDropQueue?.() ?? [];
+      for (const order of queue) {
+        const bar = this.queueProgressRefs.get(order.id);
+        if (bar) {
+          const pct = Math.round(Math.min(1, Math.max(0, order.progress)) * 100);
+          bar.style.width = `${pct}%`;
+        }
+      }
+      return;
+    }
+    this.lastBuildSignature = signature;
+    this.queueProgressRefs.clear();
+    this.buildContent.replaceChildren();
+
+    const items = this.ctx.getBuildItems?.() ?? [];
+    const pads = this.ctx.getOwnPads?.() ?? [];
+    const selectedPad = this.ctx.getSelectedPadId?.() ?? null;
+
+    const padRow = document.createElement('div');
+    padRow.className = 'build-pad-row';
+    const padLabel = document.createElement('span');
+    padLabel.className = 'build-section-title';
+    padLabel.textContent = 'Receive at';
+    padRow.append(padLabel);
+    for (const [index, pad] of pads.entries()) {
+      const padButton = document.createElement('button');
+      padButton.type = 'button';
+      padButton.className = `build-pad${pad.id === selectedPad ? ' active' : ''}`;
+      padButton.textContent = `Pad ${index + 1}`;
+      padButton.dataset.controlId = `build.pad.${pad.id}`;
+      padButton.addEventListener('click', () => {
+        this.ctx.setSelectedPad?.(pad.id);
+        this.renderBuildMenu();
+      });
+      padRow.append(padButton);
+    }
+    this.buildContent.append(padRow);
+
+    const kits = this.ctx.getKits?.() ?? [];
+    if (kits.length > 0) {
+      const kitSection = document.createElement('div');
+      kitSection.className = 'build-section';
+      const kitTitle = document.createElement('div');
+      kitTitle.className = 'build-section-title';
+      kitTitle.textContent = 'Ready to place';
+      kitSection.append(kitTitle);
+      for (const kit of kits) {
+        const place = document.createElement('button');
+        place.type = 'button';
+        place.className = 'build-place';
+        place.textContent = `Place ${kit.name}`;
+        place.dataset.controlId = `build.place.${kit.id}`;
+        place.addEventListener('click', () => {
+          if (this.ctx.startPlacement?.(kit.id)) {
+            this.setBuildMenu(false);
+          }
+        });
+        kitSection.append(place);
+      }
+      this.buildContent.append(kitSection);
+    }
+
+    const queue = this.ctx.getDropQueue?.() ?? [];
+    if (queue.length > 0) {
+      const queueSection = document.createElement('div');
+      queueSection.className = 'build-section';
+      const queueTitle = document.createElement('div');
+      queueTitle.className = 'build-section-title';
+      queueTitle.textContent = 'Queue';
+      queueSection.append(queueTitle);
+      for (const order of queue) {
+        const row = document.createElement('div');
+        row.className = 'build-queue-row';
+        const info = document.createElement('span');
+        info.className = 'build-queue-name';
+        info.textContent = order.name;
+        const bar = document.createElement('span');
+        bar.className = 'queue-bar';
+        const fill = document.createElement('span');
+        fill.className = 'queue-fill';
+        fill.style.width = `${Math.round(Math.min(1, Math.max(0, order.progress)) * 100)}%`;
+        bar.append(fill);
+        this.queueProgressRefs.set(order.id, fill);
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'build-cancel';
+        cancel.textContent = 'Cancel';
+        cancel.dataset.controlId = `build.cancel.${order.id}`;
+        cancel.addEventListener('click', () => {
+          this.ctx.cancelOrder?.(order.id);
+          this.renderBuildMenu();
+        });
+        row.append(info, bar, cancel);
+        queueSection.append(row);
+      }
+      this.buildContent.append(queueSection);
+    }
+
+    const groups: Array<{ label: string; kind: 'unit' | 'structure' }> = [
+      { label: 'Units', kind: 'unit' },
+      { label: 'Structures', kind: 'structure' },
+    ];
+    for (const group of groups) {
+      const section = document.createElement('div');
+      section.className = 'build-section';
+      const title = document.createElement('div');
+      title.className = 'build-section-title';
+      title.textContent = group.label;
+      section.append(title);
+      const list = document.createElement('div');
+      list.className = 'build-items';
+      for (const item of items.filter((entry) => entry.kind === group.kind)) {
+        const itemButton = document.createElement('button');
+        itemButton.type = 'button';
+        itemButton.className = 'build-item';
+        itemButton.dataset.controlId = `build.item.${item.id}`;
+        itemButton.disabled = item.disabledReason !== null;
+        const name = document.createElement('span');
+        name.className = 'build-item-name';
+        name.textContent = item.name;
+        const cost = document.createElement('span');
+        cost.className = 'build-item-cost';
+        cost.textContent = `${item.ore} ore · ${item.metal} metal · ${item.deliverySec.toFixed(0)}s`;
+        itemButton.append(name, cost);
+        if (item.disabledReason) {
+          const reason = document.createElement('span');
+          reason.className = 'build-reason';
+          reason.textContent = item.disabledReason;
+          itemButton.append(reason);
+        }
+        itemButton.addEventListener('click', () => {
+          this.ctx.buyItem?.(item.id);
+          this.renderBuildMenu();
+        });
+        list.append(itemButton);
+      }
+      section.append(list);
+      this.buildContent.append(section);
+    }
+  }
+
   private renderSelection(world: WorldState, selection: number[]): void {
-    // An empty selection panel is a large, contentless block parked over the
-    // battlefield; only show it while there is something in it.
     this.selectionPanel.style.display = selection.length === 0 ? 'none' : '';
     this.selectionPanel.replaceChildren();
     if (selection.length === 0) {
@@ -413,6 +742,22 @@ export class Hud implements HudHandle {
       y: offY + ((z + half) / map.size) * size,
     });
 
+    for (const deposit of world.deposits) {
+      const point = toMap(deposit.x, deposit.z);
+      context.fillStyle = deposit.kind === 'ore' ? '#f2c94c' : '#cfd8e3';
+      context.fillRect(point.x - 2, point.y - 2, 4, 4);
+    }
+
+    for (const structure of world.structures) {
+      const point = toMap(structure.x, structure.z);
+      const type = world.structureTypes.get(structure.typeId);
+      context.fillStyle = structure.owner === 1 ? '#6cf58a' : '#ff5c5c';
+      const radius = type?.kind === 'pad' ? 4 : 2.5;
+      context.beginPath();
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fill();
+    }
+
     for (const unit of world.units) {
       const point = toMap(unit.x, unit.z);
       context.fillStyle = unit.owner === 1 ? '#4ea3ff' : '#ff5c5c';
@@ -421,9 +766,6 @@ export class Hud implements HudHandle {
       context.fill();
     }
 
-    // `lastFootprint` stays the raw, unclipped footprint (the panel/`hud()`
-    // contract that MM-01 reads); only the drawn outline is clipped to the map
-    // square so it stays a proper polygon instead of a diagonal slash.
     const footprint = this.ctx.cameraFootprint();
     this.lastFootprint = footprint.map((point) => ({ ...point }));
     const visible = clipToMapSquare(footprint, half);

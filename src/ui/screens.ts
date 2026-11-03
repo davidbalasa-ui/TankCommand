@@ -1,6 +1,7 @@
 import { button } from './controls';
 import { Hud } from './hud';
 import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
+import { SIM_TICK_HZ } from '../sim/constants';
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
 
@@ -43,6 +44,11 @@ function addButton(
 
 function emit(name: string): void {
   window.dispatchEvent(new CustomEvent(`tc:${name}`));
+}
+
+function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
 export function createScreens(): Record<ScreenId, ScreenModule> {
@@ -140,6 +146,33 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           groupMembers: (group) => ctx.groupMembers?.(group) ?? [],
           pause: () => {
             ctx.go('pause');
+          },
+          getBuildItems: () => ctx.getBuildItems?.() ?? [],
+          getOwnPads: () => ctx.getOwnPads?.() ?? [],
+          getSelectedPadId: () => ctx.getSelectedPadId?.() ?? null,
+          setSelectedPad: (id) => {
+            ctx.setSelectedPad?.(id);
+          },
+          buyItem: (itemId) => ctx.buyItem?.(itemId) ?? false,
+          getDropQueue: () => ctx.getDropQueue?.() ?? [],
+          cancelOrder: (orderId) => {
+            ctx.cancelOrder?.(orderId);
+          },
+          getKits: () => ctx.getKits?.() ?? [],
+          startPlacement: (kitId) => ctx.startPlacement?.(kitId) ?? false,
+          getPlacement: () => ctx.getPlacement?.() ?? null,
+          confirmPlacement: () => ctx.confirmPlacement?.() ?? false,
+          cancelPlacement: () => {
+            ctx.cancelPlacement?.();
+          },
+          getWorkerActions: () =>
+            ctx.getWorkerActions?.() ?? {
+              canMine: false,
+              canAssign: false,
+              canSalvage: false,
+            },
+          salvageSelected: () => {
+            ctx.salvageSelected?.();
           },
         });
         ctx.registerHud?.(hud);
@@ -240,6 +273,19 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const heading = root.querySelector('h1');
       if (heading) {
         heading.textContent = winner === 1 ? 'Victory' : winner === 2 ? 'Defeat' : 'Draw';
+      }
+      if (world) {
+        const stats = world.resources.find((item) => item.player === 1);
+        const detail = document.createElement('p');
+        detail.className = 'results-stats';
+        detail.textContent = [
+          `Time ${formatClock(world.tick / SIM_TICK_HZ)}`,
+          `Units built ${stats?.unitsBuilt ?? 0}`,
+          `Units lost ${stats?.unitsLost ?? 0}`,
+          `Ore gathered ${stats?.oreGathered ?? 0}`,
+          `Metal gathered ${stats?.metalGathered ?? 0}`,
+        ].join(' · ');
+        root.append(detail);
       }
       addButton(root, 'results', 'playAgain', 'Play again', () => {
         ctx.go('loading');

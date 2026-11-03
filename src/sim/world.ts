@@ -28,14 +28,44 @@ import {
   WAYPOINT_REACHED,
   WRECK_TTL_SEC,
 } from './tuning';
+import {
+  applyAssignCommand,
+  applyMineCommand,
+  applySalvageCommand,
+  ensureSideStats,
+  updateAlerts,
+  updateMetalStations,
+} from './economy';
+import {
+  applyBuyCommand,
+  applyCancelCommand,
+  applyPlaceKitCommand,
+  updateDropQueues,
+} from './drops';
+import { updateMatchResult } from './match';
+import { updateWorkers } from './workers';
+import { addStructure, addUnit } from './spawn';
 import type {
+  CommandOutcome,
+  DepositDef,
+  DepositState,
+  DropBeamState,
+  DropOrder,
+  FactionAssignment,
   Order,
+  PendingKit,
   PlayerId,
   Point,
   ProjectileState,
+  SideStats,
+  SimAlert,
+  SimStructureType,
   SimUnitType,
-  Stance,
+  StartResources,
+  StartStructure,
   StartUnit,
+  Stance,
+  StructureState,
   UnitState,
   WeaponStats,
   WorldResult,
@@ -49,9 +79,21 @@ const TURN_SPEED_FLOOR = 0.25;
 
 export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
+  structureTypes?: ReadonlyMap<string, SimStructureType>;
   startUnits?: StartUnit[];
+  startStructures?: StartStructure[];
+  deposits?: DepositDef[];
+  factions?: FactionAssignment[];
+  startResources?: StartResources[];
   size?: number;
   cellSize?: number;
+}
+
+interface TargetRef {
+  id: number;
+  x: number;
+  z: number;
+  kind: 'unit' | 'structure';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,13 +147,23 @@ function cloneWorld(world: WorldState): WorldState {
   return {
     ...world,
     players: [...world.players],
+    factions: world.factions.map((entry) => ({ ...entry })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      job: unit.job ? { ...unit.job } : null,
     })),
+    structures: world.structures.map((structure) => ({ ...structure })),
+    deposits: world.deposits.map((deposit) => ({ ...deposit })),
+    pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
+    dropQueue: world.dropQueue.map((order) => ({ ...order })),
+    dropBeams: world.dropBeams.map((beam) => ({ ...beam })),
+    alerts: world.alerts.map((alert) => ({ ...alert })),
+    resources: world.resources.map((stats) => ({ ...stats })),
     projectiles: world.projectiles.map((projectile) => ({ ...projectile })),
     wrecks: world.wrecks.map((wreck) => ({ ...wreck })),
+    lastCommandOutcome: world.lastCommandOutcome ? { ...world.lastCommandOutcome } : null,
     result: world.result ? { winner: world.result.winner } : null,
   };
 }
@@ -151,40 +203,19 @@ export function defaultStartUnits(): StartUnit[] {
   return [...playerOne, ...playerTwo];
 }
 
-function addUnit(world: WorldState, start: StartUnit): void {
-  const type = world.unitTypes.get(start.typeId);
-  if (!type) {
-    return;
-  }
-  const position = clampToMap(world.map, start.x, start.z, UNIT_RADIUS);
-  const id = world.nextId;
-  world.nextId += 1;
-  const heading = start.heading ?? 0;
-  const turretHeading = start.turretHeading ?? heading;
-  world.units.push({
-    id,
-    owner: start.owner,
-    typeId: start.typeId,
-    x: position.x,
-    z: position.z,
-    heading,
-    turretHeading,
-    hp: type.hp,
-    order: { kind: 'idle' },
-    stance: normalizeStance(start.stance),
-    path: [],
-    reloadLeft: 0,
-    stuckTicks: 0,
-    speed: 0,
-    replans: 0,
-    attackRepathTick: 0,
-  });
-}
-
 export function createWorld(seed: number, options: CreateWorldOptions = {}): WorldState {
   const unitTypes = options.unitTypes ?? new Map<string, SimUnitType>();
+  const structureTypes = options.structureTypes ?? new Map<string, SimStructureType>();
   const map = generateMap(seed, options.size, options.cellSize);
   const rng = new Rng(seed);
+  const deposits: DepositState[] = (options.deposits ?? []).map((def, index) => ({
+    id: index + 1,
+    kind: def.kind,
+    x: def.x,
+    z: def.z,
+    amount: def.amount,
+    maxAmount: def.amount,
+  }));
   const world: WorldState = {
     tick: 0,
     seed,
@@ -192,19 +223,55 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     counter: 0,
     nextId: 1,
     players: [],
+    factions: (options.factions ?? []).map((entry) => ({ ...entry })),
     map,
     unitTypes,
+    structureTypes,
     units: [],
+    structures: [],
+    deposits,
+    pendingKits: [],
+    dropQueue: [],
+    dropBeams: [],
+    alerts: [],
+    resources: (options.startResources ?? []).map((entry) => ({
+      player: entry.player,
+      ore: entry.ore,
+      metal: entry.metal,
+      oreGathered: 0,
+      metalGathered: 0,
+      unitsBuilt: 0,
+      unitsLost: 0,
+    })),
     projectiles: [],
     wrecks: [],
+    lastCommandOutcome: null,
     result: null,
   };
 
-  const starts = options.startUnits ?? (unitTypes.size > 0 ? defaultStartUnits() : []);
+  const starts =
+    options.startUnits ??
+    (unitTypes.size > 0 && structureTypes.size === 0 ? defaultStartUnits() : []);
   for (const start of starts) {
     addUnit(world, start);
   }
-  world.players = [...new Set(world.units.map((unit) => unit.owner))].sort((a, b) => a - b);
+  for (const start of options.startStructures ?? []) {
+    addStructure(world, start);
+  }
+  for (const faction of world.factions) {
+    ensureSideStats(world, faction.player);
+  }
+  const owners = new Set<PlayerId>();
+  for (const unit of world.units) {
+    owners.add(unit.owner);
+  }
+  for (const structure of world.structures) {
+    owners.add(structure.owner);
+  }
+  for (const faction of world.factions) {
+    owners.add(faction.player);
+  }
+  world.players = [...owners].sort((a, b) => a - b);
   return world;
 }
 
@@ -255,14 +322,6 @@ function planMove(
   unit.stance = 'free';
 
   if (queue) {
-    // Queueing appends to the pending order instead of replacing it.
-    //
-    // The anchor is the tail of the current path. If the unit still holds a move
-    // order but its path is momentarily empty — the simulation clears paths when
-    // it re-plans — the order's own destination is the anchor, so a queued
-    // waypoint is never silently dropped. Whatever `findPath` says, the queued
-    // waypoint is appended, so the flag on the resulting order always reports
-    // that the path is a queue rather than a fresh order.
     const tail = unit.path.length > 0 ? unit.path[unit.path.length - 1] : undefined;
     const pending =
       unit.order.kind === 'move' || unit.order.kind === 'attackMove'
@@ -408,19 +467,19 @@ function canStand(world: WorldState, x: number, z: number): boolean {
   return !isBlockedAt(world.map, x, z);
 }
 
-function unitLineOfSight(world: WorldState, a: UnitState, b: UnitState): boolean {
+function unitLineOfSightAt(world: WorldState, unit: UnitState, x: number, z: number): boolean {
   return lineOfSightClear(
     world.map,
-    a.x,
-    a.z,
-    heightAt(world.map, a.x, a.z) + MUZZLE_HEIGHT,
-    b.x,
-    b.z,
-    heightAt(world.map, b.x, b.z) + TARGET_HEIGHT,
+    unit.x,
+    unit.z,
+    heightAt(world.map, unit.x, unit.z) + MUZZLE_HEIGHT,
+    x,
+    z,
+    heightAt(world.map, x, z) + TARGET_HEIGHT,
   );
 }
 
-function nearestEnemy(world: WorldState, unit: UnitState): UnitState | null {
+function nearestEnemyUnit(world: WorldState, unit: UnitState): UnitState | null {
   let best: UnitState | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
@@ -440,27 +499,38 @@ function selectTarget(
   world: WorldState,
   unit: UnitState,
   type: SimUnitType,
-): UnitState | null {
+): TargetRef | null {
   if (unit.order.kind === 'attack') {
-    const targetId = unit.order.targetId;
-    const explicit = world.units.find(
-      (other) => other.id === targetId && other.hp > 0 && other.owner !== unit.owner,
+    const id = unit.order.targetId;
+    const foundUnit = world.units.find(
+      (other) => other.id === id && other.hp > 0 && other.owner !== unit.owner,
     );
-    if (explicit) {
-      return explicit;
+    if (foundUnit) {
+      return { id: foundUnit.id, x: foundUnit.x, z: foundUnit.z, kind: 'unit' };
     }
-    // The ordered target is gone. Keep the order alive against the nearest
-    // survivor instead of dropping to idle: an idle unit only auto-engages
-    // inside its weapon range, so a squad that had stopped at the edge of range
-    // would sit outside every survivor and the skirmish could never resolve.
-    return nearestEnemy(world, unit);
+    const foundStructure = world.structures.find(
+      (structure) => structure.id === id && structure.hp > 0 && structure.owner !== unit.owner,
+    );
+    if (foundStructure) {
+      return {
+        id: foundStructure.id,
+        x: foundStructure.x,
+        z: foundStructure.z,
+        kind: 'structure',
+      };
+    }
+    const near = nearestEnemyUnit(world, unit);
+    if (near) {
+      return { id: near.id, x: near.x, z: near.z, kind: 'unit' };
+    }
+    return null;
   }
 
   const range =
     unit.order.kind === 'attackMove'
       ? type.sightRange * ATTACK_MOVE_ENGAGE_FACTOR
       : type.weapon?.range ?? type.sightRange;
-  let best: UnitState | null = null;
+  let best: TargetRef | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
     if (other.hp <= 0 || other.owner === unit.owner) {
@@ -468,39 +538,28 @@ function selectTarget(
     }
     const distance = Math.hypot(other.x - unit.x, other.z - unit.z);
     if (distance <= range && distance < bestDistance) {
-      best = other;
+      best = { id: other.id, x: other.x, z: other.z, kind: 'unit' };
       bestDistance = distance;
     }
   }
   return best;
 }
 
-/**
- * True when an attack or attack-move order is standing still on purpose: the
- * selected target is inside weapon range with clear line of sight.
- *
- * The stuck rule must ignore these units. Otherwise a perfectly placed firing
- * tank counts "moved less than MOVE_EPS" every tick, burns through MAX_REPLANS,
- * and has its order cancelled to idle.
- */
 function isHoldingFirePosition(
   world: WorldState,
   unit: UnitState,
   type: SimUnitType,
+  target: TargetRef | null,
 ): boolean {
   if (unit.order.kind !== 'attack' && unit.order.kind !== 'attackMove') {
     return false;
   }
   const weapon = type.weapon;
-  if (!weapon) {
-    return false;
-  }
-  const target = selectTarget(world, unit, type);
-  if (!target) {
+  if (!weapon || !target) {
     return false;
   }
   const distance = Math.hypot(target.x - unit.x, target.z - unit.z);
-  return distance <= weapon.range && unitLineOfSight(world, unit, target);
+  return distance <= weapon.range && unitLineOfSightAt(world, unit, target.x, target.z);
 }
 
 function followPath(
@@ -596,14 +655,16 @@ function followPath(
 function fireProjectile(
   world: WorldState,
   shooter: UnitState,
-  target: UnitState,
+  targetX: number,
+  targetZ: number,
   weapon: WeaponStats,
   rng: Rng,
+  targetStructureId?: number,
 ): void {
   const startY = heightAt(world.map, shooter.x, shooter.z) + MUZZLE_HEIGHT;
-  const targetY = heightAt(world.map, target.x, target.z) + TARGET_HEIGHT;
-  const dx = target.x - shooter.x;
-  const dz = target.z - shooter.z;
+  const targetY = heightAt(world.map, targetX, targetZ) + TARGET_HEIGHT;
+  const dx = targetX - shooter.x;
+  const dz = targetZ - shooter.z;
   const distance = Math.hypot(dx, dz);
   if (distance < 0.001) {
     return;
@@ -613,7 +674,7 @@ function fireProjectile(
   const angle = baseAngle + error;
   const travelTime = distance / weapon.projectileSpeed;
 
-  world.projectiles.push({
+  const projectile: ProjectileState = {
     id: world.nextId,
     owner: shooter.owner,
     x: shooter.x,
@@ -625,7 +686,11 @@ function fireProjectile(
     damage: weapon.damage,
     ttl: PROJECTILE_TTL,
     splashRadius: weapon.splashRadius,
-  });
+  };
+  if (targetStructureId !== undefined) {
+    projectile.targetStructureId = targetStructureId;
+  }
+  world.projectiles.push(projectile);
   world.nextId += 1;
 }
 
@@ -651,6 +716,12 @@ function closestPointT(
   return Math.min(1, Math.max(0, t));
 }
 
+function structureRadius(world: WorldState, type: SimStructureType): number {
+  return (
+    (Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize) / 2
+  );
+}
+
 function applySplash(
   world: WorldState,
   x: number,
@@ -658,6 +729,7 @@ function applySplash(
   z: number,
   projectile: ProjectileState,
   directUnitId?: number,
+  directStructureId?: number,
 ): void {
   const radius = Math.max(0.001, projectile.splashRadius);
   for (const unit of world.units) {
@@ -671,6 +743,28 @@ function applySplash(
       const armor = type?.armor ?? 0;
       const damage = Math.max(1, projectile.damage - armor);
       unit.hp = Math.max(0, unit.hp - damage);
+    }
+  }
+  // A shot fired at a unit must not splash a structure: the pad that sits next
+  // to the target unit would otherwise eat every shot aimed at that unit and
+  // the unit could never be damaged at all (see ProjectileState.targetStructureId).
+  if (projectile.targetStructureId === undefined) {
+    return;
+  }
+  for (const structure of world.structures) {
+    if (structure.hp <= 0) {
+      continue;
+    }
+    const type = world.structureTypes.get(structure.typeId);
+    if (!type) {
+      continue;
+    }
+    const structY = heightAt(world.map, structure.x, structure.z) + TARGET_HEIGHT;
+    const structureHitRadius = structureRadius(world, type);
+    const distance = Math.hypot(structure.x - x, structY - y, structure.z - z);
+    if (structure.id === directStructureId || distance <= radius + structureHitRadius) {
+      const damage = Math.max(1, projectile.damage - type.armor);
+      structure.hp = Math.max(0, structure.hp - damage);
     }
   }
 }
@@ -692,6 +786,7 @@ function updateProjectiles(world: WorldState): void {
     const nz = projectile.z + projectile.vz * DT;
 
     let hitUnit: UnitState | null = null;
+    let hitStructure: StructureState | null = null;
     let hitT = Number.POSITIVE_INFINITY;
     for (const unit of world.units) {
       if (unit.hp <= 0 || unit.owner === projectile.owner) {
@@ -706,6 +801,30 @@ function updateProjectiles(world: WorldState): void {
       if (distance <= UNIT_RADIUS && t < hitT) {
         hitT = t;
         hitUnit = unit;
+        hitStructure = null;
+      }
+    }
+    if (projectile.targetStructureId !== undefined) {
+      for (const structure of world.structures) {
+        if (structure.hp <= 0 || structure.owner === projectile.owner) {
+          continue;
+        }
+        const type = world.structureTypes.get(structure.typeId);
+        if (!type) {
+          continue;
+        }
+        const structY = heightAt(world.map, structure.x, structure.z) + TARGET_HEIGHT;
+        const structRadius = structureRadius(world, type);
+        const t = closestPointT(ox, oy, oz, nx, ny, nz, structure.x, structY, structure.z);
+        const px = ox + (nx - ox) * t;
+        const py = oy + (ny - oy) * t;
+        const pz = oz + (nz - oz) * t;
+        const distance = Math.hypot(px - structure.x, py - structY, pz - structure.z);
+        if (distance <= structRadius && t < hitT) {
+          hitT = t;
+          hitUnit = null;
+          hitStructure = structure;
+        }
       }
     }
 
@@ -714,6 +833,13 @@ function updateProjectiles(world: WorldState): void {
       const hy = oy + (ny - oy) * hitT;
       const hz = oz + (nz - oz) * hitT;
       applySplash(world, hx, hy, hz, projectile, hitUnit.id);
+      continue;
+    }
+    if (hitStructure) {
+      const hx = ox + (nx - ox) * hitT;
+      const hy = oy + (ny - oy) * hitT;
+      const hz = oz + (nz - oz) * hitT;
+      applySplash(world, hx, hy, hz, projectile, undefined, hitStructure.id);
       continue;
     }
 
@@ -792,7 +918,7 @@ function updateOrderPath(
   world: WorldState,
   unit: UnitState,
   type: SimUnitType,
-  target: UnitState | null,
+  target: TargetRef | null,
 ): void {
   if (unit.stance === 'hold') {
     unit.path = [];
@@ -814,9 +940,6 @@ function updateOrderPath(
         unit.speed = 0;
         return;
       }
-      // Re-planning the same order must not erase the fact that its path is a
-      // queue: the flag drives the "queued path" overlay and the acceptance
-      // test, so it follows the order rather than the individual path.
       adoptPath(unit, path, unit.order.queue, 'move');
     }
     if (unit.order.kind === 'move') {
@@ -832,7 +955,7 @@ function updateOrderPath(
       target !== null &&
       weapon !== null &&
       distance <= weapon.range &&
-      unitLineOfSight(world, unit, target);
+      unitLineOfSightAt(world, unit, target.x, target.z);
     if (inRange) {
       unit.path = [];
       unit.speed = approach(unit.speed, 0, type.accel * DT);
@@ -871,7 +994,7 @@ function updateOrderPath(
     const weapon = type.weapon;
     const distance = Math.hypot(target.x - unit.x, target.z - unit.z);
     const inRange = weapon ? distance <= weapon.range : false;
-    const los = weapon ? unitLineOfSight(world, unit, target) : false;
+    const los = weapon ? unitLineOfSightAt(world, unit, target.x, target.z) : false;
     if (inRange && los) {
       unit.path = [];
       unit.speed = approach(unit.speed, 0, type.accel * DT);
@@ -910,12 +1033,13 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     const type = world.unitTypes.get(unit.typeId);
-    if (type && isHoldingFirePosition(world, unit, type)) {
-      // Deliberately stationary to shoot: no path is wanted, so this is not a
-      // stuck unit and it must keep its order.
-      unit.stuckTicks = 0;
-      unit.replans = 0;
-      continue;
+    if (type) {
+      const target = selectTarget(world, unit, type);
+      if (isHoldingFirePosition(world, unit, type, target)) {
+        unit.stuckTicks = 0;
+        unit.replans = 0;
+        continue;
+      }
     }
 
     const moved = Math.hypot(unit.x - start.x, unit.z - start.z);
@@ -983,6 +1107,15 @@ function updateUnits(world: WorldState, rng: Rng): void {
       continue;
     }
 
+    // A worker with a job owns its speed, heading and path through
+    // `updateWorkers`; the military tick must not touch it. Otherwise
+    // `updateOrderPath` runs the idle deceleration on the same `unit.speed` the
+    // worker step just raised, and the worker never crawls faster than one
+    // `accel * DT` step per tick.
+    if (unit.job) {
+      continue;
+    }
+
     unit.reloadLeft = Math.max(0, unit.reloadLeft - DT);
     const target = selectTarget(world, unit, type);
 
@@ -1008,9 +1141,17 @@ function updateUnits(world: WorldState, rng: Rng): void {
         aligned &&
         distance <= weapon.range &&
         (type.fireOnMove || unit.speed <= FIRE_MOVE_SPEED_MAX) &&
-        unitLineOfSight(world, unit, target);
+        unitLineOfSightAt(world, unit, target.x, target.z);
       if (canFire) {
-        fireProjectile(world, unit, target, weapon, rng);
+        fireProjectile(
+          world,
+          unit,
+          target.x,
+          target.z,
+          weapon,
+          rng,
+          target.kind === 'structure' ? target.id : undefined,
+        );
         unit.reloadLeft = weapon.reloadSec;
       }
     }
@@ -1022,13 +1163,13 @@ function updateUnits(world: WorldState, rng: Rng): void {
 
 function cleanupDead(world: WorldState): void {
   const dead = world.units.filter((unit) => unit.hp <= 0);
-  if (dead.length === 0) {
-    return;
-  }
   for (const unit of dead) {
     world.wrecks.push({ x: unit.x, z: unit.z, ttl: WRECK_TTL_SEC });
+    const stats = ensureSideStats(world, unit.owner);
+    stats.unitsLost += 1;
   }
   world.units = world.units.filter((unit) => unit.hp > 0);
+  world.structures = world.structures.filter((structure) => structure.hp > 0);
 }
 
 function updateWrecks(world: WorldState): void {
@@ -1038,17 +1179,11 @@ function updateWrecks(world: WorldState): void {
   world.wrecks = world.wrecks.filter((wreck) => wreck.ttl > 0);
 }
 
-function updateResult(world: WorldState): void {
-  if (world.result || world.players.length === 0) {
-    return;
+function updateDropBeams(world: WorldState): void {
+  for (const beam of world.dropBeams) {
+    beam.ttl -= DT;
   }
-  const aliveOwners = new Set(world.units.map((unit) => unit.owner));
-  const alive = world.players.filter((player) => aliveOwners.has(player));
-  if (alive.length === 0) {
-    world.result = { winner: null };
-  } else if (alive.length === 1) {
-    world.result = { winner: alive[0] ?? null };
-  }
+  world.dropBeams = world.dropBeams.filter((beam) => beam.ttl > 0);
 }
 
 export function step(world: WorldState, commands: readonly Command[]): WorldState {
@@ -1062,27 +1197,59 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
       if (command.tick !== nextTick) {
         continue;
       }
-      if (command.kind === 'debug.addCounter') {
-        next.counter += command.amount;
-      } else if (command.kind === 'move') {
-        applyMoveCommand(next, command);
-      } else if (command.kind === 'attackMove') {
-        applyAttackMoveCommand(next, command);
-      } else if (command.kind === 'attack') {
-        applyAttackCommand(next, command);
-      } else if (command.kind === 'hold') {
-        applyHoldCommand(next, command);
-      } else if (command.kind === 'stop') {
-        applyStopCommand(next, command);
+      switch (command.kind) {
+        case 'debug.addCounter':
+          next.counter += command.amount;
+          break;
+        case 'move':
+          applyMoveCommand(next, command);
+          break;
+        case 'attackMove':
+          applyAttackMoveCommand(next, command);
+          break;
+        case 'attack':
+          applyAttackCommand(next, command);
+          break;
+        case 'hold':
+          applyHoldCommand(next, command);
+          break;
+        case 'stop':
+          applyStopCommand(next, command);
+          break;
+        case 'buy':
+          applyBuyCommand(next, command);
+          break;
+        case 'cancel':
+          applyCancelCommand(next, command);
+          break;
+        case 'placeKit':
+          applyPlaceKitCommand(next, command);
+          break;
+        case 'mine':
+          applyMineCommand(next, command);
+          break;
+        case 'assign':
+          applyAssignCommand(next, command);
+          break;
+        case 'salvage':
+          applySalvageCommand(next, command);
+          break;
+        case 'noop':
+          break;
       }
     }
   }
 
   updateUnits(next, rng);
+  updateWorkers(next);
+  updateMetalStations(next);
+  updateDropQueues(next);
   updateProjectiles(next);
   cleanupDead(next);
   updateWrecks(next);
-  updateResult(next);
+  updateDropBeams(next);
+  updateAlerts(next);
+  updateMatchResult(next);
 
   next.tick = nextTick;
   next.rngState = rng.getState();
@@ -1126,6 +1293,7 @@ export function hashWorld(world: WorldState): string {
       counter: world.counter,
       nextId: world.nextId,
       players: world.players,
+      factions: world.factions,
       units: world.units.map((unit) => ({
         id: unit.id,
         owner: unit.owner,
@@ -1143,9 +1311,18 @@ export function hashWorld(world: WorldState): string {
         speed: unit.speed,
         replans: unit.replans,
         attackRepathTick: unit.attackRepathTick,
+        job: unit.job,
       })),
+      structures: world.structures,
+      deposits: world.deposits,
+      pendingKits: world.pendingKits,
+      dropQueue: world.dropQueue,
+      dropBeams: world.dropBeams,
+      alerts: world.alerts,
+      resources: world.resources,
       projectiles: world.projectiles,
       wrecks: world.wrecks,
+      lastCommandOutcome: world.lastCommandOutcome,
       result: world.result,
     }),
   );
@@ -1155,6 +1332,9 @@ export function worldToPayload(world: WorldState): unknown {
   const unitTypes = [...world.unitTypes.entries()]
     .map(([id, type]) => ({ id, type }))
     .sort((a, b) => a.id.localeCompare(b.id));
+  const structureTypes = [...world.structureTypes.entries()]
+    .map(([id, type]) => ({ id, type }))
+    .sort((a, b) => a.id.localeCompare(b.id));
   return {
     tick: world.tick,
     seed: world.seed,
@@ -1162,15 +1342,26 @@ export function worldToPayload(world: WorldState): unknown {
     counter: world.counter,
     nextId: world.nextId,
     players: [...world.players],
+    factions: world.factions.map((entry) => ({ ...entry })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      job: unit.job ? { ...unit.job } : null,
     })),
+    structures: world.structures.map((structure) => ({ ...structure })),
+    deposits: world.deposits.map((deposit) => ({ ...deposit })),
+    pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
+    dropQueue: world.dropQueue.map((order) => ({ ...order })),
+    dropBeams: world.dropBeams.map((beam) => ({ ...beam })),
+    alerts: world.alerts.map((alert) => ({ ...alert })),
+    resources: world.resources.map((stats) => ({ ...stats })),
     projectiles: world.projectiles.map((projectile) => ({ ...projectile })),
     wrecks: world.wrecks.map((wreck) => ({ ...wreck })),
+    lastCommandOutcome: world.lastCommandOutcome ? { ...world.lastCommandOutcome } : null,
     result: world.result ? { winner: world.result.winner } : null,
     unitTypes,
+    structureTypes,
   };
 }
 
@@ -1208,17 +1399,53 @@ export function payloadToWorld(input: unknown): WorldState | null {
       unitTypes.set(entry.id, entry.type as unknown as SimUnitType);
     }
   }
+  const structureTypes = new Map<string, SimStructureType>();
+  if (Array.isArray(input.structureTypes)) {
+    for (const entry of input.structureTypes) {
+      if (!isRecord(entry) || typeof entry.id !== 'string' || !isRecord(entry.type)) {
+        continue;
+      }
+      structureTypes.set(entry.id, entry.type as unknown as SimStructureType);
+    }
+  }
 
   const units: UnitState[] = Array.isArray(input.units)
     ? (input.units as UnitState[]).map((unit) => ({
         ...unit,
         stance: normalizeStance(unit.stance),
+        job: unit.job ?? null,
       }))
+    : [];
+  const structures: StructureState[] = Array.isArray(input.structures)
+    ? (input.structures as StructureState[])
+    : [];
+  const deposits: DepositState[] = Array.isArray(input.deposits)
+    ? (input.deposits as DepositState[])
+    : [];
+  const pendingKits: PendingKit[] = Array.isArray(input.pendingKits)
+    ? (input.pendingKits as PendingKit[])
+    : [];
+  const dropQueue: DropOrder[] = Array.isArray(input.dropQueue)
+    ? (input.dropQueue as DropOrder[])
+    : [];
+  const dropBeams: DropBeamState[] = Array.isArray(input.dropBeams)
+    ? (input.dropBeams as DropBeamState[])
+    : [];
+  const alerts: SimAlert[] = Array.isArray(input.alerts)
+    ? (input.alerts as SimAlert[])
+    : [];
+  const resources: SideStats[] = Array.isArray(input.resources)
+    ? (input.resources as SideStats[])
+    : [];
+  const factions: FactionAssignment[] = Array.isArray(input.factions)
+    ? (input.factions as FactionAssignment[])
     : [];
   const projectiles: ProjectileState[] = Array.isArray(input.projectiles)
     ? (input.projectiles as ProjectileState[])
     : [];
-  const wrecks: WreckState[] = Array.isArray(input.wrecks) ? (input.wrecks as WreckState[]) : [];
+  const wrecks: WreckState[] = Array.isArray(input.wrecks)
+    ? (input.wrecks as WreckState[])
+    : [];
   const players: PlayerId[] = Array.isArray(input.players)
     ? input.players.filter((player): player is number => typeof player === 'number')
     : [];
@@ -1231,6 +1458,24 @@ export function payloadToWorld(input: unknown): WorldState | null {
     }
   }
 
+  let lastCommandOutcome: CommandOutcome | null = null;
+  if (isRecord(input.lastCommandOutcome)) {
+    const outcome = input.lastCommandOutcome;
+    if (
+      typeof outcome.tick === 'number' &&
+      typeof outcome.kind === 'string' &&
+      typeof outcome.ok === 'boolean' &&
+      typeof outcome.reason === 'string'
+    ) {
+      lastCommandOutcome = {
+        tick: outcome.tick,
+        kind: outcome.kind,
+        ok: outcome.ok,
+        reason: outcome.reason,
+      };
+    }
+  }
+
   return {
     tick,
     seed,
@@ -1238,11 +1483,21 @@ export function payloadToWorld(input: unknown): WorldState | null {
     counter,
     nextId,
     players,
+    factions,
     map,
     unitTypes,
+    structureTypes,
     units,
+    structures,
+    deposits,
+    pendingKits,
+    dropQueue,
+    dropBeams,
+    alerts,
+    resources,
     projectiles,
     wrecks,
+    lastCommandOutcome,
     result,
   };
 }

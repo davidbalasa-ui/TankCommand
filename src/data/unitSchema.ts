@@ -38,6 +38,9 @@ export const unitRowSchema = z
     abilities: z.array(z.string()),
     upgrades: z.array(z.enum(['fireRate', 'armor', 'stealth'])),
     carryCapacity: z.number().int().nonnegative().optional(),
+    workerKind: z.enum(['oreMiner', 'tug']).optional(),
+    miningRatePerSec: z.number().positive().optional(),
+    salvageRefundPercent: z.number().min(0).max(100).optional(),
     modelAssetId: z.string(),
     source: z.object({
       kind: z.enum(['placeholder', 'video', 'manual', 'tuned']),
@@ -57,6 +60,20 @@ export const unitRowSchema = z
         code: z.ZodIssueCode.custom,
         path: ['carryCapacity'],
         message: 'carryCapacity is required for workers',
+      });
+    }
+    if (row.workerKind && row.carryCapacity === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['carryCapacity'],
+        message: 'carryCapacity is required for worker units',
+      });
+    }
+    if (row.workerKind === 'oreMiner' && row.miningRatePerSec === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['miningRatePerSec'],
+        message: 'miningRatePerSec is required for ore miners',
       });
     }
     if (row.source.kind !== 'placeholder' && !row.source.ref) {

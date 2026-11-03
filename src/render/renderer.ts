@@ -4,7 +4,7 @@ import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
 import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
-import type { UnitState, WorldState } from '../sim/types';
+import type { SimStructureType, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
   QualityController,
@@ -39,6 +39,13 @@ const MAX_FRAME_SAMPLE_MS = 2000;
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
 const ORDER_LINE_COLOR = 0x8fd3ff;
 const ORDER_LINE_Y = 0.18;
+const FRIENDLY_STRUCTURE_COLOR = 0x6b8f3a;
+const ENEMY_STRUCTURE_COLOR = 0x8a3a3a;
+const ORE_DEPOSIT_COLOR = 0xd4a540;
+const METAL_DEPOSIT_COLOR = 0x9aa4b0;
+const DROP_BEAM_COLOR = 0x9adfff;
+const PLACEMENT_VALID_COLOR = 0x6cf58a;
+const PLACEMENT_INVALID_COLOR = 0xff5c5c;
 
 export interface RenderStats {
   loadedModels: string[];
@@ -86,6 +93,11 @@ interface Flash {
 interface HealthBar {
   outer: HTMLDivElement;
   fill: HTMLDivElement;
+}
+
+interface StructureVisual {
+  mesh: THREE.Mesh;
+  height: number;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -215,6 +227,9 @@ export class RenderView {
   private readonly overlay: HTMLDivElement;
   private readonly healthBars = new Map<number, HealthBar>();
   private readonly unitRoots = new Map<number, UnitVisual>();
+  private readonly structureVisuals = new Map<number, StructureVisual>();
+  private readonly depositMeshes = new Map<number, THREE.Mesh>();
+  private readonly beamPool: THREE.Mesh[] = [];
   private readonly selectionRings = new Map<number, THREE.Mesh>();
   private readonly projectileMeshes = new Map<number, THREE.Mesh>();
   private readonly projectilePositions = new Map<number, { x: number; y: number; z: number }>();
@@ -236,6 +251,8 @@ export class RenderView {
   private lightTarget: THREE.Object3D;
   private marker: THREE.Mesh | null = null;
   private markerTtl = 0;
+  private placementGhost: THREE.Mesh | null = null;
+  private placementType: SimStructureType | null = null;
   private world: WorldState;
   private lastTick = -1;
   private lastRenderAt = 0;
@@ -356,10 +373,6 @@ export class RenderView {
     return { x: first.point.x, z: first.point.z };
   }
 
-  /**
-   * The four ground points under the corners of the view, in world space. The
-   * minimap draws this as the camera footprint.
-   */
   cameraFootprint(): Array<{ x: number; z: number }> {
     if (this.pickTargets.length === 0) {
       return [];
@@ -535,6 +548,47 @@ export class RenderView {
     return result;
   }
 
+  showPlacement(structureTypeId: string, x: number, z: number, valid: boolean): void {
+    const type = this.world.structureTypes.get(structureTypeId);
+    if (!type) {
+      return;
+    }
+    this.placementType = type;
+    const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize;
+    const height = type.kind === 'pad' ? 1.2 : 2.4;
+    const groundY = heightAt(this.world.map, x, z);
+    if (!this.placementGhost) {
+      const geometry = new THREE.BoxGeometry(size, height, size);
+      const material = new THREE.MeshBasicMaterial({
+        color: PLACEMENT_VALID_COLOR,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+      });
+      this.placementGhost = new THREE.Mesh(geometry, material);
+      this.scene.add(this.placementGhost);
+    }
+    this.placementGhost.position.set(x, groundY + height / 2, z);
+    const material = this.placementGhost.material;
+    if (material instanceof THREE.MeshBasicMaterial) {
+      material.color.setHex(valid ? PLACEMENT_VALID_COLOR : PLACEMENT_INVALID_COLOR);
+    }
+  }
+
+  clearPlacement(): void {
+    this.placementType = null;
+    if (!this.placementGhost) {
+      return;
+    }
+    this.scene.remove(this.placementGhost);
+    this.placementGhost.geometry.dispose();
+    const material = this.placementGhost.material;
+    if (material instanceof THREE.Material) {
+      material.dispose();
+    }
+    this.placementGhost = null;
+  }
+
   render(alpha: number, world: WorldState): void {
     this.world = world;
     this.updateQuality();
@@ -542,6 +596,9 @@ export class RenderView {
     this.applyCamera();
     this.updateLight();
     this.syncUnits(alpha);
+    this.syncStructures(world);
+    this.syncDeposits(world);
+    this.syncDropBeams(world);
     this.syncProjectiles();
     this.syncWrecks();
     this.syncSelection();
@@ -576,6 +633,7 @@ export class RenderView {
     this.disposed = true;
     this.observer.disconnect();
     this.overlay.remove();
+    this.clearPlacement();
     this.skyTexture?.dispose();
     this.loader.release(TANK_ASSET_ID);
     this.renderer.dispose();
@@ -814,10 +872,6 @@ export class RenderView {
     const meadow = new THREE.Color(0x82904c);
     const tan = new THREE.Color(0xb79b69);
     const rock = new THREE.Color(0x93938f);
-    // Impassable slopes. This used to be 0x2a2a29, which under flat shading and
-    // the near-horizontal sun read as a pure black bar across the map at
-    // strategic zoom (see wp03-2). A mid grey-brown keeps cliffs clearly darker
-    // and distinctly not-grass while still looking like rock.
     const blockedRock = new THREE.Color(0x60594d);
 
     for (let iz = 0; iz <= map.rows; iz += 1) {
@@ -1077,6 +1131,128 @@ export class RenderView {
     }
   }
 
+  private syncStructures(world: WorldState): void {
+    const alive = new Set<number>();
+    for (const structure of world.structures) {
+      if (structure.hp <= 0) {
+        continue;
+      }
+      const type = world.structureTypes.get(structure.typeId);
+      if (!type) {
+        continue;
+      }
+      alive.add(structure.id);
+      let visual = this.structureVisuals.get(structure.id);
+      if (!visual) {
+        const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize;
+        const height = type.kind === 'pad' ? 1.2 : 2.4;
+        const geometry = new THREE.BoxGeometry(size, height, size);
+        const material = new THREE.MeshStandardMaterial({
+          color: structure.owner === 1 ? FRIENDLY_STRUCTURE_COLOR : ENEMY_STRUCTURE_COLOR,
+          roughness: 0.8,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        this.scene.add(mesh);
+        visual = { mesh, height };
+        this.structureVisuals.set(structure.id, visual);
+      }
+      visual.mesh.position.set(
+        structure.x,
+        heightAt(world.map, structure.x, structure.z) + visual.height / 2,
+        structure.z,
+      );
+    }
+    for (const [id, visual] of this.structureVisuals) {
+      if (!alive.has(id)) {
+        this.scene.remove(visual.mesh);
+        visual.mesh.geometry.dispose();
+        const material = visual.mesh.material;
+        if (material instanceof THREE.Material) {
+          material.dispose();
+        }
+        this.structureVisuals.delete(id);
+      }
+    }
+  }
+
+  private syncDeposits(world: WorldState): void {
+    const alive = new Set<number>();
+    for (const deposit of world.deposits) {
+      if (deposit.amount <= 0) {
+        continue;
+      }
+      alive.add(deposit.id);
+      if (this.depositMeshes.has(deposit.id)) {
+        continue;
+      }
+      const geometry = new THREE.CylinderGeometry(1.2, 1.2, 0.4, 10);
+      const material = new THREE.MeshStandardMaterial({
+        color: deposit.kind === 'ore' ? ORE_DEPOSIT_COLOR : METAL_DEPOSIT_COLOR,
+        roughness: 0.6,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(
+        deposit.x,
+        heightAt(world.map, deposit.x, deposit.z) + 0.2,
+        deposit.z,
+      );
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this.depositMeshes.set(deposit.id, mesh);
+    }
+    for (const [id, mesh] of this.depositMeshes) {
+      if (!alive.has(id)) {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        const material = mesh.material;
+        if (material instanceof THREE.Material) {
+          material.dispose();
+        }
+        this.depositMeshes.delete(id);
+      }
+    }
+  }
+
+  private syncDropBeams(world: WorldState): void {
+    while (this.beamPool.length < world.dropBeams.length) {
+      const geometry = new THREE.CylinderGeometry(1.5, 1.5, 20, 10);
+      const material = new THREE.MeshBasicMaterial({
+        color: DROP_BEAM_COLOR,
+        transparent: true,
+        opacity: 0.6,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      this.scene.add(mesh);
+      this.beamPool.push(mesh);
+    }
+    while (this.beamPool.length > world.dropBeams.length) {
+      const mesh = this.beamPool.pop();
+      if (!mesh) {
+        continue;
+      }
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      const material = mesh.material;
+      if (material instanceof THREE.Material) {
+        material.dispose();
+      }
+    }
+    for (let index = 0; index < world.dropBeams.length; index += 1) {
+      const beam = world.dropBeams[index];
+      const mesh = this.beamPool[index];
+      if (!beam || !mesh) {
+        continue;
+      }
+      mesh.position.set(beam.x, heightAt(world.map, beam.x, beam.z) + 10, beam.z);
+      const material = mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = Math.min(0.6, Math.max(0, beam.ttl));
+      }
+    }
+  }
+
   private syncSelection(): void {
     const selected = new Set(this.selection);
     for (const [id, ring] of this.selectionRings) {
@@ -1332,5 +1508,9 @@ export class RenderView {
       this.scene.remove(this.marker);
       this.marker = null;
     }
+  }
+
+  private placementGhostType(): SimStructureType | null {
+    return this.placementType;
   }
 }

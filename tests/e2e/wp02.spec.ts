@@ -2,6 +2,7 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import {
   countDistinctPngColors,
   enterGame,
+  winSkirmish,
   type GroundPick,
   type IssuedCommand,
   type TestCamera,
@@ -32,11 +33,6 @@ async function orderAt(page: Page, x: number, y: number, touch: boolean): Promis
   }
 }
 
-/**
- * The camera hook applies the new view synchronously (`applyCamera` updates the
- * camera matrices), so `worldToScreen` and the pick raycast are already valid on
- * the next evaluate — no settle time is needed between them.
- */
 async function setCamera(page: Page, info: Partial<TestCamera>): Promise<void> {
   await page.evaluate((camera) => {
     window.__TC_TEST__?.setCamera(camera);
@@ -53,12 +49,6 @@ async function camera(page: Page): Promise<TestCamera> {
   });
 }
 
-/**
- * Presses a registered HUD control by dispatching a real `click` on the button
- * inside the page. `locator.click()` first runs Playwright's actionability
- * checks, whose latency can be hundreds of milliseconds on a loaded runner and
- * is not part of anything under test.
- */
 async function pressControl(page: Page, controlId: string): Promise<void> {
   await page
     .locator(`[data-control-id="${controlId}"]`)
@@ -72,21 +62,6 @@ async function pressControl(page: Page, controlId: string): Promise<void> {
 
 type CanvasAction = 'left' | 'right' | 'touch';
 
-/**
- * Delivers one complete press/release on the canvas in a single task, exactly
- * like a real finger or mouse button, and returns the ground point the input
- * layer resolved for it.
- *
- * The down and the up happen in the same task, so no wall-clock gap elapses
- * between them — a slow runner cannot turn a tap into a long-press (which would
- * box-select instead of acting), and `lastGroundPick()` is read in that same
- * task so the assertion can never accidentally observe the pick left behind by
- * an earlier sample.
- *
- * `document.querySelector('canvas')` deliberately targets the game canvas: the
- * in-game screen appends it before it builds the HUD, so it is the first canvas
- * in document order.
- */
 async function pressCanvas(
   page: Page,
   x: number,
@@ -125,10 +100,6 @@ async function pressCanvas(
   );
 }
 
-/**
- * Waits until at least one fixed step has run since the order was issued and then
- * freezes the sim, so the order can be read without racing the unit's arrival.
- */
 async function freezeAfterNextStep(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const hook = window.__TC_TEST__;
@@ -150,15 +121,6 @@ interface TouchStep {
   y: number;
 }
 
-/**
- * Delivers one complete touch gesture in a single task.
- *
- * The events of a real gesture arrive back to back; dispatching them through
- * separate `page.evaluate` round trips inserts an uncontrolled amount of wall
- * clock time between them, which on a loaded runner can exceed the 400 ms
- * long-press threshold — turning a two-frame drag into a long-press box-select
- * and making a camera test fail purely because the machine was busy.
- */
 async function dispatchTouch(page: Page, steps: readonly TouchStep[]): Promise<void> {
   await page.evaluate((events) => {
     const canvas = document.querySelector('canvas');
@@ -192,15 +154,6 @@ interface LocatedPoint {
   screen: { x: number; y: number };
 }
 
-/**
- * Finds a world point near `origin`, visible at the given camera framing and at
- * least `minClearance` screen pixels from every unit's pick centre, and returns
- * it along with its screen position. If `origin` is too close to a unit (or off
- * screen), a spiral of small offsets is tried — this is what "nudge the sample
- * point and record the actual point used" means in practice. The test asserts
- * against the returned `world`, so the recorded point is exactly what was
- * pressed.
- */
 async function findSafeSample(
   page: Page,
   origin: OriginPoint,
@@ -266,8 +219,8 @@ const ORIGIN_POINTS: readonly OriginPoint[] = [
   { x: -68, z: -58 },
   { x: -58, z: -68 },
   { x: -64, z: -64 },
-  { x: 74, z: 74 }, // 8.5 units from the (80, 80) corner
-  { x: -74, z: 74 }, // 8.5 units from the (-80, 80) corner
+  { x: 74, z: 74 },
+  { x: -74, z: 74 },
 ];
 
 const SAMPLE_CAMERAS = [
@@ -285,9 +238,6 @@ test('[INP-01] ground picks land at the picked point at every zoom and near the 
   const pickRadius = touch ? 36 : 24;
   const minClearance = pickRadius + 10;
 
-  // No orders are issued in this test, so tanks never move: every sample sees
-  // the same unit positions and the clearance from a point to a unit's pick
-  // centre is stable across zoom settings.
   await pressControl(page, 'inGame.deselect');
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
@@ -341,9 +291,6 @@ test('[INP-01] a right-click issues a move whose target is the picked ground poi
     return;
   }
 
-  // The sim is paused for the whole order exercise, so neither the tank nor
-  // anything else moves between selecting the tank, pressing the ground, and
-  // reading the command. No order-derived drive time can race the assertion.
   await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
 
   await setCamera(page, { targetX: unit.x, targetZ: unit.z, distance: 60, yaw: 0 });
@@ -360,11 +307,6 @@ test('[INP-01] a right-click issues a move whose target is the picked ground poi
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.selection() ?? []))
     .toContain(unit.id);
 
-  // A destination inside the flat disc around the player start. `generateMap`
-  // flattens that disc to height 0 out to radius 14, so the sim accepts the
-  // destination verbatim — no nearest-reachable redirect applies. The search
-  // also keeps the point well clear of every unit so the press is ground, not
-  // a unit pick.
   await setCamera(page, { targetX: -50, targetZ: -50, distance: 60, yaw: 0 });
   const orderPoint = await page.evaluate(
     (tanks) => {
@@ -446,10 +388,6 @@ test('[INP-02] box selection selects exactly the own tanks in the box', async ({
   const own = (await units(page)).filter((unit) => unit.owner === 1);
   expect(own.length).toBe(4);
 
-  // The box is built from the same screen point that clicking a tank tests
-  // (`unitScreenCentre`), because box selection and click selection must agree
-  // on where a tank is; `worldToScreen` returns the ground base, a model-height
-  // lower, and a tight box around it can miss the tank's pick centre.
   const screens = await page.evaluate(
     (ids) =>
       ids
@@ -557,15 +495,6 @@ test('[INP-03] clicking an enemy with a selection lowers its HP', async ({ page 
 });
 
 test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }, testInfo) => {
-  // Frame-driven rather than sleep-driven. Every gesture is released as soon as
-  // the camera has actually moved (or, for touch, because the handlers mutate
-  // the camera synchronously), so the cost is one protocol round trip per
-  // rendered frame instead of a fixed 350 ms wait that may not contain a frame
-  // at all. On the CI desktop runner (ubuntu-latest, 2 vCPU, SwiftShader at
-  // 1920x1080) a round trip is gated by a frame of up to ~1.2 s — the previous
-  // fixed-sleep version needed 31.2 s for ~25 round trips — so the ~18 round
-  // trips and three poll windows below need up to ~60 s. 90 s covers that with
-  // headroom and still fails a genuine hang.
   test.setTimeout(90_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
@@ -582,8 +511,6 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
       Math.hypot(panned.targetX - start.targetX, panned.targetZ - start.targetZ),
     ).toBeGreaterThan(0.1);
 
-    // Panning leaves the zoom distance untouched, so `panned` is the baseline
-    // for the pinch without another round trip.
     await dispatchTouch(page, [
       { type: 'pointerdown', id: 2, x: 350, y: 300 },
       { type: 'pointerdown', id: 3, x: 450, y: 300 },
@@ -595,8 +522,6 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
     const zoomed = await camera(page);
     expect(Math.abs(zoomed.distance - panned.distance)).toBeGreaterThan(0.1);
 
-    // Pinching here is a pure scale change (the two fingers stay level), so the
-    // yaw baseline is `zoomed`.
     await dispatchTouch(page, [
       { type: 'pointerdown', id: 4, x: 350, y: 300 },
       { type: 'pointerdown', id: 5, x: 450, y: 300 },
@@ -665,8 +590,6 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
     return;
   }
 
-  // Pushed hard into the west edge: at yaw 0 `a` pans along -x, so the target
-  // must clamp and stop exactly on the -80 border.
   await page.keyboard.down('a');
   await page.keyboard.down('w');
   await expect
@@ -747,39 +670,29 @@ test('[INP-05] HUD button presses never issue map orders', async ({ page }, test
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
 });
 
-test('[PLAY-01] full skirmish flow reaches results and Play again starts a fresh 4v4', async ({
+test('[PLAY-01] full skirmish flow reaches results and Play again starts a fresh skirmish', async ({
   page,
 }) => {
-  // The spec allows up to 90 s of real time for the battle to resolve; the
-  // project default (30 s) would kill the assertion before its own timeout.
+  // WP-04 replaces the WP-02 win condition (all enemy units dead) with full
+  // skirmish elimination: every enemy pad and every fighting unit must die. The
+  // `winSkirmish` helper is the shared, WP-04-aware flow that buys extra scouts
+  // and attacks the pad plus every fighting unit in turn; using it here (instead
+  // of the old "issue one attack order and wait") keeps the test honest against
+  // the spec and reuses one implementation across packages.
   test.setTimeout(180_000);
   await enterGame(page);
-  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
-  await page.evaluate(() => {
-    const hook = window.__TC_TEST__;
-    if (!hook) {
-      return;
-    }
-    const current = hook.units();
-    const own = current.filter((unit) => unit.owner === 1).map((unit) => unit.id);
-    const enemy = current.find((unit) => unit.owner === 2);
-    if (!enemy) {
-      return;
-    }
-    hook.sendCommand({
-      kind: 'attack',
-      unitIds: own,
-      targetId: enemy.id,
-      tick: hook.snapshot().tick + 1,
-      issuer: 1,
-    });
-  });
-  await expect(page.locator('[data-screen-id="results"]')).toBeVisible({ timeout: 90_000 });
+  await winSkirmish(page);
   const heading = await page.locator('[data-screen-id="results"] h1').textContent();
   expect(['Victory', 'Defeat', 'Draw']).toContain(heading ?? '');
   await page.getByRole('button', { name: 'Play again', exact: true }).click();
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  // Eight units total after a fresh skirmish (four per side). `renderStats` /
+  // `units()` expose every live unit, own and enemy.
   await expect.poll(async () => (await units(page)).length).toBe(8);
+  const ownPads = await page.evaluate(
+    () => window.__TC_TEST__?.structures().filter((s) => s.owner === 1 && s.kind === 'pad').length ?? 0,
+  );
+  expect(ownPads).toBe(1);
 });
 
 interface OrderCandidate {
@@ -835,6 +748,8 @@ test('[PLAY-02] drag-select then right-click a visible ground point moves every 
 }) => {
   test.setTimeout(180_000);
   await enterGame(page);
+  // `renderStats().units` is the number of visible unit roots, i.e. all units on
+  // both sides. A fresh skirmish has four own and four enemy units.
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().units ?? 0))
     .toBe(8);
@@ -955,8 +870,6 @@ test('[VIS-01] in-game screenshot is non-blank, colourful and shows eight units'
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().units ?? 0))
     .toBe(8);
-  // The minimap is a second canvas on screen; the 3D surface is the one with the
-  // `game-canvas` class.
   const canvas = page.locator('canvas.game-canvas');
   const screenshot = await canvas.screenshot();
   expect(countDistinctPngColors(screenshot)).toBeGreaterThan(20);
