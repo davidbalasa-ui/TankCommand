@@ -41,6 +41,7 @@ export class RtsCamera {
   private aspect = 16 / 9;
   private fovDeg = CAMERA_FOV_DEG;
   private viewportSet = false;
+  private sensitivity = 1;
 
   constructor(mapSize: number) {
     this.mapSize = mapSize;
@@ -101,18 +102,26 @@ export class RtsCamera {
     this.distance = clamp(distance, CAMERA_MIN_DISTANCE, this.maxDistance);
   }
 
+  /**
+   * Player's camera sensitivity setting: scales rotation and zoom gestures.
+   * Panning is left alone so the ground stays under the dragging finger.
+   */
+  setSensitivity(value: number): void {
+    this.sensitivity = Number.isFinite(value) && value > 0 ? value : 1;
+  }
+
   zoomBy(factor: number): void {
     if (!Number.isFinite(factor) || factor <= 0) {
       return;
     }
-    this.setDistance(this.distance * factor);
+    this.setDistance(this.distance * Math.pow(factor, this.sensitivity));
   }
 
   rotate(delta: number): void {
     if (!Number.isFinite(delta)) {
       return;
     }
-    this.yaw += delta;
+    this.yaw += delta * this.sensitivity;
     while (this.yaw > Math.PI) {
       this.yaw -= Math.PI * 2;
     }

@@ -1,6 +1,11 @@
 import { button } from './controls';
 import { Hud } from './hud';
+import { mountBugReport } from './bugReport';
+import { mountSaveSlots } from './saveSlots';
+import { mountSettings } from './settingsScreen';
+import { mountSpeedButton } from './speedButton';
 import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
+import { SIM_SPEED_FAST, SIM_SPEED_NORMAL, SIM_SPEED_SLOW } from '../sim/tuning';
 import { SIM_TICK_HZ } from '../sim/constants';
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
@@ -54,6 +59,25 @@ function formatClock(seconds: number): string {
 export function createScreens(): Record<ScreenId, ScreenModule> {
   const screens: Record<ScreenId, ScreenModule> = {
     title: makeScreen('title', 'TankCommand', (root, ctx) => {
+      if (ctx.api) {
+        const resume = button('title', 'resume', 'Resume last game', () => {
+          void ctx.api?.resumeLastGame();
+        });
+        resume.style.display = 'none';
+        root.append(resume);
+        void ctx.api
+          .latestAutosave()
+          .then((latest) => {
+            if (latest) {
+              resume.style.display = '';
+            } else {
+              resume.remove();
+            }
+          })
+          .catch(() => {
+            resume.remove();
+          });
+      }
       addButton(root, 'title', 'campaign', 'Campaign', () => {
         ctx.go('campaignSelect');
       });
@@ -178,6 +202,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.registerHud?.(hud);
       }
 
+      const disposeSpeedButton = mountSpeedButton(root, ctx.api);
+
       let disposed = false;
       let handle: RendererHandle | null = null;
       let resultShown = false;
@@ -228,36 +254,85 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.registerHud?.(null);
         hud?.dispose();
         handle?.dispose();
+        disposeSpeedButton();
       };
     }),
 
+    // The pause menu has more controls than fit in a 412 px-tall phone viewport
+    // as a single column, and the page-wide `touch-action: none` (TCH-04) means
+    // the player cannot scroll to reach a control that is below the fold. Two
+    // columns put every button on screen at 915x412; the quit confirmation is a
+    // single inline row so it fits under the grid.
     pause: makeScreen('pause', 'Paused', (root, ctx) => {
       ctx.pauseSim(true);
-      addButton(root, 'pause', 'resume', 'Resume', () => {
+      const grid = document.createElement('div');
+      grid.className = 'pause-grid';
+      root.append(grid);
+      const add = (name: string, label: string, onClick: () => void): void => {
+        grid.append(button('pause', name, label, onClick));
+      };
+
+      add('resume', 'Resume', () => {
         ctx.router.back();
       });
-      addButton(root, 'pause', 'settings', 'Settings', () => {
+      add('save', 'Save game', () => {
+        ctx.go('saveSlots');
+      });
+      add('load', 'Load game', () => {
+        ctx.go('saveSlots');
+      });
+      add('settings', 'Settings', () => {
         ctx.go('settings');
       });
-      addButton(root, 'pause', 'bugReport', 'Report bug', () => {
+      add('bugReport', 'Report bug', () => {
         ctx.go('bugReport');
       });
-      addButton(root, 'pause', 'quit', 'Quit to title', () => {
-        ctx.go('title');
+      add('speedSlow', 'Speed slow', () => {
+        ctx.api?.setSpeedMultiplier(SIM_SPEED_SLOW);
+      });
+      add('speedNormal', 'Speed normal', () => {
+        ctx.api?.setSpeedMultiplier(SIM_SPEED_NORMAL);
+      });
+      add('speedFast', 'Speed fast', () => {
+        ctx.api?.setSpeedMultiplier(SIM_SPEED_FAST);
+      });
+
+      let confirmPanel: HTMLDivElement | null = null;
+      add('quit', 'Quit to title', () => {
+        if (confirmPanel) {
+          return;
+        }
+        confirmPanel = document.createElement('div');
+        confirmPanel.className = 'pause-confirm';
+        const text = document.createElement('p');
+        text.textContent = 'Quit this mission? Save before leaving?';
+        const actions = document.createElement('div');
+        actions.className = 'pause-confirm-actions';
+        const saveQuit = button('pause', 'confirmSaveQuit', 'Save & quit', () => {
+          void (async () => {
+            await ctx.api?.saveToSlot('manual-1');
+            ctx.go('title');
+          })();
+        });
+        const quit = button('pause', 'confirmQuit', 'Quit without saving', () => {
+          ctx.go('title');
+        });
+        const cancel = button('pause', 'cancelQuit', 'Cancel', () => {
+          confirmPanel?.remove();
+          confirmPanel = null;
+        });
+        actions.append(saveQuit, quit, cancel);
+        confirmPanel.append(text, actions);
+        root.append(confirmPanel);
       });
       return () => {
+        confirmPanel?.remove();
+        confirmPanel = null;
         ctx.pauseSim(false);
       };
     }),
 
-    settings: makeScreen('settings', 'Settings', (root, ctx) => {
-      addButton(root, 'settings', 'leftHanded', 'Left-handed layout', () => {
-        ctx.setLeftHanded?.(!(ctx.isLeftHanded?.() ?? false));
-      });
-      addButton(root, 'settings', 'back', 'Back', () => {
-        ctx.router.back();
-      });
-    }),
+    settings: makeScreen('settings', 'Settings', (root, ctx) => mountSettings(root, ctx)),
 
     help: makeScreen('help', 'Help', (root, ctx) => {
       addButton(root, 'help', 'back', 'Back', () => {
@@ -327,11 +402,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       };
     }),
 
-    bugReport: makeScreen('bugReport', 'Report Bug', (root, ctx) => {
-      addButton(root, 'bugReport', 'back', 'Back', () => {
-        ctx.router.back();
-      });
-    }),
+    bugReport: makeScreen('bugReport', 'Report Bug', (root, ctx) => mountBugReport(root, ctx)),
+
+    saveSlots: makeScreen('saveSlots', 'Save / Load', (root, ctx) => mountSaveSlots(root, ctx)),
 
     recovery: makeScreen('recovery', 'Recovery', (root) => {
       addButton(root, 'recovery', 'resume', 'Resume', () => {

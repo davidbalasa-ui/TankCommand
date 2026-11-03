@@ -93,6 +93,18 @@
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
+| GAME-01 | Pause stops the sim tick and refuses orders; backgrounding and the back button auto-pause. |
+| GAME-02 | Speed settings change the sim rate by the stated multipliers. |
+| SAVE-06 | Manual save/load in 5 slots restores an identical world hash. |
+| SAVE-07 | Autosave rotation survives relaunch and never overwrites the newest autosave first. |
+| SAVE-08 | Load returns typed results; corrupt and incompatible saves show a clear message and never crash. |
+| SAVE-09 | Resume-last-game offered on start when an autosave exists; quit asks to save. |
+| SAVE-10 | Web export/import round-trips a save; storage-full shows a message. |
+| SET-01 | Every setting persists across reload and takes effect immediately. |
+| AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
+| AUD-02 | No audio starts before the first user gesture. |
+| ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
+| BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
 | ECO-03 | Metal is credited only when a tug delivers a container to a pad; killing the tug loses the load. |
