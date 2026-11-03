@@ -24,8 +24,21 @@ export interface LoadedSave {
   meta: SaveMeta;
 }
 
+export type LoadSaveResult =
+  | { status: 'ok'; save: LoadedSave }
+  | { status: 'missing' }
+  | { status: 'corrupt' }
+  | { status: 'incompatible' };
+
+export type ImportSaveResult =
+  | { status: 'ok'; save: LoadedSave }
+  | { status: 'invalid' }
+  | { status: 'incompatible' };
+
 export const CURRENT_SAVE_SCHEMA = 1;
 export const migrations: Record<number, (payload: unknown) => unknown> = {};
+
+const AUTO_CURSOR_KEY = 'saveMeta:autoCursor';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -151,16 +164,24 @@ export class SaveManager {
     this.totalBytes = this.totalBytes - previous + size;
   }
 
-  async load(slot: string): Promise<LoadedSave | null> {
+  async load(slot: string): Promise<LoadSaveResult> {
     const text = await this.kv.get(this.key(slot));
     if (text === null) {
-      return null;
+      return { status: 'missing' };
     }
     const decoded = decodeSave(text);
     if (!decoded.ok) {
-      throw new Error(`Cannot load save "${slot}": ${decoded.reason}`);
+      return decoded.reason === 'incompatible'
+        ? { status: 'incompatible' }
+        : { status: 'corrupt' };
     }
-    return { world: decoded.world, meta: decoded.meta };
+    return {
+      status: 'ok',
+      save: {
+        world: decoded.world,
+        meta: decoded.meta,
+      },
+    };
   }
 
   async listSlots(): Promise<string[]> {
@@ -177,30 +198,60 @@ export class SaveManager {
     await this.save(slot, world);
     this.lastAutoSlot = slot;
     this.autoCursor = (this.autoCursor + 1) % 3;
+    await this.kv.set(AUTO_CURSOR_KEY, String(this.autoCursor));
   }
 
-  async latestAutosave(): Promise<LoadedSave | null> {
+  async latestAutosaveSlot(): Promise<string | null> {
     await this.ensureLoaded();
     const slots = (await this.listSlots()).filter((slot) => slot.startsWith('auto-'));
-    const first = slots[0];
-    if (!first) {
+    if (slots.length === 0) {
       return null;
     }
 
     if (this.lastAutoSlot && slots.includes(this.lastAutoSlot)) {
-      return this.load(this.lastAutoSlot);
+      return this.lastAutoSlot;
     }
 
-    let latestSlot = first;
+    let latestSlot: string | null = null;
     let latestIso = '';
     for (const slot of slots) {
       const loaded = await this.load(slot);
-      if (loaded && loaded.meta.savedAtIso > latestIso) {
-        latestIso = loaded.meta.savedAtIso;
+      if (loaded.status !== 'ok') {
+        continue;
+      }
+      if (loaded.save.meta.savedAtIso > latestIso) {
+        latestIso = loaded.save.meta.savedAtIso;
         latestSlot = slot;
       }
     }
-    return this.load(latestSlot);
+    return latestSlot;
+  }
+
+  async latestAutosave(): Promise<LoadedSave | null> {
+    const slot = await this.latestAutosaveSlot();
+    if (!slot) {
+      return null;
+    }
+    const loaded = await this.load(slot);
+    return loaded.status === 'ok' ? loaded.save : null;
+  }
+
+  async exportSlot(slot: string): Promise<string | null> {
+    return this.kv.get(this.key(slot));
+  }
+
+  async importText(slot: string, text: string): Promise<ImportSaveResult> {
+    const decoded = decodeSave(text);
+    if (!decoded.ok) {
+      return decoded.reason === 'incompatible'
+        ? { status: 'incompatible' }
+        : { status: 'invalid' };
+    }
+    await this.save(slot, decoded.world);
+    return {
+      status: 'ok',
+      save: { world: decoded.world, meta: decoded.meta },
+    };
   }
 
   private key(slot: string): string {
@@ -221,6 +272,13 @@ export class SaveManager {
         const size = byteLength(text);
         this.bytes.set(key, size);
         this.totalBytes += size;
+      }
+    }
+    const cursorText = await this.kv.get(AUTO_CURSOR_KEY);
+    if (cursorText !== null) {
+      const cursor = Number(cursorText);
+      if (Number.isInteger(cursor) && cursor >= 0 && cursor < 3) {
+        this.autoCursor = cursor;
       }
     }
   }

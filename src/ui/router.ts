@@ -1,4 +1,5 @@
 import type { WorldState } from '../sim/types';
+import type { GameApi } from '../game/api';
 
 export type ScreenId =
   | 'title'
@@ -15,6 +16,7 @@ export type ScreenId =
   | 'results'
   | 'credits'
   | 'bugReport'
+  | 'saveSlots'
   | 'recovery';
 
 export interface RendererHandle {
@@ -52,6 +54,7 @@ export interface HudHandle {
 
 export interface ScreenContext {
   router: ScreenRouter;
+  api?: GameApi;
   go: (id: ScreenId) => void;
   pauseSim: (paused: boolean) => void;
   attachRenderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
@@ -88,7 +91,14 @@ interface MountedScreen {
   unmount: () => void;
 }
 
-const OVERLAY_IDS = new Set<ScreenId>(['pause', 'objectives', 'help', 'recovery', 'bugReport']);
+const OVERLAY_IDS = new Set<ScreenId>([
+  'pause',
+  'objectives',
+  'help',
+  'recovery',
+  'bugReport',
+  'saveSlots',
+]);
 
 const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help'],
@@ -97,14 +107,15 @@ const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   briefing: ['missionSelect', 'loading'],
   skirmishSetup: ['title', 'loading'],
   loading: ['inGame', 'title'],
-  inGame: ['pause', 'objectives', 'help', 'bugReport', 'recovery', 'results', 'title'],
-  pause: ['settings', 'bugReport', 'title', 'inGame'],
+  inGame: ['pause', 'objectives', 'help', 'bugReport', 'saveSlots', 'recovery', 'results', 'title'],
+  pause: ['settings', 'bugReport', 'saveSlots', 'title', 'inGame'],
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
   results: ['title', 'missionSelect', 'loading'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
+  saveSlots: ['pause', 'inGame'],
   recovery: ['inGame', 'title'],
 };
 
@@ -120,6 +131,7 @@ const PARENT: Partial<Record<ScreenId, ScreenId>> = {
   results: 'title',
   credits: 'title',
   bugReport: 'inGame',
+  saveSlots: 'pause',
   recovery: 'inGame',
   pause: 'inGame',
 };

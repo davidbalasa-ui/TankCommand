@@ -7,6 +7,7 @@ import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
 import type { UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
+  QUALITY_LADDER,
   QualityController,
   qualityStep,
   qualityViewFor,
@@ -37,8 +38,15 @@ const SHADOW_MAP_SIZE = 1024;
 const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
+const COLORBLIND_ENEMY_TINT = new THREE.Color(0.35, 0.65, 1);
 const ORDER_LINE_COLOR = 0x8fd3ff;
 const ORDER_LINE_Y = 0.18;
+
+const QUALITY_PREFERENCE_LEVEL: Record<'low' | 'medium' | 'high', number> = {
+  high: 0,
+  medium: 2,
+  low: QUALITY_LADDER.length - 1,
+};
 
 export interface RenderStats {
   loadedModels: string[];
@@ -160,10 +168,9 @@ function remapMeshMaterials(
   });
 }
 
-function cloneMaterials(root: THREE.Object3D, enemy: boolean): void {
-  remapMeshMaterials(root, (material) =>
-    cloneWithTint(material, enemy ? ENEMY_TINT : null, false),
-  );
+function cloneMaterials(root: THREE.Object3D, enemy: boolean, colourBlind: boolean): void {
+  const tint = enemy ? (colourBlind ? COLORBLIND_ENEMY_TINT : ENEMY_TINT) : null;
+  remapMeshMaterials(root, (material) => cloneWithTint(material, tint, false));
 }
 
 function darkenMaterials(root: THREE.Object3D): void {
@@ -243,6 +250,9 @@ export class RenderView {
   private shadowsEnabled = true;
   private frame = 0;
   private disposed = false;
+  private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
+  private healthBarsMode: 'damaged' | 'always' = 'damaged';
+  private colorBlind = false;
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
     this.world = world;
@@ -327,7 +337,30 @@ export class RenderView {
   }
 
   quality(): QualityView {
-    return qualityViewFor(this.qualityController.level, this.basePixelRatio);
+    return qualityViewFor(this.effectiveQualityLevel(), this.basePixelRatio);
+  }
+
+  setQualityPreference(preference: 'auto' | 'low' | 'medium' | 'high'): void {
+    if (this.qualityPreference === preference) {
+      return;
+    }
+    this.qualityPreference = preference;
+    if (preference === 'auto') {
+      this.qualityController.reset();
+    }
+    this.applyQuality();
+  }
+
+  setHealthBarsMode(mode: 'damaged' | 'always'): void {
+    this.healthBarsMode = mode;
+  }
+
+  setColorBlindMode(enabled: boolean): void {
+    if (this.colorBlind === enabled) {
+      return;
+    }
+    this.colorBlind = enabled;
+    this.rebuildUnitVisuals();
   }
 
   applyCamera(): void {
@@ -356,10 +389,6 @@ export class RenderView {
     return { x: first.point.x, z: first.point.z };
   }
 
-  /**
-   * The four ground points under the corners of the view, in world space. The
-   * minimap draws this as the camera footprint.
-   */
   cameraFootprint(): Array<{ x: number; z: number }> {
     if (this.pickTargets.length === 0) {
       return [];
@@ -581,7 +610,17 @@ export class RenderView {
     this.renderer.dispose();
   }
 
+  private effectiveQualityLevel(): number {
+    if (this.qualityPreference === 'auto') {
+      return this.qualityController.level;
+    }
+    return QUALITY_PREFERENCE_LEVEL[this.qualityPreference];
+  }
+
   private updateQuality(): void {
+    if (this.qualityPreference !== 'auto') {
+      return;
+    }
     const now = performance.now();
     const previous = this.lastRenderAt;
     this.lastRenderAt = now;
@@ -598,7 +637,7 @@ export class RenderView {
   }
 
   private applyQuality(): void {
-    const level = this.qualityController.level;
+    const level = this.effectiveQualityLevel();
     const view = qualityViewFor(level, this.basePixelRatio);
     const step = qualityStep(level);
 
@@ -814,10 +853,6 @@ export class RenderView {
     const meadow = new THREE.Color(0x82904c);
     const tan = new THREE.Color(0xb79b69);
     const rock = new THREE.Color(0x93938f);
-    // Impassable slopes. This used to be 0x2a2a29, which under flat shading and
-    // the near-horizontal sun read as a pure black bar across the map at
-    // strategic zoom (see wp03-2). A mid grey-brown keeps cliffs clearly darker
-    // and distinctly not-grass while still looking like rock.
     const blockedRock = new THREE.Color(0x60594d);
 
     for (let iz = 0; iz <= map.rows; iz += 1) {
@@ -1028,7 +1063,7 @@ export class RenderView {
     } else {
       root = this.prepareFallback();
     }
-    cloneMaterials(root, unit.owner === 2);
+    cloneMaterials(root, unit.owner === 2, this.colorBlind);
     root.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.castShadow = true;
@@ -1172,7 +1207,7 @@ export class RenderView {
       const type = this.world.unitTypes.get(unit.typeId);
       const maxHp = type?.hp ?? unit.hp;
       const selected = this.selection.includes(unit.id);
-      if (!selected && unit.hp >= maxHp) {
+      if (!selected && this.healthBarsMode === 'damaged' && unit.hp >= maxHp) {
         continue;
       }
       alive.add(unit.id);

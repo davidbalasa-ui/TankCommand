@@ -54,8 +54,6 @@ test('[screens] wp03-3-units-selected-command-bar', async ({ page }, testInfo) =
 test('[screens] wp03-4-groups-open', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   await enterGame(page);
-  // The whole command bar is disabled with no selection, so pick something
-  // first so the Groups button is enabled and the strip can be opened.
   const ids = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
     if (!hook) return [];
@@ -90,4 +88,51 @@ test('[screens] wp03-5-left-handed', async ({ page }, testInfo) => {
     .toBe(true);
   await waitFrames(page, 3);
   await page.screenshot({ path: 'test-results/shots/wp03-5-left-handed.png' });
+});
+
+test('[screens] wp10-1-pause-menu', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  await enterGame(page);
+  await page.locator('[data-control-id="inGame.pause"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('pause');
+  await page.screenshot({ path: 'test-results/shots/wp10-1-pause-menu.png' });
+});
+
+test('[screens] wp10-2-settings', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  await enterGame(page);
+  await page.locator('[data-control-id="inGame.pause"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('pause');
+  await page.locator('[data-control-id="pause.settings"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('settings');
+  await page.screenshot({ path: 'test-results/shots/wp10-2-settings.png' });
+});
+
+test('[screens] wp10-3-save-slots', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  await enterGame(page);
+  await page.locator('[data-control-id="inGame.pause"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('pause');
+  await page.locator('[data-control-id="pause.save"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('saveSlots');
+  await page.screenshot({ path: 'test-results/shots/wp10-3-save-slots.png' });
+});
+
+test('[screens] wp10-4-alert-toast', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  await enterGame(page);
+  await page.evaluate(() => window.__TC_TEST__?.raiseAlert('padLost', 25, -25));
+  await expect(page.locator('.alert-toast')).toBeVisible();
+  await page.screenshot({ path: 'test-results/shots/wp10-4-alert-toast.png' });
+});
+
+test('[screens] wp10-5-bug-report', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  await enterGame(page);
+  await page.locator('[data-control-id="inGame.pause"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('pause');
+  await page.locator('[data-control-id="pause.bugReport"]').tap();
+  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.screen() ?? '')).toBe('bugReport');
+  await page.locator('.bug-text').fill('Sample report for the visual review.');
+  await page.screenshot({ path: 'test-results/shots/wp10-5-bug-report.png' });
 });

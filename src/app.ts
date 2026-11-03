@@ -14,7 +14,7 @@ import {
   type ScreenId,
 } from './ui/router';
 import { InputController, type IssuedCommand } from './ui/input';
-import { createWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
+import { createWorld, hashWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
 import type { PlayerId, SimUnitType, Stance, WorldState } from './sim/types';
 import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
@@ -25,7 +25,21 @@ import {
   type WatchdogReport,
 } from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
+import { pushLog } from './platform/logBuffer';
+import {
+  DEFAULT_SETTINGS,
+  type SettingsState,
+} from './platform/settings';
 import type { RenderStats, RenderView, ScreenBounds } from './render/renderer';
+import type { AlertKind, AlertSnapshot } from './ui/alerts';
+import type { AudioStatusView } from './audio/audio';
+import type {
+  ImportSaveResult,
+  LoadSlotResult,
+  SaveActionResult,
+  SaveSlotSummary,
+} from './game/api';
+import { GameServices } from './game/services';
 
 export type { IssuedCommand } from './ui/input';
 
@@ -88,6 +102,15 @@ function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string
   return result;
 }
 
+/**
+ * A command the player actually issues. Everything except the test/debug
+ * commands counts, so new order kinds from later packages are blocked while
+ * paused without touching this list.
+ */
+function isPlayerOrder(command: Command): boolean {
+  return command.kind !== 'noop' && !command.kind.startsWith('debug.');
+}
+
 export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
@@ -106,15 +129,18 @@ export class App {
   private paused = false;
   private uiPaused = false;
   private lifecyclePaused = false;
+  private lifecyclePauseScreen: ScreenId | null = null;
   private freezeSimUntil = 0;
   private selectedIds: number[] = [];
-  private simSpeed = 1;
+  private simSpeedMultiplier = 1;
   private nextSeed = 1;
   private queueModeValue = false;
   private attackMoveArmedValue = false;
   private leftHandedValue = false;
+  private matchActive = false;
   private readonly controlGroups = new Map<number, number[]>();
   private hud: HudHandle | null = null;
+  private services: GameServices | null = null;
 
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
@@ -147,6 +173,7 @@ export class App {
 
     this.router = new ScreenRouter(root, createScreens(), (router): ScreenContext => ({
       router,
+      api: this.services?.api,
       go: (id) => {
         this.go(id);
       },
@@ -197,6 +224,27 @@ export class App {
         this.hud = hud;
       },
     }));
+
+    this.services = new GameServices({
+      getWorld: () => this.world,
+      loadWorld: (world, startMatch) => {
+        this.loadWorld(world, startMatch);
+      },
+      currentScreen: () => this.router.current(),
+      inMatch: () => this.matchActive,
+      setCameraTarget: (x, z) => {
+        this.setCamera({ targetX: x, targetZ: z });
+      },
+      setSimSpeed: (multiplier) => {
+        this.simSpeedMultiplier = Math.min(8, Math.max(0.5, multiplier));
+      },
+      getSimSpeed: () => this.simSpeedMultiplier,
+      freezeReport: () => this.lastFreeze,
+      applySettings: (settings) => {
+        this.applySettings(settings);
+      },
+    });
+    this.leftHandedValue = this.services.settings().leftHanded;
   }
 
   start(): void {
@@ -204,16 +252,19 @@ export class App {
     this.lifecycle = bindLifecycleToBrowserAndCapacitor();
     this.lifecycle.on('pause', () => {
       this.pauseLifecycle();
+      void this.services?.onBackground();
     });
     this.lifecycle.on('resume', () => {
       this.resumeLifecycle();
     });
     this.lifecycle.on('back', () => {
-      this.router.back();
+      this.handleAndroidBack();
     });
+    this.installAudioUnlock();
     window.addEventListener('keydown', this.onKeyDown);
     installGlobalErrorCapture(window, (error) => {
       console.error(error.message);
+      pushLog('error', `${error.kind}: ${error.message}`);
     });
   }
 
@@ -221,11 +272,19 @@ export class App {
     if (id === 'loading') {
       this.startSkirmish();
     }
+    if (id === 'title' || id === 'results') {
+      this.matchActive = false;
+    }
     this.router.go(id);
+    this.services?.setMatchActive(this.matchActive && id !== 'results');
   }
 
   snapshot(): WorldState {
     return { ...snapshot(this.world) };
+  }
+
+  worldHash(): string {
+    return hashWorld(this.world);
   }
 
   sendCommand(command: unknown): boolean {
@@ -233,10 +292,20 @@ export class App {
     if (!validated) {
       return false;
     }
+    const order = isPlayerOrder(validated);
+    // GAME-01 refuses *orders* while paused. Debug-only commands (`noop`,
+    // `debug.addCounter`) are not orders, so they stay accepted — HOOK-02
+    // uses them specifically to steer the sim while the pause gate is up.
+    if (this.paused && order) {
+      return false;
+    }
     const stamped = this.stampCommand(validated);
     this.pendingCommands.push(stamped);
-    if ((stamped.kind === 'move' || stamped.kind === 'attackMove') && this.renderView) {
-      this.renderView.pulseMarker(stamped.x, stamped.z);
+    if (stamped.kind === 'move' || stamped.kind === 'attackMove') {
+      this.renderView?.pulseMarker(stamped.x, stamped.z);
+    }
+    if (order) {
+      this.services?.playSound({ type: 'orderAck' });
     }
     return true;
   }
@@ -339,10 +408,15 @@ export class App {
     const valid = new Set(
       this.world.units.filter((unit) => unit.owner === 1).map((unit) => unit.id),
     );
-    this.selectedIds = [...new Set(ids)].filter((id) => valid.has(id));
-    // The command bar's disabled state must follow the selection immediately
-    // rather than on the 200 ms minimap tick, otherwise the HUD tests would
-    // observe stale disabled flags right after the selection changed.
+    const next = [...new Set(ids)].filter((id) => valid.has(id));
+    const previous = this.selectedIds;
+    const changed =
+      previous.length !== next.length ||
+      next.some((id, index) => id !== previous[index]);
+    this.selectedIds = next;
+    if (changed && next.length > 0) {
+      this.services?.playSound({ type: 'selection' });
+    }
     this.hud?.refresh();
   }
 
@@ -380,12 +454,35 @@ export class App {
     return this.hud?.snapshot() ?? null;
   }
 
-  alerts(): Array<{ x: number; z: number }> {
-    return [];
+  alerts(): AlertSnapshot[] {
+    return this.services?.alerts() ?? [];
+  }
+
+  simSpeed(): number {
+    return this.simSpeedMultiplier;
+  }
+
+  isSimPaused(): boolean {
+    return this.paused;
+  }
+
+  settings(): SettingsState {
+    return this.services?.settings() ?? DEFAULT_SETTINGS;
+  }
+
+  audioStatus(): AudioStatusView {
+    return this.services?.audioStatus() ?? {
+      unlocked: false,
+      contextAvailable: false,
+      masterVolume: 0,
+      musicVolume: 0,
+      effectsVolume: 0,
+      played: [],
+    };
   }
 
   setSimSpeed(multiplier: number): void {
-    this.simSpeed = Math.min(8, Math.max(1, multiplier));
+    this.simSpeedMultiplier = Math.min(8, Math.max(0.5, multiplier));
   }
 
   setCamera(info: Partial<CameraView>): void {
@@ -421,6 +518,7 @@ export class App {
     } catch {
       // Storage can be unavailable; the setting still applies for this session.
     }
+    this.services?.setSetting('leftHanded', value);
     this.hud?.refresh();
   }
 
@@ -477,6 +575,51 @@ export class App {
     this.applyPauseState();
   }
 
+  pressAndroidBack(): void {
+    this.pauseLifecycle();
+    this.handleAndroidBack();
+  }
+
+  requestAutosave(): Promise<void> {
+    return this.services?.requestAutosave() ?? Promise.resolve();
+  }
+
+  listSaveSlots(): Promise<SaveSlotSummary[]> {
+    return this.services?.listSaveSlots() ?? Promise.resolve([]);
+  }
+
+  lastSaveOutcome(): SaveActionResult | null {
+    return this.services?.lastSaveOutcome() ?? null;
+  }
+
+  lastLoadOutcome(): LoadSlotResult | null {
+    return this.services?.lastLoadOutcome() ?? null;
+  }
+
+  lastImportOutcome(): ImportSaveResult | null {
+    return this.services?.lastImportOutcome() ?? null;
+  }
+
+  lastBugReport(): { fileName: string; content: string } | null {
+    return this.services?.lastBugReport() ?? null;
+  }
+
+  async writeRawSave(slot: string, text: string): Promise<void> {
+    await this.services?.writeRawSave(slot, text);
+  }
+
+  setStorageFullForTest(value: boolean): void {
+    this.services?.setStorageFullForTest(value);
+  }
+
+  raiseAlertForTest(kind: AlertKind, x: number, z: number): void {
+    this.services?.raiseAlert(kind, x, z);
+  }
+
+  unlockAudio(): void {
+    this.services?.unlockAudio();
+  }
+
   private newSkirmish(): WorldState {
     const options: CreateWorldOptions = { unitTypes: this.unitTypes };
     const world = createWorld(this.nextSeed, options);
@@ -490,6 +633,25 @@ export class App {
     this.selectedIds = [];
     this.fixed.reset();
     this.lastFreeze = null;
+    this.matchActive = true;
+    this.services?.resetAlerts(this.world);
+    this.services?.setMatchActive(true);
+  }
+
+  private loadWorld(world: WorldState, startMatch: boolean): void {
+    this.world = world;
+    this.pendingCommands = [];
+    this.selectedIds = [];
+    this.fixed.reset();
+    this.lastFreeze = null;
+    this.services?.resetAlerts(world);
+    if (startMatch) {
+      this.matchActive = true;
+      this.router.start('inGame');
+      this.services?.setMatchActive(true);
+    } else {
+      this.hud?.refresh();
+    }
   }
 
   private stopSelected(): void {
@@ -542,6 +704,10 @@ export class App {
             }
           },
         });
+        if (this.services) {
+          this.applySettings(this.services.settings());
+          this.services.setMusic('human', false);
+        }
         this.startLoop();
         return {
           error: null,
@@ -569,14 +735,44 @@ export class App {
     }
   };
 
+  private installAudioUnlock(): void {
+    const unlock = (): void => {
+      this.services?.unlockAudio();
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('touchstart', unlock);
+    window.addEventListener('keydown', unlock);
+  }
+
   private pauseLifecycle(): void {
+    this.lifecyclePauseScreen = this.router.current();
     this.lifecyclePaused = true;
     this.applyPauseState();
   }
 
   private resumeLifecycle(): void {
     this.lifecyclePaused = false;
+    this.lifecyclePauseScreen = null;
     this.applyPauseState();
+  }
+
+  private handleAndroidBack(): void {
+    const before = this.lifecyclePauseScreen;
+    this.lifecyclePauseScreen = null;
+    if (before === 'inGame') {
+      this.go('pause');
+      return;
+    }
+    if (before === 'pause') {
+      this.lifecyclePaused = false;
+      this.applyPauseState();
+      this.router.back();
+      return;
+    }
+    this.router.back();
   }
 
   private applyPauseState(): void {
@@ -592,6 +788,17 @@ export class App {
       this.watchdog.setSuspended(false);
       this.startLoop();
     }
+  }
+
+  private applySettings(settings: SettingsState): void {
+    document.documentElement.dataset.textSize = settings.textSize;
+    document.documentElement.classList.toggle('text-large', settings.textSize === 'large');
+    this.leftHandedValue = settings.leftHanded;
+    this.input?.setEdgeScroll(settings.edgeScroll);
+    this.renderView?.setQualityPreference(settings.graphicsQuality);
+    this.renderView?.setHealthBarsMode(settings.healthBars);
+    this.renderView?.setColorBlindMode(settings.colourBlind);
+    this.hud?.refresh();
   }
 
   private startLoop(): void {
@@ -632,7 +839,7 @@ export class App {
     let alpha = 0;
 
     if (!frozen) {
-      const result = this.fixed.advance(elapsed * this.simSpeed);
+      const result = this.fixed.advance(elapsed * this.simSpeedMultiplier);
       alpha = result.alpha;
       if (result.steps > 0) {
         this.watchdog.beat('sim');
@@ -642,6 +849,7 @@ export class App {
     this.input?.update(elapsed);
     this.pruneSelection();
     this.watchdog.check();
+    this.services?.observe(this.world);
     this.renderView.setSelection(this.selectedIds);
     this.renderView.render(alpha, this.world);
     this.raf = window.requestAnimationFrame(this.frame);
