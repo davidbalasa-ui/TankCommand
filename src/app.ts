@@ -145,6 +145,7 @@ export class App {
   private leftHandedValue = false;
   private fogValue = true;
   private aiValue = true;
+  private mapIdValue: string | undefined;
   private dropPadId: number | null = null;
   private placementState: PlacementState | null = null;
   private readonly controlGroups = new Map<number, number[]>();
@@ -165,6 +166,7 @@ export class App {
       this.leftHandedValue = window.localStorage.getItem('setting.leftHanded') === 'true';
       this.fogValue = window.localStorage.getItem('setting.fog') !== 'revealed';
       this.aiValue = window.localStorage.getItem('setting.ai') !== 'off';
+      this.mapIdValue = window.localStorage.getItem('setting.map') ?? undefined;
     } catch {
       this.leftHandedValue = false;
     }
@@ -1140,7 +1142,7 @@ export class App {
         { player: 1, faction: 'human', controller: 'human' },
         { player: 2, faction: 'alien', controller: 'ai', difficulty: 'normal' },
       ],
-      { fog: this.fogValue },
+      { fog: this.fogValue, mapId: this.mapIdValue },
     );
     if (!aiOn) {
       world.aiStates = [];

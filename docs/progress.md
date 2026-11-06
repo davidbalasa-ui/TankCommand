@@ -67,3 +67,13 @@ Enemy AI (written directly by Claude).
 - **Hookup.** Skirmish gives player 2 a normal AI (setting `setting.ai=off` disables it for e2e). Terrain is now rotationally symmetric so both bases are equal.
 - **Tests.** `tests/unit/ai.test.ts` plays 10 fixed-seed hard-vs-easy matches (about 30 s) and checks AI-01 to AI-09 and DET-05. `npm run ai:soak` runs more matches (not part of CI).
 - **Not done.** The debug route to watch AI-vs-AI in test builds, and wp07 screenshots.
+
+## WP-08 Air units and water
+
+- **Terrain.** Maps can carry lakes and rivers (with fords) via `features` on the map row. Water is carved into the heightmap and saved as `mapSpec`. Movement classes (`tracked`, `hover`, `air`) are a view of the map (`mapFor`), so pathing and collision need no special cases. Second map `map.wp08_lakeside`; pick it with `localStorage setting.map` until the WP-09 skirmish setup screen.
+- **Air.** `src/sim/air.ts`: parked / flying / returning / rearming. Aircraft are bought only with a free air base slot, launch and recall by command, burn fuel, go home when fuel is short or ammo is out, rearm at base, and crash when dry with no base. Aircraft never push or get pushed by other units.
+- **Combat.** `weapon.targets` is honoured by units and turrets: ground-only guns cannot hit flying aircraft, parked aircraft are ground targets, bombers cannot target air.
+- **Data.** Hover tank, fighter and bomber per faction (alien: glider, saucer, dropper), air base / hangar structures, an Aviation research node per faction.
+- **UI.** Launch/Recall button and ammo/fuel line appear when aircraft are selected; renderer draws a water plane and lifts flying aircraft.
+- **Tests.** `tests/unit/wp08.test.ts` (TER-01/02, AIR-01..05, DET-06), `tests/e2e/wp08.spec.ts`.
+- **Not done.** AI does not build or use aircraft or hover units; parked aircraft stack on the base centre visually; more wp08 screenshots.

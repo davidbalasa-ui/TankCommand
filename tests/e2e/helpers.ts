@@ -231,16 +231,20 @@ export async function waitForHook(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__TC_TEST__ !== undefined);
 }
 
-export async function enterGame(page: Page, options: { fog?: boolean } = {}): Promise<void> {
+export async function enterGame(page: Page, options: { fog?: boolean; map?: string } = {}): Promise<void> {
   const fog = options.fog === true;
-  await page.addInitScript((on: boolean) => {
+  const map = options.map ?? '';
+  await page.addInitScript(([on, mapId]: [boolean, string]) => {
     try {
       window.localStorage.setItem('setting.fog', on ? 'on' : 'revealed');
       window.localStorage.setItem('setting.ai', 'off');
+      if (mapId) {
+        window.localStorage.setItem('setting.map', mapId);
+      }
     } catch {
       // Storage may be unavailable.
     }
-  }, fog);
+  }, [fog, map] as [boolean, string]);
   await page.goto('/');
   await waitForHook(page);
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();

@@ -130,11 +130,11 @@ function computeSide(world: WorldState, player: PlayerId, previous: VisionSideSt
       markVisible(world, viewer, visible);
     }
     const old = previous?.cells ?? emptyCells(world);
-    const codes = new Uint8Array(total);
+    const chars: string[] = new Array<string>(total);
     for (let i = 0; i < total; i += 1) {
-      codes[i] = visible[i] === 1 ? 50 : old.charCodeAt(i) === 48 ? 48 : 49;
+      chars[i] = visible[i] === 1 ? '2' : old.charCodeAt(i) === 48 ? '0' : '1';
     }
-    cells = new TextDecoder('ascii').decode(codes);
+    cells = chars.join('');
   }
 
   const visibleUnits: number[] = [];

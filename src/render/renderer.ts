@@ -78,6 +78,7 @@ interface UnitVisual {
   root: THREE.Object3D;
   turretPivot: THREE.Object3D | null;
   owner: number;
+  lift: number;
 }
 
 interface PositionSnapshot {
@@ -822,6 +823,21 @@ export class RenderView {
 
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
+    const waterLevel = this.world.map.waterLevel;
+    if (waterLevel !== null) {
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry(this.world.map.size, this.world.map.size),
+        new THREE.MeshStandardMaterial({
+          color: 0x2f6f9f,
+          roughness: 0.25,
+          transparent: true,
+          opacity: 0.72,
+        }),
+      );
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = waterLevel;
+      this.scene.add(water);
+    }
     this.skirt = this.buildSkirt();
     if (this.skirt) {
       this.scene.add(this.skirt);
@@ -1200,6 +1216,7 @@ export class RenderView {
       root,
       turretPivot: root.getObjectByName('TurretPivot') ?? null,
       owner: unit.owner,
+      lift: 0,
     };
   }
 
@@ -1229,7 +1246,13 @@ export class RenderView {
       const z = lerp(previous.z, current.z, alpha);
       const heading = lerp(previous.heading, current.heading, alpha);
       const turretHeading = lerp(previous.turretHeading, current.turretHeading, alpha);
-      visual.root.position.set(x, heightAt(this.world.map, x, z), z);
+      const airType = unit.air ? this.world.unitTypes.get(unit.typeId)?.air : null;
+      const wantLift =
+        unit.air && (unit.air.mode === 'flying' || unit.air.mode === 'returning')
+          ? (airType?.cruiseHeight ?? 6)
+          : 0;
+      visual.lift += (wantLift - visual.lift) * 0.08;
+      visual.root.position.set(x, heightAt(this.world.map, x, z) + visual.lift, z);
       visual.root.rotation.y = -heading;
       if (visual.turretPivot) {
         visual.turretPivot.rotation.y = heading - turretHeading;

@@ -129,3 +129,11 @@
 | AI-08 | No unit stays stuck longer than the re-plan time in any of the 10 matches. |
 | AI-09 | The AI never attacks allied or neutral units and attacks a neutral side only after it is hostile; with three sides it handles two hostile opponents. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
+| TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
+| TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |
+| AIR-01 | Aircraft can only be bought with a free air base slot and are delivered parked at a base. |
+| AIR-02 | Aircraft launch, burn fuel, return when fuel is short or ammo is empty, rearm at base, and crash if they run dry away from any base. |
+| AIR-03 | Weapons honour their target list: ground-only weapons cannot hit airborne units, parked aircraft count as ground. |
+| AIR-04 | Fighters can shoot air; bombers never target air. |
+| AIR-05 | Aircraft ammo is spent one per shot and an empty aircraft stops firing. |
+| DET-06 | Air and water scenarios are deterministic. |

@@ -161,6 +161,8 @@ export class Hud implements HudHandle {
   private readonly groupsStrip: HTMLDivElement;
   private readonly attackButton: HTMLButtonElement;
   private readonly holdButton: HTMLButtonElement;
+  private readonly airButton: HTMLButtonElement;
+  private readonly airInfo: HTMLSpanElement;
   private readonly stopButton: HTMLButtonElement;
   private readonly queueButton: HTMLButtonElement;
   private readonly groupsButton: HTMLButtonElement;
@@ -248,6 +250,13 @@ export class Hud implements HudHandle {
     this.holdButton = button('inGame', 'hold', 'Hold', () => {
       this.issueHold();
     });
+    this.airButton = button('inGame', 'air', 'Launch', () => {
+      this.issueAir();
+    });
+    this.airButton.hidden = true;
+    this.airInfo = document.createElement('span');
+    this.airInfo.className = 'hud-airinfo';
+    this.airInfo.hidden = true;
     this.stopButton = button('inGame', 'stop', 'Stop', () => {
       this.issueStop();
     });
@@ -281,6 +290,8 @@ export class Hud implements HudHandle {
       this.baseButton,
       this.attackButton,
       this.holdButton,
+      this.airButton,
+      this.airInfo,
       this.stopButton,
       this.queueButton,
       this.groupsButton,
@@ -423,6 +434,7 @@ export class Hud implements HudHandle {
     this.attackButton.disabled = !hasSelection;
     this.holdButton.disabled = !hasSelection;
     this.stopButton.disabled = !hasSelection;
+    this.refreshAir(selection);
     this.queueButton.disabled = !hasSelection;
     this.groupsButton.disabled = !hasSelection;
     this.buildButton.disabled = false;
@@ -874,6 +886,46 @@ export class Hud implements HudHandle {
     }
 
     this.minimapRedraws += 1;
+  }
+
+  private selectedAircraft(selection: readonly number[]) {
+    const world = this.ctx.getWorld();
+    return world.units.filter(
+      (unit) => unit.owner === 1 && unit.hp > 0 && unit.air !== null && selection.includes(unit.id),
+    );
+  }
+
+  private refreshAir(selection: readonly number[]): void {
+    const craft = this.selectedAircraft(selection);
+    const any = craft.length > 0;
+    this.airButton.hidden = !any;
+    this.airInfo.hidden = !any;
+    if (!any) {
+      return;
+    }
+    const flying = craft.some((unit) => unit.air?.mode === 'flying' || unit.air?.mode === 'returning');
+    this.airButton.textContent = flying ? 'Recall' : 'Launch';
+    const first = craft[0]?.air;
+    if (first) {
+      this.airInfo.textContent = `Ammo ${first.ammo} · Fuel ${Math.max(0, Math.round(first.fuelLeft))}s${
+        first.mode === 'rearming' ? ' · rearming' : ''
+      }`;
+    }
+  }
+
+  private issueAir(): void {
+    const craft = this.selectedAircraft(this.ctx.getSelection());
+    if (craft.length === 0) {
+      return;
+    }
+    const flying = craft.some((unit) => unit.air?.mode === 'flying' || unit.air?.mode === 'returning');
+    this.ctx.sendCommand({
+      kind: 'air',
+      unitIds: craft.map((unit) => unit.id),
+      action: flying ? 'recall' : 'launch',
+      tick: this.ctx.getWorld().tick + 1,
+      issuer: 1,
+    });
   }
 
   private issueHold(): void {

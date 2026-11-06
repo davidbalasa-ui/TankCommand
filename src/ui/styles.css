@@ -233,6 +233,13 @@ p {
   pointer-events: auto;
 }
 
+.hud-airinfo {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #dfe8ef;
+  text-align: right;
+}
+
 .hud-commandbar button {
   width: 56px;
   height: 44px;
