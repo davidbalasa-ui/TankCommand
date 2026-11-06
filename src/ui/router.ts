@@ -115,6 +115,8 @@ export interface ScreenContext {
   getCamera?: () => CameraSnapshot;
   cameraFootprint?: () => Array<{ x: number; z: number }>;
   setCameraTarget?: (x: number, z: number) => void;
+  isFogOn?: () => boolean;
+  setFogOn?: (value: boolean) => void;
   isLeftHanded?: () => boolean;
   setLeftHanded?: (value: boolean) => void;
   isQueueMode?: () => boolean;

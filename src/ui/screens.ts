@@ -256,6 +256,17 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       addButton(root, 'settings', 'leftHanded', 'Left-handed layout', () => {
         ctx.setLeftHanded?.(!(ctx.isLeftHanded?.() ?? false));
       });
+      const fog = button(
+        'settings',
+        'fog',
+        `Fog of war: ${ctx.isFogOn?.() === false ? 'revealed' : 'on'}`,
+        () => {
+          const next = !(ctx.isFogOn?.() ?? true);
+          ctx.setFogOn?.(next);
+          fog.textContent = `Fog of war: ${next ? 'on' : 'revealed'}`;
+        },
+      );
+      root.append(fog);
       addButton(root, 'settings', 'back', 'Back', () => {
         ctx.router.back();
       });

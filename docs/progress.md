@@ -48,3 +48,12 @@ Turrets, radar, labs, packing, research, upgrades and repair (written directly b
 - **Data.** Repair and packed-turret units plus turret, radar and lab structures per faction; `research.placeholder.json` with six nodes per faction. All numbers are placeholders until Stage 0.
 - **UI.** A Base button opens a bottom sheet with the research tree (cost, time, state, progress), structure Pack/Dismantle buttons and per-vehicle Deploy/Upgrade buttons. Locked build items show "Needs: <research>"; packed turret units are hidden from the build list. Structures draw per kind, darken with damage, and rubble shows as a mound.
 - **Tests.** `tests/unit/wp05.test.ts` covers STR-01..05, RES-01..02, UPG-01..02, REP-01 and DET-03; `tests/e2e/wp05.spec.ts` checks locked items and the Base sheet by touch.
+
+## WP-06
+
+Diplomacy and vision (written directly by Claude).
+
+- **Diplomacy.** `src/sim/diplomacy.ts`: sides (controller, team, group), ordered-pair relations, `diplomacy.set`, provocation with group and forgive timer. Targeting, projectiles, splash, turrets and repair use relation queries; match result counts only human and AI sides with team victory.
+- **Vision.** `src/sim/vision.ts`: per-side explored/visible grid every 4 ticks with terrain line of sight, allied shared viewers, sensor contacts, radar (tower and mobile unit), stealth, remembered structure ghosts, and `perceivedUnits`. State is saved and hashed.
+- **Rendering/UI.** The app hands the renderer, HUD, minimap and test hook a player-view world with hidden enemies removed and ghosts added. Terrain is darkened by a fog texture, contacts are pulsing rings, the minimap shows fog and contacts. Settings has a fog on/revealed toggle.
+- **Not done yet.** FOG-07 frame-cost measurement and the wp06 screenshots 2 to 4.

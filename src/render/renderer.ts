@@ -259,6 +259,15 @@ export class RenderView {
   private readonly qualityController = new QualityController();
   private readonly orderLines = new Map<number, THREE.Line>();
   private terrain: THREE.Mesh | null = null;
+  private fogTexture: THREE.DataTexture | null = null;
+  private fogUniforms: { uFog: { value: THREE.DataTexture | null }; uFogOn: { value: number }; uFogSize: { value: number } } = {
+    uFog: { value: null },
+    uFogOn: { value: 0 },
+    uFogSize: { value: 200 },
+  };
+  private fogCells: string | null = null;
+  private readonly contactMeshes: THREE.Mesh[] = [];
+  private contacts: Array<{ x: number; z: number }> = [];
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
   private pickTargets: THREE.Object3D[] = [];
@@ -618,6 +627,7 @@ export class RenderView {
     this.syncDropBeams(world);
     this.syncProjectiles();
     this.syncWrecks();
+    this.syncContacts();
     this.syncSelection();
     this.syncOrderLines();
     this.syncHealthBars();
@@ -625,6 +635,66 @@ export class RenderView {
     this.updateFlashes();
     this.frame += 1;
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Fog texture and anonymous sensor contacts for the player's side. `cells` is the vision string.
+  setPerception(
+    fog: { cells: string; cols: number; rows: number } | null,
+    contacts: Array<{ x: number; z: number }>,
+  ): void {
+    this.contacts = contacts;
+    if (!fog) {
+      this.fogUniforms.uFogOn.value = 0;
+      return;
+    }
+    if (this.fogCells !== fog.cells) {
+      this.fogCells = fog.cells;
+      const data = new Uint8Array(fog.cols * fog.rows);
+      for (let i = 0; i < data.length; i += 1) {
+        const ch = fog.cells.charAt(i);
+        data[i] = ch === '2' ? 255 : ch === '1' ? 105 : 0;
+      }
+      let texture = this.fogTexture;
+      if (!texture || texture.image.width !== fog.cols) {
+        texture?.dispose();
+        texture = new THREE.DataTexture(data, fog.cols, fog.rows, THREE.RedFormat, THREE.UnsignedByteType);
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        this.fogTexture = texture;
+        this.fogUniforms.uFog.value = texture;
+      } else {
+        (texture.image.data as Uint8Array).set(data);
+      }
+      texture.needsUpdate = true;
+    }
+    this.fogUniforms.uFogOn.value = 1;
+  }
+
+  private syncContacts(): void {
+    while (this.contactMeshes.length < this.contacts.length) {
+      const mesh = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 1.3, 20),
+        new THREE.MeshBasicMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      this.scene.add(mesh);
+      this.contactMeshes.push(mesh);
+    }
+    const pulse = 1 + 0.25 * Math.sin(this.frame * 0.15);
+    for (let i = 0; i < this.contactMeshes.length; i += 1) {
+      const mesh = this.contactMeshes[i];
+      const contact = this.contacts[i];
+      if (!mesh) {
+        continue;
+      }
+      mesh.visible = contact !== undefined;
+      if (contact) {
+        mesh.position.set(contact.x, heightAt(this.world.map, contact.x, contact.z) + 0.4, contact.z);
+        mesh.scale.setScalar(pulse * 1.6);
+      }
+    }
   }
 
   stats(): RenderStats {
@@ -939,6 +1009,25 @@ export class RenderView {
       metalness: 0,
       flatShading: true,
     });
+    const uniforms = this.fogUniforms;
+    uniforms.uFogSize.value = map.size;
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uFog = uniforms.uFog;
+      shader.uniforms.uFogOn = uniforms.uFogOn;
+      shader.uniforms.uFogSize = uniforms.uFogSize;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;',
+        )
+        .replace(
+          '#include <color_fragment>',
+          '#include <color_fragment>\nif (uFogOn > 0.5) { float fogLevel = texture2D(uFog, vFogXZ / uFogSize + 0.5).r; diffuseColor.rgb *= fogLevel; }',
+        );
+    };
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     return mesh;

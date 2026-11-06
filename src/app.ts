@@ -61,6 +61,8 @@ import { placementValidity, structureAtPoint } from './sim/spawn';
 import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
+import { perceivedUnits } from './sim/vision';
+import type { StructureState } from './sim/types';
 import type { BaseAction, BaseView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
 
@@ -207,6 +209,7 @@ export class App {
   private readonly researchTree: ReadonlyMap<string, ResearchNode>;
   private readonly mapData: MapRow;
   private world: WorldState;
+  private viewCache: { source: WorldState; view: WorldState } | null = null;
   private pendingCommands: Command[] = [];
   private readonly fixed: FixedStepLoop;
   private readonly watchdog: Watchdog;
@@ -227,6 +230,7 @@ export class App {
   private queueModeValue = false;
   private attackMoveArmedValue = false;
   private leftHandedValue = false;
+  private fogValue = true;
   private dropPadId: number | null = null;
   private placementState: PlacementState | null = null;
   private readonly controlGroups = new Map<number, number[]>();
@@ -268,6 +272,7 @@ export class App {
     this.world = this.newSkirmish();
     try {
       this.leftHandedValue = window.localStorage.getItem('setting.leftHanded') === 'true';
+      this.fogValue = window.localStorage.getItem('setting.fog') !== 'revealed';
     } catch {
       this.leftHandedValue = false;
     }
@@ -299,7 +304,7 @@ export class App {
         this.pauseSim(paused);
       },
       attachRenderer: (canvas) => this.attachRenderer(canvas),
-      getWorld: () => this.snapshot(),
+      getWorld: () => this.viewWorld(),
       selection: () => this.selection(),
       setSelection: (ids) => {
         this.setSelection(ids);
@@ -317,6 +322,10 @@ export class App {
         this.setCamera({ targetX: x, targetZ: z });
       },
       isLeftHanded: () => this.leftHandedValue,
+      isFogOn: () => this.fogValue,
+      setFogOn: (value) => {
+        this.setFogOn(value);
+      },
       setLeftHanded: (value) => {
         this.setLeftHanded(value);
       },
@@ -418,8 +427,52 @@ export class App {
     return { ...command, tick: earliest };
   }
 
+  // The world as the player may see it: hidden enemy units and structures are removed, remembered
+  // structures come back as ghosts. Renderer, HUD, minimap and the test hook use this only.
+  viewWorld(): WorldState {
+    const world = this.world;
+    if (!world.fogEnabled) {
+      return world;
+    }
+    if (this.viewCache && this.viewCache.source === world) {
+      return this.viewCache.view;
+    }
+    const perceived = perceivedUnits(world, 1);
+    const ghosts: StructureState[] = perceived.ghosts.flatMap((ghost) => {
+      const type = world.structureTypes.get(ghost.typeId);
+      if (!type) {
+        return [];
+      }
+      return [
+        {
+          id: ghost.id,
+          owner: ghost.owner,
+          typeId: ghost.typeId,
+          x: ghost.x,
+          z: ghost.z,
+          hp: type.hp,
+          containers: 0,
+          fill: 0,
+          depositId: null,
+          upgrades: [],
+          reloadLeft: 0,
+          turretHeading: 0,
+          work: null,
+          research: null,
+        },
+      ];
+    });
+    const view: WorldState = {
+      ...world,
+      units: perceived.units,
+      structures: [...perceived.structures, ...ghosts],
+    };
+    this.viewCache = { source: world, view };
+    return view;
+  }
+
   units(): UnitView[] {
-    return this.world.units.map((unit) => {
+    return this.viewWorld().units.map((unit) => {
       let orderX: number | null = null;
       let orderZ: number | null = null;
       const order = unit.order;
@@ -462,7 +515,7 @@ export class App {
   }
 
   structures(): StructureView[] {
-    return this.world.structures.map((structure) => {
+    return this.viewWorld().structures.map((structure) => {
       const type = this.world.structureTypes.get(structure.typeId);
       return {
         id: structure.id,
@@ -1096,6 +1149,19 @@ export class App {
     this.hud?.refresh();
   }
 
+  setFogOn(value: boolean): void {
+    this.fogValue = value;
+    try {
+      window.localStorage.setItem('setting.fog', value ? 'on' : 'revealed');
+    } catch {
+      // Storage can be unavailable; the setting still applies for this session.
+    }
+  }
+
+  fogOn(): boolean {
+    return this.fogValue;
+  }
+
   leftHanded(): boolean {
     return this.leftHandedValue;
   }
@@ -1199,6 +1265,7 @@ export class App {
       startResources: setup.resources,
       size: setup.size,
       cellSize: setup.cellSize,
+      fog: this.fogValue,
     };
     const world = createWorld(this.nextSeed, options);
     this.nextSeed += 1;
@@ -1376,7 +1443,14 @@ export class App {
     this.pruneSelection();
     this.watchdog.check();
     this.renderView.setSelection(this.selectedIds);
-    this.renderView.render(alpha, this.world);
+    const vision = this.world.vision.find((item) => item.player === 1);
+    this.renderView.setPerception(
+      this.world.fogEnabled && vision
+        ? { cells: vision.cells, cols: this.world.map.cols, rows: this.world.map.rows }
+        : null,
+      vision?.contacts ?? [],
+    );
+    this.renderView.render(alpha, this.viewWorld());
     this.raf = window.requestAnimationFrame(this.frame);
   };
 

@@ -118,3 +118,4 @@
 | FOG-06 | `perceivedUnits` returns only visible units, contacts and remembered structures and never leaks hidden data. |
 | DIP-04 | Allied sides share vision; neutral and hostile do not. |
 | DET-04 | Vision is deterministic and survives save/load with an identical hash. |
+| FOG-05 | A hidden enemy is never drawn, pickable, shown on the minimap, or listed by any player-view API. |

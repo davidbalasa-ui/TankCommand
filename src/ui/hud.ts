@@ -1,4 +1,5 @@
 import { isHostile } from '../sim/diplomacy';
+import { cellState } from '../sim/vision';
 import { heightAt } from '../sim/map';
 import { SIM_TICK_HZ } from '../sim/constants';
 import { UNIT_CAP } from '../sim/tuning';
@@ -796,6 +797,29 @@ export class Hud implements HudHandle {
       context.fillRect(point.x - 2, point.y - 2, 4, 4);
     }
 
+    if (world.fogEnabled) {
+      for (let iz = 0; iz < cells; iz += 1) {
+        for (let ix = 0; ix < cells; ix += 1) {
+          const state = cellState(
+            world,
+            1,
+            -half + ((ix + 0.5) / cells) * map.size,
+            -half + ((iz + 0.5) / cells) * map.size,
+          );
+          if (state === 2) {
+            continue;
+          }
+          context.fillStyle = state === 0 ? 'rgba(0,0,0,1)' : 'rgba(0,0,0,0.5)';
+          context.fillRect(
+            offX + (ix / cells) * size,
+            offY + (iz / cells) * size,
+            Math.ceil(size / cells) + 1,
+            Math.ceil(size / cells) + 1,
+          );
+        }
+      }
+    }
+
     for (const structure of world.structures) {
       const point = toMap(structure.x, structure.z);
       const type = world.structureTypes.get(structure.typeId);
@@ -804,6 +828,17 @@ export class Hud implements HudHandle {
       context.beginPath();
       context.arc(point.x, point.y, radius, 0, Math.PI * 2);
       context.fill();
+    }
+
+    const vision = world.fogEnabled ? world.vision.find((item) => item.player === 1) : undefined;
+    if (vision) {
+      for (const contact of vision.contacts) {
+        const point = toMap(contact.x, contact.z);
+        context.fillStyle = '#c8c8c8';
+        context.beginPath();
+        context.arc(point.x, point.y, 3, 0, Math.PI * 2);
+        context.fill();
+      }
     }
 
     for (const unit of world.units) {
