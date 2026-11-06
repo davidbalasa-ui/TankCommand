@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sim.json --noEmit",
     "lint": "node scripts/lint.mjs --max-warnings 0",
     "test": "vitest run",
+    "ai:soak": "vitest run --config vitest.soak.config.ts",
     "test:e2e": "playwright test",
     "credits": "node scripts/credits.mjs",
     "credits:check": "node scripts/credits.mjs --check",

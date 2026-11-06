@@ -4,11 +4,15 @@ import { SIM_TICK_HZ } from './constants';
 import {
   clampToMap,
   generateMap,
+  NO_FEATURES,
+  type MapFeatures,
+  mapFor,
   groundLineClear,
   heightAt,
   isBlockedAt,
   lineOfSightClear,
 } from './map';
+import { unitMap } from './motion';
 import { findPath } from './pathfinding';
 import {
   ATTACK_MOVE_ENGAGE_FACTOR,
@@ -117,6 +121,7 @@ export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
   structureTypes?: ReadonlyMap<string, SimStructureType>;
   researchTree?: ReadonlyMap<string, ResearchNode>;
+  mapFeatures?: MapFeatures;
   startUnits?: StartUnit[];
   startStructures?: StartStructure[];
   deposits?: DepositDef[];
@@ -219,6 +224,7 @@ function cloneWorld(world: WorldState): WorldState {
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
+      air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
     deposits: world.deposits.map((deposit) => ({ ...deposit })),
@@ -272,7 +278,8 @@ export function defaultStartUnits(): StartUnit[] {
 export function createWorld(seed: number, options: CreateWorldOptions = {}): WorldState {
   const unitTypes = options.unitTypes ?? new Map<string, SimUnitType>();
   const structureTypes = options.structureTypes ?? new Map<string, SimStructureType>();
-  const map = generateMap(seed, options.size, options.cellSize);
+  const mapFeatures = options.mapFeatures ?? NO_FEATURES;
+  const map = generateMap(seed, options.size, options.cellSize, mapFeatures);
   const rng = new Rng(seed);
   const deposits: DepositState[] = (options.deposits ?? []).map((def, index) => ({
     id: index + 1,
@@ -296,6 +303,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     sides: [],
     relations: [],
     map,
+    mapFeatures,
     unitTypes,
     structureTypes,
     researchTree: options.researchTree ?? new Map<string, ResearchNode>(),
@@ -369,7 +377,7 @@ function computePath(
   goalX: number,
   goalZ: number,
 ): Point[] | null {
-  const path = findPath(world.map, unit.x, unit.z, goalX, goalZ);
+  const path = findPath(unitMap(world, unit), unit.x, unit.z, goalX, goalZ);
   if (!path || path.length === 0) {
     return null;
   }
@@ -410,7 +418,7 @@ function planMove(
         : undefined;
     const anchor = tail ?? pending;
     if (anchor) {
-      const appended = findPath(world.map, anchor.x, anchor.z, goalX, goalZ) ?? [
+      const appended = findPath(unitMap(world, unit), anchor.x, anchor.z, goalX, goalZ) ?? [
         { x: goalX, z: goalZ },
       ];
       const combined = [...unit.path, ...appended];
@@ -649,7 +657,7 @@ function followPath(
   type: SimUnitType,
   goal: Point,
 ): void {
-  const map = world.map;
+  const map = mapFor(world.map, type.movement);
   const goalDistance = Math.hypot(goal.x - unit.x, goal.z - unit.z);
   if (goalDistance <= STOP_DISTANCE) {
     unit.path = [];
@@ -1147,7 +1155,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'move') {
-      const path = findPath(world.map, unit.x, unit.z, unit.order.x, unit.order.z);
+      const path = findPath(unitMap(world, unit), unit.x, unit.z, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1157,7 +1165,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'attackMove') {
-      const path = findPath(world.map, unit.x, unit.z, unit.order.x, unit.order.z);
+      const path = findPath(unitMap(world, unit), unit.x, unit.z, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1168,7 +1176,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
 
     const liveTarget = type ? selectTarget(world, unit, type) : null;
     if (liveTarget) {
-      unit.path = findPath(world.map, unit.x, unit.z, liveTarget.x, liveTarget.z) ?? [];
+      unit.path = findPath(unitMap(world, unit), unit.x, unit.z, liveTarget.x, liveTarget.z) ?? [];
     } else {
       unit.order = { kind: 'idle' };
       unit.path = [];
@@ -1434,6 +1442,7 @@ export function hashWorld(world: WorldState): string {
       relations: world.relations,
       fogEnabled: world.fogEnabled,
       vision: world.vision,
+      mapFeatures: world.mapFeatures,
       aiStates: world.aiStates,
       units: world.units.map((unit) => ({
         id: unit.id,
@@ -1455,6 +1464,7 @@ export function hashWorld(world: WorldState): string {
         job: unit.job,
         upgrades: unit.upgrades,
         transform: unit.transform,
+        air: unit.air,
       })),
       structures: world.structures,
       deposits: world.deposits,
@@ -1490,6 +1500,7 @@ export function worldToPayload(world: WorldState): unknown {
     factions: world.factions.map((entry) => ({ ...entry })),
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
+    mapSpec: { size: world.map.size, cellSize: world.map.cellSize, features: world.mapFeatures },
     fogEnabled: world.fogEnabled,
     vision: world.vision.map(cloneVision),
     aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
@@ -1500,6 +1511,7 @@ export function worldToPayload(world: WorldState): unknown {
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
+      air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
     deposits: world.deposits.map((deposit) => ({ ...deposit })),
@@ -1544,7 +1556,15 @@ export function payloadToWorld(input: unknown): WorldState | null {
     return null;
   }
 
-  const map = generateMap(seed);
+  const spec = isRecord(input.mapSpec) ? input.mapSpec : null;
+  const mapFeatures: MapFeatures =
+    spec && isRecord(spec.features) ? (spec.features as unknown as MapFeatures) : NO_FEATURES;
+  const map = generateMap(
+    seed,
+    spec && typeof spec.size === 'number' ? spec.size : undefined,
+    spec && typeof spec.cellSize === 'number' ? spec.cellSize : undefined,
+    mapFeatures,
+  );
   const unitTypes = new Map<string, SimUnitType>();
   if (Array.isArray(input.unitTypes)) {
     for (const entry of input.unitTypes) {
@@ -1571,6 +1591,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
         job: unit.job ?? null,
         upgrades: Array.isArray(unit.upgrades) ? [...unit.upgrades] : [],
         transform: unit.transform ?? null,
+        air: unit.air ?? null,
       }))
     : [];
   const structures: StructureState[] = Array.isArray(input.structures)
@@ -1677,6 +1698,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
     sides,
     relations,
     map,
+    mapFeatures,
     unitTypes,
     structureTypes,
     researchTree,

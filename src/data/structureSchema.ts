@@ -5,7 +5,7 @@ export const structureRowSchema = z
     id: z.string().regex(/^structure\.[a-z0-9]+(\.[a-z0-9_]+)+$/),
     name: z.string(),
     faction: z.enum(['human', 'alien']),
-    kind: z.enum(['pad', 'metalStation', 'turret', 'radar', 'lab']),
+    kind: z.enum(['pad', 'metalStation', 'turret', 'radar', 'lab', 'airBase']),
     cost: z.object({
       ore: z.number().int().nonnegative(),
       metal: z.number().int().nonnegative(),
@@ -39,6 +39,7 @@ export const structureRowSchema = z
     dismantleSec: z.number().positive().optional(),
     dismantleRefundPercent: z.number().min(0).max(100).optional(),
     sensorRange: z.number().positive().optional(),
+    airCapacity: z.number().int().positive().optional(),
     upgrades: z.array(z.enum(['fireRate', 'armor', 'stealth'])).optional(),
     placeholder: z.boolean(),
   })

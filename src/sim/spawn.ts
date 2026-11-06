@@ -80,6 +80,9 @@ export function addUnit(world: WorldState, start: StartUnit): UnitState | null {
     job: null,
     upgrades: [],
     transform: null,
+    air: type.air
+      ? { ammo: type.air.ammo, fuelLeft: type.air.fuelSec, homeId: null, mode: 'parked', rearmLeft: 0, patrol: null }
+      : null,
   };
   world.units.push(build);
   return build;

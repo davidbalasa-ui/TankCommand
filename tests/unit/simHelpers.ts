@@ -27,6 +27,7 @@ export function tankType(overrides: Partial<SimUnitType> = {}): SimUnitType {
       projectileSpeed: 40,
       accuracy: 1,
       splashRadius: 0.5,
+      targets: ['ground', 'structure'],
     },
     oreCost: 100,
     metalCost: 50,
@@ -39,6 +40,8 @@ export function tankType(overrides: Partial<SimUnitType> = {}): SimUnitType {
     deploysTo: null,
     deploySec: 0,
     upgrades: ['fireRate', 'armor'],
+    movement: 'tracked',
+    air: null,
     ...overrides,
   };
 }
@@ -106,6 +109,7 @@ export function scoutType(overrides: Partial<SimUnitType> = {}): SimUnitType {
       projectileSpeed: 55,
       accuracy: 1,
       splashRadius: 0,
+      targets: ['ground', 'structure'],
     },
     oreCost: 50,
     metalCost: 0,
@@ -127,6 +131,7 @@ export const NO_TURRET = {
   dismantleRefundPercent: 70,
   sensorRange: 10,
   upgrades: [] as string[],
+  airCapacity: 0,
 };
 
 export function turretType(overrides: Partial<SimStructureType> = {}): SimStructureType {
@@ -144,6 +149,7 @@ export function turretType(overrides: Partial<SimStructureType> = {}): SimStruct
       projectileSpeed: 45,
       accuracy: 1,
       splashRadius: 0,
+      targets: ['ground', 'structure'],
     },
     turretTurnDegPerSec: 180,
     packSec: 2,

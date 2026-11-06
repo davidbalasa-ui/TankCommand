@@ -1,11 +1,11 @@
-import type { MapDef } from './map';
+import type { MapDef, MapFeatures, MovementClass } from './map';
 
 export type PlayerId = number;
 export type Faction = 'human' | 'alien';
 export type Stance = 'free' | 'hold';
 export type UnitRole = 'worker' | 'scout' | 'tank' | 'artillery' | 'support' | 'air' | 'structure';
 export type WorkerKind = 'oreMiner' | 'tug';
-export type StructureKind = 'pad' | 'metalStation' | 'turret' | 'radar' | 'lab';
+export type StructureKind = 'pad' | 'metalStation' | 'turret' | 'radar' | 'lab' | 'airBase';
 export type DepositKind = 'ore' | 'metal';
 export type UpgradeKind = 'fireRate' | 'armor' | 'stealth';
 
@@ -58,9 +58,13 @@ export interface UnitState {
   upgrades: string[];
   // A packed turret deploying back into a structure. Null otherwise.
   transform: { left: number } | null;
+  air: AirState | null;
 }
 
+export type WeaponTarget = 'ground' | 'air' | 'structure';
+
 export interface WeaponStats {
+  targets?: WeaponTarget[];
   damage: number;
   range: number;
   reloadSec: number;
@@ -95,6 +99,26 @@ export interface SimUnitType {
   deploysTo: string | null;
   deploySec: number;
   upgrades: string[];
+  movement: MovementClass;
+  air: AirStats | null;
+}
+
+export interface AirStats {
+  ammo: number;
+  fuelSec: number;
+  rearmSec: number;
+  cruiseHeight: number;
+}
+
+export type AirMode = 'parked' | 'flying' | 'returning' | 'rearming';
+
+export interface AirState {
+  ammo: number;
+  fuelLeft: number;
+  homeId: number | null;
+  mode: AirMode;
+  rearmLeft: number;
+  patrol: Point | null;
 }
 
 export interface SimStructureType {
@@ -121,6 +145,7 @@ export interface SimStructureType {
   dismantleRefundPercent: number;
   sensorRange: number;
   upgrades: string[];
+  airCapacity: number;
 }
 
 export interface StructureState {
@@ -364,6 +389,7 @@ export interface WorldState {
   sides: SideState[];
   relations: RelationState[];
   map: MapDef;
+  mapFeatures: MapFeatures;
   unitTypes: ReadonlyMap<string, SimUnitType>;
   structureTypes: ReadonlyMap<string, SimStructureType>;
   units: UnitState[];

@@ -326,6 +326,10 @@ export function findPath(
   goalX: number,
   goalZ: number,
 ): Point[] | null {
+  if (map.movement === 'air') {
+    const half = map.size / 2;
+    return [{ x: Math.min(half, Math.max(-half, goalX)), z: Math.min(half, Math.max(-half, goalZ)) }];
+  }
   const startCellRaw = worldToCell(map, startX, startZ);
   const start = nearestOpenCell(map, startCellRaw);
   if (!start) {

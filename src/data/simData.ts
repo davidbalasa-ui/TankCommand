@@ -38,6 +38,7 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
             projectileSpeed: weapon.projectileSpeed,
             accuracy: weapon.accuracy,
             splashRadius: weapon.splashRadius,
+            targets: [...weapon.targets],
           }
         : null,
       oreCost: row.cost.ore,
@@ -51,6 +52,8 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
       deploysTo: row.deploysTo ?? null,
       deploySec: row.deploySec ?? 0,
       upgrades: [...row.upgrades],
+      movement: row.movement ?? 'tracked',
+      air: row.air ? { ...row.air } : null,
     });
   }
   return result;
@@ -85,6 +88,7 @@ export function buildStructureTypes(
       dismantleRefundPercent: row.dismantleRefundPercent ?? DEFAULT_DISMANTLE_REFUND_PERCENT,
       sensorRange: row.sensorRange ?? row.sightRange,
       upgrades: [...(row.upgrades ?? [])],
+      airCapacity: row.airCapacity ?? 0,
     });
   }
   return result;

@@ -2,6 +2,8 @@ import {
   clampToMap,
   groundLineClear,
   isBlockedAt,
+  mapFor,
+  type MapDef,
 } from './map';
 import { findPath } from './pathfinding';
 import {
@@ -40,6 +42,10 @@ export function approach(current: number, target: number, step: number): number 
   return Math.max(target, current - step);
 }
 
+export function unitMap(world: WorldState, unit: UnitState): MapDef {
+  return mapFor(world.map, world.unitTypes.get(unit.typeId)?.movement ?? 'tracked');
+}
+
 export function canStand(world: WorldState, x: number, z: number): boolean {
   const half = world.map.size / 2;
   if (x < -half + UNIT_RADIUS || x > half - UNIT_RADIUS) {
@@ -57,7 +63,7 @@ export function computePath(
   goalX: number,
   goalZ: number,
 ): Point[] | null {
-  const path = findPath(world.map, unit.x, unit.z, goalX, goalZ);
+  const path = findPath(unitMap(world, unit), unit.x, unit.z, goalX, goalZ);
   if (!path || path.length === 0) {
     return null;
   }
@@ -70,7 +76,7 @@ export function followPath(
   type: SimUnitType,
   goal: Point,
 ): void {
-  const map = world.map;
+  const map = mapFor(world.map, type.movement);
   const goalDistance = Math.hypot(goal.x - unit.x, goal.z - unit.z);
   if (goalDistance <= STOP_DISTANCE) {
     unit.path = [];

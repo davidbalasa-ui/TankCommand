@@ -44,6 +44,15 @@ export const unitRowSchema = z
     repair: z
       .object({ radius: z.number().positive(), ratePerSec: z.number().positive() })
       .optional(),
+    movement: z.enum(['tracked', 'hover', 'air']).optional(),
+    air: z
+      .object({
+        ammo: z.number().int().positive(),
+        fuelSec: z.number().positive(),
+        rearmSec: z.number().positive(),
+        cruiseHeight: z.number().positive(),
+      })
+      .optional(),
     deploysTo: z.string().optional(),
     deploySec: z.number().positive().optional(),
     modelAssetId: z.string(),

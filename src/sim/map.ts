@@ -4,6 +4,34 @@ import {
   MAX_SLOPE,
 } from './tuning';
 
+export type MovementClass = 'tracked' | 'hover' | 'air';
+
+export interface LakeFeature {
+  x: number;
+  z: number;
+  radius: number;
+  depth: number;
+}
+
+export interface RiverFeature {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  width: number;
+  depth: number;
+  // Fractions along the river (0 to 1) that stay dry so ground units can cross.
+  fords: Array<{ from: number; to: number }>;
+}
+
+export interface MapFeatures {
+  waterLevel: number | null;
+  lakes: LakeFeature[];
+  rivers: RiverFeature[];
+}
+
+export const NO_FEATURES: MapFeatures = { waterLevel: null, lakes: [], rivers: [] };
+
 export interface MapDef {
   seed: number;
   size: number;
@@ -11,6 +39,14 @@ export interface MapDef {
   cols: number;
   rows: number;
   heights: Float32Array;
+  waterLevel: number | null;
+  // Which kind of unit this view of the map is for. Tracked when absent.
+  movement?: MovementClass;
+}
+
+// The same terrain seen by a unit of another movement class.
+export function mapFor(map: MapDef, movement: MovementClass): MapDef {
+  return (map.movement ?? 'tracked') === movement ? map : { ...map, movement };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -83,6 +119,7 @@ export function generateMap(
   seed: number,
   size = DEFAULT_MAP_SIZE,
   cellSize = DEFAULT_CELL_SIZE,
+  features: MapFeatures = NO_FEATURES,
 ): MapDef {
   const cols = Math.max(1, Math.round(size / cellSize));
   const rows = cols;
@@ -94,6 +131,7 @@ export function generateMap(
     cols,
     rows,
     heights: new Float32Array(stride * stride),
+    waterLevel: features.waterLevel,
   };
 
   const half = map.size / 2;
@@ -140,7 +178,62 @@ export function generateMap(
   flattenCircle(map, 50, 50, 14, 24, 0);
   flattenCircle(map, 20, -20, 6, 10, 0);
 
+  carveWater(map, features);
+
   return map;
+}
+
+function carveWater(map: MapDef, features: MapFeatures): void {
+  if (features.waterLevel === null) {
+    return;
+  }
+  const level = features.waterLevel;
+  const half = map.size / 2;
+  const stride = map.cols + 1;
+  for (let iz = 0; iz <= map.rows; iz += 1) {
+    for (let ix = 0; ix <= map.cols; ix += 1) {
+      const x = -half + ix * map.cellSize;
+      const z = -half + iz * map.cellSize;
+      let target = Number.POSITIVE_INFINITY;
+      let strength = 0;
+      for (const lake of features.lakes) {
+        const d = Math.hypot(x - lake.x, z - lake.z);
+        if (d < lake.radius) {
+          const falloff = smooth(1 - d / lake.radius);
+          if (falloff > strength) {
+            strength = falloff;
+            target = level - lake.depth;
+          }
+        }
+      }
+      for (const river of features.rivers) {
+        const dx = river.x1 - river.x0;
+        const dz = river.z1 - river.z0;
+        const lengthSq = dx * dx + dz * dz;
+        const t = lengthSq === 0 ? 0 : clamp(((x - river.x0) * dx + (z - river.z0) * dz) / lengthSq, 0, 1);
+        if (river.fords.some((ford) => t >= ford.from && t <= ford.to)) {
+          continue;
+        }
+        const d = Math.hypot(x - (river.x0 + dx * t), z - (river.z0 + dz * t));
+        if (d < river.width) {
+          const falloff = smooth(1 - d / river.width);
+          if (falloff > strength) {
+            strength = falloff;
+            target = level - river.depth;
+          }
+        }
+      }
+      if (strength > 0) {
+        const index = iz * stride + ix;
+        const current = map.heights[index] ?? 0;
+        map.heights[index] = current + (target - current) * strength;
+      }
+    }
+  }
+}
+
+export function isWaterAt(map: MapDef, x: number, z: number): boolean {
+  return map.waterLevel !== null && heightAt(map, x, z) < map.waterLevel;
 }
 
 export function heightAt(map: MapDef, x: number, z: number): number {
@@ -183,6 +276,13 @@ export function isBlockedAt(map: MapDef, x: number, z: number): boolean {
   if (x < -half || x > half || z < -half || z > half) {
     return true;
   }
+  const movement = map.movement ?? 'tracked';
+  if (movement === 'air') {
+    return false;
+  }
+  if (movement === 'tracked' && isWaterAt(map, x, z)) {
+    return true;
+  }
   return slopeAt(map, x, z) > MAX_SLOPE;
 }
 
@@ -190,10 +290,17 @@ export function isBlockedCell(map: MapDef, cx: number, cz: number): boolean {
   if (cx < 0 || cz < 0 || cx >= map.cols || cz >= map.rows) {
     return true;
   }
+  const movement = map.movement ?? 'tracked';
+  if (movement === 'air') {
+    return false;
+  }
   const h00 = heightAtVertex(map, cx, cz);
   const h10 = heightAtVertex(map, cx + 1, cz);
   const h01 = heightAtVertex(map, cx, cz + 1);
   const h11 = heightAtVertex(map, cx + 1, cz + 1);
+  if (movement === 'tracked' && map.waterLevel !== null && (h00 + h10 + h01 + h11) / 4 < map.waterLevel) {
+    return true;
+  }
 
   const s1 = Math.abs(h10 - h00) / map.cellSize;
   const s2 = Math.abs(h11 - h01) / map.cellSize;

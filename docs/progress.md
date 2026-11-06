@@ -57,3 +57,13 @@ Diplomacy and vision (written directly by Claude).
 - **Vision.** `src/sim/vision.ts`: per-side explored/visible grid every 4 ticks with terrain line of sight, allied shared viewers, sensor contacts, radar (tower and mobile unit), stealth, remembered structure ghosts, and `perceivedUnits`. State is saved and hashed.
 - **Rendering/UI.** The app hands the renderer, HUD, minimap and test hook a player-view world with hidden enemies removed and ghosts added. Terrain is darkened by a fog texture, contacts are pulsing rings, the minimap shows fog and contacts. Settings has a fog on/revealed toggle.
 - **Not done yet.** FOG-07 frame-cost measurement and the wp06 screenshots 2 to 4.
+
+## WP-07
+
+Enemy AI (written directly by Claude).
+
+- **Structure.** `src/ai/` (ai.ts, aiData.ts, driver.ts). The AI reads only `perceivedUnits` plus its own side's state and returns commands through `stepWithAi`, which feeds them to the normal validated command channel. AI state (rng, scout, attack group) lives in `world.aiStates`, saved and hashed. `src/ai` has the same lint isolation as `src/sim`.
+- **Behaviour.** Miners and tugs kept working, up to two metal stations, a lab with research, turrets by army size, an armed mix of tanks, one scout until an enemy structure is found, ghost-based targeting, defence of workers and base, attack groups with retreat on heavy losses, focus fire on normal and hard, and an all-in fallback when metal runs out. Easy, normal and hard differ only in data (reaction time, army threshold, stations, lab, defence, focus fire); none gets a resource bonus.
+- **Hookup.** Skirmish gives player 2 a normal AI (setting `setting.ai=off` disables it for e2e). Terrain is now rotationally symmetric so both bases are equal.
+- **Tests.** `tests/unit/ai.test.ts` plays 10 fixed-seed hard-vs-easy matches (about 30 s) and checks AI-01 to AI-09 and DET-05. `npm run ai:soak` runs more matches (not part of CI).
+- **Not done.** The debug route to watch AI-vs-AI in test builds, and wp07 screenshots.
