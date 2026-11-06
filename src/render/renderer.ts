@@ -4,6 +4,7 @@ import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
 import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
+import { damageState } from '../sim/structures';
 import type { SimStructureType, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
@@ -98,6 +99,21 @@ interface HealthBar {
 interface StructureVisual {
   mesh: THREE.Mesh;
   height: number;
+  barrel: THREE.Mesh | null;
+  baseColor: THREE.Color;
+}
+
+function structureHeight(kind: string): number {
+  switch (kind) {
+    case 'pad':
+      return 1.2;
+    case 'turret':
+      return 1.8;
+    case 'radar':
+      return 3.4;
+    default:
+      return 2.4;
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -555,7 +571,7 @@ export class RenderView {
     }
     this.placementType = type;
     const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize;
-    const height = type.kind === 'pad' ? 1.2 : 2.4;
+    const height = structureHeight(type.kind);
     const groundY = heightAt(this.world.map, x, z);
     if (!this.placementGhost) {
       const geometry = new THREE.BoxGeometry(size, height, size);
@@ -1145,7 +1161,7 @@ export class RenderView {
       let visual = this.structureVisuals.get(structure.id);
       if (!visual) {
         const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize;
-        const height = type.kind === 'pad' ? 1.2 : 2.4;
+        const height = structureHeight(type.kind);
         const geometry = new THREE.BoxGeometry(size, height, size);
         const material = new THREE.MeshStandardMaterial({
           color: structure.owner === 1 ? FRIENDLY_STRUCTURE_COLOR : ENEMY_STRUCTURE_COLOR,
@@ -1154,8 +1170,25 @@ export class RenderView {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        let barrel: THREE.Mesh | null = null;
+        if (type.kind === 'turret') {
+          barrel = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.5, size * 0.9),
+            new THREE.MeshStandardMaterial({ color: 0x333a44 }),
+          );
+          barrel.position.set(0, height / 2 + 0.3, size * 0.35);
+          const pivot = new THREE.Group();
+          pivot.add(barrel);
+          mesh.add(pivot);
+          barrel.userData.pivot = pivot;
+        }
         this.scene.add(mesh);
-        visual = { mesh, height };
+        visual = {
+          mesh,
+          height,
+          barrel,
+          baseColor: new THREE.Color(structure.owner === 1 ? FRIENDLY_STRUCTURE_COLOR : ENEMY_STRUCTURE_COLOR),
+        };
         this.structureVisuals.set(structure.id, visual);
       }
       visual.mesh.position.set(
@@ -1163,7 +1196,21 @@ export class RenderView {
         heightAt(world.map, structure.x, structure.z) + visual.height / 2,
         structure.z,
       );
+      const damage = damageState(structure.hp, type.hp);
+      const shade = damage === 'ok' ? 1 : damage === 'light' ? 0.8 : damage === 'heavy' ? 0.55 : 0.35;
+      const material = visual.mesh.material;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.color.copy(visual.baseColor).multiplyScalar(shade);
+        material.emissive.setRGB(damage === 'critical' ? 0.35 : 0, 0, 0);
+      }
+      const pivot = visual.barrel?.userData.pivot as THREE.Object3D | undefined;
+      if (pivot) {
+        pivot.rotation.y = structure.turretHeading;
+      }
+      const packing = structure.work?.kind === 'pack' || structure.work?.kind === 'dismantle';
+      visual.mesh.scale.y = packing ? 0.7 : 1;
     }
+    this.syncRubble(world);
     for (const [id, visual] of this.structureVisuals) {
       if (!alive.has(id)) {
         this.scene.remove(visual.mesh);
@@ -1173,6 +1220,35 @@ export class RenderView {
           material.dispose();
         }
         this.structureVisuals.delete(id);
+      }
+    }
+  }
+
+  private readonly rubbleMeshes: THREE.Mesh[] = [];
+
+  private syncRubble(world: WorldState): void {
+    while (this.rubbleMeshes.length < world.rubble.length) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(1, 1.2, 0.5, 7),
+        new THREE.MeshStandardMaterial({ color: 0x4a4540, roughness: 1 }),
+      );
+      this.scene.add(mesh);
+      this.rubbleMeshes.push(mesh);
+    }
+    while (this.rubbleMeshes.length > world.rubble.length) {
+      const mesh = this.rubbleMeshes.pop();
+      if (mesh) {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      }
+    }
+    for (let i = 0; i < world.rubble.length; i += 1) {
+      const item = world.rubble[i];
+      const mesh = this.rubbleMeshes[i];
+      if (item && mesh) {
+        mesh.scale.set(item.radius, 1, item.radius);
+        mesh.position.set(item.x, heightAt(world.map, item.x, item.z) + 0.2, item.z);
       }
     }
   }

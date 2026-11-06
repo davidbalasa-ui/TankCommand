@@ -3,6 +3,8 @@
   "credits.back",
   "help.back",
   "inGame.assign",
+  "inGame.base",
+  "inGame.baseClose",
   "inGame.attackMove",
   "inGame.buildClose",
   "inGame.buildMenu",

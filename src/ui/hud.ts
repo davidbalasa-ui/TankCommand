@@ -3,6 +3,7 @@ import { SIM_TICK_HZ } from '../sim/constants';
 import { UNIT_CAP } from '../sim/tuning';
 import type { WorldState } from '../sim/types';
 import { button } from './controls';
+import { BasePanel, type BaseAction, type BaseView } from './basePanel';
 import type {
   BuildItemView,
   DropQueueView,
@@ -54,6 +55,8 @@ export interface HudContext {
   cancelPlacement?: () => void;
   getWorkerActions?: () => WorkerActions;
   salvageSelected?: () => void;
+  getBaseView?: () => BaseView;
+  baseAction?: (action: BaseAction) => boolean;
 }
 
 const MINIMAP_SIZE = 240;
@@ -164,6 +167,9 @@ export class Hud implements HudHandle {
   private readonly assignButton: HTMLButtonElement;
   private readonly salvageButton: HTMLButtonElement;
   private readonly buildPanel: HTMLDivElement;
+  private readonly basePanel: BasePanel;
+  private readonly baseButton: HTMLButtonElement;
+  private baseOpen = false;
   private readonly buildContent: HTMLDivElement;
   private readonly placementBar: HTMLDivElement;
   private readonly confirmPlacement: HTMLButtonElement;
@@ -265,8 +271,12 @@ export class Hud implements HudHandle {
       ctx.salvageSelected?.();
       this.refresh();
     });
+    this.baseButton = button('inGame', 'base', 'Base', () => {
+      this.setBase(!this.baseOpen);
+    });
     commandBar.append(
       this.buildButton,
+      this.baseButton,
       this.attackButton,
       this.holdButton,
       this.stopButton,
@@ -311,6 +321,25 @@ export class Hud implements HudHandle {
     this.buildContent.className = 'build-content';
     this.buildPanel.append(buildHeader, this.buildContent);
 
+    this.basePanel = new BasePanel(
+      {
+        getView: () =>
+          this.ctx.getBaseView?.() ?? {
+            labId: null,
+            labBusy: false,
+            nodes: [],
+            structures: [],
+            units: [],
+            ore: 0,
+            metal: 0,
+          },
+        act: (action) => this.ctx.baseAction?.(action) ?? false,
+      },
+      () => {
+        this.setBase(false);
+      },
+    );
+
     this.placementBar = document.createElement('div');
     this.placementBar.className = 'hud-placement';
     this.placementBar.dataset.hudItem = 'placementBar';
@@ -331,6 +360,7 @@ export class Hud implements HudHandle {
       this.groupsStrip,
       this.selectionPanel,
       this.buildPanel,
+      this.basePanel.element,
       this.placementBar,
     );
     host.append(this.root);
@@ -362,6 +392,7 @@ export class Hud implements HudHandle {
       minimapRedraws: this.minimapRedraws,
       commandButtonsDisabled: this.attackButton.disabled,
       buildMenuOpen: this.buildMenuOpen,
+      baseOpen: this.baseOpen,
       ore: stats?.ore ?? 0,
       metal: stats?.metal ?? 0,
       workers: workerCount,
@@ -401,6 +432,7 @@ export class Hud implements HudHandle {
     this.groupsButton.classList.toggle('active', this.groupsOpen);
     this.root.classList.toggle('left-handed', this.ctx.isLeftHanded());
     this.root.classList.toggle('build-open', this.buildMenuOpen);
+    this.root.classList.toggle('base-open', this.baseOpen);
     const placing = this.ctx.getPlacement?.() !== null;
     this.root.classList.toggle('placing', placing);
     this.placementBar.classList.toggle('open', placing);
@@ -421,6 +453,7 @@ export class Hud implements HudHandle {
       element.classList.toggle('selected', same);
     }
     this.renderBuildMenu();
+    this.basePanel.refresh();
   }
 
   private update(): void {
@@ -441,7 +474,21 @@ export class Hud implements HudHandle {
     this.drawMinimap(world);
   }
 
+  private setBase(open: boolean): void {
+    this.baseOpen = open;
+    if (open) {
+      this.buildMenuOpen = false;
+      this.groupsOpen = false;
+    }
+    this.basePanel.setOpen(open);
+    this.refresh();
+  }
+
   private setBuildMenu(open: boolean): void {
+    if (open) {
+      this.baseOpen = false;
+      this.basePanel.setOpen(false);
+    }
     this.buildMenuOpen = open;
     this.groupsOpen = false;
     this.groupsStrip.classList.remove('open');

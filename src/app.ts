@@ -58,6 +58,11 @@ import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/l
 import type { RenderStats, RenderView, ScreenBounds } from './render/renderer';
 import { buildSkirmishSetup } from './sim/skirmishSetup';
 import { placementValidity, structureAtPoint } from './sim/spawn';
+import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
+import { upgradeRejection } from './sim/upgrades';
+import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
+import type { BaseAction, BaseView } from './ui/basePanel';
+import type { UpgradeKind } from './sim/types';
 
 export type { IssuedCommand } from './ui/input';
 
@@ -353,6 +358,8 @@ export class App {
       cancelPlacement: () => {
         this.cancelPlacement();
       },
+      getBaseView: () => this.baseView(),
+      baseAction: (action) => this.baseAction(action),
       getWorkerActions: () => this.workerActions(),
       salvageSelected: () => {
         this.salvageSelected();
@@ -579,7 +586,16 @@ export class App {
     const queuedUnits = this.world.dropQueue.filter(
       (order) => order.owner === 1 && order.itemKind === 'unit',
     ).length;
-    const disabled = (kind: 'unit' | 'structure', ore: number, metal: number): string | null => {
+    const disabled = (
+      kind: 'unit' | 'structure',
+      ore: number,
+      metal: number,
+      itemId: string,
+    ): string | null => {
+      if (!isItemUnlocked(this.world, 1, itemId)) {
+        const node = unlockingNode(this.world, 1, itemId);
+        return `Needs: ${node?.name ?? 'research'}`;
+      }
       if (pads.length === 0) {
         return 'No landing pad';
       }
@@ -593,7 +609,7 @@ export class App {
     };
     const items: BuildItemView[] = [];
     for (const row of this.unitRows) {
-      if (row.faction !== faction) {
+      if (row.faction !== faction || this.world.unitTypes.get(row.id)?.deploysTo) {
         continue;
       }
       items.push({
@@ -603,7 +619,7 @@ export class App {
         ore: row.cost.ore,
         metal: row.cost.metal,
         deliverySec: row.deliverySec,
-        disabledReason: disabled('unit', row.cost.ore, row.cost.metal),
+        disabledReason: disabled('unit', row.cost.ore, row.cost.metal, row.id),
       });
     }
     for (const row of this.structureRows) {
@@ -617,10 +633,141 @@ export class App {
         ore: row.cost.ore,
         metal: row.cost.metal,
         deliverySec: row.deliverySec,
-        disabledReason: disabled('structure', row.cost.ore, row.cost.metal),
+        disabledReason: disabled('structure', row.cost.ore, row.cost.metal, row.id),
       });
     }
     return items;
+  }
+
+  baseView(): BaseView {
+    const world = this.world;
+    const stats = this.sideStats(1);
+    const faction = this.factionFor(1);
+    const own = world.structures.filter((item) => item.owner === 1 && item.hp > 0);
+    const labs = own.filter((item) => world.structureTypes.get(item.typeId)?.kind === 'lab');
+    const idleLab = labs.find((item) => item.research === null && item.work === null) ?? null;
+    const done = researchDone(world, 1);
+    const nodes = [...world.researchTree.values()]
+      .filter((node) => node.faction === faction)
+      .map((node) => {
+        const running = own.find((item) => item.research?.nodeId === node.id);
+        let state: 'done' | 'researching' | 'available' | 'locked' = 'available';
+        let reason: string | null = null;
+        if (done.has(node.id)) {
+          state = 'done';
+        } else if (running) {
+          state = 'researching';
+        } else if (node.requires.some((req) => !done.has(req))) {
+          state = 'locked';
+          const need = node.requires.find((req) => !done.has(req));
+          reason = `Needs: ${world.researchTree.get(need ?? '')?.name ?? 'research'}`;
+        } else if (!stats || stats.ore < node.cost.ore || stats.metal < node.cost.metal) {
+          reason = 'Cannot afford';
+        } else if (idleLab) {
+          const code = researchRejection(world, 1, idleLab.id, node.id);
+          reason = code === null ? null : code;
+        }
+        return {
+          id: node.id,
+          name: node.name,
+          ore: node.cost.ore,
+          metal: node.cost.metal,
+          timeSec: node.timeSec,
+          state,
+          reason,
+          progress:
+            running?.research && node.timeSec > 0 ? 1 - running.research.left / node.timeSec : state === 'done' ? 1 : 0,
+        };
+      });
+    const structures = own
+      .filter((item) => world.structureTypes.get(item.typeId)?.kind !== 'pad')
+      .map((item) => {
+        const type = world.structureTypes.get(item.typeId);
+        return {
+          id: item.id,
+          name: type?.name ?? item.typeId,
+          kind: type?.kind ?? 'pad',
+          hpPercent: type ? Math.round((item.hp / type.hp) * 100) : 100,
+          busy: item.work?.kind ?? null,
+          canPack: Boolean(type?.packedUnitId),
+          canDismantle: true,
+        };
+      });
+    const units = this.selectedIds
+      .map((id) => world.units.find((unit) => unit.id === id && unit.owner === 1 && unit.hp > 0))
+      .filter((unit): unit is NonNullable<typeof unit> => unit !== undefined)
+      .map((unit) => {
+        const type = world.unitTypes.get(unit.typeId);
+        const labels: Record<UpgradeKind, string> = { fireRate: 'Fire rate', armor: 'Armor', stealth: 'Stealth' };
+        const kinds = (type?.upgrades ?? []).filter(
+          (kind): kind is UpgradeKind => kind === 'fireRate' || kind === 'armor' || kind === 'stealth',
+        );
+        const upgrades = kinds.map((kind) => {
+          const have = unit.upgrades.includes(kind);
+          const code = have ? null : upgradeRejection(world, 1, unit.id, kind);
+          return {
+            kind,
+            label: `${labels[kind]} ${UPGRADE_COST_ORE}O ${UPGRADE_COST_METAL}M`,
+            have,
+            reason: code,
+          };
+        });
+        return {
+          id: unit.id,
+          name: this.itemName(unit.typeId),
+          hpPercent: type ? Math.round((unit.hp / type.hp) * 100) : 100,
+          canDeploy: Boolean(type?.deploysTo),
+          deployReason: null,
+          upgrades,
+        };
+      });
+    return {
+      labId: idleLab?.id ?? labs[0]?.id ?? null,
+      labBusy: labs.length > 0 && idleLab === null,
+      nodes,
+      structures,
+      units,
+      ore: stats?.ore ?? 0,
+      metal: stats?.metal ?? 0,
+    };
+  }
+
+  baseAction(action: BaseAction): boolean {
+    const base = { tick: this.world.tick + 1, issuer: 1 };
+    switch (action.kind) {
+      case 'research': {
+        const view = this.baseView();
+        const lab = this.world.structures.find(
+          (item) =>
+            item.owner === 1 &&
+            item.hp > 0 &&
+            this.world.structureTypes.get(item.typeId)?.kind === 'lab' &&
+            item.research === null &&
+            item.work === null,
+        );
+        if (!lab || view.labId === null) {
+          return false;
+        }
+        return this.sendCommand({ ...base, kind: 'research', labId: lab.id, nodeId: action.nodeId });
+      }
+      case 'cancelResearch': {
+        const lab = this.world.structures.find((item) => item.owner === 1 && item.research !== null);
+        return lab ? this.sendCommand({ ...base, kind: 'cancelResearch', labId: lab.id }) : false;
+      }
+      case 'pack':
+        return this.sendCommand({ ...base, kind: 'pack', structureId: action.structureId });
+      case 'dismantle':
+        return this.sendCommand({ ...base, kind: 'dismantle', structureId: action.structureId });
+      case 'deploy':
+        return this.sendCommand({ ...base, kind: 'deploy', unitId: action.unitId });
+      case 'upgrade':
+        return this.sendCommand({
+          ...base,
+          kind: 'upgrade',
+          targetId: action.targetId,
+          upgrade: action.upgrade,
+        });
+    }
   }
 
   dropQueue(): DropQueueView[] {

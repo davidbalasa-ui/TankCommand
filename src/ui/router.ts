@@ -82,6 +82,7 @@ export interface HudSnapshot {
   minimapRedraws: number;
   commandButtonsDisabled: boolean;
   buildMenuOpen: boolean;
+  baseOpen: boolean;
   ore: number;
   metal: number;
   workers: number;
@@ -139,6 +140,8 @@ export interface ScreenContext {
   cancelPlacement?: () => void;
   getWorkerActions?: () => WorkerActions;
   salvageSelected?: () => void;
+  getBaseView?: () => import('./basePanel').BaseView;
+  baseAction?: (action: import('./basePanel').BaseAction) => boolean;
 }
 
 export interface ScreenModule {

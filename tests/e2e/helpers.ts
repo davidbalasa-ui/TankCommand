@@ -162,6 +162,7 @@ export interface HudSnapshot {
   minimapRedraws: number;
   commandButtonsDisabled: boolean;
   buildMenuOpen: boolean;
+  baseOpen: boolean;
   ore: number;
   metal: number;
   workers: number;

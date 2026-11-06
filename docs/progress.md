@@ -39,3 +39,12 @@ Economy, Landing Pads and orbital drops.
 - **UI.** The top bar shows live ore, metal, worker count and unit count/cap. The command bar gained Build, Mine, Assign and Salvage. The build sheet is a grouped phone bottom sheet (side panel on desktop) with costs, delivery times, disabled reasons, pad selection, queue progress and cancel. Structure kits enter a ghost-placement mode with green/red validity, confirm and cancel. Tapping a miner then a deposit issues a mine order; tapping a tug then a metal station assigns it.
 - **Render.** Placeholder structure meshes, deposit markers, drop-beam columns and the structure placement ghost are rendered in `src/render/renderer.ts`.
 - **Tests.** Added WP-04 unit suites for ECO-01..06, DROP-01..04, MATCH-01 and DET-02, plus phone e2e coverage for HUD-05, DROP-04, worker orders, salvage, touch placement and MATCH-02 results. `tests/e2e/screens.spec.ts` writes the six `wp04-*` visual-review screenshots.
+
+## WP-05
+
+Turrets, radar, labs, packing, research, upgrades and repair (written directly by Claude).
+
+- **Sim.** `structures.ts` (pack, deploy, dismantle, turret fire, damage states, rubble), `research.ts` (tree, lab jobs, unlocks), `upgrades.ts` (fire rate, armor, stealth) and `repair.ts` (repair vehicles). New commands: pack, deploy, dismantle, research, cancelResearch, upgrade, repair. Placement now also checks slope and rubble.
+- **Data.** Repair and packed-turret units plus turret, radar and lab structures per faction; `research.placeholder.json` with six nodes per faction. All numbers are placeholders until Stage 0.
+- **UI.** A Base button opens a bottom sheet with the research tree (cost, time, state, progress), structure Pack/Dismantle buttons and per-vehicle Deploy/Upgrade buttons. Locked build items show "Needs: <research>"; packed turret units are hidden from the build list. Structures draw per kind, darken with damage, and rubble shows as a mound.
+- **Tests.** `tests/unit/wp05.test.ts` covers STR-01..05, RES-01..02, UPG-01..02, REP-01 and DET-03; `tests/e2e/wp05.spec.ts` checks locked items and the Base sheet by touch.

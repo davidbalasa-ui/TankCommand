@@ -337,7 +337,8 @@ p {
   border-color: #6cf58a;
 }
 
-.hud-build-panel {
+.hud-build-panel,
+.hud-base-panel {
   position: absolute;
   left: 0;
   right: 0;
@@ -356,7 +357,8 @@ p {
   z-index: 6;
 }
 
-.hud-shell.build-open .hud-build-panel {
+.hud-shell.build-open .hud-build-panel,
+.hud-shell.base-open .hud-base-panel {
   display: flex;
 }
 
@@ -503,11 +505,16 @@ p {
 .hud-shell.placing .hud-commandbar,
 .hud-shell.placing .hud-groups,
 .hud-shell.placing .hud-selection,
+.hud-shell.placing .hud-base-panel,
 .hud-shell.placing .hud-build-panel {
   display: none;
 }
 
 /* Build sheet is modal: hide the underlying bottom HUD blocks. */
+.hud-shell.base-open .hud-minimap,
+.hud-shell.base-open .hud-commandbar,
+.hud-shell.base-open .hud-groups,
+.hud-shell.base-open .hud-selection,
 .hud-shell.build-open .hud-minimap,
 .hud-shell.build-open .hud-commandbar,
 .hud-shell.build-open .hud-groups,
@@ -543,4 +550,42 @@ p {
     max-height: min(520px, calc(100vh - 60px));
     border-radius: 8px;
   }
+}
+
+.base-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.base-row-text {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+}
+
+.base-row-text small {
+  opacity: 0.7;
+}
+
+.base-row button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.base-bar {
+  flex: 0 0 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.base-bar > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #6cf58a;
 }

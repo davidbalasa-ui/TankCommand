@@ -171,6 +171,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
               canAssign: false,
               canSalvage: false,
             },
+          getBaseView: () => ctx.getBaseView?.() ?? { labId: null, labBusy: false, nodes: [], structures: [], units: [], ore: 0, metal: 0 },
+          baseAction: (action) => ctx.baseAction?.(action) ?? false,
           salvageSelected: () => {
             ctx.salvageSelected?.();
           },
