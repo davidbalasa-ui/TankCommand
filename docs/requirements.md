@@ -107,3 +107,7 @@
 | MATCH-02 | Results screen shows outcome, time, units built/lost and resources gathered. |
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |
+| DIP-01 | Relations exist for every side pair, default per setup, saved and deterministic; allied/neutral/hostile queries are the only way the sim decides who is an enemy. |
+| DIP-02 | Units auto-engage only hostile targets; neutral sides are never auto-attacked; allied fire including splash never damages allies. |
+| DIP-03 | Damaging a neutral side's unit turns that neutral hostile toward the attacker only (and its group); `diplomacy.set` changes relations; forgiveness timer works. |
+| DIP-05 | A world with three armed sides and one neutral side runs, ends correctly (neutral sides never decide victory, team victory works) and keeps its hash across save/load. |

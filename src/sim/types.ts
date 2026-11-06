@@ -258,6 +258,26 @@ export interface CommandOutcome {
   reason: string;
 }
 
+export type Controller = 'human' | 'ai' | 'scripted' | 'none';
+export type DiplomacyRelation = 'allied' | 'neutral' | 'hostile';
+
+export interface SideState {
+  player: PlayerId;
+  controller: Controller;
+  team: number;
+  groupId: string | null;
+  provokable: boolean;
+  forgiveAfterSec: number | null;
+}
+
+// Relation of side `a` toward side `b` (ordered pair).
+export interface RelationState {
+  a: PlayerId;
+  b: PlayerId;
+  relation: DiplomacyRelation;
+  forgiveLeft: number | null;
+}
+
 export interface FactionAssignment {
   player: PlayerId;
   faction: Faction;
@@ -299,6 +319,8 @@ export interface WorldState {
   nextId: number;
   players: PlayerId[];
   factions: FactionAssignment[];
+  sides: SideState[];
+  relations: RelationState[];
   map: MapDef;
   unitTypes: ReadonlyMap<string, SimUnitType>;
   structureTypes: ReadonlyMap<string, SimStructureType>;

@@ -1,3 +1,4 @@
+import { isCompetitor, sideOf } from './diplomacy';
 import { ensureSideStats, isFightingUnitType } from './economy';
 import type { PlayerId, WorldState } from './types';
 
@@ -31,17 +32,34 @@ export function sideAlive(world: WorldState, player: PlayerId): boolean {
   return false;
 }
 
+// Only human and AI sides count; neutral sides never decide victory. A team wins when every
+// other team is eliminated. `winner` is the lowest player id of the winning team.
 export function updateMatchResult(world: WorldState): void {
-  if (world.result || world.players.length === 0) {
+  if (world.result) {
     return;
   }
-  const alive = world.players.filter((player) => sideAlive(world, player));
-  if (alive.length === 0) {
+  const competitors = world.players.filter((player) => isCompetitor(sideOf(world, player)));
+  if (competitors.length === 0) {
+    return;
+  }
+  const aliveTeams = new Set<number>();
+  const aliveByTeam = new Map<number, number>();
+  for (const player of competitors) {
+    if (sideAlive(world, player)) {
+      const team = sideOf(world, player)?.team ?? player;
+      aliveTeams.add(team);
+      if (!aliveByTeam.has(team)) {
+        aliveByTeam.set(team, player);
+      }
+    }
+  }
+  if (aliveTeams.size === 0) {
     world.result = { winner: null };
     return;
   }
-  if (alive.length === 1) {
-    world.result = { winner: alive[0] ?? null };
+  if (aliveTeams.size === 1) {
+    const [team] = [...aliveTeams];
+    world.result = { winner: team === undefined ? null : (aliveByTeam.get(team) ?? null) };
   }
 }
 

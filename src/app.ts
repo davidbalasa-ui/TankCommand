@@ -751,7 +751,12 @@ export class App {
         return this.sendCommand({ ...base, kind: 'research', labId: lab.id, nodeId: action.nodeId });
       }
       case 'cancelResearch': {
-        const lab = this.world.structures.find((item) => item.owner === 1 && item.research !== null);
+        const lab = this.world.structures.find(
+          (item) =>
+            item.owner === 1 &&
+            item.research !== null &&
+            (action.nodeId === undefined || item.research.nodeId === action.nodeId),
+        );
         return lab ? this.sendCommand({ ...base, kind: 'cancelResearch', labId: lab.id }) : false;
       }
       case 'pack':

@@ -1,3 +1,4 @@
+import { isAllied } from '../sim/diplomacy';
 import type { RenderView } from '../render/renderer';
 import type { WorldState } from '../sim/types';
 import { CAMERA_EDGE_BAND, CAMERA_FOV_DEG } from '../sim/tuning';
@@ -760,7 +761,7 @@ export class InputController {
     if (!structure) {
       return false;
     }
-    if (structure.owner !== 1) {
+    if (!isAllied(this.host.getWorld(), 1, structure.owner)) {
       return this.host.onAttackStructure?.(structure.id) ?? false;
     }
     if (structure.kind === 'metalStation' && this.selectionHasWorker('tug')) {
@@ -841,7 +842,7 @@ export class InputController {
     const selection = this.host.getSelection();
     const enemy = this.host.renderView.pickUnit(x, y, false, true);
     const enemyUnit = enemy === null ? null : world.units.find((unit) => unit.id === enemy);
-    if (enemyUnit && enemyUnit.owner !== 1 && selection.length > 0) {
+    if (enemyUnit && !isAllied(world, 1, enemyUnit.owner) && selection.length > 0) {
       this.issueAttack(selection, enemyUnit.id);
       return;
     }
@@ -874,7 +875,7 @@ export class InputController {
     const enemyId = this.host.renderView.pickUnit(x, y, false, false);
     const world = this.host.getWorld();
     const enemy = enemyId === null ? null : world.units.find((unit) => unit.id === enemyId);
-    if (enemy && enemy.owner !== 1) {
+    if (enemy && !isAllied(world, 1, enemy.owner)) {
       this.issueAttack(selection, enemy.id);
       return;
     }

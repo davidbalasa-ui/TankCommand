@@ -1,3 +1,4 @@
+import { isHostile } from './diplomacy';
 import { SIM_TICK_HZ } from './constants';
 import { heightAt, lineOfSightClear } from './map';
 import { setOutcome } from './drops';
@@ -95,7 +96,7 @@ export function applyDismantleCommand(
     return;
   }
   if (own.type.kind === 'pad' && world.structures.filter(
-    (item) => item.owner === command.issuer && item.hp > 0 && world.structureTypes.get(item.typeId)?.kind === 'pad',
+    (item) => item.owner === command.issuer && item.hp > 0 && item.work?.kind !== 'dismantle' && world.structureTypes.get(item.typeId)?.kind === 'pad',
   ).length <= 1) {
     setOutcome(world, command.tick, 'dismantle', false, 'lastPad');
     return;
@@ -105,6 +106,14 @@ export function applyDismantleCommand(
     return;
   }
   own.structure.work = { kind: 'dismantle', left: own.type.dismantleSec };
+  const running = own.structure.research
+    ? world.researchTree.get(own.structure.research.nodeId)
+    : undefined;
+  if (running) {
+    const stats = ensureSideStats(world, command.issuer);
+    stats.ore += running.cost.ore;
+    stats.metal += running.cost.metal;
+  }
   own.structure.research = null;
   setOutcome(world, command.tick, 'dismantle', true, 'ok');
 }
@@ -251,7 +260,7 @@ export function updateTurrets(world: WorldState, rng: Rng, fire: FireFn): void {
     let best: { id: number; x: number; z: number; structure: boolean } | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
     for (const unit of world.units) {
-      if (unit.hp <= 0 || unit.owner === turret.owner) {
+      if (unit.hp <= 0 || !isHostile(world, turret.owner, unit.owner)) {
         continue;
       }
       const distance = Math.hypot(unit.x - turret.x, unit.z - turret.z);
@@ -262,7 +271,7 @@ export function updateTurrets(world: WorldState, rng: Rng, fire: FireFn): void {
     }
     if (!best) {
       for (const other of world.structures) {
-        if (other.hp <= 0 || other.owner === turret.owner) {
+        if (other.hp <= 0 || !isHostile(world, turret.owner, other.owner)) {
           continue;
         }
         const distance = Math.hypot(other.x - turret.x, other.z - turret.z);

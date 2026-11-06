@@ -1,3 +1,4 @@
+import { isHostile } from '../sim/diplomacy';
 import { heightAt } from '../sim/map';
 import { SIM_TICK_HZ } from '../sim/constants';
 import { UNIT_CAP } from '../sim/tuning';
@@ -387,7 +388,7 @@ export class Hud implements HudHandle {
       attackMoveArmed: this.ctx.isAttackMoveArmed(),
       selectedCount: selection.length,
       ownUnits: ownUnits.length,
-      enemyUnits: world.units.filter((unit) => unit.owner !== 1 && unit.hp > 0).length,
+      enemyUnits: world.units.filter((unit) => isHostile(world, 1, unit.owner) && unit.hp > 0).length,
       minimapFootprint: this.lastFootprint.map((point) => ({ x: point.x, z: point.z })),
       minimapRedraws: this.minimapRedraws,
       commandButtonsDisabled: this.attackButton.disabled,

@@ -78,6 +78,13 @@ const commandSchema = z.discriminatedUnion('kind', [
     unitIds,
   }),
   baseCommand.extend({
+    kind: z.literal('diplomacy.set'),
+    a: entityId,
+    b: entityId,
+    relation: z.enum(['allied', 'neutral', 'hostile']),
+    oneWay: z.boolean().optional(),
+  }),
+  baseCommand.extend({
     kind: z.literal('pack'),
     structureId: entityId,
   }),

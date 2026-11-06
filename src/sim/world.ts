@@ -44,6 +44,16 @@ import {
 } from './drops';
 import { updateMatchResult } from './match';
 import {
+  buildRelations,
+  defaultSide,
+  isAllied,
+  isHostile,
+  provoke,
+  setRelation,
+  touchProvocation,
+  updateDiplomacy,
+} from './diplomacy';
+import {
   applyCancelResearchCommand,
   applyResearchCommand,
   updateResearch,
@@ -76,6 +86,9 @@ import type {
   ProjectileState,
   ResearchNode,
   ResearchSideState,
+  SideState,
+  RelationState,
+  DiplomacyRelation,
   RubbleState,
   SideStats,
   SimAlert,
@@ -105,6 +118,8 @@ export interface CreateWorldOptions {
   startStructures?: StartStructure[];
   deposits?: DepositDef[];
   factions?: FactionAssignment[];
+  sides?: SideState[];
+  relations?: Array<{ a: PlayerId; b: PlayerId; relation: DiplomacyRelation }>;
   startResources?: StartResources[];
   size?: number;
   cellSize?: number;
@@ -178,6 +193,10 @@ function cloneWorld(world: WorldState): WorldState {
     ...world,
     players: [...world.players],
     factions: world.factions.map((entry) => ({ ...entry })),
+    sides: world.sides.map((side) => ({ ...side })),
+    relations: world.relations.map((item) => ({ ...item })),
+    rubble: world.rubble.map((item) => ({ ...item })),
+    research: world.research.map((item) => ({ ...item, done: [...item.done] })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -256,6 +275,8 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     nextId: 1,
     players: [],
     factions: (options.factions ?? []).map((entry) => ({ ...entry })),
+    sides: [],
+    relations: [],
     map,
     unitTypes,
     structureTypes,
@@ -306,7 +327,13 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
   for (const faction of world.factions) {
     owners.add(faction.player);
   }
+  for (const side of options.sides ?? []) {
+    owners.add(side.player);
+  }
   world.players = [...owners].sort((a, b) => a - b);
+  const given = new Map((options.sides ?? []).map((side) => [side.player, side]));
+  world.sides = world.players.map((player) => ({ ...(given.get(player) ?? defaultSide(player)) }));
+  buildRelations(world, options.relations ?? []);
   return world;
 }
 
@@ -518,7 +545,7 @@ function nearestEnemyUnit(world: WorldState, unit: UnitState): UnitState | null 
   let best: UnitState | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
-    if (other.hp <= 0 || other.owner === unit.owner) {
+    if (other.hp <= 0 || !isHostile(world, unit.owner, other.owner)) {
       continue;
     }
     const distance = Math.hypot(other.x - unit.x, other.z - unit.z);
@@ -538,13 +565,13 @@ function selectTarget(
   if (unit.order.kind === 'attack') {
     const id = unit.order.targetId;
     const foundUnit = world.units.find(
-      (other) => other.id === id && other.hp > 0 && other.owner !== unit.owner,
+      (other) => other.id === id && other.hp > 0 && !isAllied(world, unit.owner, other.owner),
     );
     if (foundUnit) {
       return { id: foundUnit.id, x: foundUnit.x, z: foundUnit.z, kind: 'unit' };
     }
     const foundStructure = world.structures.find(
-      (structure) => structure.id === id && structure.hp > 0 && structure.owner !== unit.owner,
+      (structure) => structure.id === id && structure.hp > 0 && !isAllied(world, unit.owner, structure.owner),
     );
     if (foundStructure) {
       return {
@@ -568,7 +595,7 @@ function selectTarget(
   let best: TargetRef | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
-    if (other.hp <= 0 || other.owner === unit.owner) {
+    if (other.hp <= 0 || !isHostile(world, unit.owner, other.owner)) {
       continue;
     }
     const distance = Math.hypot(other.x - unit.x, other.z - unit.z);
@@ -768,7 +795,7 @@ function applySplash(
 ): void {
   const radius = Math.max(0.001, projectile.splashRadius);
   for (const unit of world.units) {
-    if (unit.hp <= 0) {
+    if (unit.hp <= 0 || isAllied(world, projectile.owner, unit.owner)) {
       continue;
     }
     const unitY = heightAt(world.map, unit.x, unit.z) + TARGET_HEIGHT;
@@ -778,6 +805,8 @@ function applySplash(
       const armor = unitArmor(unit, type);
       const damage = Math.max(1, projectile.damage - armor);
       unit.hp = Math.max(0, unit.hp - damage);
+      provoke(world, unit.owner, projectile.owner);
+      touchProvocation(world, unit.owner, projectile.owner);
     }
   }
   // A shot fired at a unit must not splash a structure: the pad that sits next
@@ -787,7 +816,7 @@ function applySplash(
     return;
   }
   for (const structure of world.structures) {
-    if (structure.hp <= 0) {
+    if (structure.hp <= 0 || isAllied(world, projectile.owner, structure.owner)) {
       continue;
     }
     const type = world.structureTypes.get(structure.typeId);
@@ -800,6 +829,8 @@ function applySplash(
     if (structure.id === directStructureId || distance <= radius + structureHitRadius) {
       const damage = Math.max(1, projectile.damage - structureArmor(structure.upgrades, type));
       structure.hp = Math.max(0, structure.hp - damage);
+      provoke(world, structure.owner, projectile.owner);
+      touchProvocation(world, structure.owner, projectile.owner);
     }
   }
 }
@@ -824,7 +855,7 @@ function updateProjectiles(world: WorldState): void {
     let hitStructure: StructureState | null = null;
     let hitT = Number.POSITIVE_INFINITY;
     for (const unit of world.units) {
-      if (unit.hp <= 0 || unit.owner === projectile.owner) {
+      if (unit.hp <= 0 || isAllied(world, projectile.owner, unit.owner)) {
         continue;
       }
       const unitY = heightAt(world.map, unit.x, unit.z) + TARGET_HEIGHT;
@@ -841,7 +872,7 @@ function updateProjectiles(world: WorldState): void {
     }
     if (projectile.targetStructureId !== undefined) {
       for (const structure of world.structures) {
-        if (structure.hp <= 0 || structure.owner === projectile.owner) {
+        if (structure.hp <= 0 || isAllied(world, projectile.owner, structure.owner)) {
           continue;
         }
         const type = world.structureTypes.get(structure.typeId);
@@ -1274,6 +1305,9 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
         case 'salvage':
           applySalvageCommand(next, command);
           break;
+        case 'diplomacy.set':
+          setRelation(next, command.a, command.b, command.relation, command.oneWay === true);
+          break;
         case 'pack':
           applyPackCommand(next, command);
           break;
@@ -1318,6 +1352,7 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   });
   updateStructureWork(next);
   updateDeploys(next);
+  updateDiplomacy(next);
   updateRepair(next);
   updateResearch(next);
   updateWorkers(next);
@@ -1375,6 +1410,8 @@ export function hashWorld(world: WorldState): string {
       nextId: world.nextId,
       players: world.players,
       factions: world.factions,
+      sides: world.sides,
+      relations: world.relations,
       units: world.units.map((unit) => ({
         id: unit.id,
         owner: unit.owner,
@@ -1428,6 +1465,8 @@ export function worldToPayload(world: WorldState): unknown {
     nextId: world.nextId,
     players: [...world.players],
     factions: world.factions.map((entry) => ({ ...entry })),
+    sides: world.sides.map((side) => ({ ...side })),
+    relations: world.relations.map((item) => ({ ...item })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -1559,6 +1598,14 @@ export function payloadToWorld(input: unknown): WorldState | null {
     ? input.players.filter((player): player is number => typeof player === 'number')
     : [];
 
+  const sides: SideState[] =
+    Array.isArray(input.sides) && input.sides.length > 0
+      ? (input.sides as SideState[])
+      : players.map((player) => defaultSide(player));
+  const relations: RelationState[] = Array.isArray(input.relations)
+    ? (input.relations as RelationState[])
+    : [];
+
   let result: WorldResult | null = null;
   if (isRecord(input.result)) {
     const winner = input.result.winner;
@@ -1593,6 +1640,8 @@ export function payloadToWorld(input: unknown): WorldState | null {
     nextId,
     players,
     factions,
+    sides,
+    relations,
     map,
     unitTypes,
     structureTypes,

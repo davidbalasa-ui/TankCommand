@@ -49,7 +49,7 @@ export interface BaseView {
 
 export type BaseAction =
   | { kind: 'research'; nodeId: string }
-  | { kind: 'cancelResearch' }
+  | { kind: 'cancelResearch'; nodeId?: string }
   | { kind: 'pack'; structureId: number }
   | { kind: 'dismantle'; structureId: number }
   | { kind: 'deploy'; unitId: number }
@@ -191,7 +191,7 @@ export class BasePanel {
       bar.style.width = `${Math.round(node.progress * 100)}%`;
       if (node.state === 'researching') {
         const cancel = dyn(`inGame.cancelResearch.${node.id}`, 'Cancel', () => {
-          this.act({ kind: 'cancelResearch' });
+          this.act({ kind: 'cancelResearch', nodeId: node.id });
         });
         row.append(cancel);
       } else if (node.state !== 'done') {

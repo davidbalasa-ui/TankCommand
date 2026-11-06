@@ -1,3 +1,4 @@
+import { isAllied } from './diplomacy';
 import { SIM_TICK_HZ } from './constants';
 import { setOutcome } from './drops';
 import type { Command } from './commands';
@@ -15,7 +16,7 @@ export function updateRepair(world: WorldState): void {
     const { radius, ratePerSec } = type.repair;
     const amount = ratePerSec * DT;
     for (const unit of world.units) {
-      if (unit.id === medic.id || unit.owner !== medic.owner || unit.hp <= 0) {
+      if (unit.id === medic.id || !isAllied(world, medic.owner, unit.owner) || unit.hp <= 0) {
         continue;
       }
       const max = world.unitTypes.get(unit.typeId)?.hp ?? unit.hp;
@@ -24,7 +25,7 @@ export function updateRepair(world: WorldState): void {
       }
     }
     for (const structure of world.structures) {
-      if (structure.owner !== medic.owner || structure.hp <= 0) {
+      if (!isAllied(world, medic.owner, structure.owner) || structure.hp <= 0) {
         continue;
       }
       const max = world.structureTypes.get(structure.typeId)?.hp ?? structure.hp;

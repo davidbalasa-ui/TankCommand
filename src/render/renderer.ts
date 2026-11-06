@@ -4,6 +4,7 @@ import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
 import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
+import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
 import type { SimStructureType, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
@@ -513,7 +514,7 @@ export class RenderView {
         pool = own;
       }
     } else {
-      const enemy = candidates.filter((candidate) => candidate.owner !== 1);
+      const enemy = candidates.filter((candidate) => !isAllied(this.world, 1, candidate.owner));
       if (enemy.length > 0) {
         pool = enemy;
       }
@@ -1098,7 +1099,7 @@ export class RenderView {
     } else {
       root = this.prepareFallback();
     }
-    cloneMaterials(root, unit.owner === 2);
+    cloneMaterials(root, isHostile(this.world, 1, unit.owner));
     root.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.castShadow = true;
