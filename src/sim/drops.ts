@@ -265,7 +265,7 @@ function firstOwnPad(world: WorldState, player: PlayerId): number | null {
   return best;
 }
 
-function addBeam(world: WorldState, owner: PlayerId, x: number, z: number): void {
+export function addBeam(world: WorldState, owner: PlayerId, x: number, z: number): void {
   world.dropBeams.push({ owner, x, z, ttl: DROP_BEAM_TTL_SEC });
 }
 

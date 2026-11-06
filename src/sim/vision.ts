@@ -16,6 +16,7 @@ interface Viewer {
   z: number;
   sight: number;
   sensor: number;
+  free?: boolean;
 }
 
 function cellIndex(world: WorldState, x: number, z: number): number {
@@ -72,6 +73,11 @@ function viewersFor(world: WorldState, player: PlayerId): Viewer[] {
       });
     }
   }
+  if (world.mission && player === world.mission.humanSide) {
+    for (const reveal of world.mission.reveals) {
+      viewers.push({ x: reveal.x, z: reveal.z, sight: reveal.radius, sensor: reveal.radius, free: true });
+    }
+  }
   return viewers;
 }
 
@@ -94,7 +100,7 @@ function markVisible(world: WorldState, viewer: Viewer, visible: Uint8Array): vo
         continue;
       }
       const own = cx === originCx && cz === originCz;
-      if (own || lineOfSightClear(map, viewer.x, viewer.z, eye, tx, tz, heightAt(map, tx, tz) + TARGET_HEIGHT)) {
+      if (own || viewer.free || lineOfSightClear(map, viewer.x, viewer.z, eye, tx, tz, heightAt(map, tx, tz) + TARGET_HEIGHT)) {
         visible[index] = 1;
       }
     }

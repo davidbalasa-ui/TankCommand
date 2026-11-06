@@ -1,3 +1,4 @@
+import type { MissionState } from './triggers';
 import type { MapDef, MapFeatures, MovementClass } from './map';
 
 export type PlayerId = number;
@@ -407,4 +408,5 @@ export interface WorldState {
   research: ResearchSideState[];
   lastCommandOutcome: CommandOutcome | null;
   result: WorldResult | null;
+  mission: MissionState | null;
 }

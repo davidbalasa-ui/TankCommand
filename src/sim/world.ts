@@ -48,6 +48,7 @@ import {
   updateDropQueues,
 } from './drops';
 import { updateMatchResult } from './match';
+import { cloneMission, updateMission, type MissionState } from './triggers';
 import { updateVision } from './vision';
 import {
   buildRelations,
@@ -123,6 +124,7 @@ export interface CreateWorldOptions {
   structureTypes?: ReadonlyMap<string, SimStructureType>;
   researchTree?: ReadonlyMap<string, ResearchNode>;
   mapFeatures?: MapFeatures;
+  mission?: MissionState | null;
   startUnits?: StartUnit[];
   startStructures?: StartStructure[];
   deposits?: DepositDef[];
@@ -216,6 +218,7 @@ function cloneWorld(world: WorldState): WorldState {
     relations: world.relations.map((item) => ({ ...item })),
     rubble: world.rubble.map((item) => ({ ...item })),
     research: world.research.map((item) => ({ ...item, done: [...item.done] })),
+    mission: world.mission ? cloneMission(world.mission) : null,
     vision: world.vision.map(cloneVision),
     aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
     units: world.units.map((unit) => ({
@@ -330,6 +333,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     research: [],
     lastCommandOutcome: null,
     result: null,
+    mission: options.mission ? cloneMission(options.mission) : null,
   };
 
   const starts =
@@ -1411,7 +1415,15 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   updateRubble(next);
   updateDropBeams(next);
   updateAlerts(next);
-  updateMatchResult(next);
+  if (next.mission) {
+    updateMission(next, {
+      attackMove: (target, side, unitIds, x, z) => {
+        applyAttackMoveCommand(target, { kind: 'attackMove', tick: target.tick + 1, issuer: side, unitIds, x, z });
+      },
+    });
+  } else {
+    updateMatchResult(next);
+  }
 
   next.tick = nextTick;
   updateVision(next);
@@ -1498,6 +1510,7 @@ export function hashWorld(world: WorldState): string {
       research: world.research,
       lastCommandOutcome: world.lastCommandOutcome,
       result: world.result,
+      mission: world.mission,
     }),
   );
 }
@@ -1519,6 +1532,7 @@ export function worldToPayload(world: WorldState): unknown {
     factions: world.factions.map((entry) => ({ ...entry })),
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
+    mission: world.mission ? cloneMission(world.mission) : null,
     mapSpec: { size: world.map.size, cellSize: world.map.cellSize, features: world.mapFeatures },
     fogEnabled: world.fogEnabled,
     vision: world.vision.map(cloneVision),
@@ -1575,6 +1589,9 @@ export function payloadToWorld(input: unknown): WorldState | null {
     return null;
   }
 
+  const mission: MissionState | null = isRecord(input.mission)
+    ? cloneMission(input.mission as unknown as MissionState)
+    : null;
   const spec = isRecord(input.mapSpec) ? input.mapSpec : null;
   const mapFeatures: MapFeatures =
     spec && isRecord(spec.features) ? (spec.features as unknown as MapFeatures) : NO_FEATURES;
@@ -1735,5 +1752,6 @@ export function payloadToWorld(input: unknown): WorldState | null {
     research,
     lastCommandOutcome,
     result,
+    mission,
   };
 }

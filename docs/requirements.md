@@ -136,4 +136,13 @@
 | AIR-03 | Weapons honour their target list: ground-only weapons cannot hit airborne units, parked aircraft count as ground. |
 | AIR-04 | Fighters can shoot air; bombers never target air. |
 | AIR-05 | Aircraft ammo is spent one per shot and an empty aircraft stops firing. |
+| MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
+| MSN-02 | Every condition and action type has a unit test that fires it. |
+| MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). |
+| MSN-04 | No placeholder mission can reach a state with no way to win or lose. |
+| MSN-05 | Completing a mission unlocks the next; progress persists across reload; reached missions can be replayed. |
+| MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
+| MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
+| SKR-01 | Skirmish setup options all take effect, with 1 to 3 AI opponents. |
+| DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |
