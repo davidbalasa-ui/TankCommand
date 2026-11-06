@@ -77,6 +77,37 @@ const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('salvage'),
     unitIds,
   }),
+  baseCommand.extend({
+    kind: z.literal('pack'),
+    structureId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('deploy'),
+    unitId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('dismantle'),
+    structureId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('research'),
+    labId: entityId,
+    nodeId: z.string().min(1),
+  }),
+  baseCommand.extend({
+    kind: z.literal('cancelResearch'),
+    labId: entityId,
+  }),
+  baseCommand.extend({
+    kind: z.literal('upgrade'),
+    targetId: entityId,
+    upgrade: z.enum(['fireRate', 'armor', 'stealth']),
+  }),
+  baseCommand.extend({
+    kind: z.literal('repair'),
+    unitIds,
+    targetId: entityId,
+  }),
 ]);
 
 export type Command = z.infer<typeof commandSchema>;

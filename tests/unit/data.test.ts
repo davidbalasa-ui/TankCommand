@@ -26,19 +26,23 @@ function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>>
 describe('unit data containers', () => {
   it('[DATA-01] placeholder table loads against the real asset manifest', () => {
     const table = loadUnitTable(units, registry);
-    expect(table.size).toBe(8);
+    expect(table.size).toBe(12);
     expect([...table.keys()].sort()).toEqual([
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
+      'unit.alien.repair',
       'unit.alien.tug',
+      'unit.alien.turret_packed',
       'unit.human.light_tank',
       'unit.human.ore_miner',
+      'unit.human.repair',
       'unit.human.scout',
       'unit.human.tug',
+      'unit.human.turret_packed',
     ]);
     const structureTable = loadStructureTable(structures);
-    expect(structureTable.size).toBe(4);
+    expect(structureTable.size).toBe(10);
     const mapTable = loadMapTable(maps);
     expect(mapTable).toHaveLength(1);
     expect(mapTable[0]?.deposits.filter((d) => d.kind === 'ore')).toHaveLength(8);
@@ -102,11 +106,15 @@ describe('unit data containers', () => {
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
+      'unit.alien.repair',
       'unit.alien.tug',
+      'unit.alien.turret_packed',
       'unit.human.light_tank',
       'unit.human.ore_miner',
+      'unit.human.repair',
       'unit.human.scout',
       'unit.human.tug',
+      'unit.human.turret_packed',
     ]);
 
     const row = table.get('unit.human.light_tank');
@@ -120,10 +128,14 @@ describe('unit data containers', () => {
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
+      'unit.alien.repair',
       'unit.alien.tug',
+      'unit.alien.turret_packed',
       'unit.human.ore_miner',
+      'unit.human.repair',
       'unit.human.scout',
       'unit.human.tug',
+      'unit.human.turret_packed',
     ]);
   });
 });

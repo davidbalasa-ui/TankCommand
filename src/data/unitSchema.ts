@@ -41,6 +41,11 @@ export const unitRowSchema = z
     workerKind: z.enum(['oreMiner', 'tug']).optional(),
     miningRatePerSec: z.number().positive().optional(),
     salvageRefundPercent: z.number().min(0).max(100).optional(),
+    repair: z
+      .object({ radius: z.number().positive(), ratePerSec: z.number().positive() })
+      .optional(),
+    deploysTo: z.string().optional(),
+    deploySec: z.number().positive().optional(),
     modelAssetId: z.string(),
     source: z.object({
       kind: z.enum(['placeholder', 'video', 'manual', 'tuned']),

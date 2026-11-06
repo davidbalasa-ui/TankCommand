@@ -2,6 +2,7 @@ import type { AssetRegistry } from '../assets/registry';
 import { unitRowSchema, type UnitRow } from './unitSchema';
 import { structureRowSchema, type StructureRow } from './structureSchema';
 import { mapRowSchema, type MapRow } from './mapSchema';
+import { researchRowSchema, type ResearchRow } from './researchSchema';
 
 export class UnitDataError extends Error {
   constructor(message: string) {
@@ -14,6 +15,13 @@ export class StructureDataError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'StructureDataError';
+  }
+}
+
+export class ResearchDataError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResearchDataError';
   }
 }
 
@@ -77,6 +85,43 @@ export function loadStructureTable(json: unknown): ReadonlyMap<string, Structure
       throw new StructureDataError(`${row.id}: duplicate id`);
     }
     table.set(row.id, row);
+  }
+  return table;
+}
+
+export function loadResearchTable(
+  json: unknown,
+  knownItemIds: ReadonlySet<string>,
+): ReadonlyMap<string, ResearchRow> {
+  if (!Array.isArray(json)) {
+    throw new ResearchDataError('Research table must be an array');
+  }
+  const table = new Map<string, ResearchRow>();
+  for (const [index, raw] of json.entries()) {
+    const parsed = researchRowSchema.safeParse(raw);
+    if (!parsed.success) {
+      const id =
+        typeof raw === 'object' && raw !== null && 'id' in raw
+          ? String((raw as { id?: unknown }).id)
+          : `row ${index}`;
+      throw new ResearchDataError(`${id}: ${parsed.error.issues[0]?.message ?? 'invalid row'}`);
+    }
+    if (table.has(parsed.data.id)) {
+      throw new ResearchDataError(`${parsed.data.id}: duplicate id`);
+    }
+    table.set(parsed.data.id, parsed.data);
+  }
+  for (const row of table.values()) {
+    for (const req of row.requires) {
+      if (!table.has(req)) {
+        throw new ResearchDataError(`${row.id}: unknown prerequisite ${req}`);
+      }
+    }
+    for (const item of row.unlocks) {
+      if (!knownItemIds.has(item)) {
+        throw new ResearchDataError(`${row.id}: unlocks unknown item ${item}`);
+      }
+    }
   }
   return table;
 }

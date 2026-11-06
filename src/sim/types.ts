@@ -5,8 +5,9 @@ export type Faction = 'human' | 'alien';
 export type Stance = 'free' | 'hold';
 export type UnitRole = 'worker' | 'scout' | 'tank' | 'artillery' | 'support' | 'air' | 'structure';
 export type WorkerKind = 'oreMiner' | 'tug';
-export type StructureKind = 'pad' | 'metalStation';
+export type StructureKind = 'pad' | 'metalStation' | 'turret' | 'radar' | 'lab';
 export type DepositKind = 'ore' | 'metal';
+export type UpgradeKind = 'fireRate' | 'armor' | 'stealth';
 
 export interface Point {
   x: number;
@@ -54,6 +55,9 @@ export interface UnitState {
   replans: number;
   attackRepathTick: number;
   job: WorkerJob | null;
+  upgrades: string[];
+  // A packed turret deploying back into a structure. Null otherwise.
+  transform: { left: number } | null;
 }
 
 export interface WeaponStats {
@@ -85,6 +89,11 @@ export interface SimUnitType {
   miningRatePerSec: number;
   carryCapacity: number;
   salvageRefundPercent: number;
+  repair: { radius: number; ratePerSec: number } | null;
+  // Set on a packed structure: the structure type it deploys back into.
+  deploysTo: string | null;
+  deploySec: number;
+  upgrades: string[];
 }
 
 export interface SimStructureType {
@@ -103,6 +112,14 @@ export interface SimStructureType {
   metalRatePerSec: number;
   containerSize: number;
   maxContainers: number;
+  weapon: WeaponStats | null;
+  turretTurnDegPerSec: number;
+  packSec: number;
+  packedUnitId: string | null;
+  dismantleSec: number;
+  dismantleRefundPercent: number;
+  sensorRange: number;
+  upgrades: string[];
 }
 
 export interface StructureState {
@@ -115,6 +132,12 @@ export interface StructureState {
   containers: number;
   fill: number;
   depositId: number | null;
+  upgrades: string[];
+  reloadLeft: number;
+  turretHeading: number;
+  // Pack or dismantle in progress; the structure can't fire while it runs.
+  work: { kind: 'pack' | 'dismantle'; left: number } | null;
+  research: { nodeId: string; left: number } | null;
 }
 
 export interface ProjectileState {
@@ -135,6 +158,29 @@ export interface ProjectileState {
   // near a target unit soaks every shot aimed at that unit and the unit can
   // never take damage at all.
   targetStructureId?: number;
+}
+
+export interface RubbleState {
+  x: number;
+  z: number;
+  radius: number;
+  ttl: number;
+}
+
+export interface ResearchNode {
+  id: string;
+  name: string;
+  faction: Faction;
+  cost: { ore: number; metal: number };
+  timeSec: number;
+  requires: string[];
+  unlocks: string[];
+  upgrades: string[];
+}
+
+export interface ResearchSideState {
+  player: PlayerId;
+  done: string[];
 }
 
 export interface WreckState {
@@ -190,7 +236,12 @@ export interface DropOrder {
   costMetal: number;
 }
 
-export type AlertKind = 'depositEmpty' | 'dropArrived' | 'unitLost' | 'structureLost';
+export type AlertKind =
+  | 'depositEmpty'
+  | 'dropArrived'
+  | 'unitLost'
+  | 'structureLost'
+  | 'researchDone';
 
 export interface SimAlert {
   kind: AlertKind;
@@ -261,6 +312,9 @@ export interface WorldState {
   resources: SideStats[];
   projectiles: ProjectileState[];
   wrecks: WreckState[];
+  rubble: RubbleState[];
+  researchTree: ReadonlyMap<string, ResearchNode>;
+  research: ResearchSideState[];
   lastCommandOutcome: CommandOutcome | null;
   result: WorldResult | null;
 }

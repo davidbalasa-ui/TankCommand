@@ -5,11 +5,18 @@
     "faction": "human",
     "role": "tank",
     "techLevel": 1,
-    "cost": { "ore": 100, "metal": 50 },
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
     "deliverySec": 12.5,
     "hp": 220,
     "armor": 4,
-    "speed": { "top": 8, "accel": 4, "turnDegPerSec": 90 },
+    "speed": {
+      "top": 8,
+      "accel": 4,
+      "turnDegPerSec": 90
+    },
     "turretTurnDegPerSec": 120,
     "weapons": [
       {
@@ -20,16 +27,24 @@
         "projectileSpeed": 40,
         "accuracy": 0.85,
         "splashRadius": 0.5,
-        "targets": ["ground", "structure"]
+        "targets": [
+          "ground",
+          "structure"
+        ]
       }
     ],
     "fireOnMove": false,
     "sightRange": 14,
     "sensorRange": 15,
     "abilities": [],
-    "upgrades": ["fireRate", "armor"],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.human.scout",
@@ -37,11 +52,18 @@
     "faction": "human",
     "role": "scout",
     "techLevel": 1,
-    "cost": { "ore": 50, "metal": 0 },
+    "cost": {
+      "ore": 50,
+      "metal": 0
+    },
     "deliverySec": 6,
     "hp": 80,
     "armor": 1,
-    "speed": { "top": 11, "accel": 6, "turnDegPerSec": 150 },
+    "speed": {
+      "top": 11,
+      "accel": 6,
+      "turnDegPerSec": 150
+    },
     "turretTurnDegPerSec": 180,
     "weapons": [
       {
@@ -52,16 +74,24 @@
         "projectileSpeed": 55,
         "accuracy": 0.85,
         "splashRadius": 0,
-        "targets": ["ground", "structure"]
+        "targets": [
+          "ground",
+          "structure"
+        ]
       }
     ],
     "fireOnMove": true,
     "sightRange": 12,
     "sensorRange": 12,
     "abilities": [],
-    "upgrades": ["fireRate", "stealth"],
+    "upgrades": [
+      "fireRate",
+      "stealth"
+    ],
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.human.ore_miner",
@@ -69,24 +99,35 @@
     "faction": "human",
     "role": "worker",
     "techLevel": 1,
-    "cost": { "ore": 80, "metal": 0 },
+    "cost": {
+      "ore": 80,
+      "metal": 0
+    },
     "deliverySec": 8,
     "hp": 120,
     "armor": 1,
-    "speed": { "top": 6, "accel": 3, "turnDegPerSec": 90 },
+    "speed": {
+      "top": 6,
+      "accel": 3,
+      "turnDegPerSec": 90
+    },
     "turretTurnDegPerSec": 0,
     "weapons": [],
     "fireOnMove": false,
     "sightRange": 10,
     "sensorRange": 10,
-    "abilities": ["mine"],
+    "abilities": [
+      "mine"
+    ],
     "upgrades": [],
     "carryCapacity": 20,
     "workerKind": "oreMiner",
     "miningRatePerSec": 4,
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.human.tug",
@@ -94,23 +135,34 @@
     "faction": "human",
     "role": "worker",
     "techLevel": 1,
-    "cost": { "ore": 70, "metal": 20 },
+    "cost": {
+      "ore": 70,
+      "metal": 20
+    },
     "deliverySec": 8,
     "hp": 120,
     "armor": 1,
-    "speed": { "top": 7, "accel": 3.5, "turnDegPerSec": 100 },
+    "speed": {
+      "top": 7,
+      "accel": 3.5,
+      "turnDegPerSec": 100
+    },
     "turretTurnDegPerSec": 0,
     "weapons": [],
     "fireOnMove": false,
     "sightRange": 10,
     "sensorRange": 10,
-    "abilities": ["haul"],
+    "abilities": [
+      "haul"
+    ],
     "upgrades": [],
     "carryCapacity": 10,
     "workerKind": "tug",
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.alien.light_tank",
@@ -118,11 +170,18 @@
     "faction": "alien",
     "role": "tank",
     "techLevel": 1,
-    "cost": { "ore": 100, "metal": 50 },
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
     "deliverySec": 12.5,
     "hp": 220,
     "armor": 4,
-    "speed": { "top": 8, "accel": 4, "turnDegPerSec": 90 },
+    "speed": {
+      "top": 8,
+      "accel": 4,
+      "turnDegPerSec": 90
+    },
     "turretTurnDegPerSec": 120,
     "weapons": [
       {
@@ -133,16 +192,24 @@
         "projectileSpeed": 40,
         "accuracy": 0.85,
         "splashRadius": 0.5,
-        "targets": ["ground", "structure"]
+        "targets": [
+          "ground",
+          "structure"
+        ]
       }
     ],
     "fireOnMove": false,
     "sightRange": 14,
     "sensorRange": 15,
     "abilities": [],
-    "upgrades": ["fireRate", "armor"],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.alien.light_skimmer",
@@ -150,11 +217,18 @@
     "faction": "alien",
     "role": "scout",
     "techLevel": 1,
-    "cost": { "ore": 50, "metal": 0 },
+    "cost": {
+      "ore": 50,
+      "metal": 0
+    },
     "deliverySec": 6,
     "hp": 80,
     "armor": 1,
-    "speed": { "top": 11, "accel": 6, "turnDegPerSec": 150 },
+    "speed": {
+      "top": 11,
+      "accel": 6,
+      "turnDegPerSec": 150
+    },
     "turretTurnDegPerSec": 180,
     "weapons": [
       {
@@ -165,16 +239,24 @@
         "projectileSpeed": 55,
         "accuracy": 0.85,
         "splashRadius": 0,
-        "targets": ["ground", "structure"]
+        "targets": [
+          "ground",
+          "structure"
+        ]
       }
     ],
     "fireOnMove": true,
     "sightRange": 12,
     "sensorRange": 12,
     "abilities": [],
-    "upgrades": ["fireRate", "stealth"],
+    "upgrades": [
+      "fireRate",
+      "stealth"
+    ],
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.alien.ore_miner",
@@ -182,24 +264,35 @@
     "faction": "alien",
     "role": "worker",
     "techLevel": 1,
-    "cost": { "ore": 80, "metal": 0 },
+    "cost": {
+      "ore": 80,
+      "metal": 0
+    },
     "deliverySec": 8,
     "hp": 120,
     "armor": 1,
-    "speed": { "top": 6, "accel": 3, "turnDegPerSec": 90 },
+    "speed": {
+      "top": 6,
+      "accel": 3,
+      "turnDegPerSec": 90
+    },
     "turretTurnDegPerSec": 0,
     "weapons": [],
     "fireOnMove": false,
     "sightRange": 10,
     "sensorRange": 10,
-    "abilities": ["mine"],
+    "abilities": [
+      "mine"
+    ],
     "upgrades": [],
     "carryCapacity": 20,
     "workerKind": "oreMiner",
     "miningRatePerSec": 4,
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
   },
   {
     "id": "unit.alien.tug",
@@ -207,22 +300,183 @@
     "faction": "alien",
     "role": "worker",
     "techLevel": 1,
-    "cost": { "ore": 70, "metal": 20 },
+    "cost": {
+      "ore": 70,
+      "metal": 20
+    },
     "deliverySec": 8,
     "hp": 120,
     "armor": 1,
-    "speed": { "top": 7, "accel": 3.5, "turnDegPerSec": 100 },
+    "speed": {
+      "top": 7,
+      "accel": 3.5,
+      "turnDegPerSec": 100
+    },
     "turretTurnDegPerSec": 0,
     "weapons": [],
     "fireOnMove": false,
     "sightRange": 10,
     "sensorRange": 10,
-    "abilities": ["haul"],
+    "abilities": [
+      "haul"
+    ],
     "upgrades": [],
     "carryCapacity": 10,
     "workerKind": "tug",
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
-    "source": { "kind": "placeholder" }
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.human.repair",
+    "name": "Human Repair Vehicle",
+    "faction": "human",
+    "role": "support",
+    "techLevel": 2,
+    "cost": {
+      "ore": 90,
+      "metal": 30
+    },
+    "deliverySec": 9,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 4,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "repair"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "repair": {
+      "radius": 9,
+      "ratePerSec": 8
+    },
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.human.turret_packed",
+    "name": "Human Packed Turret",
+    "faction": "human",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 400,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "deploysTo": "structure.human.turret",
+    "deploySec": 4,
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.alien.repair",
+    "name": "Alien Repair Vehicle",
+    "faction": "alien",
+    "role": "support",
+    "techLevel": 2,
+    "cost": {
+      "ore": 90,
+      "metal": 30
+    },
+    "deliverySec": 9,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 4,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "repair"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "repair": {
+      "radius": 9,
+      "ratePerSec": 8
+    },
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.alien.turret_packed",
+    "name": "Alien Packed Turret",
+    "faction": "alien",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 400,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "deploysTo": "structure.alien.turret",
+    "deploySec": 4,
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
   }
 ]

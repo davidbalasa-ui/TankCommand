@@ -2,10 +2,12 @@ import rawManifest from '../public/assets/manifest.json';
 import units from './data/units.placeholder.json';
 import structures from './data/structures.placeholder.json';
 import maps from './data/maps.placeholder.json';
+import research from './data/research.placeholder.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
 import {
   loadMapTable,
+  loadResearchTable,
   loadStructureTable,
   loadUnitTable,
 } from './data/dataRegistry';
@@ -32,6 +34,7 @@ import type {
   CommandOutcome,
   DepositState,
   PlayerId,
+  ResearchNode,
   SimStructureType,
   SimUnitType,
   Stance,
@@ -41,6 +44,8 @@ import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
 import {
+  DEFAULT_DISMANTLE_REFUND_PERCENT,
+  DEFAULT_DISMANTLE_SEC,
   DEPOSIT_PICK_RADIUS,
   UNIT_CAP,
 } from './sim/tuning';
@@ -143,6 +148,10 @@ function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string
       miningRatePerSec: row.miningRatePerSec ?? 0,
       carryCapacity: row.carryCapacity ?? 0,
       salvageRefundPercent: row.salvageRefundPercent ?? 0,
+      repair: row.repair ? { radius: row.repair.radius, ratePerSec: row.repair.ratePerSec } : null,
+      deploysTo: row.deploysTo ?? null,
+      deploySec: row.deploySec ?? 0,
+      upgrades: [...row.upgrades],
     });
   }
   return result;
@@ -169,6 +178,14 @@ function buildStructureTypes(
       metalRatePerSec: row.metalRatePerSec ?? 0,
       containerSize: row.containerSize ?? 0,
       maxContainers: row.maxContainers ?? 0,
+      weapon: row.weapon ? { ...row.weapon } : null,
+      turretTurnDegPerSec: row.turretTurnDegPerSec ?? 0,
+      packSec: row.packSec ?? 0,
+      packedUnitId: row.packedUnitId ?? null,
+      dismantleSec: row.dismantleSec ?? DEFAULT_DISMANTLE_SEC,
+      dismantleRefundPercent: row.dismantleRefundPercent ?? DEFAULT_DISMANTLE_REFUND_PERCENT,
+      sensorRange: row.sensorRange ?? row.sightRange,
+      upgrades: [...(row.upgrades ?? [])],
     });
   }
   return result;
@@ -181,6 +198,7 @@ export class App {
   private readonly structureTypes: ReadonlyMap<string, SimStructureType>;
   private readonly unitRows: UnitRow[];
   private readonly structureRows: StructureRow[];
+  private readonly researchTree: ReadonlyMap<string, ResearchNode>;
   private readonly mapData: MapRow;
   private world: WorldState;
   private pendingCommands: Command[] = [];
@@ -222,6 +240,25 @@ export class App {
     this.structureTypes = buildStructureTypes(structureTable);
     this.unitRows = [...table.values()];
     this.structureRows = [...structureTable.values()];
+    const researchTable = loadResearchTable(
+      research,
+      new Set([...table.keys(), ...structureTable.keys()]),
+    );
+    this.researchTree = new Map(
+      [...researchTable.values()].map((row) => [
+        row.id,
+        {
+          id: row.id,
+          name: row.name,
+          faction: row.faction,
+          cost: { ore: row.cost.ore, metal: row.cost.metal },
+          timeSec: row.timeSec,
+          requires: [...row.requires],
+          unlocks: [...row.unlocks],
+          upgrades: [...row.upgrades],
+        },
+      ]),
+    );
     this.world = this.newSkirmish();
     try {
       this.leftHandedValue = window.localStorage.getItem('setting.leftHanded') === 'true';
@@ -370,34 +407,7 @@ export class App {
     if (command.tick >= earliest) {
       return command;
     }
-    switch (command.kind) {
-      case 'noop':
-        return { ...command, tick: earliest };
-      case 'debug.addCounter':
-        return { ...command, tick: earliest };
-      case 'move':
-        return { ...command, tick: earliest };
-      case 'attackMove':
-        return { ...command, tick: earliest };
-      case 'attack':
-        return { ...command, tick: earliest };
-      case 'hold':
-        return { ...command, tick: earliest };
-      case 'stop':
-        return { ...command, tick: earliest };
-      case 'buy':
-        return { ...command, tick: earliest };
-      case 'cancel':
-        return { ...command, tick: earliest };
-      case 'placeKit':
-        return { ...command, tick: earliest };
-      case 'mine':
-        return { ...command, tick: earliest };
-      case 'assign':
-        return { ...command, tick: earliest };
-      case 'salvage':
-        return { ...command, tick: earliest };
-    }
+    return { ...command, tick: earliest };
   }
 
   units(): UnitView[] {
@@ -1028,6 +1038,7 @@ export class App {
     const options: CreateWorldOptions = {
       unitTypes: this.unitTypes,
       structureTypes: this.structureTypes,
+      researchTree: this.researchTree,
       startUnits: setup.startUnits,
       startStructures: setup.startStructures,
       deposits: setup.deposits,

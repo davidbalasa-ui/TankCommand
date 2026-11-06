@@ -43,6 +43,23 @@ import {
   updateDropQueues,
 } from './drops';
 import { updateMatchResult } from './match';
+import {
+  applyCancelResearchCommand,
+  applyResearchCommand,
+  updateResearch,
+} from './research';
+import { applyUpgradeCommand, reloadSeconds, unitArmor, structureArmor } from './upgrades';
+import { resolveRepairCommand, updateRepair } from './repair';
+import {
+  applyDeployCommand,
+  applyDismantleCommand,
+  applyPackCommand,
+  collectRubble,
+  updateDeploys,
+  updateRubble,
+  updateStructureWork,
+  updateTurrets,
+} from './structures';
 import { updateWorkers } from './workers';
 import { addStructure, addUnit } from './spawn';
 import type {
@@ -57,6 +74,9 @@ import type {
   PlayerId,
   Point,
   ProjectileState,
+  ResearchNode,
+  ResearchSideState,
+  RubbleState,
   SideStats,
   SimAlert,
   SimStructureType,
@@ -80,6 +100,7 @@ const TURN_SPEED_FLOOR = 0.25;
 export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
   structureTypes?: ReadonlyMap<string, SimStructureType>;
+  researchTree?: ReadonlyMap<string, ResearchNode>;
   startUnits?: StartUnit[];
   startStructures?: StartStructure[];
   deposits?: DepositDef[];
@@ -143,6 +164,15 @@ function normalizeStance(stance: Stance | undefined): Stance {
   return stance === 'hold' ? 'hold' : 'free';
 }
 
+function cloneStructure(structure: StructureState): StructureState {
+  return {
+    ...structure,
+    upgrades: [...structure.upgrades],
+    work: structure.work ? { ...structure.work } : null,
+    research: structure.research ? { ...structure.research } : null,
+  };
+}
+
 function cloneWorld(world: WorldState): WorldState {
   return {
     ...world,
@@ -153,8 +183,10 @@ function cloneWorld(world: WorldState): WorldState {
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
       job: unit.job ? { ...unit.job } : null,
+      upgrades: [...unit.upgrades],
+      transform: unit.transform ? { ...unit.transform } : null,
     })),
-    structures: world.structures.map((structure) => ({ ...structure })),
+    structures: world.structures.map(cloneStructure),
     deposits: world.deposits.map((deposit) => ({ ...deposit })),
     pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
     dropQueue: world.dropQueue.map((order) => ({ ...order })),
@@ -227,6 +259,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     map,
     unitTypes,
     structureTypes,
+    researchTree: options.researchTree ?? new Map<string, ResearchNode>(),
     units: [],
     structures: [],
     deposits,
@@ -245,6 +278,8 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     })),
     projectiles: [],
     wrecks: [],
+    rubble: [],
+    research: [],
     lastCommandOutcome: null,
     result: null,
   };
@@ -654,7 +689,7 @@ function followPath(
 
 function fireProjectile(
   world: WorldState,
-  shooter: UnitState,
+  shooter: { owner: PlayerId; x: number; z: number },
   targetX: number,
   targetZ: number,
   weapon: WeaponStats,
@@ -740,7 +775,7 @@ function applySplash(
     const distance = Math.hypot(unit.x - x, unitY - y, unit.z - z);
     if (unit.id === directUnitId || distance <= radius + UNIT_RADIUS) {
       const type = world.unitTypes.get(unit.typeId);
-      const armor = type?.armor ?? 0;
+      const armor = unitArmor(unit, type);
       const damage = Math.max(1, projectile.damage - armor);
       unit.hp = Math.max(0, unit.hp - damage);
     }
@@ -763,7 +798,7 @@ function applySplash(
     const structureHitRadius = structureRadius(world, type);
     const distance = Math.hypot(structure.x - x, structY - y, structure.z - z);
     if (structure.id === directStructureId || distance <= radius + structureHitRadius) {
-      const damage = Math.max(1, projectile.damage - type.armor);
+      const damage = Math.max(1, projectile.damage - structureArmor(structure.upgrades, type));
       structure.hp = Math.max(0, structure.hp - damage);
     }
   }
@@ -1115,6 +1150,11 @@ function updateUnits(world: WorldState, rng: Rng): void {
     if (unit.job) {
       continue;
     }
+    // Deploying units stand still and can't fire; updateDeploys finishes the job.
+    if (unit.transform) {
+      unit.speed = 0;
+      continue;
+    }
 
     unit.reloadLeft = Math.max(0, unit.reloadLeft - DT);
     const target = selectTarget(world, unit, type);
@@ -1152,7 +1192,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
           rng,
           target.kind === 'structure' ? target.id : undefined,
         );
-        unit.reloadLeft = weapon.reloadSec;
+        unit.reloadLeft = reloadSeconds(unit, weapon.reloadSec);
       }
     }
   }
@@ -1234,6 +1274,38 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
         case 'salvage':
           applySalvageCommand(next, command);
           break;
+        case 'pack':
+          applyPackCommand(next, command);
+          break;
+        case 'deploy':
+          applyDeployCommand(next, command);
+          break;
+        case 'dismantle':
+          applyDismantleCommand(next, command);
+          break;
+        case 'research':
+          applyResearchCommand(next, command);
+          break;
+        case 'cancelResearch':
+          applyCancelResearchCommand(next, command);
+          break;
+        case 'upgrade':
+          applyUpgradeCommand(next, command);
+          break;
+        case 'repair': {
+          const resolved = resolveRepairCommand(next, command);
+          if (resolved) {
+            applyMoveCommand(next, {
+              kind: 'move',
+              tick: command.tick,
+              issuer: command.issuer,
+              unitIds: resolved.unitIds,
+              x: resolved.x,
+              z: resolved.z,
+            });
+          }
+          break;
+        }
         case 'noop':
           break;
       }
@@ -1241,12 +1313,21 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   }
 
   updateUnits(next, rng);
+  updateTurrets(next, rng, (shooter, x, z, weapon, shotRng, structureId) => {
+    fireProjectile(next, shooter, x, z, weapon, shotRng, structureId);
+  });
+  updateStructureWork(next);
+  updateDeploys(next);
+  updateRepair(next);
+  updateResearch(next);
   updateWorkers(next);
   updateMetalStations(next);
   updateDropQueues(next);
   updateProjectiles(next);
+  collectRubble(next);
   cleanupDead(next);
   updateWrecks(next);
+  updateRubble(next);
   updateDropBeams(next);
   updateAlerts(next);
   updateMatchResult(next);
@@ -1312,6 +1393,8 @@ export function hashWorld(world: WorldState): string {
         replans: unit.replans,
         attackRepathTick: unit.attackRepathTick,
         job: unit.job,
+        upgrades: unit.upgrades,
+        transform: unit.transform,
       })),
       structures: world.structures,
       deposits: world.deposits,
@@ -1322,6 +1405,8 @@ export function hashWorld(world: WorldState): string {
       resources: world.resources,
       projectiles: world.projectiles,
       wrecks: world.wrecks,
+      rubble: world.rubble,
+      research: world.research,
       lastCommandOutcome: world.lastCommandOutcome,
       result: world.result,
     }),
@@ -1348,8 +1433,10 @@ export function worldToPayload(world: WorldState): unknown {
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
       job: unit.job ? { ...unit.job } : null,
+      upgrades: [...unit.upgrades],
+      transform: unit.transform ? { ...unit.transform } : null,
     })),
-    structures: world.structures.map((structure) => ({ ...structure })),
+    structures: world.structures.map(cloneStructure),
     deposits: world.deposits.map((deposit) => ({ ...deposit })),
     pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
     dropQueue: world.dropQueue.map((order) => ({ ...order })),
@@ -1358,10 +1445,13 @@ export function worldToPayload(world: WorldState): unknown {
     resources: world.resources.map((stats) => ({ ...stats })),
     projectiles: world.projectiles.map((projectile) => ({ ...projectile })),
     wrecks: world.wrecks.map((wreck) => ({ ...wreck })),
+    rubble: world.rubble.map((item) => ({ ...item })),
+    research: world.research.map((side) => ({ ...side, done: [...side.done] })),
     lastCommandOutcome: world.lastCommandOutcome ? { ...world.lastCommandOutcome } : null,
     result: world.result ? { winner: world.result.winner } : null,
     unitTypes,
     structureTypes,
+    researchTree: [...world.researchTree.values()].sort((a, b) => a.id.localeCompare(b.id)),
   };
 }
 
@@ -1414,10 +1504,29 @@ export function payloadToWorld(input: unknown): WorldState | null {
         ...unit,
         stance: normalizeStance(unit.stance),
         job: unit.job ?? null,
+        upgrades: Array.isArray(unit.upgrades) ? [...unit.upgrades] : [],
+        transform: unit.transform ?? null,
       }))
     : [];
   const structures: StructureState[] = Array.isArray(input.structures)
-    ? (input.structures as StructureState[])
+    ? (input.structures as StructureState[]).map((structure) => ({
+        ...structure,
+        upgrades: Array.isArray(structure.upgrades) ? [...structure.upgrades] : [],
+        reloadLeft: structure.reloadLeft ?? 0,
+        turretHeading: structure.turretHeading ?? 0,
+        work: structure.work ?? null,
+        research: structure.research ?? null,
+      }))
+    : [];
+  const researchTree = new Map<string, ResearchNode>();
+  if (Array.isArray(input.researchTree)) {
+    for (const node of input.researchTree as ResearchNode[]) {
+      researchTree.set(node.id, node);
+    }
+  }
+  const rubble: RubbleState[] = Array.isArray(input.rubble) ? (input.rubble as RubbleState[]) : [];
+  const research: ResearchSideState[] = Array.isArray(input.research)
+    ? (input.research as ResearchSideState[])
     : [];
   const deposits: DepositState[] = Array.isArray(input.deposits)
     ? (input.deposits as DepositState[])
@@ -1487,6 +1596,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
     map,
     unitTypes,
     structureTypes,
+    researchTree,
     units,
     structures,
     deposits,
@@ -1497,6 +1607,8 @@ export function payloadToWorld(input: unknown): WorldState | null {
     resources,
     projectiles,
     wrecks,
+    rubble,
+    research,
     lastCommandOutcome,
     result,
   };

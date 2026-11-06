@@ -34,6 +34,10 @@ export function tankType(overrides: Partial<SimUnitType> = {}): SimUnitType {
     miningRatePerSec: 0,
     carryCapacity: 0,
     salvageRefundPercent: 0,
+    repair: null,
+    deploysTo: null,
+    deploySec: 0,
+    upgrades: ['fireRate', 'armor'],
     ...overrides,
   };
 }
@@ -113,6 +117,58 @@ export function scoutType(overrides: Partial<SimUnitType> = {}): SimUnitType {
   });
 }
 
+export const NO_TURRET = {
+  weapon: null,
+  turretTurnDegPerSec: 0,
+  packSec: 0,
+  packedUnitId: null,
+  dismantleSec: 4,
+  dismantleRefundPercent: 70,
+  sensorRange: 10,
+  upgrades: [] as string[],
+};
+
+export function turretType(overrides: Partial<SimStructureType> = {}): SimStructureType {
+  return {
+    ...padType(),
+    id: 'structure.test.turret',
+    name: 'Test Turret',
+    kind: 'turret',
+    hp: 400,
+    footprint: { cellsX: 1, cellsZ: 1 },
+    weapon: {
+      damage: 20,
+      range: 14,
+      reloadSec: 1,
+      projectileSpeed: 45,
+      accuracy: 1,
+      splashRadius: 0,
+    },
+    turretTurnDegPerSec: 180,
+    packSec: 2,
+    packedUnitId: 'unit.test.packed_turret',
+    ...overrides,
+  };
+}
+
+export function labType(overrides: Partial<SimStructureType> = {}): SimStructureType {
+  return { ...padType(), id: 'structure.test.lab', name: 'Test Lab', kind: 'lab', ...overrides };
+}
+
+export function packedTurretUnit(overrides: Partial<SimUnitType> = {}): SimUnitType {
+  return tankType({
+    id: 'unit.test.packed_turret',
+    role: 'structure',
+    hp: 400,
+    weapon: null,
+    topSpeed: 2,
+    turretTurnDegPerSec: 0,
+    deploysTo: 'structure.test.turret',
+    deploySec: 2,
+    ...overrides,
+  });
+}
+
 export function padType(overrides: Partial<SimStructureType> = {}): SimStructureType {
   return {
     id: 'structure.test.pad',
@@ -130,6 +186,7 @@ export function padType(overrides: Partial<SimStructureType> = {}): SimStructure
     metalRatePerSec: 0,
     containerSize: 1,
     maxContainers: 1,
+    ...NO_TURRET,
     ...overrides,
   };
 }
@@ -151,6 +208,7 @@ export function metalStationType(overrides: Partial<SimStructureType> = {}): Sim
     metalRatePerSec: 20,
     containerSize: 2,
     maxContainers: 5,
+    ...NO_TURRET,
     ...overrides,
   };
 }

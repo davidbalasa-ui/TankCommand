@@ -1,8 +1,9 @@
-import { clampToMap, isBlockedAt } from './map';
+import { clampToMap, heightAt, isBlockedAt } from './map';
 import { canStand } from './motion';
 import {
   DROP_SPAWN_RADIUS,
   DROP_SPAWN_TRIES,
+  MAX_PLACEMENT_SLOPE,
   PLACEMENT_CLEARANCE,
   PLACEMENT_SAMPLE_STEPS,
   STRUCTURE_PICK_PADDING,
@@ -25,6 +26,8 @@ export type PlacementReason =
   | 'outside'
   | 'blocked'
   | 'overlap'
+  | 'steep'
+  | 'rubble'
   | 'needsMetalDeposit';
 
 export interface PlacementResult {
@@ -75,6 +78,8 @@ export function addUnit(world: WorldState, start: StartUnit): UnitState | null {
     replans: 0,
     attackRepathTick: 0,
     job: null,
+    upgrades: [],
+    transform: null,
   };
   world.units.push(build);
   return build;
@@ -121,6 +126,11 @@ export function addStructure(world: WorldState, start: StartStructure): Structur
     containers: 0,
     fill: 0,
     depositId: deposit?.id ?? null,
+    upgrades: [],
+    reloadLeft: 0,
+    turretHeading: 0,
+    work: null,
+    research: null,
   };
   world.structures.push(structure);
   return structure;
@@ -132,6 +142,7 @@ export function placementValidity(
   type: SimStructureType,
   x: number,
   z: number,
+  ignoreUnitId?: number,
 ): PlacementResult {
   const half = world.map.size / 2;
   const size = structureSize(world, type);
@@ -154,6 +165,29 @@ export function placementValidity(
     }
   }
 
+  let minHeight = Number.POSITIVE_INFINITY;
+  let maxHeight = Number.NEGATIVE_INFINITY;
+  for (const [cx, cz] of [
+    [x - size.x / 2, z - size.z / 2],
+    [x + size.x / 2, z - size.z / 2],
+    [x - size.x / 2, z + size.z / 2],
+    [x + size.x / 2, z + size.z / 2],
+    [x, z],
+  ] as const) {
+    const height = heightAt(world.map, cx, cz);
+    minHeight = Math.min(minHeight, height);
+    maxHeight = Math.max(maxHeight, height);
+  }
+  if ((maxHeight - minHeight) / Math.max(size.x, size.z) > MAX_PLACEMENT_SLOPE) {
+    return { valid: false, reason: 'steep', depositId: null };
+  }
+
+  for (const item of world.rubble) {
+    if (Math.hypot(item.x - x, item.z - z) < item.radius + Math.max(size.x, size.z) / 2) {
+      return { valid: false, reason: 'rubble', depositId: null };
+    }
+  }
+
   for (const structure of world.structures) {
     if (structure.hp <= 0) {
       continue;
@@ -173,7 +207,7 @@ export function placementValidity(
 
   const radius = Math.max(size.x, size.z) / 2;
   for (const unit of world.units) {
-    if (unit.hp <= 0) {
+    if (unit.hp <= 0 || unit.id === ignoreUnitId) {
       continue;
     }
     if (Math.hypot(unit.x - x, unit.z - z) < radius + UNIT_RADIUS) {

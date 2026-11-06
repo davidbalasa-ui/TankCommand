@@ -1,6 +1,7 @@
 import { SIM_TICK_HZ } from './constants';
 import { findNearestFreeSpot, addStructure, addUnit, placementValidity, unitCount } from './spawn';
 import { addAlert, ensureSideStats } from './economy';
+import { isItemUnlocked } from './research';
 import {
   DROP_BEAM_TTL_SEC,
   UNIT_CAP,
@@ -28,9 +29,10 @@ type BuyReason =
   | 'notInRoster'
   | 'padGone'
   | 'unaffordable'
+  | 'locked'
   | 'cap';
 
-function setOutcome(
+export function setOutcome(
   world: WorldState,
   tick: number,
   kind: string,
@@ -63,6 +65,12 @@ function resolveItem(
     if (!unit && structure && structure.faction !== faction) {
       return { item: null, reason: 'notInRoster' };
     }
+  }
+  if (unit && unit.deploysTo !== null) {
+    return { item: null, reason: 'notInRoster' };
+  }
+  if (!isItemUnlocked(world, player, itemId)) {
+    return { item: null, reason: 'locked' };
   }
   if (unit) {
     return { item: { kind: 'unit', unit }, reason: 'ok' };

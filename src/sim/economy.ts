@@ -7,6 +7,7 @@ import {
 } from './tuning';
 import type { Command } from './commands';
 import type {
+  AlertKind,
   CommandOutcome,
   DepositState,
   PlayerId,
@@ -68,7 +69,7 @@ export function creditMetal(world: WorldState, player: PlayerId, amount: number)
 
 export function addAlert(
   world: WorldState,
-  kind: 'depositEmpty' | 'dropArrived' | 'unitLost' | 'structureLost',
+  kind: AlertKind,
   owner: PlayerId,
   x: number,
   z: number,
