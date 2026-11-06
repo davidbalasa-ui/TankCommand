@@ -120,6 +120,7 @@ export class App {
   private readonly structureRows: StructureRow[];
   private readonly researchTree: ReadonlyMap<string, ResearchNode>;
   private readonly mapData: MapRow;
+  private readonly mapRows: MapRow[];
   private world: WorldState;
   private viewCache: { source: WorldState; view: WorldState } | null = null;
   private pendingCommands: Command[] = [];
@@ -153,6 +154,7 @@ export class App {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
     const data = loadSimData(this.registry);
     this.mapData = data.mapData;
+    this.mapRows = data.mapRows;
     this.unitTypes = data.unitTypes;
     this.structureTypes = data.structureTypes;
     this.unitRows = data.unitRows;
@@ -1132,7 +1134,7 @@ export class App {
   private newSkirmish(): WorldState {
     const aiOn = this.aiValue;
     const world = createSkirmishWorld(
-      { unitTypes: this.unitTypes, structureTypes: this.structureTypes, unitRows: this.unitRows, structureRows: this.structureRows, researchTree: this.researchTree, mapData: this.mapData },
+      { unitTypes: this.unitTypes, structureTypes: this.structureTypes, unitRows: this.unitRows, structureRows: this.structureRows, researchTree: this.researchTree, mapData: this.mapData, mapRows: this.mapRows },
       this.nextSeed,
       [
         { player: 1, faction: 'human', controller: 'human' },

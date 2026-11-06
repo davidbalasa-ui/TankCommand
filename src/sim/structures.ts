@@ -2,6 +2,7 @@ import { isHostile } from './diplomacy';
 import { SIM_TICK_HZ } from './constants';
 import { heightAt, lineOfSightClear } from './map';
 import { setOutcome } from './drops';
+import { unitTargetKind, weaponCanHit } from './air';
 import { ensureSideStats } from './economy';
 import { addStructure, addUnit, placementValidity, structureRadius } from './spawn';
 import {
@@ -261,6 +262,9 @@ export function updateTurrets(world: WorldState, rng: Rng, fire: FireFn): void {
     let bestDistance = Number.POSITIVE_INFINITY;
     for (const unit of world.units) {
       if (unit.hp <= 0 || !isHostile(world, turret.owner, unit.owner)) {
+        continue;
+      }
+      if (!weaponCanHit(weapon, unitTargetKind(unit))) {
         continue;
       }
       const distance = Math.hypot(unit.x - turret.x, unit.z - turret.z);

@@ -1,3 +1,4 @@
+import { assignHome, hasFreeAirSlot } from './air';
 import { SIM_TICK_HZ } from './constants';
 import { findNearestFreeSpot, addStructure, addUnit, placementValidity, unitCount } from './spawn';
 import { addAlert, ensureSideStats } from './economy';
@@ -30,7 +31,8 @@ type BuyReason =
   | 'padGone'
   | 'unaffordable'
   | 'locked'
-  | 'cap';
+  | 'cap'
+  | 'noAirBase';
 
 export function setOutcome(
   world: WorldState,
@@ -136,6 +138,9 @@ function rejection(
     unitCount(world, player) + queuedUnits(world, player) >= UNIT_CAP
   ) {
     return { item: resolved.item, reason: 'cap' };
+  }
+  if (resolved.item.kind === 'unit' && resolved.item.unit.air && !hasFreeAirSlot(world, player)) {
+    return { item: resolved.item, reason: 'noAirBase' };
   }
   return { item: resolved.item, reason: 'ok' };
 }
@@ -313,6 +318,7 @@ export function updateDropQueues(world: WorldState): void {
       if (!spawned) {
         continue;
       }
+      assignHome(world, spawned);
       const stats = ensureSideStats(world, player);
       stats.unitsBuilt += 1;
       addBeam(world, player, spot.x, spot.z);

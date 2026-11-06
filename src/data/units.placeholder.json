@@ -546,5 +546,317 @@
     "source": {
       "kind": "placeholder"
     }
+  },
+  {
+    "id": "unit.human.hover_tank",
+    "name": "Hover Tank",
+    "faction": "human",
+    "role": "tank",
+    "techLevel": 2,
+    "cost": {
+      "ore": 130,
+      "metal": 60
+    },
+    "deliverySec": 14,
+    "hp": 200,
+    "armor": 3,
+    "speed": {
+      "top": 9,
+      "accel": 5,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 130,
+    "weapons": [
+      {
+        "id": "cannon",
+        "damage": 26,
+        "range": 11,
+        "reloadSec": 2.2,
+        "projectileSpeed": 42,
+        "accuracy": 0.85,
+        "splashRadius": 0.4,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "hover",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.human.fighter",
+    "name": "Fighter",
+    "faction": "human",
+    "role": "air",
+    "techLevel": 2,
+    "cost": {
+      "ore": 120,
+      "metal": 40
+    },
+    "deliverySec": 12,
+    "hp": 90,
+    "armor": 1,
+    "speed": {
+      "top": 16,
+      "accel": 10,
+      "turnDegPerSec": 200
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [
+      {
+        "id": "guns",
+        "damage": 8,
+        "range": 9,
+        "reloadSec": 0.6,
+        "projectileSpeed": 60,
+        "accuracy": 0.8,
+        "splashRadius": 0,
+        "targets": [
+          "air",
+          "ground"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "air",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    },
+    "air": {
+      "ammo": 40,
+      "fuelSec": 60,
+      "rearmSec": 8,
+      "cruiseHeight": 6
+    }
+  },
+  {
+    "id": "unit.human.bomber",
+    "name": "Bomber",
+    "faction": "human",
+    "role": "air",
+    "techLevel": 2,
+    "cost": {
+      "ore": 160,
+      "metal": 80
+    },
+    "deliverySec": 15,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 11,
+      "accel": 6,
+      "turnDegPerSec": 120
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [
+      {
+        "id": "bombs",
+        "damage": 70,
+        "range": 3,
+        "reloadSec": 1.2,
+        "projectileSpeed": 30,
+        "accuracy": 0.9,
+        "splashRadius": 2.5,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 12,
+    "sensorRange": 12,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "air",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    },
+    "air": {
+      "ammo": 6,
+      "fuelSec": 70,
+      "rearmSec": 12,
+      "cruiseHeight": 8
+    }
+  },
+  {
+    "id": "unit.alien.glider",
+    "name": "Alien Glider",
+    "faction": "alien",
+    "role": "tank",
+    "techLevel": 2,
+    "cost": {
+      "ore": 130,
+      "metal": 60
+    },
+    "deliverySec": 14,
+    "hp": 200,
+    "armor": 3,
+    "speed": {
+      "top": 9,
+      "accel": 5,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 130,
+    "weapons": [
+      {
+        "id": "cannon",
+        "damage": 26,
+        "range": 11,
+        "reloadSec": 2.2,
+        "projectileSpeed": 42,
+        "accuracy": 0.85,
+        "splashRadius": 0.4,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "hover",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.alien.saucer",
+    "name": "Alien Saucer",
+    "faction": "alien",
+    "role": "air",
+    "techLevel": 2,
+    "cost": {
+      "ore": 120,
+      "metal": 40
+    },
+    "deliverySec": 12,
+    "hp": 90,
+    "armor": 1,
+    "speed": {
+      "top": 16,
+      "accel": 10,
+      "turnDegPerSec": 200
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [
+      {
+        "id": "guns",
+        "damage": 8,
+        "range": 9,
+        "reloadSec": 0.6,
+        "projectileSpeed": 60,
+        "accuracy": 0.8,
+        "splashRadius": 0,
+        "targets": [
+          "air",
+          "ground"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "air",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    },
+    "air": {
+      "ammo": 40,
+      "fuelSec": 60,
+      "rearmSec": 8,
+      "cruiseHeight": 6
+    }
+  },
+  {
+    "id": "unit.alien.dropper",
+    "name": "Alien Dropper",
+    "faction": "alien",
+    "role": "air",
+    "techLevel": 2,
+    "cost": {
+      "ore": 160,
+      "metal": 80
+    },
+    "deliverySec": 15,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 11,
+      "accel": 6,
+      "turnDegPerSec": 120
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [
+      {
+        "id": "bombs",
+        "damage": 70,
+        "range": 3,
+        "reloadSec": 1.2,
+        "projectileSpeed": 30,
+        "accuracy": 0.9,
+        "splashRadius": 2.5,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 12,
+    "sensorRange": 12,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "air",
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    },
+    "air": {
+      "ammo": 6,
+      "fuelSec": 70,
+      "rearmSec": 12,
+      "cruiseHeight": 8
+    }
   }
 ]

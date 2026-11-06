@@ -102,12 +102,14 @@ export interface SimData {
   structureRows: StructureRow[];
   researchTree: ReadonlyMap<string, ResearchNode>;
   mapData: MapRow;
+  mapRows: MapRow[];
 }
 
 export function loadSimData(registry: AssetRegistry): SimData {
   const table = loadUnitTable(units, registry);
   const structureTable = loadStructureTable(structures);
-  const mapData = loadMapTable(maps)[0];
+  const mapRows = loadMapTable(maps);
+  const mapData = mapRows[0];
   if (!mapData) {
     throw new Error('No map data available');
   }
@@ -136,6 +138,7 @@ export function loadSimData(registry: AssetRegistry): SimData {
       ]),
     ),
     mapData,
+    mapRows,
   };
 }
 
@@ -151,16 +154,17 @@ export function createSkirmishWorld(
   data: SimData,
   seed: number,
   specs: SkirmishSideSpec[],
-  options: { fog?: boolean } = {},
+  options: { fog?: boolean; mapId?: string } = {},
 ): WorldState {
+  const mapRow = data.mapRows.find((row) => row.id === options.mapId) ?? data.mapData;
   const setup = buildSkirmishSetup(
     data.unitTypes,
     data.structureTypes,
     {
-      size: data.mapData.size,
-      cellSize: data.mapData.cellSize,
-      starts: data.mapData.starts,
-      deposits: data.mapData.deposits,
+      size: mapRow.size,
+      cellSize: mapRow.cellSize,
+      starts: mapRow.starts,
+      deposits: mapRow.deposits,
     },
     specs.map((spec) => ({ player: spec.player, faction: spec.faction })),
   );
@@ -176,6 +180,7 @@ export function createSkirmishWorld(
     size: setup.size,
     cellSize: setup.cellSize,
     fog: options.fog ?? true,
+    mapFeatures: mapRow.features,
     sides: specs.map((spec) => ({
       player: spec.player,
       controller: spec.controller,

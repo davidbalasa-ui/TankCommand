@@ -258,5 +258,53 @@
     "modelId": "structure.lab",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70
+  },
+  {
+    "faction": "human",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.human.air_base",
+    "name": "Air Base",
+    "kind": "airBase",
+    "cost": {
+      "ore": 220,
+      "metal": 60
+    },
+    "deliverySec": 12,
+    "hp": 450,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.pad",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4
+  },
+  {
+    "faction": "alien",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.alien.air_base",
+    "name": "Alien Hangar",
+    "kind": "airBase",
+    "cost": {
+      "ore": 220,
+      "metal": 60
+    },
+    "deliverySec": 12,
+    "hp": 450,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.pad",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4
   }
 ]

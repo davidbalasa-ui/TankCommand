@@ -210,5 +210,47 @@
     "unlocks": [],
     "upgrades": [],
     "placeholder": true
+  },
+  {
+    "id": "research.human.aviation",
+    "name": "Aviation",
+    "faction": "human",
+    "cost": {
+      "ore": 180,
+      "metal": 80
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.human.fire_control"
+    ],
+    "unlocks": [
+      "structure.human.air_base",
+      "unit.human.fighter",
+      "unit.human.bomber",
+      "unit.human.hover_tank"
+    ],
+    "upgrades": [],
+    "placeholder": true
+  },
+  {
+    "id": "research.alien.aviation",
+    "name": "Aviation",
+    "faction": "alien",
+    "cost": {
+      "ore": 180,
+      "metal": 80
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.alien.fire_control"
+    ],
+    "unlocks": [
+      "structure.alien.air_base",
+      "unit.alien.saucer",
+      "unit.alien.dropper",
+      "unit.alien.glider"
+    ],
+    "upgrades": [],
+    "placeholder": true
   }
 ]

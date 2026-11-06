@@ -13,6 +13,7 @@ import {
   lineOfSightClear,
 } from './map';
 import { unitMap } from './motion';
+import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
 import { findPath } from './pathfinding';
 import {
   ATTACK_MOVE_ENGAGE_FACTOR,
@@ -340,6 +341,9 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
   for (const start of options.startStructures ?? []) {
     addStructure(world, start);
   }
+  for (const unit of world.units) {
+    assignHome(world, unit);
+  }
   for (const faction of world.factions) {
     ensureSideStats(world, faction.player);
   }
@@ -623,6 +627,9 @@ function selectTarget(
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const other of world.units) {
     if (other.hp <= 0 || !isHostile(world, unit.owner, other.owner)) {
+      continue;
+    }
+    if (type.weapon && !weaponCanHit(type.weapon, unitTargetKind(other))) {
       continue;
     }
     const distance = Math.hypot(other.x - unit.x, other.z - unit.z);
@@ -962,7 +969,7 @@ function separateUnits(world: WorldState): void {
       }
       for (let j = i + 1; j < world.units.length; j += 1) {
         const b = world.units[j];
-        if (!b || b.hp <= 0) {
+        if (!b || b.hp <= 0 || a.air || b.air) {
           continue;
         }
         let dx = b.x - a.x;
@@ -1213,6 +1220,11 @@ function updateUnits(world: WorldState, rng: Rng): void {
       unit.speed = 0;
       continue;
     }
+    // Aircraft on the ground (parked or rearming) neither move nor shoot.
+    if (unit.air && !isAirborne(unit)) {
+      unit.speed = 0;
+      continue;
+    }
 
     unit.reloadLeft = Math.max(0, unit.reloadLeft - DT);
     const target = selectTarget(world, unit, type);
@@ -1228,7 +1240,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
 
     updateOrderPath(world, unit, type, target);
 
-    if (target && type.weapon && unit.reloadLeft <= 0) {
+    if (target && type.weapon && unit.reloadLeft <= 0 && (!unit.air || unit.air.ammo > 0)) {
       const weapon = type.weapon;
       const distance = Math.hypot(target.x - unit.x, target.z - unit.z);
       const bearing = Math.atan2(target.z - unit.z, target.x - unit.x);
@@ -1251,6 +1263,9 @@ function updateUnits(world: WorldState, rng: Rng): void {
           target.kind === 'structure' ? target.id : undefined,
         );
         unit.reloadLeft = reloadSeconds(unit, weapon.reloadSec);
+        if (unit.air) {
+          unit.air.ammo -= 1;
+        }
       }
     }
   }
@@ -1367,6 +1382,9 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
           }
           break;
         }
+        case 'air':
+          applyAirCommand(next, command);
+          break;
         case 'noop':
           break;
       }
@@ -1374,6 +1392,7 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   }
 
   updateUnits(next, rng);
+  updateAir(next);
   updateTurrets(next, rng, (shooter, x, z, weapon, shotRng, structureId) => {
     fireProjectile(next, shooter, x, z, weapon, shotRng, structureId);
   });

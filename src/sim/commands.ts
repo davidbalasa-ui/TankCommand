@@ -111,6 +111,11 @@ const commandSchema = z.discriminatedUnion('kind', [
     upgrade: z.enum(['fireRate', 'armor', 'stealth']),
   }),
   baseCommand.extend({
+    kind: z.literal('air'),
+    unitIds,
+    action: z.enum(['launch', 'recall']),
+  }),
+  baseCommand.extend({
     kind: z.literal('repair'),
     unitIds,
     targetId: entityId,

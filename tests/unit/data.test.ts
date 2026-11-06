@@ -26,15 +26,21 @@ function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>>
 describe('unit data containers', () => {
   it('[DATA-01] placeholder table loads against the real asset manifest', () => {
     const table = loadUnitTable(units, registry);
-    expect(table.size).toBe(14);
+    expect(table.size).toBe(20);
     expect([...table.keys()].sort()).toEqual([
+      'unit.alien.dropper',
+      'unit.alien.glider',
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
       'unit.alien.radar',
       'unit.alien.repair',
+      'unit.alien.saucer',
       'unit.alien.tug',
       'unit.alien.turret_packed',
+      'unit.human.bomber',
+      'unit.human.fighter',
+      'unit.human.hover_tank',
       'unit.human.light_tank',
       'unit.human.ore_miner',
       'unit.human.radar',
@@ -44,9 +50,9 @@ describe('unit data containers', () => {
       'unit.human.turret_packed',
     ]);
     const structureTable = loadStructureTable(structures);
-    expect(structureTable.size).toBe(10);
+    expect(structureTable.size).toBe(12);
     const mapTable = loadMapTable(maps);
-    expect(mapTable).toHaveLength(1);
+    expect(mapTable).toHaveLength(2);
     expect(mapTable[0]?.deposits.filter((d) => d.kind === 'ore')).toHaveLength(8);
     expect(mapTable[0]?.deposits.filter((d) => d.kind === 'metal')).toHaveLength(4);
   });
@@ -105,13 +111,19 @@ describe('unit data containers', () => {
   it('[DATA-03] placeholderReport lists placeholder rows and drops tuned rows', () => {
     const table = loadUnitTable(units, registry);
     expect(placeholderReport(table)).toEqual([
+      'unit.alien.dropper',
+      'unit.alien.glider',
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
       'unit.alien.radar',
       'unit.alien.repair',
+      'unit.alien.saucer',
       'unit.alien.tug',
       'unit.alien.turret_packed',
+      'unit.human.bomber',
+      'unit.human.fighter',
+      'unit.human.hover_tank',
       'unit.human.light_tank',
       'unit.human.ore_miner',
       'unit.human.radar',
@@ -129,13 +141,19 @@ describe('unit data containers', () => {
     const changed = new Map(table);
     changed.set(row.id, { ...row, source: { kind: 'tuned', ref: 'x' } });
     expect(placeholderReport(changed)).toEqual([
+      'unit.alien.dropper',
+      'unit.alien.glider',
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
       'unit.alien.ore_miner',
       'unit.alien.radar',
       'unit.alien.repair',
+      'unit.alien.saucer',
       'unit.alien.tug',
       'unit.alien.turret_packed',
+      'unit.human.bomber',
+      'unit.human.fighter',
+      'unit.human.hover_tank',
       'unit.human.ore_miner',
       'unit.human.radar',
       'unit.human.repair',
