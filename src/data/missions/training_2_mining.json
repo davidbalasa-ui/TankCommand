@@ -1,0 +1,81 @@
+{
+  "id": "mission.training.2_mining",
+  "campaign": "training",
+  "order": 2,
+  "title": "Mining",
+  "briefing": "Ore pays for everything. Your miner digs ore deposits and carries it to the pad. Mine 300 ore.",
+  "mapId": "map.wp02_skirmish",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 200,
+      "metal": 0
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -52,
+      "z": -46,
+      "heading": 0.785
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -50,
+      "z": -50
+    }
+  ],
+  "objectives": [
+    {
+      "id": "ore",
+      "text": "Reach 500 ore",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Select the miner and tap an ore deposit."
+        }
+      ]
+    },
+    {
+      "id": "rich",
+      "when": {
+        "t": "resourceReached",
+        "side": 1,
+        "ore": 500
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "ore",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "timeLimitSec": 900,
+  "placeholder": true
+}

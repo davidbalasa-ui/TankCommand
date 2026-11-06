@@ -1,0 +1,197 @@
+[
+  {
+    "id": "map.wp02_skirmish",
+    "name": "Utopia Basin",
+    "size": 160,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -50,
+        "z": -50
+      },
+      {
+        "player": 2,
+        "x": 50,
+        "z": 50
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -57,
+        "z": -44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": -57,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -60,
+        "z": -50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": -60,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -58,
+        "z": -52,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -52,
+        "z": -58,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 57,
+        "z": 44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": 57,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": 50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 50,
+        "z": 60,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 58,
+        "z": 52,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 52,
+        "z": 58,
+        "amount": 250
+      }
+    ],
+    "placeholder": true
+  },
+  {
+    "id": "map.wp08_lakeside",
+    "name": "Lakeside Crossing",
+    "size": 160,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -50,
+        "z": -50
+      },
+      {
+        "player": 2,
+        "x": 50,
+        "z": 50
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -57,
+        "z": -44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": -57,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -58,
+        "z": -52,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -52,
+        "z": -58,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 57,
+        "z": 44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": 57,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 58,
+        "z": 52,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 52,
+        "z": 58,
+        "amount": 250
+      }
+    ],
+    "features": {
+      "waterLevel": -0.5,
+      "lakes": [
+        {
+          "x": -25,
+          "z": 25,
+          "radius": 12,
+          "depth": 4
+        },
+        {
+          "x": 25,
+          "z": -25,
+          "radius": 12,
+          "depth": 4
+        }
+      ],
+      "rivers": [
+        {
+          "x0": -80,
+          "z0": 0,
+          "x1": 80,
+          "z1": 0,
+          "width": 8,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.45,
+              "to": 0.55
+            }
+          ]
+        }
+      ]
+    },
+    "placeholder": true
+  }
+]

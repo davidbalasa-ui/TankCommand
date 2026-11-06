@@ -1,0 +1,5 @@
+I applied your files and ran every check for real (Node 22, Chromium, phone 915x412 touch, tablet 1280x800 touch, desktop 1920x1080). Below is the real failure output, trimmed.
+Fix every failure at its root cause. Same rules as before: no eslint-disable, no weakening lint/tsconfig/tests, no skipped or deleted tests, no new dependencies.
+If a test you wrote is wrong (it tests something the spec doesn't require, or it is racy), fix the test and say why; if the code is wrong, fix the code.
+Return ONLY the files you changed, as full files, in the same block format, then a short REPORT block listing each fix and its root cause.
+

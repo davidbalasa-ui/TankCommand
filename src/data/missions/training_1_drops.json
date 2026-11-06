@@ -1,0 +1,109 @@
+{
+  "id": "mission.training.1_drops",
+  "campaign": "training",
+  "order": 1,
+  "title": "Drops and Movement",
+  "briefing": "Commander, welcome to the field. Orders arrive by drop pod. Open Build, buy a Light Tank, then drive any tank to the marked area.",
+  "mapId": "map.wp02_skirmish",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 400,
+      "metal": 100
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46,
+      "z": -48,
+      "heading": 0.785
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -50,
+      "z": -50
+    }
+  ],
+  "objectives": [
+    {
+      "id": "buy",
+      "text": "Buy a Light Tank",
+      "kind": "primary"
+    },
+    {
+      "id": "move",
+      "text": "Move a tank to the marked area",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Buy a Light Tank, then send a tank to the marked area."
+        }
+      ]
+    },
+    {
+      "id": "bought",
+      "when": {
+        "t": "unitsAlive",
+        "side": 1,
+        "op": ">=",
+        "count": 2
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "buy",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Good drop. Now move out."
+        }
+      ]
+    },
+    {
+      "id": "arrived",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": -25,
+        "z": -25,
+        "radius": 7
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "move",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "timeLimitSec": 900,
+  "placeholder": true
+}

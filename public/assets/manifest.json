@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "unit.human.poc_tank",
+      "kind": "model",
+      "path": "assets/models/human/poc_tank.glb",
+      "bytes": 111064,
+      "faction": "human",
+      "tags": ["poc"],
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Proof-of-concept tank",
+        "usedFor": "Placeholder human tank"
+      }
+    }
+  ]
+}

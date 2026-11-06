@@ -1,20 +1,72 @@
-# TankCommand (Orbital Drop Command)
+# TankCommand
 
-Modernized 3D mobile & web real-time strategy rebuild inspired by the 1998 classic *Armor Command* (Ronin Entertainment / Ripcord Games), architected by David Balasa.
+TankCommand is a mobile and desktop real-time strategy game rebuild, currently containing only the project foundation: deterministic simulation plumbing, asset and data containers, platform storage/lifecycle services, a DOM UI shell, and a three.js render shell. Gameplay rules, balance data, AI, pathfinding, combat and missions are not implemented yet.
 
-## Key Features
-- **Orbital Drop Pad Production Loop**: Queue vehicles and structure kits in orbit aboard the Seed Ship and beam them down to planetary **Landing Pads**.
-- **Dual-Resource Economy & Physical Tug Convoys**: Harvest surface **Ore** with mobile Resource Miners (auto-dismantling on vein depletion) and refine high-tier **Metal / Precursor Metal** using a two-part **Mining Platform + Resource Tug** supply convoy.
-- **Untethered Map-Wide Placement & Pack/Relocate Defenses**: Place turrets and structures anywhere on clear terrain with zero power-grid tether, or dismantle/relocate turrets (4s timer, 70% Ore refund) to leapfrog with the front line.
-- **100% Vehicular Fire-on-the-Move Roster**: 12 mechanical unit/structure classes across **Tech Levels 1–6**, featuring decoupled 360-degree turret tracking, per-vehicle field upgrades (*"Scanning Vehicle — Upgrade Launched"*), and active **Long-Range Radar** piercing the Fog of War.
-- **Continuous 3-Tier Camera Rig**: Smoothly interpolate along `z in [0.0, 1.0]` between **Tier 1 Satellite Strategic View (MSDF Tactical Icons)**, **Tier 2 Tactical 3D PBR View**, and **Tier 3 Action Close-Up Chase Cam**—plus a 1-click **1998 Retro CRT/Affine Mode**.
-- **Two-Layer Utility AI & Special "Overpower: Orbital Director" Mode**: Battle 4 distinct AI Commander personalities (*Convoy Raider*, *Leapfrog Siege*, *Xenomorphic Swarm*, and *Obelisk Archon*) across Precursor Teleporters, Charged Ground conduits, and the 60-second Superweapon Obelisk race.
-- **Autonomous Headless Browser E2E Swim Suite (`tests/e2e_headless_swim.py`)**: Verifies all 9 screens across 3 mobile/tablet viewports, economy/combat loops, 20,000-tick AI-vs-AI soak tests, and 4 visual camera modes via `window.__QA_BRIDGE__`.
+## Prerequisites
 
-## Playing it / Deploying
-The whole game is one self-contained `index.html` (no build step). It deploys to Vercel as a static site using `vercel.json` (no framework, no build, output directory `.`).
+- Node.js 22
+- npm
+- For Android packaging: Android Studio and the Capacitor Android platform generated after install.
 
-- **Locally:** `npx serve .` then open http://localhost:3000
-- **Vercel:** import this repo at https://vercel.com/new, leave Framework Preset as "Other", and deploy. Every push to `main` redeploys.
+## Scripts
 
-The original design spec is in `docs/Armor_Command_1998_Mobile_Rebuild_SOR.pdf`.
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite development server. |
+| `npm run build` | Typecheck both TypeScript configs and build `dist/`. |
+| `npm run preview` | Preview the built app on port 4173. |
+| `npm run typecheck` | Run both TypeScript project typechecks. |
+| `npm run lint` | Run ESLint with zero warnings allowed. |
+| `npm test` | Run Vitest unit tests. |
+| `npm run test:e2e` | Run Playwright end-to-end tests. |
+| `npm run credits` | Regenerate `CREDITS.md` and `public/CREDITS.md`. |
+| `npm run credits:check` | Fail if credits files are stale. |
+| `npm run coverage:req` | Check requirement IDs against test titles. |
+| `npm run cap:sync` | Build and sync the Capacitor Android project. |
+| `npm run ci` | Run the full local CI sequence. |
+
+## Folder map
+
+- `src/sim/` — deterministic headless simulation plumbing.
+- `src/data/` — unit data schema and placeholder rows.
+- `src/assets/` — asset manifest schema, registry, loader and three.js decoders.
+- `src/platform/` — storage, saves, lifecycle and watchdog services.
+- `src/render/` — three.js renderer shell.
+- `src/ui/` — DOM screen router, controls and screens.
+- `src/testhook/` — browser test hook, included only in test builds.
+- `tests/unit/` — Vitest tests.
+- `tests/e2e/` — Playwright tests.
+- `scripts/` — credits and requirement-coverage scripts.
+- `docs/` — requirements, decisions and progress notes.
+
+## Running end-to-end tests
+
+Install Playwright Chromium once:
+
+```sh
+npx playwright install --with-deps chromium
+```
+
+Then run:
+
+```sh
+npm run test:e2e
+```
+
+The Playwright web server builds with `VITE_TEST_HOOK=1` and runs the preview server on port 4173.
+
+## Adding an asset
+
+1. Put the file under `public/assets/...`.
+2. Add an entry to `public/assets/manifest.json` with the exact byte size and credit fields.
+3. Run `npm run credits`.
+4. Run `npm test` and `npm run credits:check`.
+
+## Building Android
+
+```sh
+npx cap add android
+npm run cap:sync
+```
+
+Then open the generated `android/` folder in Android Studio. The `android/` folder is generated by Capacitor and is not written by this package.

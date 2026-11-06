@@ -1,0 +1,310 @@
+[
+  {
+    "id": "structure.human.landing_pad",
+    "name": "Landing Pad",
+    "faction": "human",
+    "kind": "pad",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 15,
+    "hp": 1200,
+    "armor": 8,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 18,
+    "modelId": "structure.landing_pad",
+    "buildOnMetalDeposit": false,
+    "placeholder": true
+  },
+  {
+    "id": "structure.human.metal_station",
+    "name": "Metal Station",
+    "faction": "human",
+    "kind": "metalStation",
+    "cost": {
+      "ore": 200,
+      "metal": 50
+    },
+    "deliverySec": 12,
+    "hp": 600,
+    "armor": 4,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.metal_station",
+    "buildOnMetalDeposit": true,
+    "metalRatePerSec": 1.5,
+    "containerSize": 10,
+    "maxContainers": 5,
+    "placeholder": true
+  },
+  {
+    "id": "structure.alien.landing_pad",
+    "name": "Alien Landing Pad",
+    "faction": "alien",
+    "kind": "pad",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 15,
+    "hp": 1200,
+    "armor": 8,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 18,
+    "modelId": "structure.landing_pad",
+    "buildOnMetalDeposit": false,
+    "placeholder": true
+  },
+  {
+    "id": "structure.alien.metal_station",
+    "name": "Alien Metal Station",
+    "faction": "alien",
+    "kind": "metalStation",
+    "cost": {
+      "ore": 200,
+      "metal": 50
+    },
+    "deliverySec": 12,
+    "hp": 600,
+    "armor": 4,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.metal_station",
+    "buildOnMetalDeposit": true,
+    "metalRatePerSec": 1.5,
+    "containerSize": 10,
+    "maxContainers": 5,
+    "placeholder": true
+  },
+  {
+    "faction": "human",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.human.turret",
+    "name": "Human Gun Turret",
+    "kind": "turret",
+    "cost": {
+      "ore": 150,
+      "metal": 30
+    },
+    "deliverySec": 10,
+    "hp": 400,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 14,
+    "modelId": "structure.turret",
+    "weapon": {
+      "damage": 15,
+      "range": 14,
+      "reloadSec": 1.5,
+      "projectileSpeed": 45,
+      "accuracy": 0.85,
+      "splashRadius": 0
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.human.turret_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ]
+  },
+  {
+    "faction": "human",
+    "armor": 2,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.human.radar",
+    "name": "Human Radar Tower",
+    "kind": "radar",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "deliverySec": 10,
+    "hp": 250,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 12,
+    "modelId": "structure.radar",
+    "sensorRange": 32,
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70
+  },
+  {
+    "faction": "human",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.human.lab",
+    "name": "Human Research Lab",
+    "kind": "lab",
+    "cost": {
+      "ore": 250,
+      "metal": 50
+    },
+    "deliverySec": 12,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.lab",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70
+  },
+  {
+    "faction": "alien",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.alien.turret",
+    "name": "Alien Gun Turret",
+    "kind": "turret",
+    "cost": {
+      "ore": 150,
+      "metal": 30
+    },
+    "deliverySec": 10,
+    "hp": 400,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 14,
+    "modelId": "structure.turret",
+    "weapon": {
+      "damage": 15,
+      "range": 14,
+      "reloadSec": 1.5,
+      "projectileSpeed": 45,
+      "accuracy": 0.85,
+      "splashRadius": 0
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.alien.turret_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ]
+  },
+  {
+    "faction": "alien",
+    "armor": 2,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.alien.radar",
+    "name": "Alien Radar Tower",
+    "kind": "radar",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "deliverySec": 10,
+    "hp": 250,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 12,
+    "modelId": "structure.radar",
+    "sensorRange": 32,
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70
+  },
+  {
+    "faction": "alien",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.alien.lab",
+    "name": "Alien Research Lab",
+    "kind": "lab",
+    "cost": {
+      "ore": 250,
+      "metal": 50
+    },
+    "deliverySec": 12,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.lab",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70
+  },
+  {
+    "faction": "human",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.human.air_base",
+    "name": "Air Base",
+    "kind": "airBase",
+    "cost": {
+      "ore": 220,
+      "metal": 60
+    },
+    "deliverySec": 12,
+    "hp": 450,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.pad",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4
+  },
+  {
+    "faction": "alien",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "id": "structure.alien.air_base",
+    "name": "Alien Hangar",
+    "kind": "airBase",
+    "cost": {
+      "ore": 220,
+      "metal": 60
+    },
+    "deliverySec": 12,
+    "hp": 450,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.pad",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4
+  }
+]

@@ -1,0 +1,14 @@
+export const BOX_DRAG_THRESHOLD = 6; // placeholder until Stage 0
+export const TAP_MAX_MOVE = 8; // placeholder until Stage 0
+export const TAP_MAX_MS = 500; // placeholder until Stage 0
+export const DOUBLE_TAP_MS = 300; // placeholder until Stage 0
+export const DOUBLE_TAP_DISTANCE = 30; // placeholder until Stage 0
+export const LONG_PRESS_MS = 400; // placeholder until Stage 0
+export const TWO_FINGER_TAP_MAX_MOVE = 10; // placeholder until Stage 0
+export const TWO_FINGER_TAP_MS = 400; // placeholder until Stage 0
+export const MIN_PINCH_DISTANCE = 0.01; // placeholder until Stage 0
+export const GROUP_LONG_PRESS_MS = 450; // placeholder until Stage 0
+export const GROUP_DOUBLE_TAP_MS = 600; // placeholder until Stage 0
+export const KEY_ROTATE_SPEED = 1.2; // placeholder until Stage 0
+export const MOUSE_ROTATE_SPEED = 0.005; // placeholder until Stage 0
+export const CLEAR_ATTACK_MOVE_AFTER_MS = 4000; // placeholder until Stage 0
