@@ -130,6 +130,17 @@ export function updateAir(world: WorldState): void {
     if (!air || !type?.air || unit.hp <= 0) {
       continue;
     }
+    if (air.mode === 'parked' || air.mode === 'rearming') {
+      const homeAlive = world.structures.some((s) => s.id === air.homeId && s.hp > 0);
+      if (!homeAlive) {
+        const base = nearestBase(world, unit, true);
+        air.homeId = base ? base.id : null;
+        if (base) {
+          unit.x = base.x;
+          unit.z = base.z;
+        }
+      }
+    }
     if (air.mode === 'parked') {
       continue;
     }

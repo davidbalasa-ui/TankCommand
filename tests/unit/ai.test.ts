@@ -40,9 +40,11 @@ function playMatch(seed: number): Played {
 }
 
 describe('enemy AI', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     for (let seed = 1; seed <= 10; seed += 1) {
       played.push(playMatch(seed));
+      // Yield so vitest's worker RPC is not starved on slow CI machines.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }, 600_000);
 

@@ -467,9 +467,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             : 'Mission failed'
           : winner === 1
             ? 'Victory'
-            : winner === 2
-              ? 'Defeat'
-              : 'Draw';
+            : winner === null
+              ? 'Draw'
+              : 'Defeat';
       }
       if (view?.mission) {
         const note = document.createElement('p');

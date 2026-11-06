@@ -1,5 +1,6 @@
 import { SIM_TICK_HZ } from './constants';
 import { relation, setRelation } from './diplomacy';
+import { assignHome } from './air';
 import { addBeam } from './drops';
 import { ensureSideStats } from './economy';
 import { sideAlive } from './match';
@@ -180,6 +181,7 @@ export function runAction(
           heading: 0,
         });
         if (unit) {
+          assignHome(world, unit);
           if (action.tag) {
             tagUnit(mission, action.tag, unit.id);
           }

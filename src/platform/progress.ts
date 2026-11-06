@@ -31,6 +31,9 @@ export function parseProgress(raw: string | null): CampaignProgress {
     const result = emptyProgress();
     if (typeof completed === 'object' && completed !== null) {
       for (const [id, entry] of Object.entries(completed)) {
+        if (typeof entry !== 'object' || entry === null) {
+          continue;
+        }
         const e = entry as { bestTimeSec?: unknown; wins?: unknown };
         if (typeof e.bestTimeSec === 'number' && typeof e.wins === 'number') {
           result.completed[id] = { bestTimeSec: e.bestTimeSec, wins: e.wins };

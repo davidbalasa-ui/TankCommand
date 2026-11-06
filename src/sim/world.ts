@@ -1589,9 +1589,14 @@ export function payloadToWorld(input: unknown): WorldState | null {
     return null;
   }
 
-  const mission: MissionState | null = isRecord(input.mission)
-    ? cloneMission(input.mission as unknown as MissionState)
-    : null;
+  let mission: MissionState | null = null;
+  if (isRecord(input.mission)) {
+    const m = input.mission;
+    if (!Array.isArray(m.fired) || !Array.isArray(m.objectives) || !Array.isArray(m.messages) || !Array.isArray(m.reveals) || !isRecord(m.tags) || !isRecord(m.def)) {
+      return null;
+    }
+    mission = cloneMission(input.mission as unknown as MissionState);
+  }
   const spec = isRecord(input.mapSpec) ? input.mapSpec : null;
   const mapFeatures: MapFeatures =
     spec && isRecord(spec.features) ? (spec.features as unknown as MapFeatures) : NO_FEATURES;

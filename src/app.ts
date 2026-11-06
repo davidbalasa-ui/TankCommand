@@ -1052,7 +1052,7 @@ export class App {
   }
 
   structureAt(x: number, z: number): { id: number; owner: PlayerId; kind: string } | null {
-    const structure = structureAtPoint(this.world, x, z);
+    const structure = structureAtPoint(this.viewWorld(), x, z);
     if (!structure) {
       return null;
     }
