@@ -236,6 +236,7 @@ export async function enterGame(page: Page, options: { fog?: boolean } = {}): Pr
   await page.addInitScript((on: boolean) => {
     try {
       window.localStorage.setItem('setting.fog', on ? 'on' : 'revealed');
+      window.localStorage.setItem('setting.ai', 'off');
     } catch {
       // Storage may be unavailable.
     }
@@ -501,4 +502,17 @@ export function countDistinctPngColors(buffer: Buffer): number {
     }
   }
   return colors.size;
+}
+
+// Opens the app with the AI off and fog revealed, the baseline most e2e flows were written against.
+export async function gotoQuiet(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem('setting.fog', 'revealed');
+      window.localStorage.setItem('setting.ai', 'off');
+    } catch {
+      // Storage may be unavailable.
+    }
+  });
+  await page.goto('/');
 }

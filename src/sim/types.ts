@@ -276,9 +276,25 @@ export interface SensorContact {
 export interface VisionSideState {
   player: PlayerId;
   cells: string;
+  signature: string;
   visibleUnits: number[];
   contacts: SensorContact[];
   ghosts: GhostStructure[];
+}
+
+export type AiDifficulty = 'easy' | 'normal' | 'hard';
+
+// Saved with the match. The AI module owns the contents; the sim only stores and hashes them.
+export interface AiState {
+  player: PlayerId;
+  difficulty: AiDifficulty;
+  rngState: number;
+  scoutId: number | null;
+  groupIds: number[];
+  groupStartValue: number;
+  waypoint: number;
+  lastPads: Array<{ x: number; z: number }>;
+  spent: number;
 }
 
 export type Controller = 'human' | 'ai' | 'scripted' | 'none';
@@ -343,6 +359,7 @@ export interface WorldState {
   players: PlayerId[];
   factions: FactionAssignment[];
   fogEnabled: boolean;
+  aiStates: AiState[];
   vision: VisionSideState[];
   sides: SideState[];
   relations: RelationState[];

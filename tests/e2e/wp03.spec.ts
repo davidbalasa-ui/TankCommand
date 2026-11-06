@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { countDistinctPngColors, enterGame } from './helpers';
+import { countDistinctPngColors, enterGame, gotoQuiet } from './helpers';
 
 const PHONE_ONLY = 'phone-only gesture test';
 const DESKTOP_ONLY = 'desktop-only input test';

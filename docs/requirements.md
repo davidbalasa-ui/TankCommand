@@ -119,3 +119,13 @@
 | DIP-04 | Allied sides share vision; neutral and hostile do not. |
 | DET-04 | Vision is deterministic and survives save/load with an identical hash. |
 | FOG-05 | A hidden enemy is never drawn, pickable, shown on the minimap, or listed by any player-view API. |
+| AI-01 | AI issues only validated commands through the command channel; it can't create units, resources or vision. |
+| AI-02 | AI decisions use only perceived data: moving a hidden enemy unit never changes the AI's command output. |
+| AI-03 | AI spending never exceeds its income plus starting resources over a whole match. |
+| AI-04 | Every one of 10 fixed-seed AI-vs-AI matches ends with a winner before 45 game minutes (placeholder). |
+| AI-05 | An AI side with no pads and no fighting units is declared eliminated. |
+| AI-06 | Against an idle player the normal AI destroys the player's pad within 20 game minutes (placeholder). |
+| AI-07 | Hard beats easy in at least 8 of 10 fixed-seed matches. |
+| AI-08 | No unit stays stuck longer than the re-plan time in any of the 10 matches. |
+| AI-09 | The AI never attacks allied or neutral units and attacks a neutral side only after it is hostile; with three sides it handles two hostile opponents. |
+| DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |

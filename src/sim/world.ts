@@ -90,6 +90,7 @@ import type {
   SideState,
   RelationState,
   VisionSideState,
+  AiState,
   DiplomacyRelation,
   RubbleState,
   SideStats,
@@ -210,6 +211,7 @@ function cloneWorld(world: WorldState): WorldState {
     rubble: world.rubble.map((item) => ({ ...item })),
     research: world.research.map((item) => ({ ...item, done: [...item.done] })),
     vision: world.vision.map(cloneVision),
+    aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -289,6 +291,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     players: [],
     factions: (options.factions ?? []).map((entry) => ({ ...entry })),
     fogEnabled: options.fog ?? true,
+    aiStates: [],
     vision: [],
     sides: [],
     relations: [],
@@ -1431,6 +1434,7 @@ export function hashWorld(world: WorldState): string {
       relations: world.relations,
       fogEnabled: world.fogEnabled,
       vision: world.vision,
+      aiStates: world.aiStates,
       units: world.units.map((unit) => ({
         id: unit.id,
         owner: unit.owner,
@@ -1488,6 +1492,7 @@ export function worldToPayload(world: WorldState): unknown {
     relations: world.relations.map((item) => ({ ...item })),
     fogEnabled: world.fogEnabled,
     vision: world.vision.map(cloneVision),
+    aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -1613,6 +1618,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
     ? (input.vision as VisionSideState[])
     : [];
   const fogEnabled = input.fogEnabled !== false;
+  const aiStates: AiState[] = Array.isArray(input.aiStates) ? (input.aiStates as AiState[]) : [];
   const projectiles: ProjectileState[] = Array.isArray(input.projectiles)
     ? (input.projectiles as ProjectileState[])
     : [];
@@ -1666,6 +1672,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
     players,
     factions,
     fogEnabled,
+    aiStates,
     vision,
     sides,
     relations,

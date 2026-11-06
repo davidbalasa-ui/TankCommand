@@ -122,6 +122,20 @@ export function generateMap(
     }
   }
 
+  // Rotationally symmetric terrain so both start positions are equally good.
+  for (let iz = 0; iz <= rows; iz += 1) {
+    for (let ix = 0; ix <= cols; ix += 1) {
+      const mirrorIx = cols - ix;
+      const mirrorIz = rows - iz;
+      if (iz * stride + ix < mirrorIz * stride + mirrorIx) {
+        const average =
+          ((map.heights[iz * stride + ix] ?? 0) + (map.heights[mirrorIz * stride + mirrorIx] ?? 0)) / 2;
+        setHeight(map, ix, iz, average);
+        setHeight(map, mirrorIx, mirrorIz, average);
+      }
+    }
+  }
+
   flattenCircle(map, -50, -50, 14, 24, 0);
   flattenCircle(map, 50, 50, 14, 24, 0);
   flattenCircle(map, 20, -20, 6, 10, 0);

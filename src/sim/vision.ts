@@ -105,17 +105,36 @@ function isStealthed(unit: UnitState): boolean {
   return unit.upgrades.includes('stealth');
 }
 
+function viewerSignature(world: WorldState, viewers: Viewer[]): string {
+  const { map } = world;
+  const half = map.size / 2;
+  return viewers
+    .map((v) => `${Math.floor((v.x + half) / map.cellSize)},${Math.floor((v.z + half) / map.cellSize)},${v.sight}`)
+    .join(';');
+}
+
 function computeSide(world: WorldState, player: PlayerId, previous: VisionSideState | undefined): VisionSideState {
   const total = world.map.cols * world.map.rows;
-  const visible = new Uint8Array(total);
   const viewers = viewersFor(world, player);
-  for (const viewer of viewers) {
-    markVisible(world, viewer, visible);
-  }
-  const old = previous?.cells ?? emptyCells(world);
-  let cells = '';
-  for (let i = 0; i < total; i += 1) {
-    cells += visible[i] === 1 ? '2' : old.charAt(i) === '0' || old.charAt(i) === '' ? '0' : '1';
+  const signature = viewerSignature(world, viewers);
+  const visible = new Uint8Array(total);
+  let cells: string;
+  if (previous && previous.signature === signature) {
+    // Nobody changed cell: the visible set is the same as last time, so reuse it.
+    cells = previous.cells;
+    for (let i = 0; i < total; i += 1) {
+      visible[i] = cells.charCodeAt(i) === 50 ? 1 : 0;
+    }
+  } else {
+    for (const viewer of viewers) {
+      markVisible(world, viewer, visible);
+    }
+    const old = previous?.cells ?? emptyCells(world);
+    const codes = new Uint8Array(total);
+    for (let i = 0; i < total; i += 1) {
+      codes[i] = visible[i] === 1 ? 50 : old.charCodeAt(i) === 48 ? 48 : 49;
+    }
+    cells = new TextDecoder('ascii').decode(codes);
   }
 
   const visibleUnits: number[] = [];
@@ -168,7 +187,7 @@ function computeSide(world: WorldState, player: PlayerId, previous: VisionSideSt
     }
   }
   ghosts.sort((a, b) => a.id - b.id);
-  return { player, cells, visibleUnits, contacts, ghosts };
+  return { player, cells, signature, visibleUnits, contacts, ghosts };
 }
 
 export function updateVision(world: WorldState, force = false): void {

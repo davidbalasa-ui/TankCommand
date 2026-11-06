@@ -5,6 +5,7 @@ import {
   assertButtonLayout,
   countDistinctPngColors,
   enterGame,
+  gotoQuiet,
   waitForHook,
 } from './helpers';
 
@@ -141,7 +142,7 @@ test('[WD-04] a frozen sim records a freeze report and only the 5 s recover mark
 });
 
 test('[UI-05] all controls meet touch size and do not overlap across the main flow', async ({ page }) => {
-  await page.goto('/');
+  await gotoQuiet(page);
   await waitForHook(page);
   await assertButtonLayout(page);
 

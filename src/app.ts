@@ -1,16 +1,7 @@
 import rawManifest from '../public/assets/manifest.json';
-import units from './data/units.placeholder.json';
-import structures from './data/structures.placeholder.json';
-import maps from './data/maps.placeholder.json';
-import research from './data/research.placeholder.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
-import {
-  loadMapTable,
-  loadResearchTable,
-  loadStructureTable,
-  loadUnitTable,
-} from './data/dataRegistry';
+import { createSkirmishWorld, loadSimData } from './data/simData';
 import type { MapRow } from './data/mapSchema';
 import type { StructureRow } from './data/structureSchema';
 import type { UnitRow } from './data/unitSchema';
@@ -29,7 +20,7 @@ import {
   type WorkerActions,
 } from './ui/router';
 import { InputController, type IssuedCommand } from './ui/input';
-import { createWorld, snapshot, step, type CreateWorldOptions } from './sim/world';
+import { snapshot } from './sim/world';
 import type {
   CommandOutcome,
   DepositState,
@@ -44,8 +35,6 @@ import { validateCommand, type Command } from './sim/commands';
 import { FixedStepLoop } from './sim/loop';
 import { SIM_TICK_HZ } from './sim/constants';
 import {
-  DEFAULT_DISMANTLE_REFUND_PERCENT,
-  DEFAULT_DISMANTLE_SEC,
   DEPOSIT_PICK_RADIUS,
   UNIT_CAP,
 } from './sim/tuning';
@@ -56,12 +45,12 @@ import {
 } from './platform/watchdog';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import type { RenderStats, RenderView, ScreenBounds } from './render/renderer';
-import { buildSkirmishSetup } from './sim/skirmishSetup';
 import { placementValidity, structureAtPoint } from './sim/spawn';
 import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
 import { perceivedUnits } from './sim/vision';
+import { stepWithAi } from './ai/driver';
 import type { StructureState } from './sim/types';
 import type { BaseAction, BaseView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
@@ -122,83 +111,6 @@ interface PlacementState {
   valid: boolean;
 }
 
-function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string, SimUnitType> {
-  const result = new Map<string, SimUnitType>();
-  for (const row of table.values()) {
-    const weapon = row.weapons[0];
-    result.set(row.id, {
-      id: row.id,
-      faction: row.faction,
-      role: row.role,
-      hp: row.hp,
-      armor: row.armor,
-      topSpeed: row.speed.top,
-      accel: row.speed.accel,
-      turnDegPerSec: row.speed.turnDegPerSec,
-      turretTurnDegPerSec: row.turretTurnDegPerSec,
-      fireOnMove: row.fireOnMove,
-      sightRange: row.sightRange,
-      sensorRange: row.sensorRange,
-      weapon: weapon
-        ? {
-            damage: weapon.damage,
-            range: weapon.range,
-            reloadSec: weapon.reloadSec,
-            projectileSpeed: weapon.projectileSpeed,
-            accuracy: weapon.accuracy,
-            splashRadius: weapon.splashRadius,
-          }
-        : null,
-      oreCost: row.cost.ore,
-      metalCost: row.cost.metal,
-      deliverySec: row.deliverySec,
-      workerKind: row.workerKind ?? null,
-      miningRatePerSec: row.miningRatePerSec ?? 0,
-      carryCapacity: row.carryCapacity ?? 0,
-      salvageRefundPercent: row.salvageRefundPercent ?? 0,
-      repair: row.repair ? { radius: row.repair.radius, ratePerSec: row.repair.ratePerSec } : null,
-      deploysTo: row.deploysTo ?? null,
-      deploySec: row.deploySec ?? 0,
-      upgrades: [...row.upgrades],
-    });
-  }
-  return result;
-}
-
-function buildStructureTypes(
-  table: ReadonlyMap<string, StructureRow>,
-): ReadonlyMap<string, SimStructureType> {
-  const result = new Map<string, SimStructureType>();
-  for (const row of table.values()) {
-    result.set(row.id, {
-      id: row.id,
-      name: row.name,
-      faction: row.faction,
-      kind: row.kind,
-      cost: { ore: row.cost.ore, metal: row.cost.metal },
-      deliverySec: row.deliverySec,
-      hp: row.hp,
-      armor: row.armor,
-      footprint: { cellsX: row.footprint.cellsX, cellsZ: row.footprint.cellsZ },
-      sightRange: row.sightRange,
-      modelId: row.modelId,
-      buildOnMetalDeposit: row.buildOnMetalDeposit,
-      metalRatePerSec: row.metalRatePerSec ?? 0,
-      containerSize: row.containerSize ?? 0,
-      maxContainers: row.maxContainers ?? 0,
-      weapon: row.weapon ? { ...row.weapon } : null,
-      turretTurnDegPerSec: row.turretTurnDegPerSec ?? 0,
-      packSec: row.packSec ?? 0,
-      packedUnitId: row.packedUnitId ?? null,
-      dismantleSec: row.dismantleSec ?? DEFAULT_DISMANTLE_SEC,
-      dismantleRefundPercent: row.dismantleRefundPercent ?? DEFAULT_DISMANTLE_REFUND_PERCENT,
-      sensorRange: row.sensorRange ?? row.sightRange,
-      upgrades: [...(row.upgrades ?? [])],
-    });
-  }
-  return result;
-}
-
 export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
@@ -231,6 +143,7 @@ export class App {
   private attackMoveArmedValue = false;
   private leftHandedValue = false;
   private fogValue = true;
+  private aiValue = true;
   private dropPadId: number | null = null;
   private placementState: PlacementState | null = null;
   private readonly controlGroups = new Map<number, number[]>();
@@ -238,41 +151,18 @@ export class App {
 
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
-    const table = loadUnitTable(units, this.registry);
-    const structureTable = loadStructureTable(structures);
-    const mapTable = loadMapTable(maps);
-    const map = mapTable[0];
-    if (!map) {
-      throw new Error('No map data available');
-    }
-    this.mapData = map;
-    this.unitTypes = buildUnitTypes(table);
-    this.structureTypes = buildStructureTypes(structureTable);
-    this.unitRows = [...table.values()];
-    this.structureRows = [...structureTable.values()];
-    const researchTable = loadResearchTable(
-      research,
-      new Set([...table.keys(), ...structureTable.keys()]),
-    );
-    this.researchTree = new Map(
-      [...researchTable.values()].map((row) => [
-        row.id,
-        {
-          id: row.id,
-          name: row.name,
-          faction: row.faction,
-          cost: { ore: row.cost.ore, metal: row.cost.metal },
-          timeSec: row.timeSec,
-          requires: [...row.requires],
-          unlocks: [...row.unlocks],
-          upgrades: [...row.upgrades],
-        },
-      ]),
-    );
+    const data = loadSimData(this.registry);
+    this.mapData = data.mapData;
+    this.unitTypes = data.unitTypes;
+    this.structureTypes = data.structureTypes;
+    this.unitRows = data.unitRows;
+    this.structureRows = data.structureRows;
+    this.researchTree = data.researchTree;
     this.world = this.newSkirmish();
     try {
       this.leftHandedValue = window.localStorage.getItem('setting.leftHanded') === 'true';
       this.fogValue = window.localStorage.getItem('setting.fog') !== 'revealed';
+      this.aiValue = window.localStorage.getItem('setting.ai') !== 'off';
     } catch {
       this.leftHandedValue = false;
     }
@@ -1240,34 +1130,19 @@ export class App {
   }
 
   private newSkirmish(): WorldState {
-    const setup = buildSkirmishSetup(
-      this.unitTypes,
-      this.structureTypes,
-      {
-        size: this.mapData.size,
-        cellSize: this.mapData.cellSize,
-        starts: this.mapData.starts,
-        deposits: this.mapData.deposits,
-      },
+    const aiOn = this.aiValue;
+    const world = createSkirmishWorld(
+      { unitTypes: this.unitTypes, structureTypes: this.structureTypes, unitRows: this.unitRows, structureRows: this.structureRows, researchTree: this.researchTree, mapData: this.mapData },
+      this.nextSeed,
       [
-        { player: 1, faction: 'human' },
-        { player: 2, faction: 'alien' },
+        { player: 1, faction: 'human', controller: 'human' },
+        { player: 2, faction: 'alien', controller: 'ai', difficulty: 'normal' },
       ],
+      { fog: this.fogValue },
     );
-    const options: CreateWorldOptions = {
-      unitTypes: this.unitTypes,
-      structureTypes: this.structureTypes,
-      researchTree: this.researchTree,
-      startUnits: setup.startUnits,
-      startStructures: setup.startStructures,
-      deposits: setup.deposits,
-      factions: setup.factions,
-      startResources: setup.resources,
-      size: setup.size,
-      cellSize: setup.cellSize,
-      fog: this.fogValue,
-    };
-    const world = createWorld(this.nextSeed, options);
+    if (!aiOn) {
+      world.aiStates = [];
+    }
     this.nextSeed += 1;
     this.dropPadId = null;
     this.placementState = null;
@@ -1463,7 +1338,7 @@ export class App {
   private stepSimulation(): void {
     const nextTick = this.world.tick + 1;
     const due = this.pendingCommands.filter((command) => command.tick === nextTick);
-    this.world = step(this.world, due);
+    this.world = stepWithAi(this.world, due);
     this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
     this.pruneSelection();
     if (this.placementState && !this.world.pendingKits.some((kit) => kit.id === this.placementState?.kitId)) {

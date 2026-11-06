@@ -40,7 +40,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/sim/**/*.ts'],
+    files: ['src/sim/**/*.ts', 'src/ai/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
