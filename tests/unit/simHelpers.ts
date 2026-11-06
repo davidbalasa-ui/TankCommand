@@ -19,6 +19,7 @@ export function tankType(overrides: Partial<SimUnitType> = {}): SimUnitType {
     turretTurnDegPerSec: 120,
     fireOnMove: false,
     sightRange: 14,
+    sensorRange: 14,
     weapon: {
       damage: 30,
       range: 12,

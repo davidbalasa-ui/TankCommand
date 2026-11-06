@@ -136,6 +136,7 @@ function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap<string
       turretTurnDegPerSec: row.turretTurnDegPerSec,
       fireOnMove: row.fireOnMove,
       sightRange: row.sightRange,
+      sensorRange: row.sensorRange,
       weapon: weapon
         ? {
             damage: weapon.damage,

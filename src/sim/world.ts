@@ -43,6 +43,7 @@ import {
   updateDropQueues,
 } from './drops';
 import { updateMatchResult } from './match';
+import { updateVision } from './vision';
 import {
   buildRelations,
   defaultSide,
@@ -88,6 +89,7 @@ import type {
   ResearchSideState,
   SideState,
   RelationState,
+  VisionSideState,
   DiplomacyRelation,
   RubbleState,
   SideStats,
@@ -118,6 +120,7 @@ export interface CreateWorldOptions {
   startStructures?: StartStructure[];
   deposits?: DepositDef[];
   factions?: FactionAssignment[];
+  fog?: boolean;
   sides?: SideState[];
   relations?: Array<{ a: PlayerId; b: PlayerId; relation: DiplomacyRelation }>;
   startResources?: StartResources[];
@@ -188,6 +191,15 @@ function cloneStructure(structure: StructureState): StructureState {
   };
 }
 
+function cloneVision(item: VisionSideState): VisionSideState {
+  return {
+    ...item,
+    visibleUnits: [...item.visibleUnits],
+    contacts: item.contacts.map((c) => ({ ...c })),
+    ghosts: item.ghosts.map((g) => ({ ...g })),
+  };
+}
+
 function cloneWorld(world: WorldState): WorldState {
   return {
     ...world,
@@ -197,6 +209,7 @@ function cloneWorld(world: WorldState): WorldState {
     relations: world.relations.map((item) => ({ ...item })),
     rubble: world.rubble.map((item) => ({ ...item })),
     research: world.research.map((item) => ({ ...item, done: [...item.done] })),
+    vision: world.vision.map(cloneVision),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -275,6 +288,8 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
     nextId: 1,
     players: [],
     factions: (options.factions ?? []).map((entry) => ({ ...entry })),
+    fogEnabled: options.fog ?? true,
+    vision: [],
     sides: [],
     relations: [],
     map,
@@ -334,6 +349,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
   const given = new Map((options.sides ?? []).map((side) => [side.player, side]));
   world.sides = world.players.map((player) => ({ ...(given.get(player) ?? defaultSide(player)) }));
   buildRelations(world, options.relations ?? []);
+  updateVision(world, true);
   return world;
 }
 
@@ -1368,6 +1384,7 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   updateMatchResult(next);
 
   next.tick = nextTick;
+  updateVision(next);
   next.rngState = rng.getState();
   next.counter += rng.int(0, 3);
   return next;
@@ -1412,6 +1429,8 @@ export function hashWorld(world: WorldState): string {
       factions: world.factions,
       sides: world.sides,
       relations: world.relations,
+      fogEnabled: world.fogEnabled,
+      vision: world.vision,
       units: world.units.map((unit) => ({
         id: unit.id,
         owner: unit.owner,
@@ -1467,6 +1486,8 @@ export function worldToPayload(world: WorldState): unknown {
     factions: world.factions.map((entry) => ({ ...entry })),
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
+    fogEnabled: world.fogEnabled,
+    vision: world.vision.map(cloneVision),
     units: world.units.map((unit) => ({
       ...unit,
       order: cloneOrder(unit.order),
@@ -1588,6 +1609,10 @@ export function payloadToWorld(input: unknown): WorldState | null {
   const factions: FactionAssignment[] = Array.isArray(input.factions)
     ? (input.factions as FactionAssignment[])
     : [];
+  const vision: VisionSideState[] = Array.isArray(input.vision)
+    ? (input.vision as VisionSideState[])
+    : [];
+  const fogEnabled = input.fogEnabled !== false;
   const projectiles: ProjectileState[] = Array.isArray(input.projectiles)
     ? (input.projectiles as ProjectileState[])
     : [];
@@ -1640,6 +1665,8 @@ export function payloadToWorld(input: unknown): WorldState | null {
     nextId,
     players,
     factions,
+    fogEnabled,
+    vision,
     sides,
     relations,
     map,

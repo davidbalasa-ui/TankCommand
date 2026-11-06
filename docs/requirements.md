@@ -111,3 +111,10 @@
 | DIP-02 | Units auto-engage only hostile targets; neutral sides are never auto-attacked; allied fire including splash never damages allies. |
 | DIP-03 | Damaging a neutral side's unit turns that neutral hostile toward the attacker only (and its group); `diplomacy.set` changes relations; forgiveness timer works. |
 | DIP-05 | A world with three armed sides and one neutral side runs, ends correctly (neutral sides never decide victory, team victory works) and keeps its hash across save/load. |
+| FOG-01 | Each cell is unexplored, explored or visible per side; explored cells stay explored. |
+| FOG-02 | Hills block sight: a unit behind a ridge is not visible to an enemy on the other side. |
+| FOG-03 | Enemies inside sensor range but outside sight appear only as anonymous contacts; radar extends it. |
+| FOG-04 | Stealthed units are never contacts and are visible only within the reduced range. |
+| FOG-06 | `perceivedUnits` returns only visible units, contacts and remembered structures and never leaks hidden data. |
+| DIP-04 | Allied sides share vision; neutral and hostile do not. |
+| DET-04 | Vision is deterministic and survives save/load with an identical hash. |

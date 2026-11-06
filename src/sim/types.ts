@@ -81,6 +81,7 @@ export interface SimUnitType {
   turretTurnDegPerSec: number;
   fireOnMove: boolean;
   sightRange: number;
+  sensorRange: number;
   weapon: WeaponStats | null;
   oreCost: number;
   metalCost: number;
@@ -258,6 +259,28 @@ export interface CommandOutcome {
   reason: string;
 }
 
+export interface GhostStructure {
+  id: number;
+  typeId: string;
+  owner: PlayerId;
+  x: number;
+  z: number;
+}
+
+export interface SensorContact {
+  x: number;
+  z: number;
+}
+
+// One digit per cell: 0 unexplored, 1 explored, 2 visible. Allied sides share the same viewers.
+export interface VisionSideState {
+  player: PlayerId;
+  cells: string;
+  visibleUnits: number[];
+  contacts: SensorContact[];
+  ghosts: GhostStructure[];
+}
+
 export type Controller = 'human' | 'ai' | 'scripted' | 'none';
 export type DiplomacyRelation = 'allied' | 'neutral' | 'hostile';
 
@@ -319,6 +342,8 @@ export interface WorldState {
   nextId: number;
   players: PlayerId[];
   factions: FactionAssignment[];
+  fogEnabled: boolean;
+  vision: VisionSideState[];
   sides: SideState[];
   relations: RelationState[];
   map: MapDef;

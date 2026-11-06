@@ -478,5 +478,73 @@
     "source": {
       "kind": "placeholder"
     }
+  },
+  {
+    "id": "unit.human.radar",
+    "name": "Human Radar Vehicle",
+    "faction": "human",
+    "role": "support",
+    "techLevel": 2,
+    "cost": {
+      "ore": 90,
+      "metal": 30
+    },
+    "deliverySec": 9,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 4,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 60,
+    "abilities": [
+      "repair"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
+  },
+  {
+    "id": "unit.alien.radar",
+    "name": "Alien Radar Vehicle",
+    "faction": "alien",
+    "role": "support",
+    "techLevel": 2,
+    "cost": {
+      "ore": 90,
+      "metal": 30
+    },
+    "deliverySec": 9,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 4,
+      "turnDegPerSec": 100
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 60,
+    "abilities": [
+      "repair"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "placeholder"
+    }
   }
 ]

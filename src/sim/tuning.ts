@@ -72,3 +72,7 @@ export const STRUCTURE_DAMAGE_LIGHT = 0.75; // placeholder until Stage 0
 export const STRUCTURE_DAMAGE_HEAVY = 0.5; // placeholder until Stage 0
 export const STRUCTURE_DAMAGE_CRITICAL = 0.25; // placeholder until Stage 0
 export const REPAIR_IDLE_ONLY = false; // placeholder until Stage 0
+
+export const VISION_INTERVAL_TICKS = 4; // placeholder until Stage 0
+export const STEALTH_SIGHT_FACTOR = 0.35; // placeholder until Stage 0
+export const VIEWER_EYE_HEIGHT = 1.5; // placeholder until Stage 0

@@ -62,7 +62,8 @@
       "research.human.fire_control"
     ],
     "unlocks": [
-      "structure.human.radar"
+      "structure.human.radar",
+      "unit.human.radar"
     ],
     "upgrades": [
       "stealth"
@@ -167,7 +168,8 @@
       "research.alien.fire_control"
     ],
     "unlocks": [
-      "structure.alien.radar"
+      "structure.alien.radar",
+      "unit.alien.radar"
     ],
     "upgrades": [
       "stealth"
