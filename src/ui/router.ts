@@ -70,6 +70,64 @@ export interface WorkerActions {
   canSalvage: boolean;
 }
 
+export type CampaignId = 'training' | 'human' | 'alien';
+
+export interface MissionListItem {
+  id: string;
+  title: string;
+  order: number;
+  status: 'locked' | 'open' | 'done';
+}
+
+export interface BriefingView {
+  title: string;
+  text: string;
+  objectives: Array<{ text: string; kind: 'primary' | 'optional' }>;
+  map: {
+    size: number;
+    cellSize: number;
+    seed: number;
+    starts: Array<{ player: number; x: number; z: number }>;
+    deposits: Array<{ kind: string; x: number; z: number }>;
+    features: import('../sim/map').MapFeatures | null;
+  };
+}
+
+export interface ObjectiveView {
+  id: string;
+  text: string;
+  kind: 'primary' | 'optional';
+  status: 'active' | 'done' | 'failed';
+}
+
+export interface MissionMessageView {
+  seq: number;
+  speaker: string | null;
+  text: string;
+}
+
+export interface SkirmishOpponent {
+  faction: 'human' | 'alien';
+  difficulty: 'easy' | 'normal' | 'hard';
+}
+
+export interface SkirmishConfig {
+  mapId: string;
+  faction: 'human' | 'alien';
+  opponents: SkirmishOpponent[];
+  resources: 'low' | 'normal' | 'high';
+  force: 'padOnly' | 'padForce';
+  fog: boolean;
+}
+
+export interface ResultView {
+  mission: boolean;
+  won: boolean;
+  title: string | null;
+  reason: string | null;
+  hasNext: boolean;
+}
+
 export interface HudSnapshot {
   leftHanded: boolean;
   groupsOpen: boolean;
@@ -142,6 +200,19 @@ export interface ScreenContext {
   cancelPlacement?: () => void;
   getWorkerActions?: () => WorkerActions;
   salvageSelected?: () => void;
+  chooseCampaign?: (campaign: CampaignId) => void;
+  getCampaign?: () => CampaignId | null;
+  getMissionList?: () => MissionListItem[];
+  chooseMission?: (id: string) => boolean;
+  getBriefing?: () => BriefingView | null;
+  getObjectives?: () => ObjectiveView[];
+  getMissionMessages?: () => MissionMessageView[];
+  getResultView?: () => ResultView;
+  chooseNextMission?: () => boolean;
+  getSkirmishConfig?: () => SkirmishConfig;
+  setSkirmishConfig?: (config: SkirmishConfig) => void;
+  getSkirmishMaps?: () => Array<{ id: string; name: string }>;
+  beginSkirmish?: () => void;
   getBaseView?: () => import('./basePanel').BaseView;
   baseAction?: (action: import('./basePanel').BaseAction) => boolean;
 }

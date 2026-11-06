@@ -25,6 +25,7 @@ export interface HudCamera {
 }
 
 export interface HudContext {
+  openObjectives?: () => void;
   getWorld: () => WorldState;
   getSelection: () => number[];
   setSelection: (ids: number[]) => void;
@@ -163,6 +164,10 @@ export class Hud implements HudHandle {
   private readonly holdButton: HTMLButtonElement;
   private readonly airButton: HTMLButtonElement;
   private readonly airInfo: HTMLSpanElement;
+  private readonly objectivesButton: HTMLButtonElement;
+  private readonly toast: HTMLDivElement;
+  private toastSeq = 0;
+  private toastUntil = 0;
   private readonly stopButton: HTMLButtonElement;
   private readonly queueButton: HTMLButtonElement;
   private readonly groupsButton: HTMLButtonElement;
@@ -222,7 +227,15 @@ export class Hud implements HudHandle {
     const pause = button('inGame', 'pause', 'Pause', () => {
       ctx.pause();
     });
-    topbar.append(deselect, lefty, pause);
+    this.objectivesButton = button('inGame', 'objectives', 'Objectives', () => {
+      ctx.openObjectives?.();
+    });
+    this.objectivesButton.hidden = true;
+    topbar.append(deselect, lefty, this.objectivesButton, pause);
+    this.toast = document.createElement('div');
+    this.toast.className = 'hud-toast';
+    this.toast.dataset.hudItem = 'toast';
+    this.toast.hidden = true;
 
     const minimapWrap = document.createElement('div');
     minimapWrap.className = 'hud-minimap';
@@ -368,6 +381,7 @@ export class Hud implements HudHandle {
 
     this.root.append(
       topbar,
+      this.toast,
       minimapWrap,
       commandBar,
       this.groupsStrip,
@@ -435,6 +449,7 @@ export class Hud implements HudHandle {
     this.holdButton.disabled = !hasSelection;
     this.stopButton.disabled = !hasSelection;
     this.refreshAir(selection);
+    this.refreshMission();
     this.queueButton.disabled = !hasSelection;
     this.groupsButton.disabled = !hasSelection;
     this.buildButton.disabled = false;
@@ -473,6 +488,7 @@ export class Hud implements HudHandle {
   private update(): void {
     const world = this.ctx.getWorld();
     this.clock.textContent = formatClock(world.tick / SIM_TICK_HZ);
+    this.refreshMission();
     const selection = this.ctx.getSelection();
     const stats = world.resources.find((item) => item.player === 1);
     const ownUnits = world.units.filter((unit) => unit.owner === 1 && unit.hp > 0);
@@ -886,6 +902,30 @@ export class Hud implements HudHandle {
     }
 
     this.minimapRedraws += 1;
+  }
+
+  private refreshMission(): void {
+    const mission = this.ctx.getWorld().mission;
+    this.objectivesButton.hidden = !mission;
+    if (!mission) {
+      return;
+    }
+    const latest = mission.messages[mission.messages.length - 1];
+    if (latest && latest.seq > this.toastSeq) {
+      this.toastSeq = latest.seq;
+      this.toastUntil = Date.now() + 6000;
+      this.toast.replaceChildren();
+      if (latest.speaker) {
+        const who = document.createElement('strong');
+        who.textContent = `${latest.speaker}: `;
+        this.toast.append(who);
+      }
+      this.toast.append(document.createTextNode(latest.text));
+      this.toast.hidden = false;
+    }
+    if (!this.toast.hidden && Date.now() > this.toastUntil) {
+      this.toast.hidden = true;
+    }
   }
 
   private selectedAircraft(selection: readonly number[]) {

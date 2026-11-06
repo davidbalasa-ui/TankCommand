@@ -1,7 +1,17 @@
 import rawManifest from '../public/assets/manifest.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
-import { createSkirmishWorld, loadSimData } from './data/simData';
+import { createSkirmishWorld, loadSimData, type SimData } from './data/simData';
+import { MISSIONS, buildMissionWorld, missionsOf, nextMission } from './data/missions';
+import { createKvStore, type KvStore } from './platform/kv';
+import {
+  emptyProgress,
+  loadProgress,
+  missionStatus,
+  recordWin,
+  saveProgress,
+  type CampaignProgress,
+} from './platform/progress';
 import type { MapRow } from './data/mapSchema';
 import type { StructureRow } from './data/structureSchema';
 import type { UnitRow } from './data/unitSchema';
@@ -9,6 +19,12 @@ import { createScreens } from './ui/screens';
 import {
   ScreenRouter,
   type BuildItemView,
+  type BriefingView,
+  type CampaignId,
+  type MissionListItem,
+  type ObjectiveView,
+  type ResultView,
+  type SkirmishConfig,
   type DropQueueView,
   type HudHandle,
   type HudSnapshot,
@@ -146,6 +162,21 @@ export class App {
   private fogValue = true;
   private aiValue = true;
   private mapIdValue: string | undefined;
+  private readonly simData: SimData;
+  private mode: { kind: 'skirmish' } | { kind: 'mission'; id: string } = { kind: 'skirmish' };
+  private skirmishConfig: SkirmishConfig = {
+    mapId: '',
+    faction: 'human',
+    opponents: [{ faction: 'alien', difficulty: 'normal' }],
+    resources: 'normal',
+    force: 'padForce',
+    fog: true,
+  };
+  private campaignValue: CampaignId | null = null;
+  private selectedMissionId: string | null = null;
+  private progress: CampaignProgress = emptyProgress();
+  private readonly kv: KvStore;
+  private resultRecorded = false;
   private dropPadId: number | null = null;
   private placementState: PlacementState | null = null;
   private readonly controlGroups = new Map<number, number[]>();
@@ -154,6 +185,11 @@ export class App {
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
     const data = loadSimData(this.registry);
+    this.simData = data;
+    this.kv = createKvStore();
+    void loadProgress(this.kv).then((loaded) => {
+      this.progress = loaded;
+    });
     this.mapData = data.mapData;
     this.mapRows = data.mapRows;
     this.unitTypes = data.unitTypes;
@@ -167,6 +203,7 @@ export class App {
       this.fogValue = window.localStorage.getItem('setting.fog') !== 'revealed';
       this.aiValue = window.localStorage.getItem('setting.ai') !== 'off';
       this.mapIdValue = window.localStorage.getItem('setting.map') ?? undefined;
+      this.skirmishConfig = { ...this.skirmishConfig, mapId: this.mapIdValue ?? '', fog: this.fogValue };
     } catch {
       this.leftHandedValue = false;
     }
@@ -261,6 +298,26 @@ export class App {
       confirmPlacement: () => this.confirmPlacement(),
       cancelPlacement: () => {
         this.cancelPlacement();
+      },
+      chooseCampaign: (campaign) => {
+        this.campaignValue = campaign;
+      },
+      getCampaign: () => this.campaignValue,
+      getMissionList: () => this.missionList(),
+      chooseMission: (id) => this.chooseMission(id),
+      getBriefing: () => this.briefing(),
+      getObjectives: () => this.objectives(),
+      getResultView: () => this.resultView(),
+      chooseNextMission: () => this.chooseNextMission(),
+      getSkirmishConfig: () => this.skirmishConfig,
+      setSkirmishConfig: (config) => {
+        this.skirmishConfig = config;
+      },
+      getSkirmishMaps: () => this.mapRows.map((row) => ({ id: row.id, name: row.name })),
+      beginSkirmish: () => {
+        this.mode = { kind: 'skirmish' };
+        this.fogValue = this.skirmishConfig.fog;
+        this.mapIdValue = this.skirmishConfig.mapId || this.mapIdValue;
       },
       getBaseView: () => this.baseView(),
       baseAction: (action) => this.baseAction(action),
@@ -1134,17 +1191,23 @@ export class App {
   }
 
   private newSkirmish(): WorldState {
-    const aiOn = this.aiValue;
-    const world = createSkirmishWorld(
-      { unitTypes: this.unitTypes, structureTypes: this.structureTypes, unitRows: this.unitRows, structureRows: this.structureRows, researchTree: this.researchTree, mapData: this.mapData, mapRows: this.mapRows },
-      this.nextSeed,
-      [
-        { player: 1, faction: 'human', controller: 'human' },
-        { player: 2, faction: 'alien', controller: 'ai', difficulty: 'normal' },
-      ],
-      { fog: this.fogValue, mapId: this.mapIdValue },
-    );
-    if (!aiOn) {
+    const config = this.skirmishConfig;
+    const specs = [
+      { player: 1, faction: config.faction, controller: 'human' as const },
+      ...config.opponents.map((opponent, index) => ({
+        player: index + 2,
+        faction: opponent.faction,
+        controller: 'ai' as const,
+        difficulty: opponent.difficulty,
+      })),
+    ];
+    const world = createSkirmishWorld(this.simData, this.nextSeed, specs, {
+      fog: this.fogValue,
+      mapId: this.mapIdValue,
+      resources: config.resources,
+      force: config.force,
+    });
+    if (!this.aiValue) {
       world.aiStates = [];
     }
     this.nextSeed += 1;
@@ -1153,8 +1216,113 @@ export class App {
     return world;
   }
 
+  private newMission(id: string): WorldState {
+    const row = MISSIONS.find((mission) => mission.id === id);
+    if (!row) {
+      return this.newSkirmish();
+    }
+    const world = buildMissionWorld(this.simData, row, 1, { fog: this.fogValue });
+    if (!this.aiValue) {
+      world.aiStates = [];
+    }
+    this.dropPadId = null;
+    this.placementState = null;
+    return world;
+  }
+
+  private missionList(): MissionListItem[] {
+    if (!this.campaignValue) {
+      return [];
+    }
+    const missions = missionsOf(this.campaignValue);
+    return missions.map((mission) => ({
+      id: mission.id,
+      title: mission.title,
+      order: mission.order,
+      status: missionStatus(this.progress, missions, mission.id),
+    }));
+  }
+
+  private chooseMission(id: string): boolean {
+    const mission = MISSIONS.find((item) => item.id === id);
+    if (!mission) {
+      return false;
+    }
+    const status = missionStatus(this.progress, missionsOf(mission.campaign), id);
+    if (status === 'locked') {
+      return false;
+    }
+    this.selectedMissionId = id;
+    this.mode = { kind: 'mission', id };
+    return true;
+  }
+
+  private chooseNextMission(): boolean {
+    const current = MISSIONS.find((item) => item.id === this.selectedMissionId);
+    const next = current ? nextMission(current) : null;
+    return next ? this.chooseMission(next.id) : false;
+  }
+
+  private briefing(): BriefingView | null {
+    const mission = MISSIONS.find((item) => item.id === this.selectedMissionId);
+    const map = mission ? this.mapRows.find((row) => row.id === mission.mapId) : undefined;
+    if (!mission || !map) {
+      return null;
+    }
+    return {
+      title: mission.title,
+      text: mission.briefing,
+      objectives: mission.objectives.map((o) => ({ text: o.text, kind: o.kind })),
+      map: {
+        size: map.size,
+        cellSize: map.cellSize,
+        seed: 1,
+        starts: map.starts,
+        deposits: map.deposits,
+        features: map.features ?? null,
+      },
+    };
+  }
+
+  private objectives(): ObjectiveView[] {
+    return (this.world.mission?.objectives ?? []).map((o) => ({ ...o }));
+  }
+
+  private resultView(): ResultView {
+    const mission = this.world.mission;
+    if (!mission) {
+      return { mission: false, won: false, title: null, reason: null, hasNext: false };
+    }
+    const row = MISSIONS.find((item) => item.id === mission.def.id);
+    const won = this.world.result?.winner === mission.humanSide;
+    const reasons: Record<string, string> = {
+      timeout: 'Time ran out.',
+      defeated: 'Your base was lost.',
+    };
+    return {
+      mission: true,
+      won,
+      title: row?.title ?? null,
+      reason: mission.failReason ? (reasons[mission.failReason] ?? mission.failReason) : null,
+      hasNext: row ? nextMission(row) !== null : false,
+    };
+  }
+
+  private recordMissionResult(): void {
+    const mission = this.world.mission;
+    if (!mission || !this.world.result || this.resultRecorded) {
+      return;
+    }
+    this.resultRecorded = true;
+    if (this.world.result.winner === mission.humanSide) {
+      this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ);
+      void saveProgress(this.kv, this.progress).catch(() => undefined);
+    }
+  }
+
   private startSkirmish(): void {
-    this.world = this.newSkirmish();
+    this.resultRecorded = false;
+    this.world = this.mode.kind === 'mission' ? this.newMission(this.mode.id) : this.newSkirmish();
     this.pendingCommands = [];
     this.selectedIds = [];
     this.fixed.reset();
@@ -1345,6 +1513,7 @@ export class App {
     this.world = stepWithAi(this.world, due);
     this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
     this.pruneSelection();
+    this.recordMissionResult();
     if (this.placementState && !this.world.pendingKits.some((kit) => kit.id === this.placementState?.kitId)) {
       this.placementState = null;
       this.renderView?.clearPlacement();

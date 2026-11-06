@@ -78,3 +78,5 @@
 | 2026-11-06 | WP-05 review fixes | cloneWorld now copies rubble and research; dismantling a lab refunds running research; two pads can no longer both be dismantled; Cancel cancels the tapped node. | Reviewer findings 1, 3, 4, 5. | Claude |
 | 2026-11-06 | How do movement classes block terrain? | A `mapFor(map, movement)` view applied inside the blocked checks; air pathing is a straight line. | Pathfinding and collision keep one code path. | Claude (WP-08) |
 | 2026-11-06 | What happens to aircraft with no fuel and no base? | They crash. | Gives bases a real purpose without a landing mini-game. | Claude (WP-08) |
+| 2026-11-06 | Rectangle or circle for mission areas? | Circle (x, z, radius). | One shape keeps the schema and UI simple; revisit if a mission needs rectangles. | Claude (WP-09) |
+| 2026-11-06 | How do missions decide the result? | Trigger rules replace the normal elimination rule: all primaries done wins, any failed primary, a lose action, the time limit or losing the player's base loses. | Missions need data-driven outcomes without engine code per mission. | Claude (WP-09) |

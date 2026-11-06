@@ -176,6 +176,8 @@ export function generateMap(
 
   flattenCircle(map, -50, -50, 14, 24, 0);
   flattenCircle(map, 50, 50, 14, 24, 0);
+  flattenCircle(map, 50, -50, 14, 24, 0);
+  flattenCircle(map, -50, 50, 14, 24, 0);
   flattenCircle(map, 20, -20, 6, 10, 0);
 
   carveWater(map, features);

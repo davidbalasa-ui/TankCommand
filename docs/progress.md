@@ -77,3 +77,12 @@ Enemy AI (written directly by Claude).
 - **UI.** Launch/Recall button and ammo/fuel line appear when aircraft are selected; renderer draws a water plane and lifts flying aircraft.
 - **Tests.** `tests/unit/wp08.test.ts` (TER-01/02, AIR-01..05, DET-06), `tests/e2e/wp08.spec.ts`.
 - **Not done.** AI does not build or use aircraft or hover units; parked aircraft stack on the base centre visually; more wp08 screenshots.
+
+## WP-09 Missions, campaigns and skirmish setup
+
+- **Mission data.** `src/sim/missionSchema.ts` (zod) defines missions, conditions, actions and triggers; invalid files name the failing field. Four placeholder missions live in `src/data/missions/` (two training, Human 1 and Alien 1). `buildMissionWorld` turns a mission row into a world (sides, relations, tagged units, research done, AI sides).
+- **Trigger engine.** `src/sim/triggers.ts`, run every tick inside `step` in place of the normal elimination rule. Conditions: time, areaEntered, unitDestroyed, allDestroyed, resourceReached, objectiveDone, structureBuilt, relationIs, unitsAlive, unitEscorted, and/or/not. Actions: spawn (with drop beam), message, revealArea, setObjective, grant, win, lose, aiOrder, setRelation. Mission state is saved and hashed. Win is all primary objectives done; lose is a failed primary objective, a lose action, the time limit, or the player's base falling.
+- **Screens.** Campaign select, mission select (locked greyed), briefing with a heightmap preview, in-game Objectives sheet and message toast, results with Next/Retry/Mission list, and a skirmish setup screen (map, faction, 1-3 AI with faction and level, resources, start force, fog). Campaign progress is saved through the kv layer.
+- **Skirmish.** `createSkirmishWorld` now takes map, resources and start force, and adds corner starts for a third and fourth side.
+- **Tests.** `tests/unit/wp09.test.ts` (MSN-01..05, 07, DET-07), `tests/e2e/wp09.spec.ts` (MSN-05, MSN-06, SKR-01). MSN-03 wins use a scripted command stream (explicit attack on structures).
+- **Not done.** The training area is not marked in the 3D view yet; revealArea uses a circle, not a rectangle; best result per difficulty is just best time; mission AI is not shown any briefing art.

@@ -149,34 +149,73 @@ export interface SkirmishSideSpec {
   difficulty?: 'easy' | 'normal' | 'hard';
 }
 
+export type SkirmishResources = 'low' | 'normal' | 'high';
+export type SkirmishForce = 'padOnly' | 'padForce';
+
+export interface SkirmishOptions {
+  fog?: boolean;
+  mapId?: string;
+  resources?: SkirmishResources;
+  force?: SkirmishForce;
+}
+
+const RESOURCE_SCALE: Record<SkirmishResources, number> = { low: 0.5, normal: 1, high: 2 };
+
+// Extra start corners for matches with three or four sides; the map row only lists two.
+const EXTRA_STARTS = [
+  { player: 3, x: 50, z: -50 },
+  { player: 4, x: -50, z: 50 },
+];
+
+function cornerDeposits(x: number, z: number): MapRow['deposits'] {
+  const a = Math.sign(x);
+  const b = Math.sign(z);
+  return [
+    { kind: 'ore', x: a * 57, z: b * 44, amount: 500 },
+    { kind: 'ore', x: a * 44, z: b * 57, amount: 500 },
+    { kind: 'ore', x: a * 60, z: b * 50, amount: 500 },
+    { kind: 'ore', x: a * 50, z: b * 60, amount: 500 },
+    { kind: 'metal', x: a * 58, z: b * 52, amount: 250 },
+    { kind: 'metal', x: a * 52, z: b * 58, amount: 250 },
+  ];
+}
+
 // Builds a skirmish world from the placeholder data. Used by the app and by headless AI tests.
 export function createSkirmishWorld(
   data: SimData,
   seed: number,
   specs: SkirmishSideSpec[],
-  options: { fog?: boolean; mapId?: string } = {},
+  options: SkirmishOptions = {},
 ): WorldState {
   const mapRow = data.mapRows.find((row) => row.id === options.mapId) ?? data.mapData;
+  const starts = [...mapRow.starts];
+  const deposits = mapRow.deposits.map((deposit) => ({ ...deposit }));
+  for (const extra of EXTRA_STARTS) {
+    if (specs.some((spec) => spec.player === extra.player) && !starts.some((s) => s.player === extra.player)) {
+      starts.push(extra);
+      deposits.push(...cornerDeposits(extra.x, extra.z));
+    }
+  }
   const setup = buildSkirmishSetup(
     data.unitTypes,
     data.structureTypes,
-    {
-      size: mapRow.size,
-      cellSize: mapRow.cellSize,
-      starts: mapRow.starts,
-      deposits: mapRow.deposits,
-    },
+    { size: mapRow.size, cellSize: mapRow.cellSize, starts, deposits },
     specs.map((spec) => ({ player: spec.player, faction: spec.faction })),
   );
+  const scale = RESOURCE_SCALE[options.resources ?? 'normal'];
   const world = createWorld(seed, {
     unitTypes: data.unitTypes,
     structureTypes: data.structureTypes,
     researchTree: data.researchTree,
-    startUnits: setup.startUnits,
+    startUnits: options.force === 'padOnly' ? [] : setup.startUnits,
     startStructures: setup.startStructures,
     deposits: setup.deposits,
     factions: setup.factions,
-    startResources: setup.resources,
+    startResources: setup.resources.map((entry) => ({
+      player: entry.player,
+      ore: Math.round(entry.ore * scale),
+      metal: Math.round(entry.metal * scale),
+    })),
     size: setup.size,
     cellSize: setup.cellSize,
     fog: options.fog ?? true,

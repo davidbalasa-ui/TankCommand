@@ -1,6 +1,14 @@
 import { button } from './controls';
 import { Hud } from './hud';
-import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
+import { drawMapPreview } from './mapPreview';
+import type {
+  CampaignId,
+  RendererHandle,
+  ScreenContext,
+  ScreenId,
+  ScreenModule,
+  SkirmishConfig,
+} from './router';
 import { SIM_TICK_HZ } from '../sim/constants';
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
@@ -71,16 +79,162 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       });
     }),
 
-    campaignSelect: makeScreen('campaignSelect', 'Campaign'),
+    campaignSelect: makeScreen('campaignSelect', 'Campaign', (root, ctx) => {
+      const choices: Array<[CampaignId, string]> = [
+        ['training', 'Training'],
+        ['human', 'Human campaign'],
+        ['alien', 'Alien campaign'],
+      ];
+      for (const [id, label] of choices) {
+        addButton(root, 'campaignSelect', id, label, () => {
+          ctx.chooseCampaign?.(id);
+          ctx.go('missionSelect');
+        });
+      }
+      addButton(root, 'campaignSelect', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
 
-    missionSelect: makeScreen('missionSelect', 'Select Mission'),
+    missionSelect: makeScreen('missionSelect', 'Select Mission', (root, ctx) => {
+      const list = ctx.getMissionList?.() ?? [];
+      for (const item of list) {
+        const label = `${item.order}. ${item.title}${item.status === 'done' ? ' ✓' : item.status === 'locked' ? ' (locked)' : ''}`;
+        const entry = button('missionSelect', 'mission', label, () => {
+          if (item.status !== 'locked' && ctx.chooseMission?.(item.id)) {
+            ctx.go('briefing');
+          }
+        });
+        entry.disabled = item.status === 'locked';
+        entry.dataset.missionId = item.id;
+        entry.dataset.status = item.status;
+        root.append(entry);
+      }
+      addButton(root, 'missionSelect', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
 
-    briefing: makeScreen('briefing', 'Briefing'),
+    briefing: makeScreen('briefing', 'Briefing', (root, ctx) => {
+      const view = ctx.getBriefing?.() ?? null;
+      const heading = root.querySelector('h1');
+      if (view && heading) {
+        heading.textContent = view.title;
+      }
+      const body = document.createElement('div');
+      body.className = 'briefing-body';
+      if (view) {
+        const preview = document.createElement('canvas');
+        preview.className = 'briefing-map';
+        preview.setAttribute('aria-label', 'Map preview');
+        drawMapPreview(preview, view.map);
+        const text = document.createElement('div');
+        text.className = 'briefing-text';
+        const paragraph = document.createElement('p');
+        paragraph.textContent = view.text;
+        const objectives = document.createElement('ul');
+        objectives.className = 'briefing-objectives';
+        for (const objective of view.objectives) {
+          const item = document.createElement('li');
+          item.textContent = objective.kind === 'optional' ? `Optional: ${objective.text}` : objective.text;
+          objectives.append(item);
+        }
+        text.append(paragraph, objectives);
+        body.append(preview, text);
+      }
+      root.append(body);
+      const row = document.createElement('div');
+      row.className = 'button-row';
+      row.append(
+        button('briefing', 'start', 'Start mission', () => {
+          ctx.go('loading');
+        }),
+        button('briefing', 'back', 'Back', () => {
+          ctx.router.back();
+        }),
+      );
+      root.append(row);
+    }),
 
     skirmishSetup: makeScreen('skirmishSetup', 'Skirmish Setup', (root, ctx) => {
-      addButton(root, 'skirmishSetup', 'start', 'Start', () => {
-        ctx.go('loading');
-      });
+      const fallback: SkirmishConfig = {
+        mapId: '',
+        faction: 'human',
+        opponents: [{ faction: 'alien', difficulty: 'normal' }],
+        resources: 'normal',
+        force: 'padForce',
+        fog: true,
+      };
+      let config: SkirmishConfig = ctx.getSkirmishConfig?.() ?? fallback;
+      const maps = ctx.getSkirmishMaps?.() ?? [];
+      const grid = document.createElement('div');
+      grid.className = 'setup-grid';
+      root.append(grid);
+      const cycle = <T,>(values: readonly T[], current: T): T => {
+        const index = values.indexOf(current);
+        return values[(index + 1) % values.length] ?? current;
+      };
+      const label = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+      const render = (): void => {
+        grid.replaceChildren();
+        const set = (next: SkirmishConfig): void => {
+          config = next;
+          ctx.setSkirmishConfig?.(next);
+          render();
+        };
+        const map = maps.find((m) => m.id === config.mapId) ?? maps[0];
+        const add = (name: string, text: string, onClick: () => void): void => {
+          grid.append(button('skirmishSetup', name, text, onClick));
+        };
+        add('map', `Map: ${map?.name ?? 'Default'}`, () => {
+          const ids = maps.map((m) => m.id);
+          set({ ...config, mapId: cycle(ids, config.mapId || (ids[0] ?? '')) });
+        });
+        add('faction', `You: ${label(config.faction)}`, () => {
+          set({ ...config, faction: config.faction === 'human' ? 'alien' : 'human' });
+        });
+        add('opponents', `Opponents: ${config.opponents.length}`, () => {
+          const count = (config.opponents.length % 3) + 1;
+          const opponents = Array.from({ length: count }, (_, i) => config.opponents[i] ?? { faction: 'alien' as const, difficulty: 'normal' as const });
+          set({ ...config, opponents });
+        });
+        config.opponents.forEach((opponent, index) => {
+          add(`opp${index + 1}Faction`, `AI ${index + 1}: ${label(opponent.faction)}`, () => {
+            const opponents = config.opponents.map((o, i) =>
+              i === index ? { ...o, faction: o.faction === 'human' ? ('alien' as const) : ('human' as const) } : o,
+            );
+            set({ ...config, opponents });
+          });
+          add(`opp${index + 1}Difficulty`, `AI ${index + 1} level: ${label(opponent.difficulty)}`, () => {
+            const opponents = config.opponents.map((o, i) =>
+              i === index ? { ...o, difficulty: cycle(['easy', 'normal', 'hard'] as const, o.difficulty) } : o,
+            );
+            set({ ...config, opponents });
+          });
+        });
+        add('resources', `Resources: ${label(config.resources)}`, () => {
+          set({ ...config, resources: cycle(['low', 'normal', 'high'] as const, config.resources) });
+        });
+        add('force', `Start: ${config.force === 'padOnly' ? 'Pad only' : 'Pad + force'}`, () => {
+          set({ ...config, force: config.force === 'padOnly' ? 'padForce' : 'padOnly' });
+        });
+        add('fog', `Fog: ${config.fog ? 'On' : 'Revealed'}`, () => {
+          set({ ...config, fog: !config.fog });
+        });
+      };
+      render();
+      const row = document.createElement('div');
+      row.className = 'button-row';
+      row.append(
+        button('skirmishSetup', 'start', 'Start', () => {
+          ctx.beginSkirmish?.();
+          ctx.go('loading');
+        }),
+        button('skirmishSetup', 'back', 'Back', () => {
+          ctx.router.back();
+        }),
+      );
+      root.append(row);
     }),
 
     loading: makeScreen('loading', 'Loading', (_root, ctx) => {
@@ -146,6 +300,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           groupMembers: (group) => ctx.groupMembers?.(group) ?? [],
           pause: () => {
             ctx.go('pause');
+          },
+          openObjectives: () => {
+            ctx.go('objectives');
           },
           getBuildItems: () => ctx.getBuildItems?.() ?? [],
           getOwnPads: () => ctx.getOwnPads?.() ?? [],
@@ -278,14 +435,47 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       });
     }),
 
-    objectives: makeScreen('objectives', 'Objectives'),
+    objectives: makeScreen('objectives', 'Objectives', (root, ctx) => {
+      ctx.pauseSim(true);
+      const list = document.createElement('ul');
+      list.className = 'objective-list';
+      for (const objective of ctx.getObjectives?.() ?? []) {
+        const item = document.createElement('li');
+        item.dataset.status = objective.status;
+        const mark = objective.status === 'done' ? '✓' : objective.status === 'failed' ? '✗' : '•';
+        item.textContent = `${mark} ${objective.kind === 'optional' ? 'Optional: ' : ''}${objective.text}`;
+        list.append(item);
+      }
+      root.append(list);
+      addButton(root, 'objectives', 'close', 'Close', () => {
+        ctx.router.back();
+      });
+      return () => {
+        ctx.pauseSim(false);
+      };
+    }),
 
     results: makeScreen('results', 'Results', (root, ctx) => {
       const world = ctx.getWorld?.();
       const winner = world?.result?.winner ?? null;
+      const view = ctx.getResultView?.() ?? null;
       const heading = root.querySelector('h1');
       if (heading) {
-        heading.textContent = winner === 1 ? 'Victory' : winner === 2 ? 'Defeat' : 'Draw';
+        heading.textContent = view?.mission
+          ? view.won
+            ? 'Mission complete'
+            : 'Mission failed'
+          : winner === 1
+            ? 'Victory'
+            : winner === 2
+              ? 'Defeat'
+              : 'Draw';
+      }
+      if (view?.mission) {
+        const note = document.createElement('p');
+        note.className = 'results-mission';
+        note.textContent = view.won ? (view.title ?? '') : (view.reason ?? 'Try again.');
+        root.append(note);
       }
       if (world) {
         const stats = world.resources.find((item) => item.player === 1);
@@ -300,9 +490,25 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ].join(' · ');
         root.append(detail);
       }
-      addButton(root, 'results', 'playAgain', 'Play again', () => {
-        ctx.go('loading');
-      });
+      if (view?.mission) {
+        if (view.won && view.hasNext) {
+          addButton(root, 'results', 'next', 'Next mission', () => {
+            if (ctx.chooseNextMission?.()) {
+              ctx.go('loading');
+            }
+          });
+        }
+        addButton(root, 'results', 'retry', 'Retry', () => {
+          ctx.go('loading');
+        });
+        addButton(root, 'results', 'missions', 'Mission list', () => {
+          ctx.go('missionSelect');
+        });
+      } else {
+        addButton(root, 'results', 'playAgain', 'Play again', () => {
+          ctx.go('loading');
+        });
+      }
       addButton(root, 'results', 'title', 'Title', () => {
         ctx.go('title');
       });
