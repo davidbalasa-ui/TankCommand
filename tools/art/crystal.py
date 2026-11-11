@@ -6,7 +6,7 @@ Ribbons are a few cheap emissive strips; in game they spin and their texture scr
 
 Run with Blender's Python (pip bpy):
   python crystal.py <atlas_dir> <out.glb> [render_dir]
-Nodes: Base (ruined plinth), Crystal (spins slowly), Core, Ribbons (spin faster).
+Nodes: Base (ruined plinth with claws), Crystal (spins slowly), Core, Ribbons (spin faster), Shards (orbit).
 """
 import math
 import random
@@ -101,22 +101,22 @@ def mesh_from(name, verts, faces, tile, material, smooth=False, uvs=None):
 
 rng = random.Random(3)
 FLOAT = 3.0   # gap between plinth and crystal tip
-H = 12.0      # crystal height
-R = 2.1       # widest radius
+H = 14.0      # crystal height
+R = 1.9       # widest radius
 SIDES = 8
 
 # --- Crystal: stacked rings, every other ring turned half a step, so the facets are triangles.
-rings = [0.0, 0.12, 0.3, 0.5, 0.68, 0.85, 1.0]
+rings = [0.0, 0.1, 0.24, 0.4, 0.55, 0.7, 0.84, 1.0]
 verts, faces = [], []
 verts.append((0, 0, FLOAT))  # bottom tip
 ring_idx = []
 for k, t in enumerate(rings[1:-1]):
-    r = R * math.sin(math.pi * t) ** 0.75 * rng.uniform(0.92, 1.05)
+    r = R * math.sin(math.pi * t ** 0.85) ** 0.9 * rng.uniform(0.85, 1.1)
     off = (k % 2) * math.pi / SIDES
     row = []
     for i in range(SIDES):
         a = off + 2 * math.pi * i / SIDES
-        rr = r * rng.uniform(0.93, 1.05)
+        rr = r * rng.uniform(0.8, 1.15)
         row.append(len(verts))
         verts.append((rr * math.cos(a), rr * math.sin(a), FLOAT + H * t + rng.uniform(-0.15, 0.15)))
     ring_idx.append(row)
@@ -132,6 +132,40 @@ for a, b in zip(ring_idx, ring_idx[1:]):
         faces.append([a[i], a[j], b[i]])
         faces.append([a[j], b[j], b[i]])
 crystal = mesh_from('Crystal', verts, faces, 'facet', glass)
+
+
+def spike(name, base_c, tip, w, sides, material, tile):
+    """A jagged spike from a small base ring (around base_c) to a tip point."""
+    import mathutils
+    b, t = mathutils.Vector(base_c), mathutils.Vector(tip)
+    axis = (t - b).normalized()
+    side = axis.cross(mathutils.Vector((0, 0, 1)))
+    if side.length < 1e-3:
+        side = mathutils.Vector((1, 0, 0))
+    side.normalize()
+    up = axis.cross(side)
+    vs = [tuple(t)]
+    for k in range(sides):
+        a = 2 * math.pi * k / sides
+        vs.append(tuple(b + (side * math.cos(a) + up * math.sin(a)) * w * rng.uniform(0.8, 1.2)))
+    vs.append(tuple(b - axis * w * 0.6))
+    fs = []
+    for k in range(sides):
+        j = (k + 1) % sides
+        fs.append([0, 1 + k, 1 + j])
+        fs.append([sides + 1, 1 + j, 1 + k])
+    return mesh_from(name, vs, fs, tile, material)
+
+
+# Orbiting shards: broken-off splinters that circle the crystal, points turned outward like blades.
+shard_objs = []
+for k in range(7):
+    a = 2 * math.pi * k / 7 + rng.uniform(-0.2, 0.2)
+    z = FLOAT + H * rng.uniform(0.25, 0.75)
+    r0 = R + 1.6
+    c = (r0 * math.cos(a), r0 * math.sin(a), z)
+    tip = (c[0] + 1.6 * math.cos(a + 0.5), c[1] + 1.6 * math.sin(a + 0.5), z + rng.uniform(0.6, 1.4))
+    shard_objs.append(spike(f'Shard{k}', c, tip, rng.uniform(0.22, 0.32), 4, glass, 'facet'))
 
 # --- Core: a glowing orb at the crystal's heart (an icosphere, low).
 bm = bmesh.new()
@@ -178,9 +212,15 @@ for ring in range(3):
         pfaces.append([a + i, a + j, b + j, b + i])
 pfaces.append(list(range(3 * SIDES, 4 * SIDES)))
 plinth = [mesh_from('Slab', pverts, pfaces, 'stone', stone)]
-for i in range(0, SIDES, 2):
+# Claws: tall curved stone fangs rising from the plinth and leaning in toward the crystal.
+for i in range(6):
+    a = 2 * math.pi * (i + 0.25) / 6
+    base_c = (3.9 * math.cos(a), 3.9 * math.sin(a), 0.6)
+    tip = (2.6 * math.cos(a + 0.25), 2.6 * math.sin(a + 0.25), rng.uniform(4.0, 6.0))
+    plinth.append(spike(f'Claw{i}', base_c, tip, 0.5, 5, stone, 'stone'))
+for i in range(0, SIDES, 4):
     a = 2 * math.pi * (i + 0.5) / SIDES
-    hgt = rng.uniform(0.8, 2.6)
+    hgt = rng.uniform(0.8, 1.6)
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, verts=bm.verts, vec=(0.7, 0.7, hgt))
@@ -206,13 +246,14 @@ def join(objs, name):
 
 
 base = join(plinth, 'Base')
+shards = join(shard_objs, 'Shards')
 root = bpy.data.objects.new('SuperCrystal', None)
 scene.collection.objects.link(root)
-for o in (base, crystal, core, ribbons):
+for o in (base, crystal, core, ribbons, shards):
     o.parent = root
 
 tris = 0
-for o in (base, crystal, core, ribbons):
+for o in (base, crystal, core, ribbons, shards):
     o.data.calc_loop_triangles()
     tris += len(o.data.loop_triangles)
 print('TRIANGLES', tris)
@@ -223,7 +264,7 @@ bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', export_apply=Tr
 if render_dir:
     world = bpy.data.worlds.new('W'); scene.world = world
     world.use_nodes = True
-    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.05, 0.06, 0.14, 1)
+    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.025, 0.015, 0.05, 1)
     world.node_tree.nodes['Background'].inputs['Strength'].default_value = 1.0
     sun = bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN'))
     sun.data.energy = 2.5
@@ -254,5 +295,5 @@ if render_dir:
         scene.render.filepath = f'{render_dir}/{name}.png'
         bpy.ops.render.render(write_still=True)
 
-    look('crystal_front', (21, -21, 7.0), target=(0, 0, 7.0), lens_mm=35)
+    look('crystal_front', (15, -15, 2.5), target=(0, 0, 8.0), lens_mm=26)
     look('crystal_rts', (16, -16, 30), target=(0, 0, 4), lens_mm=35)

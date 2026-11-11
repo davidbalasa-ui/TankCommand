@@ -5,7 +5,8 @@
   barrel (256,256)-(512,384)  dark metal with glowing gold slots
   glow   (  0,384)-(128,512)  solid gold (emissive)
   core   (128,384)-(256,512)  radial white-gold orb (emissive)
-  dark   (256,384)-(512,512)  dark bronze
+  dark   (256,384)-(384,512)  dark bronze
+  obsid  (384,384)-(512,512)  dark purple obsidian with light-catching facets
 Usage: python3 atlas_kesh.py <outdir>  -> kesh_atlas.png, kesh_emissive.png
 """
 import math
@@ -70,7 +71,17 @@ def main(out):
         c = (255, int(255 - 70 * t), int(230 - 200 * t))
         for dd in (d, e):
             dd.ellipse((192 - r, 448 - r, 192 + r, 448 + r), fill=c)
-    d.rectangle((256, 384, 512, 512), fill=(70, 56, 44))
+    d.rectangle((256, 384, 384, 512), fill=(70, 56, 44))
+    # Obsidian: near-black purple glass broken into facets, bright violet glints on the edges.
+    d.rectangle((384, 384, 512, 512), fill=(22, 10, 36))
+    for _ in range(26):
+        cx, cy = rng.uniform(384, 512), rng.uniform(384, 512)
+        pts = [(cx + rng.uniform(-22, 22), cy + rng.uniform(-22, 22)) for _ in range(3)]
+        v = rng.uniform(0, 1)
+        d.polygon(pts, fill=(int(30 + 60 * v), int(12 + 20 * v), int(50 + 90 * v)))
+        if v > 0.6:
+            d.line(pts[:2], fill=(210, 170, 255), width=1)
+            e.line(pts[:2], fill=(120, 70, 200), width=1)
     img = img.filter(ImageFilter.SMOOTH)
     img.save(f'{out}/kesh_atlas.png')
     emit.save(f'{out}/kesh_emissive.png')

@@ -72,30 +72,45 @@ def finish(obj, tile):
     return obj
 
 
-def mesh_from(name, verts, faces, tile):
+def mesh_from(name, verts, faces, tile, bevel=0.0):
     me = bpy.data.meshes.new(name)
     me.from_pydata(verts, [], faces)
     me.update()
+    if bevel > 0:
+        # Chamfer every edge once: kills the boxy look for a few extra triangles.
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, segments=1, affect='EDGES', profile=0.5)
+        bm.to_mesh(me)
+        bm.free()
     obj = bpy.data.objects.new(name, me)
     scene.collection.objects.link(obj)
     return finish(obj, tile)
 
 
-def prism(name, profile, y0, y1, tile):
-    """Extrude a side profile (list of (x, z), counter-clockwise) between y0 and y1."""
+def prism(name, profile, y0, y1, tile, bevel=0.0, taper=1.0):
+    """Extrude a side profile (list of (x, z), counter-clockwise) between y0 and y1.
+    taper < 1 pulls the upper half of the sides inward, so armour slopes like a real glacis."""
     n = len(profile)
-    verts = [(x, y0, z) for x, z in profile] + [(x, y1, z) for x, z in profile]
+    zs = [z for _, z in profile]
+    zlo, zhi = min(zs), max(zs)
+    yc = (y0 + y1) / 2
+
+    def ty(y, z):
+        k = 1 - (1 - taper) * max(0.0, (z - zlo) / (zhi - zlo + 1e-9))
+        return yc + (y - yc) * k
+    verts = [(x, ty(y0, z), z) for x, z in profile] + [(x, ty(y1, z), z) for x, z in profile]
     faces = [list(range(n))[::-1], list(range(n, 2 * n))]
     for i in range(n):
         j = (i + 1) % n
         faces.append([i, j, n + j, n + i])
-    return mesh_from(name, verts, faces, tile)
+    return mesh_from(name, verts, faces, tile, bevel)
 
 
-def box(name, c, s, tile):
+def box(name, c, s, tile, bevel=0.0, taper=1.0):
     (cx, cy, cz), (sx, sy, sz) = c, s
     prof = [(cx - sx, cz - sz), (cx + sx, cz - sz), (cx + sx, cz + sz), (cx - sx, cz + sz)]
-    return prism(name, prof, cy - sy, cy + sy, tile)
+    return prism(name, prof, cy - sy, cy + sy, tile, bevel, taper)
 
 
 def cylinder_x(name, x0, x1, y, z, r, sides, tile):
@@ -118,18 +133,18 @@ def cylinder_x(name, x0, x1, y, z, r, sides, tile):
 parts = []
 # --- Hull: low, wide, angular. Side profile in (x, z), front +X.
 hull_profile = [(-3.0, 0.55), (2.6, 0.55), (3.2, 0.95), (2.4, 1.45), (-2.7, 1.45), (-3.1, 1.15)]
-parts.append(prism('HullCore', hull_profile, -1.25, 1.25, 'hull'))
+parts.append(prism('HullCore', hull_profile, -1.25, 1.25, 'hull', bevel=0.09, taper=0.82))
 # Upper deck plate with a sloped glacis, slightly narrower.
 deck = [(-2.6, 1.45), (2.2, 1.45), (1.6, 1.75), (-2.3, 1.75)]
-parts.append(prism('HullDeck', deck, -1.05, 1.05, 'hull'))
+parts.append(prism('HullDeck', deck, -1.05, 1.05, 'hull', bevel=0.06, taper=0.8))
 # Track pods: chamfered ends, outside the hull.
 pod = [(-3.25, 0.1), (2.95, 0.1), (3.4, 0.5), (3.0, 0.9), (-3.2, 0.9), (-3.45, 0.5)]
 for side, y in (('L', 1.62), ('R', -1.62)):
-    parts.append(prism(f'Track{side}', pod, y - 0.42, y + 0.42, 'track'))
+    parts.append(prism(f'Track{side}', pod, y - 0.42, y + 0.42, 'track', bevel=0.07))
     # Angled side skirt over the upper track.
     skirt = [(-3.1, 0.7), (2.8, 0.7), (3.15, 1.0), (2.7, 1.32), (-3.0, 1.32)]
     y_out = y + (0.48 if y > 0 else -0.48)
-    parts.append(prism(f'Skirt{side}', skirt, min(y, y_out), max(y, y_out), 'hull'))
+    parts.append(prism(f'Skirt{side}', skirt, min(y, y_out), max(y, y_out), 'hull', bevel=0.05))
     # Orange running light at the front of each skirt, cyan strip along it.
     parts.append(box(f'Amber{side}', (3.0, y_out, 1.1), (0.12, 0.05, 0.06), 'amber'))
     parts.append(box(f'Seam{side}', (0.0, y_out + (0.02 if y > 0 else -0.02), 0.95), (2.2, 0.02, 0.03), 'glow'))
@@ -137,7 +152,17 @@ for side, y in (('L', 1.62), ('R', -1.62)):
 for y in (0.8, -0.8):
     parts.append(box(f'Head{y}', (3.05, y, 1.05), (0.06, 0.18, 0.06), 'glow'))
 # Rear engine block.
-parts.append(box('Engine', (-2.75, 0, 1.6), (0.35, 0.8, 0.2), 'dark'))
+parts.append(box('Engine', (-2.75, 0, 1.6), (0.35, 0.8, 0.2), 'dark', bevel=0.05, taper=0.85))
+# Rear exhaust grilles with a cyan heat glow, front spaced-armour wedge, tow hooks.
+for y in (0.5, -0.5):
+    parts.append(box(f'Exhaust{y}', (-3.05, y, 1.25), (0.06, 0.28, 0.12), 'dark', bevel=0.02))
+    parts.append(box(f'ExhaustGlow{y}', (-3.12, y, 1.25), (0.01, 0.22, 0.05), 'glow'))
+    parts.append(box(f'Hook{y}', (3.25, y * 1.6, 0.8), (0.12, 0.06, 0.06), 'dark'))
+wedge = [(2.3, 1.2), (3.15, 0.95), (3.3, 1.05), (2.5, 1.48)]
+parts.append(prism('NoseArmor', wedge, -0.95, 0.95, 'turret', bevel=0.04, taper=0.9))
+# Side stowage boxes over the skirts.
+for side in (1, -1):
+    parts.append(box(f'Stow{side}', (-1.6, side * 1.25, 1.62), (0.6, 0.22, 0.13), 'turret', bevel=0.04))
 
 # Road wheels peeking out under the skirts (8-sided, along Y).
 def cylinder_y(name, x, y, z, r, w, sides, tile):
@@ -160,21 +185,27 @@ for y in (1.62, -1.62):
 tx = -0.4
 turret_profile = [(tx - 1.7, 1.75), (tx + 1.3, 1.75), (tx + 2.1, 2.05), (tx + 1.5, 2.5),
                   (tx - 1.2, 2.55), (tx - 1.9, 2.2)]
-turret = [prism('TurretBody', turret_profile, -1.05, 1.05, 'turret')]
+turret = [prism('TurretBody', turret_profile, -1.05, 1.05, 'turret', bevel=0.08, taper=0.72)]
 roof = [(tx - 1.0, 2.5), (tx + 1.2, 2.5), (tx + 0.9, 2.68), (tx - 0.8, 2.68)]
-turret.append(prism('TurretRoof', roof, -0.7, 0.7, 'turret'))
+turret.append(prism('TurretRoof', roof, -0.7, 0.7, 'turret', bevel=0.04, taper=0.85))
 bustle = [(tx - 2.5, 1.95), (tx - 1.7, 1.85), (tx - 1.7, 2.45), (tx - 2.3, 2.4)]
-turret.append(prism('Bustle', bustle, -0.85, 0.85, 'turret'))
+turret.append(prism('Bustle', bustle, -0.85, 0.85, 'turret', bevel=0.05, taper=0.8))
 for y in (1.2, -1.2):
     pod = [(tx - 1.2, 1.9), (tx + 0.6, 1.9), (tx + 0.9, 2.15), (tx + 0.5, 2.4), (tx - 1.1, 2.4)]
-    turret.append(prism(f'Pod{y}', pod, y - 0.2, y + 0.2, 'hull'))
+    turret.append(prism(f'Pod{y}', pod, y - 0.2, y + 0.2, 'hull', bevel=0.04))
     turret.append(box(f'PodLight{y}', (tx + 0.82, y, 2.15), (0.03, 0.12, 0.05), 'amber'))
-turret.append(box('Sensor', (tx - 0.6, 0.45, 2.85), (0.22, 0.16, 0.17), 'dark'))
+turret.append(box('Sensor', (tx - 0.6, 0.45, 2.85), (0.22, 0.16, 0.17), 'dark', bevel=0.03))
+# Commander cupola with vision blocks, smoke dischargers on the turret cheeks.
+turret.append(cylinder_x('Cupola', tx - 0.2, tx + 0.35, -0.35, 2.78, 0.26, 8, 'turret'))
+turret.append(box('CupolaGlass', (tx + 0.08, -0.35, 2.82), (0.2, 0.2, 0.025), 'glow'))
+for y in (1.0, -1.0):
+    for k in range(3):
+        turret.append(cylinder_x(f'Smoke{y}{k}', tx + 0.9, tx + 1.25, y * (0.75 + 0.13 * k) / 1.0, 2.42 + 0.02 * k, 0.06, 6, 'dark'))
 turret.append(box('SensorLens', (tx - 0.37, 0.45, 2.87), (0.02, 0.1, 0.07), 'glow'))
 turret.append(box('Antenna', (tx - 1.6, -0.6, 3.2), (0.02, 0.02, 0.6), 'dark'))
 turret.append(box('TurretSeam', (tx + 0.2, 0, 2.69), (0.9, 0.02, 0.01), 'glow'))
 # Twin long barrels: slim tubes, a shroud with energy coils near the mantlet, short muzzle brakes.
-turret.append(box('Mantlet', (tx + 2.05, 0, 2.2), (0.25, 0.62, 0.22), 'dark'))
+turret.append(box('Mantlet', (tx + 2.05, 0, 2.2), (0.25, 0.62, 0.22), 'dark', bevel=0.06, taper=0.8))
 for y in (0.3, -0.3):
     turret.append(cylinder_x(f'Barrel{y}', tx + 2.2, tx + 8.2, y, 2.2, 0.11, 8, 'dark'))
     turret.append(cylinder_x(f'Shroud{y}', tx + 2.2, tx + 4.6, y, 2.2, 0.17, 8, 'barrel'))
