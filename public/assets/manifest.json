@@ -307,12 +307,12 @@
       "id": "unit.alien.disc",
       "kind": "model",
       "path": "assets/models/alien/disc.glb",
-      "bytes": 119732,
+      "bytes": 245780,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Disc",
+        "title": "Disc (competition winner, procedural textures)",
         "usedFor": "Disc (saucer)"
       }
     },
