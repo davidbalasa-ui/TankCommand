@@ -31,20 +31,52 @@ def foundation(name, half, h=0.4, tile='dark'):
 
 # ---------------------------------------------------------------- Terran
 def t_landing_pad():
-    out = [foundation('Base', 6.0, 0.5)]
-    out.append(plate('Deck', octagon(4.6), 0.5, 0.75, 'hull', bevel=0.06))
-    out.append(lathe('RingGlow', [(3.6, 0.76), (3.75, 0.76)], 24, 'glow', smooth=False))
-    out.append(lathe('Inner', [(1.2, 0.76), (1.3, 0.76)], 16, 'amber', smooth=False))
-    for k in range(4):
-        a = math.pi / 4 + k * math.pi / 2
-        x, y = 5.3 * math.cos(a), 5.3 * math.sin(a)
+    """12 x 12 pad. Landing circle in the middle, exit ramp on +X (the game turns +X toward the
+    pad's exit edge), cargo lift and dock on -Y (left of the exit, where workers unload)."""
+    H, R0 = 6.0, 2.6  # half size; ramp half width
+    out = []
+    # Foundation in three pieces so the ramp notch at +X is open to the ground.
+    c = H * 0.84
+    out.append(plate('Base', [(-c, -H), (3.6, -H), (3.6, H), (-c, H), (-H, c), (-H, -c)], 0.0, 0.5, 'dark', bevel=0.05))
+    out.append(plate('BaseR', [(3.6, R0 + 0.3), (H, R0 + 0.3), (H, c), (c, H), (3.6, H)], 0.0, 0.5, 'dark', bevel=0.05))
+    out.append(plate('BaseL', [(3.6, -H), (c, -H), (H, -c), (H, -R0 - 0.3), (3.6, -R0 - 0.3)], 0.0, 0.5, 'dark', bevel=0.05))
+    # Exit ramp and its rails.
+    out.append(prism('Ramp', [(3.4, 0.0), (H + 0.05, 0.0), (H + 0.05, 0.06), (3.4, 0.74)], -R0, R0, 'hull', bevel=0.03))
+    for side in (-1, 1):
+        y = side * (R0 + 0.15)
+        out.append(prism(f'Rail{side}', [(3.4, 0.0), (H, 0.0), (H, 0.3), (3.4, 1.0)], y - 0.15, y + 0.15, 'turret', bevel=0.03))
+        out.append(prism(f'RailGlow{side}', [(3.5, 0.98), (H - 0.1, 0.28), (H - 0.1, 0.33), (3.5, 1.03)], y - 0.06, y + 0.06, 'glow'))
+    for k in range(2):  # arrows on the ramp pointing out
+        x = 4.15 + k * 0.95
+        z = 0.74 - (x + 0.3 - 3.4) / (H - 3.4) * 0.68 + 0.03
+        out.append(plate(f'RampArrow{k}', [(x, -0.9), (x + 0.6, 0.0), (x, 0.9), (x + 0.25, 0.0)], z, z + 0.03, 'amber'))
+    # Deck and landing circle.
+    out.append(plate('Deck', octagon(3.5), 0.5, 0.75, 'hull', bevel=0.05))
+    out.append(lathe('RingGlow', [(2.95, 0.76), (3.12, 0.76)], 28, 'glow', smooth=False))
+    out.append(lathe('Inner', [(0.9, 0.76), (1.0, 0.76)], 16, 'amber', smooth=False))
+    for k in range(8):
+        g = box(f'Tick{k}', (2.2, 0, 0.77), (0.4, 0.07, 0.01), 'glow')
+        out.append(kit.rot_z(g, 22.5 + 45 * k))
+    # Exit arrow on the deck.
+    out.append(plate('ExitArrow', [(1.5, -0.45), (2.3, 0.0), (1.5, 0.45), (1.75, 0.0)], 0.76, 0.78, 'glow'))
+    # Cargo lift on the dock side: hazard-framed platform with a gantry over it.
+    ly = -H * 0.62
+    out.append(plate('LiftFrame', [(-1.35, ly - 1.35), (1.35, ly - 1.35), (1.35, ly + 1.0), (-1.35, ly + 1.0)], 0.5, 0.62, 'amber', bevel=0.03))
+    out.append(plate('LiftDeck', [(-1.05, ly - 1.1), (1.05, ly - 1.1), (1.05, ly + 0.75), (-1.05, ly + 0.75)], 0.5, 0.66, 'turret', bevel=0.03))
+    out.append(box('LiftGlow', (0, ly - 0.17, 0.665), (0.9, 0.04, 0.005), 'glow'))
+    for side in (-1, 1):
+        x = side * 1.6
+        out.append(box(f'GantryPost{side}', (x, ly - 0.2, 1.55), (0.16, 0.16, 1.05), 'turret', bevel=0.03))
+        out.append(box(f'GantryLamp{side}', (x, ly - 0.2, 2.68), (0.12, 0.12, 0.08), 'amber'))
+    out.append(box('GantryBeam', (0, ly - 0.2, 2.5), (1.76, 0.18, 0.12), 'hull', bevel=0.03))
+    out.append(box('GantryHook', (0, ly - 0.2, 2.2), (0.22, 0.22, 0.2), 'dark', bevel=0.03))
+    # Dock apron: where the worker parks, painted bay lines just off the -Y edge.
+    for side in (-1, 1):
+        out.append(box(f'BayLine{side}', (side * 1.4, -H + 0.3, 0.51), (0.07, 0.28, 0.01), 'amber'))
+    # Corner beacons and the control booth on the far corner.
+    for k, (x, y) in enumerate(((-5.0, -5.0), (5.0, 5.0), (5.0, -5.0))):
         out.append(box(f'Beacon{k}', (x, y, 0.85), (0.25, 0.25, 0.35), 'dark', bevel=0.04))
         out.append(box(f'BeaconLamp{k}', (x, y, 1.25), (0.16, 0.16, 0.06), 'amber'))
-    for k in range(8):
-        a = k * math.pi / 4
-        g = box(f'Chev{k}', (2.5, 0, 0.77), (0.5, 0.08, 0.01), 'glow')
-        out.append(kit.rot_z(g, math.degrees(a)))
-    # control booth on one corner
     out.append(prism('Booth', [(-5.6, 0.5), (-3.9, 0.5), (-4.1, 2.4), (-5.4, 2.6)], 3.9, 5.6, 'turret', bevel=0.06))
     out.append(box('BoothGlass', (-3.98, 4.75, 2.0), (0.02, 0.6, 0.25), 'glow'))
     out += antenna('Ant', -5.0, 5.2, 2.6, 1.6)
@@ -176,13 +208,34 @@ def k_base(name, r, h=0.35):
 
 
 def k_landing_nest():
+    """Kesh nest, same layout as the Terran pad: open mouth toward +X (exit), cargo cradle on -Y.
+    The petals float free of the base, held up by nothing, like the rest of the Kesh."""
     out = [k_base('Base', 5.8)]
     out.append(lathe('Bowl', [(5.2, 0.35), (4.6, 0.75), (3.0, 0.55), (1.2, 0.45)], 20, 'shell', top=0.45))
-    out.append(ring('GoldRing', (0, 0, 0.6), 3.4, 0.08, sides=24, tube=4, tile='glow'))
-    out.append(orb('Heart', (0, 0, 0.5), 0.6, 'core', scale=(1, 1, 0.4)))
-    for k in range(8):
+    out.append(ring('GoldRing', (0, 0, 0.62), 2.9, 0.08, sides=24, tube=4, tile='glow'))
+    out.append(orb('Heart', (0, 0, 0.5), 0.55, 'core', scale=(1, 1, 0.35)))
+    # Exit tongue: a smooth lip sloping down and out on +X.
+    out.append(prism('Tongue', [(3.2, 0.0), (6.0, 0.0), (6.0, 0.06), (3.2, 0.62)], -2.3, 2.3, 'shell', bevel=0.12, taper=0.8))
+    for side in (-1, 1):
+        out.append(cyl(f'TongueVein{side}', (3.5, side * 1.5, 0.52), (5.6, side * 1.6, 0.08), 0.06, 5, 'glow'))
+    # Floating petals, leaving the mouth (+X) and the cradle side (-Y) open.
+    for k, a in enumerate((67.5, 112.5, 157.5, 202.5, 247.5)):
         f = arc_fin(f'Petal{k}', 8.4, 0.3, 3.6, 180, 118, 0.55, 0.12, tile='fin')
-        out.append(kit.rot_z(f, 22.5 + 45 * k))
+        f.location = (0, 0, 0.35)
+        kit._apply(f)
+        out.append(kit.rot_z(f, a))
+    # Cargo cradle on -Y: a floating ring over a glowing pool, held by three hovering claws.
+    ly = -5.8 * 0.62
+    out.append(lathe('Pool', [(1.25, 0.66), (1.05, 0.72)], 16, 'glow', center=(0, ly, 0), top=0.72, smooth=False))
+    out.append(ring('CradleRing', (0, ly, 1.9), 1.15, 0.1, sides=20, tube=5, tile='fin'))
+    for k in range(3):
+        a = math.radians(90 + k * 120)
+        cx, cy = 1.35 * math.cos(a), ly + 1.35 * math.sin(a)
+        claw = arc_fin(f'Claw{k}', 0.0, 0.0, 1.3, 210, 150, 0.32, 0.1, tile='shell')
+        claw.location = (cx, cy, 1.25)
+        kit._apply(claw)
+        out.append(kit.rot_z(claw, math.degrees(a) + 180, about=(cx, cy, 1.25)))
+        out.append(orb(f'ClawBead{k}', (cx, cy, 0.95), 0.12, 'core'))
     return out, {}, 5000
 
 

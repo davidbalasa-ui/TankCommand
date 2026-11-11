@@ -6,6 +6,7 @@
 //   - the dock edge, at right angles to the exit: miners and haulers unload there, one at a time,
 //     and the others wait in a line behind it.
 import { clampToMap } from './map';
+import { canStand } from './motion';
 import { UNIT_RADIUS } from './tuning';
 import type { StructureState, UnitState, WorldState } from './types';
 
@@ -150,4 +151,36 @@ export function padLine(world: WorldState, pad: StructureState): UnitState[] {
       const qb = b.job?.queuedAt ?? 0;
       return qa - qb || a.id - b.id;
     });
+}
+
+/**
+ * Where a fresh arrival parks: the rally point past the exit edge, or the nearest free slot in a
+ * grid of rows laid out in the pad's own frame (alternating left and right), so arrivals line up
+ * neatly beside each other the same way for every pad orientation.
+ */
+export function padRallySpot(world: WorldState, pad: StructureState, selfId: number): { x: number; z: number } {
+  const layout = padLayout(world, pad);
+  const fx = Math.round(Math.cos(layout.facing));
+  const fz = Math.round(Math.sin(layout.facing));
+  const free = (x: number, z: number): boolean =>
+    canStand(world, x, z) &&
+    !world.units.some(
+      (other) => other.id !== selfId && other.hp > 0 && Math.hypot(other.x - x, other.z - z) < UNIT_RADIUS * 2,
+    );
+  for (let i = 0; i < 30; i += 1) {
+    const row = Math.floor(i / 5);
+    const col = i % 5;
+    const lateral = (col === 0 ? 0 : Math.ceil(col / 2) * (col % 2 === 1 ? 1 : -1)) * UNIT_RADIUS * 2.4;
+    const forward = row * UNIT_RADIUS * 2.8;
+    const spot = clampToMap(
+      world.map,
+      layout.rallyX + fx * forward - fz * lateral,
+      layout.rallyZ + fz * forward + fx * lateral,
+      UNIT_RADIUS,
+    );
+    if (free(spot.x, spot.z)) {
+      return spot;
+    }
+  }
+  return { x: layout.rallyX, z: layout.rallyZ };
 }

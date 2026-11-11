@@ -1,5 +1,5 @@
 import { flyNewAircraftHome, hasFreeAirSlot } from './air';
-import { PAD_CLEAR_TIMEOUT_SEC, PAD_LAND_SEC, padLayout, padOccupied } from './pad';
+import { PAD_CLEAR_TIMEOUT_SEC, PAD_LAND_SEC, padLayout, padOccupied, padRallySpot } from './pad';
 import { SIM_TICK_HZ } from './constants';
 import { addStructure, addUnit, placementValidity, unitCount } from './spawn';
 import { addAlert, ensureSideStats } from './economy';
@@ -300,7 +300,9 @@ function touchDown(
     if (spawned.air) {
       flyNewAircraftHome(world, spawned);
     } else {
-      spawned.order = { kind: 'move', x: layout.rallyX, z: layout.rallyZ, queue: false };
+      // Park beside earlier arrivals rather than on top of them.
+      const spot = padRallySpot(world, pad, spawned.id);
+      spawned.order = { kind: 'move', x: spot.x, z: spot.z, queue: false };
     }
     pad.padUnitId = spawned.id;
     pad.padClearLeft = PAD_CLEAR_TIMEOUT_SEC;

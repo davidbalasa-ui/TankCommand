@@ -385,7 +385,7 @@
       "id": "structure.human.landing_pad",
       "kind": "model",
       "path": "assets/models/structures/terran_landing_pad.glb",
-      "bytes": 55272,
+      "bytes": 96512,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",
@@ -476,7 +476,7 @@
       "id": "structure.alien.landing_pad",
       "kind": "model",
       "path": "assets/models/structures/kesh_landing_nest.glb",
-      "bytes": 135272,
+      "bytes": 158700,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",

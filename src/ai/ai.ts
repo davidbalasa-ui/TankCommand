@@ -226,13 +226,19 @@ function assignWorkers(planner: Planner): void {
   const { world } = planner;
   const miners = planner.ownUnits().filter((u) => isMiner(planner.unitType(u)));
   const busy = new Map<number, number>();
+  // A miner whose deposit ran dry sits in 'waiting' with nothing left to dig: send it elsewhere.
+  const dry = (unit: UnitState): boolean =>
+    unit.job !== null &&
+    unit.job.stage === 'waiting' &&
+    unit.job.load <= 0 &&
+    !world.deposits.some((d) => d.id === unit.job?.targetId && d.amount > 0);
   for (const unit of miners) {
-    if (unit.job && 'depositId' in unit.job && typeof unit.job.depositId === 'number') {
-      busy.set(unit.job.depositId, (busy.get(unit.job.depositId) ?? 0) + 1);
+    if (unit.job && !dry(unit)) {
+      busy.set(unit.job.targetId, (busy.get(unit.job.targetId) ?? 0) + 1);
     }
   }
   for (const unit of miners) {
-    if (unit.job || unit.order.kind !== 'idle') {
+    if ((unit.job && !dry(unit)) || unit.order.kind !== 'idle') {
       continue;
     }
     const deposit = world.deposits

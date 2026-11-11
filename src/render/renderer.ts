@@ -6,7 +6,9 @@ import { heightAt, slopeAt } from '../sim/map';
 import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
 import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
-import type { SimStructureType, UnitState, WorldState } from '../sim/types';
+import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
+import { SIM_TICK_HZ } from '../sim/constants';
+import type { DropOrder, SimStructureType, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
   QUALITY_LADDER,
@@ -669,6 +671,7 @@ export class RenderView {
     this.syncStructures(world);
     this.syncDeposits(world);
     this.syncDropBeams(world);
+    this.syncPadTraffic(world, alpha);
     this.syncProjectiles();
     this.syncWrecks();
     this.syncContacts();
@@ -1522,6 +1525,10 @@ export class RenderView {
             }
           });
           modelPivot = model.getObjectByName('TurretPivot') ?? null;
+          if (type.kind === 'pad') {
+            // The model's ramp (+X) points along the pad's exit edge.
+            model.rotation.y = -padFacing(structure);
+          }
           mesh.add(model);
           // The box stays as the picking and selection body, but is not drawn.
           material.visible = false;
@@ -1642,8 +1649,183 @@ export class RenderView {
     }
   }
 
+  // ---- Landing pad traffic -------------------------------------------------------------
+  // Deliveries descend onto the pad (sim: DropOrder.landingSec), workers hand cargo across to the
+  // pad's lift (job stage 'unloading'), and the cargo then rises away (drop beams of kind ore/metal).
+  private readonly landingVisuals = new Map<number, THREE.Object3D>();
+  private readonly cargoVisuals = new Map<string, THREE.Mesh>();
+  private cargoGeometry: THREE.BoxGeometry | null = null;
+  private readonly cargoMaterials = new Map<string, THREE.Material>();
+
+  private cargoMaterial(kind: 'ore' | 'metal' | 'kit'): THREE.Material {
+    let material = this.cargoMaterials.get(kind);
+    if (!material) {
+      const color = kind === 'ore' ? 0xc0702c : kind === 'metal' ? 0x9aa6b2 : 0x5c6a3a;
+      const glow = kind === 'ore' ? 0x5a2a08 : kind === 'metal' ? 0x10303c : 0x1a2208;
+      material = new THREE.MeshStandardMaterial({ color, emissive: glow, roughness: 0.6, metalness: 0.4 });
+      this.cargoMaterials.set(kind, material);
+    }
+    return material;
+  }
+
+  private cargoMesh(kind: 'ore' | 'metal' | 'kit', size: number): THREE.Mesh {
+    if (!this.cargoGeometry) {
+      this.cargoGeometry = new THREE.BoxGeometry(1, 1, 1);
+    }
+    const mesh = new THREE.Mesh(this.cargoGeometry, this.cargoMaterial(kind));
+    mesh.scale.set(size, size * 0.75, size);
+    mesh.castShadow = true;
+    return mesh;
+  }
+
+  private makeLandingVisual(world: WorldState, order: DropOrder): THREE.Object3D {
+    const group = new THREE.Group();
+    let body: THREE.Object3D;
+    if (order.itemKind === 'unit') {
+      const template = this.templateFor(order.itemId);
+      if (template) {
+        body = template.clone(true);
+        body.scale.setScalar(world.unitTypes.get(order.itemId)?.visualScale ?? 1);
+      } else {
+        body = this.prepareFallback();
+      }
+      cloneMaterials(body, isHostile(world, 1, order.owner), this.colorBlind);
+      body.userData.ownMaterials = true;
+    } else {
+      body = this.cargoMesh('kit', 3);
+      body.position.y = 1.1;
+    }
+    group.add(body);
+    const human = world.factions.find((entry) => entry.player === order.owner)?.faction !== 'alien';
+    const flame = new THREE.Mesh(
+      new THREE.ConeGeometry(1.4, 6, 12, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: human ? 0x66e0ff : 0xffc24a,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    flame.rotation.x = Math.PI; // point down
+    flame.position.y = -3;
+    flame.name = 'LandingFlame';
+    group.add(flame);
+    this.scene.add(group);
+    return group;
+  }
+
+  private disposeLandingVisual(group: THREE.Object3D): void {
+    this.scene.remove(group);
+    const shared = new Set<unknown>(this.cargoMaterials.values());
+    group.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        const geometry: unknown = object.geometry;
+        if (object.name === 'LandingFlame' && geometry instanceof THREE.BufferGeometry) {
+          geometry.dispose();
+        }
+        const material: unknown = object.material;
+        if (material instanceof THREE.Material && !shared.has(material)) {
+          material.dispose();
+        }
+      }
+    });
+  }
+
+  private syncPadTraffic(world: WorldState, alpha: number): void {
+    const tickSec = 1 / SIM_TICK_HZ;
+    const live = new Set<number>();
+    for (const order of world.dropQueue) {
+      if (order.landingSec === undefined) {
+        continue;
+      }
+      const pad = world.structures.find((item) => item.id === order.padId && item.hp > 0);
+      if (!pad || (order.owner !== 1 && !this.structureVisuals.has(pad.id))) {
+        continue;
+      }
+      live.add(order.id);
+      let visual = this.landingVisuals.get(order.id);
+      if (!visual) {
+        visual = this.makeLandingVisual(world, order);
+        this.landingVisuals.set(order.id, visual);
+      }
+      const t = Math.min(1, Math.max(0, (order.landingSec + alpha * tickSec) / PAD_LAND_SEC));
+      const eased = 1 - (1 - t) ** 3; // fast from high up, settling gently onto the deck
+      const deck = heightAt(world.map, pad.x, pad.z) + structureHeight('pad') * 0.35;
+      visual.position.set(pad.x, deck + (1 - eased) * 42, pad.z);
+      visual.rotation.y = -padFacing(pad);
+      const flame = visual.getObjectByName('LandingFlame');
+      if (flame) {
+        flame.scale.setScalar(Math.max(0.05, 1 - t * 0.8));
+        flame.visible = t < 0.98;
+      }
+    }
+    for (const [id, visual] of this.landingVisuals) {
+      if (!live.has(id)) {
+        this.disposeLandingVisual(visual);
+        this.landingVisuals.delete(id);
+      }
+    }
+
+    // Cargo: worker -> pad lift while unloading, then rising off the lift.
+    const liveCargo = new Set<string>();
+    for (const unit of world.units) {
+      const job = unit.job;
+      if (!job || job.stage !== 'unloading' || unit.hp <= 0) {
+        continue;
+      }
+      const pad = world.structures.find((item) => item.id === job.dockPadId && item.hp > 0);
+      if (!pad) {
+        continue;
+      }
+      const key = `u${unit.id}`;
+      liveCargo.add(key);
+      const kind = job.kind === 'oreMiner' ? 'ore' : 'metal';
+      let mesh = this.cargoVisuals.get(key);
+      if (!mesh) {
+        mesh = this.cargoMesh(kind, 1.6);
+        this.scene.add(mesh);
+        this.cargoVisuals.set(key, mesh);
+      }
+      const layout = padLayout(world, pad);
+      const left = Math.max(0, (job.unloadLeft ?? PAD_UNLOAD_SEC) - alpha * tickSec);
+      const t = Math.min(1, Math.max(0, 1 - left / PAD_UNLOAD_SEC));
+      const x = unit.x + (layout.liftX - unit.x) * t;
+      const z = unit.z + (layout.liftZ - unit.z) * t;
+      const ground = heightAt(world.map, x, z);
+      mesh.position.set(x, ground + 1.6 + Math.sin(t * Math.PI) * 1.8, z);
+      mesh.rotation.y = -layout.facing;
+    }
+    world.dropBeams.forEach((beam, index) => {
+      if (beam.kind !== 'ore' && beam.kind !== 'metal') {
+        return;
+      }
+      const key = `b${index}:${beam.kind}`;
+      liveCargo.add(key);
+      let mesh = this.cargoVisuals.get(key);
+      if (!mesh) {
+        mesh = this.cargoMesh(beam.kind, 1.6);
+        this.scene.add(mesh);
+        this.cargoVisuals.set(key, mesh);
+      }
+      const total = beam.total ?? 1;
+      const t = Math.min(1, Math.max(0, 1 - (beam.ttl - alpha * tickSec) / total));
+      const ground = heightAt(world.map, beam.x, beam.z);
+      mesh.position.set(beam.x, ground + 1.6 + t * t * 34, beam.z);
+      mesh.rotation.y = t * 2.5;
+    });
+    for (const [key, mesh] of this.cargoVisuals) {
+      if (!liveCargo.has(key)) {
+        this.scene.remove(mesh);
+        this.cargoVisuals.delete(key);
+      }
+    }
+  }
+
   private syncDropBeams(world: WorldState): void {
-    while (this.beamPool.length < world.dropBeams.length) {
+    const arrivals = world.dropBeams.filter((beam) => (beam.kind ?? 'arrive') === 'arrive');
+    while (this.beamPool.length < arrivals.length) {
       const geometry = new THREE.CylinderGeometry(1.5, 1.5, 20, 10);
       const material = new THREE.MeshBasicMaterial({
         color: DROP_BEAM_COLOR,
@@ -1654,7 +1836,7 @@ export class RenderView {
       this.scene.add(mesh);
       this.beamPool.push(mesh);
     }
-    while (this.beamPool.length > world.dropBeams.length) {
+    while (this.beamPool.length > arrivals.length) {
       const mesh = this.beamPool.pop();
       if (!mesh) {
         continue;
@@ -1666,8 +1848,8 @@ export class RenderView {
         material.dispose();
       }
     }
-    for (let index = 0; index < world.dropBeams.length; index += 1) {
-      const beam = world.dropBeams[index];
+    for (let index = 0; index < arrivals.length; index += 1) {
+      const beam = arrivals[index];
       const mesh = this.beamPool[index];
       if (!beam || !mesh) {
         continue;
