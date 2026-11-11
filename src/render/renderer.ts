@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
@@ -107,6 +108,8 @@ interface HealthBar {
   outer: HTMLDivElement;
   fill: HTMLDivElement;
 }
+
+const ENVIRONMENT_INTENSITY = 0.45;
 
 interface StructureVisual {
   mesh: THREE.Mesh;
@@ -923,6 +926,13 @@ export class RenderView {
 
     const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
     this.scene.add(hemisphere);
+
+    // Soft reflected light for metal surfaces. Without an environment, metallic materials only
+    // reflect black and the Kesh bronze and Terran gunmetal read dull. Built once, tiny, and cheap.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = ENVIRONMENT_INTENSITY;
+    pmrem.dispose();
 
     this.directional.castShadow = true;
     this.directional.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
