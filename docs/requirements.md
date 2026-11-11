@@ -157,6 +157,6 @@
 | MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
 | MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
-| SKR-01 | Skirmish setup options all take effect, with 1 to 3 AI opponents. |
+| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |

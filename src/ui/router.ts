@@ -190,6 +190,10 @@ export interface ScreenContext {
   groupMembers?: (group: number) => number[];
   registerHud?: (hud: HudHandle | null) => void;
   getBuildItems?: () => BuildItemView[];
+  /** Portrait of a unit or structure type rendered from its model; null until loaded. */
+  thumbnail?: (kind: 'unit' | 'structure', typeId: string) => string | null;
+  /** Friendly name of a unit or structure type. */
+  itemName?: (typeId: string) => string;
   getOwnPads?: () => Array<{ id: number; x: number; z: number }>;
   getSelectedPadId?: () => number | null;
   setSelectedPad?: (id: number) => void;
@@ -214,7 +218,7 @@ export interface ScreenContext {
   chooseNextMission?: () => boolean;
   getSkirmishConfig?: () => SkirmishConfig;
   setSkirmishConfig?: (config: SkirmishConfig) => void;
-  getSkirmishMaps?: () => Array<{ id: string; name: string }>;
+  getSkirmishMaps?: () => Array<{ id: string; name: string; preview?: BriefingView['map'] }>;
   beginSkirmish?: () => void;
   getBaseView?: () => import('./basePanel').BaseView;
   baseAction?: (action: import('./basePanel').BaseAction) => boolean;

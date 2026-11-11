@@ -1,8 +1,7 @@
 import { generateMap, heightAt, isWaterAt } from '../sim/map';
 import type { BriefingView } from './router';
 
-export function drawMapPreview(canvas: HTMLCanvasElement, view: BriefingView['map']): void {
-  const size = 128;
+export function drawMapPreview(canvas: HTMLCanvasElement, view: BriefingView['map'], size = 128): void {
   canvas.width = size;
   canvas.height = size;
   const g = canvas.getContext('2d');
@@ -30,7 +29,8 @@ export function drawMapPreview(canvas: HTMLCanvasElement, view: BriefingView['ma
   const toPx = (v: number): number => ((v + half) / map.size) * size;
   for (const deposit of view.deposits) {
     g.fillStyle = deposit.kind === 'metal' ? '#c8d0d8' : '#e0a030';
-    g.fillRect(toPx(deposit.x) - 1, toPx(deposit.z) - 1, 3, 3);
+    const d = Math.max(3, Math.round(size / 48));
+    g.fillRect(toPx(deposit.x) - d / 2, toPx(deposit.z) - d / 2, d, d);
   }
   for (const start of view.starts) {
     g.fillStyle = start.player === 1 ? '#4da3ff' : '#ff5d5d';

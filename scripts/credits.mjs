@@ -42,6 +42,16 @@ for (const asset of assets) {
   );
 }
 
+// Fonts are not manifest assets; they are listed here so the in-game credits name them too.
+lines.push(
+  '',
+  '## Fonts',
+  '',
+  '| Font | Author | Licence | Source | Used for |',
+  '| --- | --- | --- | --- | --- |',
+  '| Inter (public/fonts) | The Inter Project Authors | SIL OFL 1.1 (public/fonts/OFL.txt) | https://github.com/rsms/inter | Menu and HUD text |',
+);
+
 const content = `${lines.join('\n')}\n`;
 
 function writeOrCheck(path) {

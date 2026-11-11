@@ -9,6 +9,11 @@ export const ControlInventory = {
   },
 };
 
+/** Registers a control id for an element that is not built by `button()` (e.g. a segmented group). */
+export function registerControl(id: string): void {
+  registered.add(id);
+}
+
 export function button(
   screenId: string,
   name: string,

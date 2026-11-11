@@ -354,6 +354,9 @@ function createFallbackTank(): THREE.Group {
   return group;
 }
 
+const THUMB_WIDTH = 112;
+const THUMB_HEIGHT = 104;
+
 export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -426,6 +429,7 @@ export class RenderView {
   private templateRoot: THREE.Group | null = null;
   // Per-model templates keyed by asset id (unit type modelId); units without one use templateRoot.
   private readonly templates = new Map<string, THREE.Group>();
+  private readonly thumbnails = new Map<string, string>();
   private readonly registry: AssetRegistry;
   private directional: THREE.DirectionalLight;
   private lightTarget: THREE.Object3D;
@@ -1514,6 +1518,94 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     if (loaded) {
       this.rebuildUnitVisuals();
     }
+  }
+
+  /**
+   * A small portrait of a unit or structure type (UI selection panel, build cards), rendered once
+   * from its loaded model and cached as a PNG data URL. Null until the model has loaded.
+   */
+  thumbnail(kind: 'unit' | 'structure', typeId: string): string | null {
+    const key = `${kind}:${typeId}`;
+    const cached = this.thumbnails.get(key);
+    if (cached) {
+      return cached;
+    }
+    const modelId =
+      kind === 'unit' ? this.world.unitTypes.get(typeId)?.modelId : this.world.structureTypes.get(typeId)?.modelId;
+    const template = modelId ? this.templates.get(modelId) : undefined;
+    if (!template || this.disposed) {
+      return null;
+    }
+    const width = THUMB_WIDTH;
+    const height = THUMB_HEIGHT;
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 1.1));
+    const key1 = new THREE.DirectionalLight(0xfff3d6, 2.6);
+    key1.position.set(4, 6, 5);
+    const rim = new THREE.DirectionalLight(0x8fd8ff, 1.4);
+    rim.position.set(-5, 3, -4);
+    scene.add(key1, rim);
+    const model = template.clone(true);
+    cloneMaterials(model, false, this.colorBlind);
+    scene.add(model);
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const centre = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    bounds.getCenter(centre);
+    bounds.getSize(size);
+    const radius = Math.max(0.001, size.length() / 2);
+    const camera = new THREE.PerspectiveCamera(30, width / height, 0.01, 100);
+    const distance = radius / Math.sin(THREE.MathUtils.degToRad(15)) * 0.92;
+    const direction = new THREE.Vector3(1, 0.75, 1.15).normalize();
+    camera.position.copy(centre).addScaledVector(direction, distance);
+    camera.lookAt(centre);
+    const target = new THREE.WebGLRenderTarget(width, height, { samples: 4 });
+    target.texture.colorSpace = THREE.SRGBColorSpace;
+    const previousTarget = this.renderer.getRenderTarget();
+    const previousClear = this.renderer.getClearColor(new THREE.Color());
+    const previousAlpha = this.renderer.getClearAlpha();
+    const previousShadows = this.renderer.shadowMap.enabled;
+    let url: string | null = null;
+    try {
+      this.renderer.shadowMap.enabled = false;
+      this.renderer.setRenderTarget(target);
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.clear();
+      this.renderer.render(scene, camera);
+      const pixels = new Uint8Array(width * height * 4);
+      this.renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const g = canvas.getContext('2d');
+      if (g) {
+        const image = g.createImageData(width, height);
+        for (let row = 0; row < height; row += 1) {
+          const src = (height - 1 - row) * width * 4;
+          image.data.set(pixels.subarray(src, src + width * 4), row * width * 4);
+        }
+        g.putImageData(image, 0, 0);
+        url = canvas.toDataURL('image/png');
+      }
+    } finally {
+      this.renderer.setRenderTarget(previousTarget);
+      this.renderer.setClearColor(previousClear, previousAlpha);
+      this.renderer.shadowMap.enabled = previousShadows;
+      target.dispose();
+      model.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          const material: unknown = object.material;
+          if (material instanceof THREE.Material) {
+            material.dispose();
+          }
+        }
+      });
+    }
+    if (url) {
+      this.thumbnails.set(key, url);
+    }
+    return url;
   }
 
   private templateFor(typeId: string): THREE.Group | null {

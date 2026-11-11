@@ -314,6 +314,8 @@ export class App {
         this.hud = hud;
       },
       getBuildItems: () => this.buildItems(),
+      thumbnail: (kind, typeId) => this.renderView?.thumbnail(kind, typeId) ?? null,
+      itemName: (typeId) => this.itemName(typeId),
       getOwnPads: () => this.ownPads(),
       getSelectedPadId: () => this.currentDropPadId(),
       setSelectedPad: (id) => {
@@ -345,7 +347,19 @@ export class App {
       setSkirmishConfig: (config) => {
         this.skirmishConfig = config;
       },
-      getSkirmishMaps: () => this.mapRows.map((row) => ({ id: row.id, name: row.name })),
+      getSkirmishMaps: () =>
+        this.mapRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          preview: {
+            size: row.size,
+            cellSize: row.cellSize,
+            seed: 1,
+            starts: row.starts,
+            deposits: row.deposits,
+            features: row.features ?? null,
+          },
+        })),
       beginSkirmish: () => {
         this.mode = { kind: 'skirmish' };
         this.fogValue = this.skirmishConfig.fog;
@@ -1715,6 +1729,7 @@ export class App {
   private applySettings(settings: SettingsState): void {
     document.documentElement.dataset.textSize = settings.textSize;
     document.documentElement.classList.toggle('text-large', settings.textSize === 'large');
+    document.documentElement.classList.toggle('quality-low', settings.graphicsQuality === 'low');
     this.leftHandedValue = settings.leftHanded;
     this.input?.setEdgeScroll(settings.edgeScroll);
     this.renderView?.setQualityPreference(settings.graphicsQuality);

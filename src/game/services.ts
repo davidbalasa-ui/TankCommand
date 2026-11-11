@@ -17,6 +17,7 @@ import { SettingsStore, type SettingsState } from '../platform/settings';
 import type { WatchdogReport } from '../platform/watchdog';
 import type { WorldState } from '../sim/types';
 import { AUTOSAVE_CHECK_INTERVAL_MS } from '../sim/tuning';
+import { SIM_TICK_HZ } from '../sim/constants';
 import { AlertCenter, type AlertKind, type AlertSnapshot } from '../ui/alerts';
 import type {
   AutosaveSummary,
@@ -221,7 +222,13 @@ export class GameServices implements GameApi {
     if (loaded.status !== 'ok') {
       return null;
     }
-    return { slot, savedAtIso: loaded.save.meta.savedAtIso };
+    const world = loaded.save.world;
+    return {
+      slot,
+      savedAtIso: loaded.save.meta.savedAtIso,
+      mode: world.mission ? 'mission' : 'skirmish',
+      playSeconds: Math.floor(world.tick / SIM_TICK_HZ),
+    };
   }
 
   async resumeLastGame(): Promise<LoadSlotResult> {

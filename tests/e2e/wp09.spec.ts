@@ -85,13 +85,12 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
   await page.goto('/');
   await waitForHook(page);
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
-  await page.getByRole('button', { name: /^Opponents/ }).click();
-  await page.getByRole('button', { name: /^Opponents/ }).click();
-  await expect(page.getByRole('button', { name: 'Opponents: 3' })).toBeVisible();
-  await page.getByRole('button', { name: /^You:/ }).click();
-  await page.getByRole('button', { name: /^Resources/ }).click();
-  await page.getByRole('button', { name: /^Start:/ }).click();
-  await page.getByRole('button', { name: /^Fog/ }).click();
+  await page.getByRole('radio', { name: 'Opponents: 2 AI' }).click();
+  await expect(page.getByRole('radio', { name: 'Opponents: 2 AI' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Your side: Kesh' }).click();
+  await page.getByRole('radio', { name: 'Resources: High' }).click();
+  await page.getByRole('radio', { name: 'Start with: Pad only' }).click();
+  await page.getByRole('radio', { name: 'Fog of war: Off' }).click();
   await page.screenshot({ path: 'test-results/shots/wp09-5-skirmish-setup.png' });
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
@@ -110,7 +109,8 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
       units: window.__TC_TEST__?.units().filter((u) => u.owner === 1).length ?? -1,
     };
   });
-  expect(state.players).toBe(4);
+  expect(state.players).toBe(3);
+  expect(state.fog).toBe(false);
   expect(state.faction).toBe('alien');
   expect(state.ore).toBe(1000);
   expect(state.units).toBe(0);

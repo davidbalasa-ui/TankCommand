@@ -23,6 +23,10 @@ export interface LoadSlotResult {
 export interface AutosaveSummary {
   slot: string;
   savedAtIso: string;
+  /** 'mission' when the save is a campaign mission, else 'skirmish'. */
+  mode?: 'mission' | 'skirmish';
+  /** In-game time played, in seconds. */
+  playSeconds?: number;
 }
 
 export interface ImportSaveResult {

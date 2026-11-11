@@ -58,3 +58,9 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.human.skimmer | TankCommand project (scripted Blender) | ORIGINAL | - | Skimmer (hover tank) |
 | unit.human.spire_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Spire (packed) (missile battery packed) |
 | unit.human.watchman | TankCommand project (scripted Blender) | ORIGINAL | - | Watchman (radar) |
+
+## Fonts
+
+| Font | Author | Licence | Source | Used for |
+| --- | --- | --- | --- | --- |
+| Inter (public/fonts) | The Inter Project Authors | SIL OFL 1.1 (public/fonts/OFL.txt) | https://github.com/rsms/inter | Menu and HUD text |
