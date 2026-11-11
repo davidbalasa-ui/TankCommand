@@ -3,6 +3,8 @@ import { heightAt } from './map';
 import {
   ALERT_TTL_SEC,
   DEPOSIT_REACH,
+  ORE_CRATE_SIZE,
+  ORE_MAX_CRATES,
   UNIT_CAP,
 } from './tuning';
 import type { Command } from './commands';
@@ -119,6 +121,54 @@ export function nearestPad(
   return best;
 }
 
+export function cloneDeposit(deposit: DepositState): DepositState {
+  return deposit.crates
+    ? { ...deposit, crates: deposit.crates.map((pile) => ({ ...pile })) }
+    : { ...deposit };
+}
+
+/** Ore a side has packed into crates beside this deposit. */
+export function crateOre(deposit: DepositState, owner: PlayerId): number {
+  return deposit.crates?.find((pile) => pile.owner === owner)?.ore ?? 0;
+}
+
+/** Number of crates to show for a side's pile (a part-filled crate counts). */
+export function crateCount(deposit: DepositState, owner: PlayerId): number {
+  return Math.ceil(crateOre(deposit, owner) / ORE_CRATE_SIZE - 1e-6);
+}
+
+export function crateRoom(deposit: DepositState, owner: PlayerId): number {
+  return Math.max(0, ORE_MAX_CRATES * ORE_CRATE_SIZE - crateOre(deposit, owner));
+}
+
+function addCrateOre(deposit: DepositState, owner: PlayerId, ore: number): void {
+  const crates = deposit.crates ?? (deposit.crates = []);
+  const pile = crates.find((item) => item.owner === owner);
+  if (pile) {
+    pile.ore += ore;
+  } else {
+    crates.push({ owner, ore });
+    crates.sort((a, b) => a.owner - b.owner);
+  }
+}
+
+/** Take up to `max` ore (whole crates first) from a side's pile. Returns what was taken. */
+export function takeCrateOre(deposit: DepositState, owner: PlayerId, max: number): number {
+  const pile = deposit.crates?.find((item) => item.owner === owner);
+  if (!pile || pile.ore <= 1e-6) {
+    return 0;
+  }
+  const taken = Math.min(pile.ore, max);
+  pile.ore -= taken;
+  if (pile.ore <= 1e-6 && deposit.crates) {
+    deposit.crates = deposit.crates.filter((item) => item !== pile);
+    if (deposit.crates.length === 0) {
+      delete deposit.crates;
+    }
+  }
+  return taken;
+}
+
 export function findDeposit(world: WorldState, id: number): DepositState | undefined {
   return world.deposits.find((deposit) => deposit.id === id);
 }
@@ -192,7 +242,7 @@ export function applyMineCommand(
     unit.job = {
       kind: 'oreMiner',
       targetId: deposit.id,
-      stage: load > 0 ? 'toPad' : 'toDeposit',
+      stage: 'toDeposit',
       load,
       progress,
       reportedEmpty: false,
@@ -228,8 +278,10 @@ export function applyAssignCommand(
     unit.job = {
       kind: 'tug',
       targetId: station.id,
+      source: 'station',
       stage: load > 0 ? 'toPad' : 'toStation',
       load,
+      cargo: unit.job?.kind === 'tug' ? unit.job.cargo : undefined,
       progress: 0,
       reportedEmpty: false,
     };
@@ -240,6 +292,42 @@ export function applyAssignCommand(
     applied = true;
   }
   outcome(world, command.tick, 'assign', applied, applied ? 'ok' : 'noTug');
+}
+
+/** Send haulers to collect the ore crates miners stack beside a deposit. */
+export function applyHaulCommand(
+  world: WorldState,
+  command: Extract<Command, { kind: 'haul' }>,
+): void {
+  const deposit = findDeposit(world, command.depositId);
+  if (!deposit || deposit.kind !== 'ore') {
+    outcome(world, command.tick, 'haul', false, 'depositMissing');
+    return;
+  }
+  let applied = false;
+  for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    const type = world.unitTypes.get(unit.typeId);
+    if (!type || type.workerKind !== 'tug') {
+      continue;
+    }
+    const load = unit.job?.kind === 'tug' ? unit.job.load : 0;
+    unit.job = {
+      kind: 'tug',
+      targetId: deposit.id,
+      source: 'deposit',
+      stage: load > 0 ? 'toPad' : 'toStation',
+      load,
+      cargo: unit.job?.kind === 'tug' ? unit.job.cargo : undefined,
+      progress: 0,
+      reportedEmpty: false,
+    };
+    unit.order = { kind: 'idle' };
+    unit.path = [];
+    unit.speed = 0;
+    unit.stance = 'free';
+    applied = true;
+  }
+  outcome(world, command.tick, 'haul', applied, applied ? 'ok' : 'noTug');
 }
 
 export function applySalvageCommand(
@@ -266,6 +354,11 @@ export function applySalvageCommand(
   outcome(world, command.tick, 'salvage', true, 'ok');
 }
 
+/**
+ * One tick of a miner at its deposit: it grinds ore into its hopper and packs every full hopper
+ * load into a crate beside the deposit. Miners never drive to the pad; haulers collect the crates.
+ * With its side's crate stack full the miner stops until a hauler takes one.
+ */
 export function minerDiggingStep(
   world: WorldState,
   unit: UnitState,
@@ -276,25 +369,32 @@ export function minerDiggingStep(
   if (!job || job.kind !== 'oreMiner' || job.stage !== 'digging') {
     return;
   }
-  const loadSize = Math.max(1, type.carryCapacity);
-  job.progress += type.miningRatePerSec * DT;
-  const whole = Math.floor(job.progress);
-  const move = Math.min(
-    whole,
-    Math.max(0, loadSize - job.load),
-    Math.floor(deposit.amount),
-  );
-  if (move > 0) {
-    job.progress -= move;
-    job.load += move;
-    deposit.amount = Math.max(0, deposit.amount - move);
+  const hopper = Math.max(ORE_CRATE_SIZE, type.carryCapacity);
+  const space = Math.max(0, hopper - job.load);
+  if (space > 0 && deposit.amount > 0) {
+    job.progress += type.miningRatePerSec * DT;
+    const move = Math.min(Math.floor(job.progress), space, Math.floor(deposit.amount));
+    if (move > 0) {
+      job.progress -= move;
+      job.load += move;
+      deposit.amount = Math.max(0, deposit.amount - move);
+    }
+  } else {
+    job.progress = Math.min(job.progress, 1);
   }
-  if (job.load >= loadSize) {
-    job.stage = 'toPad';
-    unit.path = [];
-    unit.speed = 0;
-  } else if (deposit.amount <= 0) {
-    job.stage = job.load > 0 ? 'toPad' : 'waiting';
+  // Pack whole crates; once the deposit is spent, the last part-filled load goes in too.
+  const exhausted = deposit.amount < 1;
+  while (job.load > 0) {
+    const crate = exhausted ? Math.min(job.load, ORE_CRATE_SIZE) : ORE_CRATE_SIZE;
+    if (job.load + 1e-6 < crate || crateRoom(deposit, unit.owner) + 1e-6 < crate) {
+      break;
+    }
+    job.load -= crate;
+    addCrateOre(deposit, unit.owner, crate);
+  }
+  if (exhausted && job.load <= 0) {
+    job.load = 0;
+    job.stage = 'waiting';
     unit.path = [];
     unit.speed = 0;
   }

@@ -35,8 +35,10 @@ import {
 } from './tuning';
 import {
   applyAssignCommand,
+  applyHaulCommand,
   applyMineCommand,
   applySalvageCommand,
+  cloneDeposit,
   ensureSideStats,
   updateAlerts,
   updateMetalStations,
@@ -232,7 +234,7 @@ function cloneWorld(world: WorldState): WorldState {
       air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
-    deposits: world.deposits.map((deposit) => ({ ...deposit })),
+    deposits: world.deposits.map(cloneDeposit),
     pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
     dropQueue: world.dropQueue.map((order) => ({ ...order })),
     dropBeams: world.dropBeams.map((beam) => ({ ...beam })),
@@ -1349,6 +1351,9 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
         case 'assign':
           applyAssignCommand(next, command);
           break;
+        case 'haul':
+          applyHaulCommand(next, command);
+          break;
         case 'salvage':
           applySalvageCommand(next, command);
           break;
@@ -1553,7 +1558,7 @@ export function worldToPayload(world: WorldState): unknown {
       air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
-    deposits: world.deposits.map((deposit) => ({ ...deposit })),
+    deposits: world.deposits.map(cloneDeposit),
     pendingKits: world.pendingKits.map((kit) => ({ ...kit })),
     dropQueue: world.dropQueue.map((order) => ({ ...order })),
     dropBeams: world.dropBeams.map((beam) => ({ ...beam })),

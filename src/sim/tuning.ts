@@ -49,6 +49,11 @@ export const AUDIO_MUSIC_CROSSFADE_SEC = 0.25; // placeholder until Stage 0
 export const UNIT_CAP = 200; // placeholder until Stage 0
 export const DEPOSIT_REACH = 2; // placeholder until Stage 0
 export const PAD_REACH = 4; // placeholder until Stage 0
+// Ore crates: miners pack ore into crates of this size beside the deposit, up to this many per
+// side; haulers carry them to the pad. A miner with a full stack stops digging until one is taken.
+export const ORE_CRATE_SIZE = 10;
+export const ORE_MAX_CRATES = 5;
+export const CRATE_REACH = 4;
 export const STATION_REACH = 4; // placeholder until Stage 0
 export const DEPOSIT_PICK_RADIUS = 3; // placeholder until Stage 0
 export const STRUCTURE_PICK_PADDING = 1; // placeholder until Stage 0

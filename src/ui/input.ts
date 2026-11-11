@@ -55,6 +55,7 @@ export interface InputHost {
   getStructureAt?: (x: number, z: number) => StructureHit | null;
   onMineOrder?: (depositId: number) => boolean;
   onAssignOrder?: (stationId: number) => boolean;
+  onHaulOrder?: (depositId: number) => boolean;
   onAttackStructure?: (structureId: number) => boolean;
   isPlacementActive?: () => boolean;
   previewPlacement?: (x: number, z: number) => void;
@@ -754,8 +755,13 @@ export class InputController {
       return false;
     }
     const deposit = this.host.getDepositAt?.(ground.x, ground.z) ?? null;
-    if (deposit && deposit.kind === 'ore' && this.selectionHasWorker('oreMiner')) {
-      return this.host.onMineOrder?.(deposit.id) ?? false;
+    if (deposit && deposit.kind === 'ore') {
+      // Miners dig there and haulers collect the crates; a mixed selection gets both orders.
+      const mine = this.selectionHasWorker('oreMiner') && (this.host.onMineOrder?.(deposit.id) ?? false);
+      const haul = this.selectionHasWorker('tug') && (this.host.onHaulOrder?.(deposit.id) ?? false);
+      if (mine || haul) {
+        return true;
+      }
     }
     const structure = this.host.getStructureAt?.(ground.x, ground.z) ?? null;
     if (!structure) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, step } from '../../src/sim/world';
+import { createWorld, hashWorld, step } from '../../src/sim/world';
+import { decodeSave, encodeSave } from '../../src/platform/saves';
 import { Rng } from '../../src/sim/rng';
 import type { Command } from '../../src/sim/commands';
 import type {
@@ -15,6 +16,9 @@ import {
   scoutType,
   tugType,
 } from './simHelpers';
+import { crateOre } from '../../src/sim/economy';
+import { padLayout } from '../../src/sim/pad';
+import { ORE_CRATE_SIZE, ORE_MAX_CRATES } from '../../src/sim/tuning';
 
 function buildTypes(): {
   units: ReadonlyMap<string, SimUnitType>;
@@ -78,56 +82,142 @@ function stats(world: ReturnType<typeof economyWorld>) {
 }
 
 describe('economy', () => {
-  it('[ECO-01] ore is credited only when load reaches a pad and in exact load-size chunks', () => {
+  it('[ECO-01] miners stack ore in crates at the deposit; only haulers deliver it, one crate at a time', () => {
     let world = economyWorld({
-      startUnits: [{ owner: 1, typeId: 'unit.test.miner', x: -50, z: -46 }],
-      oreDeposit: { x: -46, z: -50, amount: 100 },
+      startUnits: [
+        { owner: 1, typeId: 'unit.test.miner', x: -50, z: -38 },
+        { owner: 1, typeId: 'unit.test.tug', x: -54, z: -38 },
+      ],
+      oreDeposit: { x: -40, z: -36, amount: 100 },
     });
     const minerId = world.units[0]?.id ?? 0;
-    const padId = world.structures[0]?.id ?? 0;
+    const tugId = world.units[1]?.id ?? 0;
+    const pad = world.structures[0];
+    expect(pad).toBeDefined();
+    const dock = padLayout(world, pad!);
     world = step(world, [
       { kind: 'mine', unitIds: [minerId], depositId: 1, tick: 1, issuer: 1 },
+      { kind: 'haul', unitIds: [tugId], depositId: 1, tick: 1, issuer: 1 },
     ]);
     let previous = stats(world)?.ore ?? 0;
     const deltas: number[] = [];
-    for (let i = 0; i < 300; i += 1) {
+    let sawCrates = false;
+    for (let i = 0; i < 1200; i += 1) {
       world = step(world, []);
+      const miner = world.units.find((unit) => unit.id === minerId);
+      expect(miner?.job?.stage).not.toBe('toPad');
+      expect(miner?.job?.stage).not.toBe('unloading');
+      sawCrates ||= crateOre(world.deposits[0]!, 1) > 0;
       const current = stats(world)?.ore ?? previous;
       if (current > previous) {
         deltas.push(current - previous);
-        const miner = world.units.find((unit) => unit.id === minerId);
-        const pad = world.structures.find((structure) => structure.id === padId);
-        expect(miner).toBeDefined();
-        expect(pad).toBeDefined();
-        if (miner && pad) {
-          expect(Math.hypot(miner.x - pad.x, miner.z - pad.z)).toBeLessThanOrEqual(5);
-        }
+        const tug = world.units.find((unit) => unit.id === tugId);
+        expect(tug).toBeDefined();
+        expect(Math.hypot(tug!.x - dock.dockX, tug!.z - dock.dockZ)).toBeLessThanOrEqual(2);
         previous = current;
       }
       if (deltas.length >= 2) {
         break;
       }
     }
-    expect(deltas.length).toBeGreaterThanOrEqual(1);
+    expect(sawCrates).toBe(true);
+    expect(deltas.length).toBeGreaterThanOrEqual(2);
     for (const delta of deltas) {
-      expect(delta).toBe(5);
+      expect(delta).toBe(ORE_CRATE_SIZE);
     }
+  });
+
+  it('[ECO-01b] a miner with a full crate stack stops digging until a crate is taken', () => {
+    let world = economyWorld({
+      startUnits: [{ owner: 1, typeId: 'unit.test.miner', x: -50, z: -38 }],
+      oreDeposit: { x: -40, z: -36, amount: 1000 },
+    });
+    const minerId = world.units[0]?.id ?? 0;
+    world = step(world, [{ kind: 'mine', unitIds: [minerId], depositId: 1, tick: 1, issuer: 1 }]);
+    for (let i = 0; i < 1200; i += 1) {
+      world = step(world, []);
+    }
+    const deposit = world.deposits[0]!;
+    expect(crateOre(deposit, 1)).toBe(ORE_MAX_CRATES * ORE_CRATE_SIZE);
+    const left = deposit.amount;
+    for (let i = 0; i < 100; i += 1) {
+      world = step(world, []);
+    }
+    expect(world.deposits[0]!.amount).toBe(left);
+    expect(stats(world)?.ore).toBe(0);
+  });
+
+  it('[ECO-01c] crates and hauler loads survive save/load with the same hash', () => {
+    let world = economyWorld({
+      startUnits: [
+        { owner: 1, typeId: 'unit.test.miner', x: -50, z: -38 },
+        { owner: 1, typeId: 'unit.test.tug', x: -54, z: -38 },
+      ],
+      oreDeposit: { x: -40, z: -36, amount: 500 },
+    });
+    world = step(world, [{ kind: 'mine', unitIds: [world.units[0]!.id], depositId: 1, tick: 1, issuer: 1 }]);
+    let saved = false;
+    for (let i = 0; i < 1200 && !saved; i += 1) {
+      world = step(world, []);
+      const tug = world.units[1]!;
+      saved = crateOre(world.deposits[0]!, 1) > 0 && tug.job?.stage === 'toPad' && tug.job.load > 0;
+    }
+    expect(saved).toBe(true);
+    const decoded = decodeSave(encodeSave(world, { gameVersion: 'test', savedAtIso: '2026-11-11T00:00:00.000Z' }));
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) {
+      return;
+    }
+    let resumed = decoded.world;
+    let uninterrupted = world;
+    expect(hashWorld(resumed)).toBe(hashWorld(uninterrupted));
+    for (let i = 0; i < 400; i += 1) {
+      resumed = step(resumed, []);
+      uninterrupted = step(uninterrupted, []);
+    }
+    expect(hashWorld(resumed)).toBe(hashWorld(uninterrupted));
+    expect(stats(resumed)?.ore).toBeGreaterThan(0);
+  });
+
+  it('[ECO-01d] haul orders only move the issuer haulers, and a deposit tap needs an ore deposit', () => {
+    let world = economyWorld({
+      startUnits: [
+        { owner: 1, typeId: 'unit.test.tug', x: -54, z: -38 },
+        { owner: 1, typeId: 'unit.test.miner', x: -50, z: -38 },
+      ],
+      oreDeposit: { x: -40, z: -36, amount: 500 },
+      metalDeposit: { x: 0, z: 0, amount: 500 },
+    });
+    const [tug, miner] = world.units;
+    world = step(world, [{ kind: 'haul', unitIds: [miner!.id], depositId: 1, tick: 1, issuer: 1 }]);
+    expect(world.lastCommandOutcome).toMatchObject({ kind: 'haul', ok: false, reason: 'noTug' });
+    world = step(world, [{ kind: 'haul', unitIds: [tug!.id], depositId: 2, tick: 2, issuer: 1 }]);
+    expect(world.lastCommandOutcome).toMatchObject({ kind: 'haul', ok: false, reason: 'depositMissing' });
+    world = step(world, [{ kind: 'haul', unitIds: [tug!.id], depositId: 1, tick: 3, issuer: 2 }]);
+    expect(world.lastCommandOutcome).toMatchObject({ kind: 'haul', ok: false });
+    world = step(world, [{ kind: 'haul', unitIds: [tug!.id], depositId: 1, tick: 4, issuer: 1 }]);
+    expect(world.lastCommandOutcome).toMatchObject({ kind: 'haul', ok: true });
+    const job = world.units.find((unit) => unit.id === tug!.id)?.job;
+    expect(job).toMatchObject({ kind: 'tug', source: 'deposit', targetId: 1 });
   });
 
   it('[ECO-02] a finite deposit reaches zero, stays empty and reports it', () => {
     let world = economyWorld({
-      startUnits: [{ owner: 1, typeId: 'unit.test.miner', x: -50, z: -46 }],
-      oreDeposit: { x: -46, z: -50, amount: 3 },
+      startUnits: [
+        { owner: 1, typeId: 'unit.test.miner', x: -50, z: -38 },
+        { owner: 1, typeId: 'unit.test.tug', x: -54, z: -38 },
+      ],
+      oreDeposit: { x: -40, z: -36, amount: 3 },
     });
     const minerId = world.units[0]?.id ?? 0;
     world = step(world, [
       { kind: 'mine', unitIds: [minerId], depositId: 1, tick: 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 600; i += 1) {
+    for (let i = 0; i < 1200; i += 1) {
       world = step(world, []);
       const deposit = world.deposits[0];
       const miner = world.units.find((unit) => unit.id === minerId);
-      if (deposit && miner?.job?.stage === 'waiting' && deposit.amount === 0) {
+      if (deposit && miner?.job?.stage === 'waiting' && deposit.amount === 0 && stats(world)?.ore === 3) {
         break;
       }
     }
@@ -135,6 +225,7 @@ describe('economy', () => {
     const miner = world.units.find((unit) => unit.id === minerId);
     expect(deposit?.amount).toBe(0);
     expect(miner?.job?.stage).toBe('waiting');
+    // The last part-filled crate is hauled too (the hauler found the work by itself).
     expect(stats(world)?.ore).toBe(3);
     expect(world.alerts.some((alert) => alert.kind === 'depositEmpty')).toBe(true);
 

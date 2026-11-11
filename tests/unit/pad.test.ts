@@ -138,15 +138,20 @@ describe('[PAD] landing pad traffic', () => {
   });
 
   it('[PAD-04] workers unload at the dock one at a time, in the order they arrive', () => {
-    const units: StartUnit[] = [0, 1, 2].map((i) => ({
+    // Two miners fill crates; three haulers carry them to the pad's dock.
+    const units: StartUnit[] = [0, 1, 2, 3, 4].map((i) => ({
       owner: 1,
-      typeId: 'unit.test.miner',
+      typeId: i < 2 ? 'unit.test.miner' : 'unit.test.tug',
       x: -50 + i * 3,
       z: -30,
     }));
     let world = padWorld({ units, oreDeposit: { x: -44, z: -26, amount: 1000 } });
-    const ids = world.units.map((unit) => unit.id);
-    world = step(world, [{ kind: 'mine', unitIds: ids, depositId: 1, tick: 1, issuer: 1 }]);
+    const miners = world.units.filter((unit) => unit.typeId === 'unit.test.miner').map((unit) => unit.id);
+    const tugs = world.units.filter((unit) => unit.typeId === 'unit.test.tug').map((unit) => unit.id);
+    world = step(world, [
+      { kind: 'mine', unitIds: miners, depositId: 1, tick: 1, issuer: 1 },
+      { kind: 'haul', unitIds: tugs, depositId: 1, tick: 1, issuer: 1 },
+    ]);
     const layout = padLayout(world, myPad(world));
     let maxUnloading = 0;
     const credits: number[] = [];

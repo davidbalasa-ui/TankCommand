@@ -244,6 +244,8 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
   if (!station || !tug) {
     return;
   }
+  // Haulers drive off to work by themselves; at normal speed the tap still lands on this one.
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(1));
   await tapUnit(page, tug.id);
   await expect
     .poll(async () =>
@@ -256,9 +258,12 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
   await tapWorldPoint(page, station.x, station.z);
   await expect
     .poll(async () =>
-      page.evaluate((id) => window.__TC_TEST__?.units().find((unit) => unit.id === id)?.jobKind ?? null, tug.id),
+      page.evaluate((id) => {
+        const unit = window.__TC_TEST__?.units().find((item) => item.id === id);
+        return unit ? `${unit.jobSource}:${unit.jobTargetId}` : null;
+      }, tug.id),
     )
-    .toBe('tug');
+    .toBe(`station:${station.id}`);
 });
 
 test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({ page }, testInfo) => {

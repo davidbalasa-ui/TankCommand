@@ -25,6 +25,8 @@ export interface TestUnit {
   orderZ: number | null;
   jobKind: string | null;
   jobStage: string | null;
+  jobTargetId: number | null;
+  jobSource: string | null;
   load: number;
   workerKind: string | null;
 }
@@ -403,7 +405,8 @@ export async function winSkirmish(page: Page): Promise<void> {
           }
           return hook.units().filter((unit) => unit.owner === 1 && unit.typeId === 'unit.human.scout').length;
         }),
-      { timeout: 30_000 },
+      // Deliveries land one at a time (2.5 s each on the pad), so ten take a while.
+      { timeout: 60_000 },
     )
     .toBeGreaterThanOrEqual(10);
 

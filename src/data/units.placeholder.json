@@ -143,7 +143,7 @@
     "techLevel": 1,
     "cost": {
       "ore": 70,
-      "metal": 20
+      "metal": 0
     },
     "deliverySec": 8,
     "hp": 100,
@@ -162,7 +162,7 @@
       "haul"
     ],
     "upgrades": [],
-    "carryCapacity": 10,
+    "carryCapacity": 30,
     "workerKind": "tug",
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.hauler",
@@ -316,7 +316,7 @@
     "techLevel": 1,
     "cost": {
       "ore": 70,
-      "metal": 20
+      "metal": 0
     },
     "deliverySec": 8,
     "hp": 100,
@@ -335,7 +335,7 @@
       "haul"
     ],
     "upgrades": [],
-    "carryCapacity": 10,
+    "carryCapacity": 30,
     "workerKind": "tug",
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.alien.ferrier",

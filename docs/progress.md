@@ -131,3 +131,19 @@ WP-10 (pause, speed, five save slots, settings, generated audio, alerts, offline
 - **Structures.** `structures_set.py` builds the 7 structures per faction sized to their footprints; the renderer draws the model in place of the box (the box stays invisible for picking) and turns its TurretPivot.
 - **Loading.** Models now load in parallel (sequential loading took about 30 seconds on a busy machine).
 - **Open.** The renderer still scales every unit to one tank length; a per-type visual size is next. The third faction (mushroom crawler, `myco_crawler.py`) and the crystal superweapon are samples only.
+
+## C-05 Landing pad traffic (2026-11-11)
+
+- Pads are 6x6 cells with the exit facing the map centre. Deliveries come down one at a time in order (`src/sim/pad.ts`), drive off the exit to a rally grid, and the next waits until the deck is clear. Cancelling is refused once a delivery is descending.
+- Loaded workers line up at one dock beside the pad and unload one at a time; the cargo lifts off to the ships. New pad and nest models with ramp, deck ring and cargo lift. The game now has soft environment reflections.
+
+## C-06 Economy: miners dig, haulers deliver (2026-11-11)
+
+David's rule: one unit mines out of the ground, another delivers to the landing pad for the ships. Miners no longer drive to the pad.
+
+- **Miners** grind ore into their hopper and pack each full load into an ore crate beside the deposit (`ORE_CRATE_SIZE` 10, up to `ORE_MAX_CRATES` 5 per side per deposit, stored on `DepositState.crates`). With the stack full the miner stops until a crate is taken. When the deposit runs out, the last part-filled crate is packed and the miner reports the deposit empty.
+- **Haulers** (tugs) are the only units that deliver. They collect ore crates from deposits or metal containers from stations, as many as they hold (30), and unload at the pad's single dock line. Idle haulers find work by themselves; a new `haul` command (tap an ore deposit with haulers selected) points them at one deposit. Unserved stations are preferred so metal does not stall.
+- **Balance.** Tug carry 10 -> 30 and metal cost 20 -> 0, so a side can always rebuy a hauler and restart its income. The AI buys about one hauler per miner, plus one for metal.
+- **Visuals.** Ore heap in the miner's hopper grows with its load and the miner judders while grinding; haulers carry painted crates or containers on their back; crate stacks sit beside each deposit facing the owner's pad.
+- **Missions.** Mining training mission gets a hauler and new briefing text.
+- **Tests.** ECO-01/02 rewritten for the new flow, ECO-01b (full stack stops digging), ECO-01c (save/load hash with crates), ECO-01d (haul command validation); PAD-04 uses haulers. AI-07 hard beats easy 10/10.

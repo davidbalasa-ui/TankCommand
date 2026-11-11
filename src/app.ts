@@ -104,6 +104,8 @@ export interface UnitView {
   orderZ: number | null;
   jobKind: string | null;
   jobStage: string | null;
+  jobTargetId: number | null;
+  jobSource: string | null;
   load: number;
   workerKind: string | null;
 }
@@ -529,6 +531,8 @@ export class App {
         orderZ,
         jobKind: unit.job?.kind ?? null,
         jobStage: unit.job?.stage ?? null,
+        jobTargetId: unit.job?.targetId ?? null,
+        jobSource: unit.job?.kind === 'tug' ? (unit.job.source ?? 'station') : null,
         load: unit.job?.load ?? 0,
         workerKind: type?.workerKind ?? null,
       };
@@ -1113,6 +1117,24 @@ export class App {
     });
   }
 
+  haulAt(depositId: number): boolean {
+    const ids = this.selectedIds.filter((id) => {
+      const unit = this.world.units.find((item) => item.id === id);
+      const type = unit ? this.world.unitTypes.get(unit.typeId) : undefined;
+      return type?.workerKind === 'tug';
+    });
+    if (ids.length === 0) {
+      return false;
+    }
+    return this.sendCommand({
+      kind: 'haul',
+      unitIds: ids,
+      depositId,
+      tick: this.world.tick + 1,
+      issuer: 1,
+    });
+  }
+
   attackStructure(structureId: number): boolean {
     if (this.selectedIds.length === 0) {
       return false;
@@ -1559,6 +1581,7 @@ export class App {
           getStructureAt: (x, z) => this.structureAt(x, z),
           onMineOrder: (depositId) => this.mineAt(depositId),
           onAssignOrder: (stationId) => this.assignAt(stationId),
+          onHaulOrder: (depositId) => this.haulAt(depositId),
           onAttackStructure: (structureId) => this.attackStructure(structureId),
           isPlacementActive: () => this.placementState !== null,
           previewPlacement: (x, z) => {

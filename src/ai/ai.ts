@@ -455,7 +455,12 @@ function strategic(planner: Planner): void {
     planner.buyStructure(stationType, 0, false);
   }
   const tugType = types.find((t) => isTug(t));
-  if (tugType && (hasStation || hasKit) && !units.some((u) => isTug(planner.unitType(u))) && planner.queued(tugType.id) === 0) {
+  // Haulers carry both the miners' ore crates and the stations' metal to the pad: about one per
+  // miner plus one for metal.
+  const minerCount = units.filter((u) => isMiner(planner.unitType(u))).length;
+  const tugCount = units.filter((u) => isTug(planner.unitType(u))).length;
+  const tugsWanted = Math.min(5, Math.max(1, minerCount) + (hasStation || hasKit ? 1 : 0));
+  if (tugType && tugCount < tugsWanted && planner.queued(tugType.id) === 0) {
     planner.buyUnit(tugType, 0);
   }
 

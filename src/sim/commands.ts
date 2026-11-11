@@ -74,6 +74,11 @@ const commandSchema = z.discriminatedUnion('kind', [
     stationId: entityId,
   }),
   baseCommand.extend({
+    kind: z.literal('haul'),
+    unitIds,
+    depositId: entityId,
+  }),
+  baseCommand.extend({
     kind: z.literal('salvage'),
     unitIds,
   }),

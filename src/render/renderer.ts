@@ -4,9 +4,10 @@ import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
-import { CAMERA_FOV_DEG, MAX_SLOPE, TANK_LENGTH } from '../sim/tuning';
+import { CAMERA_FOV_DEG, MAX_SLOPE, ORE_CRATE_SIZE, TANK_LENGTH } from '../sim/tuning';
 import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
+import { crateCount } from '../sim/economy';
 import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, UnitState, WorldState } from '../sim/types';
@@ -83,6 +84,52 @@ export interface OrderPathInfo {
 
 interface MaterialHost {
   material: THREE.Material | THREE.Material[];
+}
+
+// A small painted texture so cargo reads at a glance: a dark steel frame around an ore (orange,
+// with a rock glyph) or metal (steel blue, ingot bars) panel, and hazard corners.
+function cargoTexture(kind: 'ore' | 'metal' | 'kit'): THREE.Texture | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const g = canvas.getContext('2d');
+  if (!g) {
+    return null;
+  }
+  const panel = kind === 'ore' ? '#c8742c' : kind === 'metal' ? '#7f93a6' : '#5c6a3a';
+  const mark = kind === 'ore' ? '#ffcf7a' : kind === 'metal' ? '#6ee6ff' : '#d8e0a0';
+  g.fillStyle = '#23272c';
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = panel;
+  g.fillRect(7, 7, 50, 50);
+  g.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let y = 11; y < 57; y += 8) {
+    g.fillRect(7, y, 50, 2);
+  }
+  g.fillStyle = mark;
+  if (kind === 'ore') {
+    g.beginPath();
+    g.moveTo(20, 42);
+    g.lineTo(26, 24);
+    g.lineTo(38, 20);
+    g.lineTo(46, 34);
+    g.lineTo(40, 44);
+    g.closePath();
+    g.fill();
+  } else if (kind === 'metal') {
+    g.fillRect(18, 22, 28, 6);
+    g.fillRect(18, 31, 28, 6);
+    g.fillRect(18, 40, 28, 6);
+  }
+  g.fillStyle = '#f2c230';
+  for (const [x, y] of [[0, 0], [56, 0], [0, 56], [56, 56]] as const) {
+    g.fillRect(x, y, 8, 8);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 interface UnitVisual {
@@ -675,6 +722,7 @@ export class RenderView {
     this.syncDeposits(world);
     this.syncDropBeams(world);
     this.syncPadTraffic(world, alpha);
+    this.syncWorkerCargo(world, alpha);
     this.syncProjectiles();
     this.syncWrecks();
     this.syncContacts();
@@ -1670,9 +1718,14 @@ export class RenderView {
   private cargoMaterial(kind: 'ore' | 'metal' | 'kit'): THREE.Material {
     let material = this.cargoMaterials.get(kind);
     if (!material) {
-      const color = kind === 'ore' ? 0xc0702c : kind === 'metal' ? 0x9aa6b2 : 0x5c6a3a;
-      const glow = kind === 'ore' ? 0x5a2a08 : kind === 'metal' ? 0x10303c : 0x1a2208;
-      material = new THREE.MeshStandardMaterial({ color, emissive: glow, roughness: 0.6, metalness: 0.4 });
+      const glow = kind === 'ore' ? 0x5a2a08 : kind === 'metal' ? 0x0c3442 : 0x1a2208;
+      material = new THREE.MeshStandardMaterial({
+        map: cargoTexture(kind),
+        emissive: glow,
+        emissiveIntensity: 0.6,
+        roughness: 0.55,
+        metalness: 0.45,
+      });
       this.cargoMaterials.set(kind, material);
     }
     return material;
@@ -1791,7 +1844,7 @@ export class RenderView {
       }
       const key = `u${unit.id}`;
       liveCargo.add(key);
-      const kind = job.kind === 'oreMiner' ? 'ore' : 'metal';
+      const kind = job.cargo ?? (job.kind === 'oreMiner' ? 'ore' : 'metal');
       let mesh = this.cargoVisuals.get(key);
       if (!mesh) {
         mesh = this.cargoMesh(kind, 1.6);
@@ -1829,6 +1882,142 @@ export class RenderView {
       if (!liveCargo.has(key)) {
         this.scene.remove(mesh);
         this.cargoVisuals.delete(key);
+      }
+    }
+  }
+
+  // ---- Worker status -------------------------------------------------------------------
+  // Miners show the ore in their hopper (and shake while grinding), haulers carry their crates or
+  // metal containers on their back, and full crates stack up beside each ore deposit.
+  private readonly workerCargo = new Map<string, THREE.Mesh>();
+  private readonly unitTopCache = new Map<string, { top: number; ax: number; az: number; length: number }>();
+  private oreChunkGeometry: THREE.BufferGeometry | null = null;
+
+  // Where cargo sits on a unit model, in the unit's own frame: the deck height (a little under the
+  // highest point, which is usually an antenna) and the middle of the body.
+  private unitTop(typeId: string, root: THREE.Object3D): { top: number; ax: number; az: number; length: number } {
+    let top = this.unitTopCache.get(typeId);
+    if (!top) {
+      const saved = root.rotation.y;
+      root.rotation.y = 0;
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root);
+      root.rotation.y = saved;
+      root.updateMatrixWorld(true);
+      top = box.isEmpty()
+        ? { top: 1.2, ax: 0, az: 0, length: TANK_LENGTH }
+        : {
+            top: Math.max(0.6, (box.max.y - root.position.y) * 0.78),
+            ax: (box.min.x + box.max.x) / 2 - root.position.x,
+            az: (box.min.z + box.max.z) / 2 - root.position.z,
+            length: box.max.x - box.min.x,
+          };
+      this.unitTopCache.set(typeId, top);
+    }
+    return top;
+  }
+
+  private workerMesh(live: Set<string>, key: string, make: () => THREE.Mesh): THREE.Mesh {
+    live.add(key);
+    let mesh = this.workerCargo.get(key);
+    if (!mesh) {
+      mesh = make();
+      this.scene.add(mesh);
+      this.workerCargo.set(key, mesh);
+    }
+    return mesh;
+  }
+
+  private oreChunk(): THREE.Mesh {
+    if (!this.oreChunkGeometry) {
+      this.oreChunkGeometry = new THREE.IcosahedronGeometry(0.5, 0);
+    }
+    const mesh = new THREE.Mesh(this.oreChunkGeometry, this.cargoMaterial('ore'));
+    mesh.castShadow = true;
+    return mesh;
+  }
+
+  private syncWorkerCargo(world: WorldState, alpha: number): void {
+    const live = new Set<string>();
+    const time = (world.tick + alpha) / SIM_TICK_HZ;
+    for (const unit of world.units) {
+      const job = unit.job;
+      const visual = this.unitRoots.get(unit.id);
+      if (!job || unit.hp <= 0 || !visual || !visual.root.visible) {
+        continue;
+      }
+      const type = world.unitTypes.get(unit.typeId);
+      const anchor = this.unitTop(unit.typeId, visual.root);
+      const top = anchor.top;
+      const turn = visual.root.rotation.y;
+      // Both factions' miners carry their hopper (bin or ore sac) behind the middle of the body.
+      const ax = anchor.ax - (job.kind === 'oreMiner' ? anchor.length * 0.22 : 0);
+      const base = new THREE.Vector3(
+        visual.root.position.x + Math.cos(turn) * ax + Math.sin(turn) * anchor.az,
+        visual.root.position.y,
+        visual.root.position.z - Math.sin(turn) * ax + Math.cos(turn) * anchor.az,
+      );
+      if (job.kind === 'oreMiner') {
+        const hopper = Math.max(ORE_CRATE_SIZE, type?.carryCapacity ?? ORE_CRATE_SIZE);
+        const fill = Math.min(1, job.load / hopper);
+        const grinding = job.stage === 'digging';
+        if (fill > 0.02 || grinding) {
+          const heap = this.workerMesh(live, `m${unit.id}`, () => this.oreChunk());
+          const size = 0.5 + fill * 1.3;
+          heap.scale.set(size * 1.4, size * 0.75, size * 1.1);
+          const shake = grinding ? Math.sin(time * 31 + unit.id) * 0.06 : 0;
+          heap.position.set(base.x + shake, base.y + top, base.z - shake);
+          heap.rotation.set(0, grinding ? time * 2.2 : visual.root.rotation.y, 0);
+        }
+        // Grinding: the miner body judders while it chews through the deposit.
+        if (grinding) {
+          visual.root.position.y += Math.abs(Math.sin(time * 27 + unit.id)) * 0.08;
+        }
+        continue;
+      }
+      if (job.load > 0 && job.stage !== 'unloading') {
+        const kind = job.cargo ?? 'metal';
+        const crates = Math.min(3, Math.max(1, Math.round(job.load / ORE_CRATE_SIZE)));
+        for (let i = 0; i < crates; i += 1) {
+          const crate = this.workerMesh(live, `t${unit.id}:${i}`, () => this.cargoMesh(kind, 1.2));
+          crate.material = this.cargoMaterial(kind);
+          const heading = visual.root.rotation.y;
+          const along = (i - (crates - 1) / 2) * 1.3;
+          crate.position.set(
+            base.x + Math.cos(heading) * along,
+            base.y + top + 0.3,
+            base.z - Math.sin(heading) * along,
+          );
+          crate.rotation.y = heading;
+        }
+      }
+    }
+    // Crate stacks beside ore deposits, one stack per side, two rows deep.
+    for (const deposit of world.deposits) {
+      for (const pile of deposit.crates ?? []) {
+        const count = crateCount(deposit, pile.owner);
+        const pad = world.structures.find((item) => item.owner === pile.owner && item.hp > 0);
+        const towards = pad ? Math.atan2(pad.z - deposit.z, pad.x - deposit.x) : pile.owner;
+        const cx = deposit.x + Math.cos(towards) * 2.6;
+        const cz = deposit.z + Math.sin(towards) * 2.6;
+        const sideX = -Math.sin(towards);
+        const sideZ = Math.cos(towards);
+        for (let i = 0; i < count; i += 1) {
+          const crate = this.workerMesh(live, `d${deposit.id}:${pile.owner}:${i}`, () => this.cargoMesh('ore', 1.1));
+          // Bottom row of three, then two on top in the gaps.
+          const layer = i < 3 ? 0 : 1;
+          const offset = layer === 0 ? (i - 1) * 1.2 : (i - 3.5) * 1.2;
+          const x = cx + sideX * offset;
+          const z = cz + sideZ * offset;
+          crate.position.set(x, heightAt(world.map, x, z) + 0.42 + layer * 0.83, z);
+          crate.rotation.y = -towards;
+        }
+      }
+    }
+    for (const [key, mesh] of this.workerCargo) {
+      if (!live.has(key)) {
+        this.scene.remove(mesh);
+        this.workerCargo.delete(key);
       }
     }
   }

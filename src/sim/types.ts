@@ -42,6 +42,10 @@ export interface WorkerJob {
   dockPadId?: number | null;
   queuedAt?: number;
   unloadLeft?: number;
+  // Haulers only: what they collect from ('station' = metal containers, 'deposit' = the ore
+  // crates miners stack beside a deposit) and what they carry now.
+  source?: 'station' | 'deposit';
+  cargo?: 'ore' | 'metal';
 }
 
 export interface UnitState {
@@ -258,9 +262,17 @@ export interface DepositDef {
   amount: number;
 }
 
+// Ore that miners have packed into crates beside a deposit, waiting for a hauler. Kept per owner
+// because sides can mine the same deposit.
+export interface OreCrates {
+  owner: PlayerId;
+  ore: number;
+}
+
 export interface DepositState extends DepositDef {
   id: number;
   maxAmount: number;
+  crates?: OreCrates[];
 }
 
 export interface PendingKit {

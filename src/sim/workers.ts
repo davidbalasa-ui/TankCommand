@@ -1,11 +1,14 @@
 import { SIM_TICK_HZ } from './constants';
 import {
+  CRATE_REACH,
   DEPOSIT_REACH,
+  ORE_CRATE_SIZE,
   STATION_REACH,
 } from './tuning';
 import { approach, computePath, followPath } from './motion';
 import {
   addAlert,
+  crateOre,
   creditMetal,
   creditOre,
   findDeposit,
@@ -13,6 +16,7 @@ import {
   minerDiggingStep,
   nearestPad,
   structureTypeOf,
+  takeCrateOre,
 } from './economy';
 import {
   PAD_CARGO_LIFT_SEC,
@@ -23,7 +27,7 @@ import {
   padLine,
   padQueueSpot,
 } from './pad';
-import type { SimUnitType, StructureState, UnitState, WorkerJob, WorldState } from './types';
+import type { DepositState, SimUnitType, StructureState, UnitState, WorkerJob, WorldState } from './types';
 
 const DT = 1 / SIM_TICK_HZ;
 
@@ -154,10 +158,28 @@ function deliverAtPad(
 
 export function updateWorkers(world: WorldState): void {
   for (const unit of world.units) {
-    if (unit.hp <= 0 || !unit.job) {
+    if (unit.hp <= 0) {
       continue;
     }
     const type = world.unitTypes.get(unit.typeId);
+    if (!unit.job) {
+      // Haulers look for work by themselves once they stand idle (fresh off the pad, say).
+      if (type?.workerKind === 'tug' && unit.order.kind === 'idle' && unit.path.length === 0) {
+        const job: WorkerJob = {
+          kind: 'tug',
+          targetId: -1,
+          stage: 'waiting',
+          load: 0,
+          progress: 0,
+          reportedEmpty: false,
+        };
+        if (retargetTug(world, unit, job)) {
+          unit.job = job;
+          unit.stance = 'free';
+        }
+      }
+      continue;
+    }
     if (!type) {
       unit.job = null;
       continue;
@@ -175,27 +197,23 @@ function updateMiner(world: WorldState, unit: UnitState, type: SimUnitType): voi
   if (!job || job.kind !== 'oreMiner') {
     return;
   }
-  const deposit = findDeposit(world, job.targetId);
-  if (!deposit || deposit.kind !== 'ore') {
-    if (job.load > 0) {
-      job.stage = 'toPad';
-    } else {
-      job.stage = 'waiting';
-      reportEmpty(world, unit, job.targetId);
-    }
+  // Miners no longer deliver; one left on its way to the pad by an older save goes back to dig.
+  if (job.stage === 'toPad' || job.stage === 'unloading' || job.stage === 'loading' || job.stage === 'toStation') {
+    leaveLine(job);
+    job.stage = 'toDeposit';
   }
-
-  if (deposit && deposit.kind === 'ore' && deposit.amount <= 0 && job.load <= 0) {
+  const deposit = findDeposit(world, job.targetId);
+  if (!deposit || deposit.kind !== 'ore' || (deposit.amount < 1 && job.load <= 0)) {
     job.stage = 'waiting';
     reportEmpty(world, unit, job.targetId);
   }
 
-  if (job.stage === 'waiting') {
+  if (job.stage === 'waiting' || !deposit) {
     stopMoving(unit, type);
     return;
   }
 
-  if (job.stage === 'toDeposit' && deposit) {
+  if (job.stage === 'toDeposit') {
     const arrived = moveWorkerTo(world, unit, type, deposit.x, deposit.z, DEPOSIT_REACH);
     if (arrived) {
       job.stage = 'digging';
@@ -204,31 +222,15 @@ function updateMiner(world: WorldState, unit: UnitState, type: SimUnitType): voi
     return;
   }
 
-  if (job.stage === 'digging' && deposit) {
+  if (job.stage === 'digging') {
     stopMoving(unit, type);
     if (minerAtDeposit(unit, deposit)) {
       minerDiggingStep(world, unit, type, deposit);
+      if ((job.stage as string) === 'waiting') {
+        reportEmpty(world, unit, job.targetId);
+      }
     } else {
       job.stage = 'toDeposit';
-    }
-    return;
-  }
-
-  if (job.stage === 'toPad' || job.stage === 'unloading') {
-    if (!deliverAtPad(world, unit, type, job, 'ore')) {
-      return;
-    }
-    creditOre(world, unit.owner, job.load);
-    job.load = 0;
-    job.progress = 0;
-    stopMoving(unit, type);
-    const after = findDeposit(world, job.targetId);
-    if (after && after.kind === 'ore' && after.amount > 0) {
-      job.stage = 'toDeposit';
-    } else {
-      job.stage = 'waiting';
-      job.reportedEmpty = false;
-      reportEmpty(world, unit, job.targetId);
     }
   }
 }
@@ -242,29 +244,126 @@ function stationDry(world: WorldState, station: StructureState): boolean {
   return !deposit || deposit.amount <= 1e-6;
 }
 
-// Move an empty-handed tug to the nearest own station that still has or will have metal.
-function retargetTug(world: WorldState, unit: UnitState, job: { targetId: number; stage: string }): boolean {
-  let best: StructureState | null = null;
-  let bestD = Number.POSITIVE_INFINITY;
+// An ore deposit has work for a side's haulers while crates are stacked there or one of its
+// miners is still digging it.
+function oreSiteMinedBy(world: WorldState, deposit: DepositState, owner: number): boolean {
+  if (deposit.amount < 1) {
+    return false;
+  }
+  return world.units.some(
+    (unit) =>
+      unit.owner === owner &&
+      unit.hp > 0 &&
+      unit.job?.kind === 'oreMiner' &&
+      unit.job.targetId === deposit.id &&
+      unit.job.stage !== 'waiting',
+  );
+}
+
+function oreSiteDry(world: WorldState, deposit: DepositState, owner: number): boolean {
+  return crateOre(deposit, owner) <= 1e-6 && !oreSiteMinedBy(world, deposit, owner);
+}
+
+function haulersOn(world: WorldState, self: UnitState, source: 'station' | 'deposit', id: number): number {
+  let count = 0;
+  for (const unit of world.units) {
+    if (
+      unit !== self &&
+      unit.owner === self.owner &&
+      unit.hp > 0 &&
+      unit.job?.kind === 'tug' &&
+      (unit.job.source ?? 'station') === source &&
+      unit.job.targetId === id
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * Point an empty-handed hauler at the best place to collect from: an own metal station or an ore
+ * deposit where own miners stack crates. Cargo waiting now counts in a site's favour, other
+ * haulers already working it count against it, then distance decides.
+ */
+function retargetTug(world: WorldState, unit: UnitState, job: WorkerJob): boolean {
+  let best: { source: 'station' | 'deposit'; id: number; score: number } | null = null;
+  const consider = (source: 'station' | 'deposit', id: number, x: number, z: number, ready: boolean): void => {
+    const others = haulersOn(world, unit, source, id);
+    // An unserved metal station counts extra: its containers stop filling once they are full.
+    const score =
+      Math.hypot(x - unit.x, z - unit.z) +
+      others * 30 -
+      (ready ? 20 : 0) -
+      (source === 'station' && others === 0 ? 40 : 0);
+    if (!best || score < best.score - 1e-9) {
+      best = { source, id, score };
+    }
+  };
   for (const candidate of world.structures) {
-    if (candidate.owner !== unit.owner || candidate.hp <= 0 || candidate.id === job.targetId) {
+    if (candidate.owner !== unit.owner || candidate.hp <= 0) {
       continue;
     }
     if (structureTypeOf(world, candidate)?.kind !== 'metalStation' || stationDry(world, candidate)) {
       continue;
     }
-    const d = Math.hypot(candidate.x - unit.x, candidate.z - unit.z);
-    if (d < bestD || (d === bestD && best !== null && candidate.id < best.id)) {
-      best = candidate;
-      bestD = d;
-    }
+    consider('station', candidate.id, candidate.x, candidate.z, candidate.containers > 0);
   }
-  if (!best) {
+  for (const deposit of world.deposits) {
+    if (deposit.kind !== 'ore' || oreSiteDry(world, deposit, unit.owner)) {
+      continue;
+    }
+    consider('deposit', deposit.id, deposit.x, deposit.z, crateOre(deposit, unit.owner) > 1e-6);
+  }
+  const pick = best as { source: 'station' | 'deposit'; id: number } | null;
+  if (!pick) {
     return false;
   }
-  job.targetId = best.id;
+  job.source = pick.source;
+  job.targetId = pick.id;
   job.stage = 'toStation';
   return true;
+}
+
+interface TugSource {
+  x: number;
+  z: number;
+  reach: number;
+  dry: boolean;
+  station?: StructureState;
+  containerSize?: number;
+  deposit?: DepositState;
+}
+
+function tugSource(world: WorldState, unit: UnitState, job: WorkerJob): TugSource | null {
+  if (job.source === 'deposit') {
+    const deposit = findDeposit(world, job.targetId);
+    if (!deposit || deposit.kind !== 'ore') {
+      return null;
+    }
+    return {
+      x: deposit.x,
+      z: deposit.z,
+      reach: CRATE_REACH,
+      dry: oreSiteDry(world, deposit, unit.owner),
+      deposit,
+    };
+  }
+  const station = world.structures.find(
+    (structure) => structure.id === job.targetId && structure.hp > 0 && structure.owner === unit.owner,
+  );
+  const stationType = station ? structureTypeOf(world, station) : undefined;
+  if (!station || !stationType || stationType.kind !== 'metalStation') {
+    return null;
+  }
+  return {
+    x: station.x,
+    z: station.z,
+    reach: STATION_REACH,
+    dry: stationDry(world, station),
+    station,
+    containerSize: stationType.containerSize,
+  };
 }
 
 function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void {
@@ -272,66 +371,76 @@ function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void 
   if (!job || job.kind !== 'tug') {
     return;
   }
-  const station = world.structures.find(
-    (structure) => structure.id === job.targetId && structure.hp > 0,
-  );
-  const stationType = station ? structureTypeOf(world, station) : undefined;
+  if (job.load > 0 && (job.stage === 'waiting' || job.stage === 'toStation' || job.stage === 'loading')) {
+    job.stage = 'toPad';
+  }
+  const source = tugSource(world, unit, job);
 
   if (job.stage === 'waiting') {
     stopMoving(unit, type);
-    if (job.load <= 0 && (!station || stationDry(world, station))) {
+    if (!source || source.dry) {
       retargetTug(world, unit, job);
+    } else {
+      job.stage = 'toStation';
     }
     return;
   }
 
-  if (job.stage === 'toStation') {
-    if (!station || !stationType || stationType.kind !== 'metalStation') {
-      if (job.load > 0) {
-        job.stage = 'toPad';
-      } else {
+  if (job.stage === 'toStation' || job.stage === 'loading') {
+    if (!source || source.dry) {
+      if (!retargetTug(world, unit, job)) {
         job.stage = 'waiting';
+        stopMoving(unit, type);
       }
       return;
     }
-    const arrived = moveWorkerTo(world, unit, type, station.x, station.z, STATION_REACH);
-    if (arrived) {
-      job.stage = 'loading';
-      stopMoving(unit, type);
-    }
-    return;
-  }
-
-  if (job.stage === 'loading') {
-    stopMoving(unit, type);
-    if (!station || !stationType || stationType.kind !== 'metalStation') {
-      job.stage = job.load > 0 ? 'toPad' : 'waiting';
+    if (job.stage === 'toStation') {
+      if (moveWorkerTo(world, unit, type, source.x, source.z, source.reach)) {
+        job.stage = 'loading';
+        stopMoving(unit, type);
+      }
       return;
     }
-    if (job.load <= 0 && station.containers > 0) {
-      station.containers -= 1;
-      job.load = stationType.containerSize;
+    stopMoving(unit, type);
+    // Load as many containers or crates as the hauler holds (at least one) and leave at once.
+    if (source.station && source.station.containers > 0) {
+      const size = source.containerSize ?? 0;
+      const fits = Math.max(1, Math.floor(type.carryCapacity / Math.max(1, size)));
+      const count = Math.min(fits, source.station.containers);
+      source.station.containers -= count;
+      job.load = count * size;
+      job.cargo = 'metal';
       job.stage = 'toPad';
-    } else if (job.load <= 0 && stationDry(world, station)) {
-      retargetTug(world, unit, job);
+    } else if (source.deposit) {
+      const taken = takeCrateOre(source.deposit, unit.owner, Math.max(ORE_CRATE_SIZE, type.carryCapacity));
+      if (taken > 0) {
+        job.load = taken;
+        job.cargo = 'ore';
+        job.stage = 'toPad';
+      }
     }
     return;
   }
 
   if (job.stage === 'toPad' || job.stage === 'unloading') {
-    if (!deliverAtPad(world, unit, type, job, 'metal')) {
+    const cargo = job.cargo ?? (job.source === 'deposit' ? 'ore' : 'metal');
+    if (!deliverAtPad(world, unit, type, job, cargo)) {
       return;
     }
-    creditMetal(world, unit.owner, job.load);
+    if (cargo === 'ore') {
+      creditOre(world, unit.owner, job.load);
+    } else {
+      creditMetal(world, unit.owner, job.load);
+    }
     job.load = 0;
+    job.cargo = undefined;
     stopMoving(unit, type);
-    const aliveStation = world.structures.find(
-      (structure) => structure.id === job.targetId && structure.hp > 0,
-    );
-    if (aliveStation) {
+    job.stage = 'waiting';
+    const back = tugSource(world, unit, job);
+    if (back && !back.dry) {
       job.stage = 'toStation';
     } else {
-      job.stage = 'waiting';
+      retargetTug(world, unit, job);
     }
   }
 }
