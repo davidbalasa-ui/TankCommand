@@ -14,3 +14,7 @@ Started 2026-11-11. The engine (WP-01..10) is done and merged on this branch. Th
 | C-08 | Balance: AI-vs-AI soak, no unit/strategy over 65% of mirror matches | Opus | |
 | C-09 | Performance: low-end phone profile fps check, memory budget | Opus | |
 | C-10 | Play readiness: Capacitor Android build, one-time unlock purchase, privacy policy, store listing drafts | Sonnet | David's one-time tasks gate upload |
+
+## Backlog: sound (David, 2026-11-11)
+
+Replace the generated beeps with real, high-quality sound effects: weapons per faction (Terran lasers and bombs, Kesh lightning and the saucer's ground-blasting beam, third-faction spore bursts), explosions, engines and hover hum, the miner's grinding, pad landings and cargo lift, UI clicks and alerts. Source from free libraries first (CC0 or royalty-free: Kenney, OpenGameArt, Freesound CC0, Sonniss GDC bundles), list every file in CREDITS.md, keep the total download small (compressed .ogg/.m4a). Music later.
