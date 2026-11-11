@@ -19,8 +19,8 @@ describe('save envelopes', () => {
     const manager = new SaveManager(kv);
     await manager.save('slot-a', firstHalf);
     const loaded = await manager.load('slot-a');
-    expect(loaded).not.toBeNull();
-    let resumed = loaded?.world ?? createWorld(1);
+    expect(loaded.status).toBe('ok');
+    let resumed = loaded.status === 'ok' ? loaded.save.world : createWorld(1);
     for (let i = 0; i < 500; i += 1) {
       resumed = step(resumed, []);
     }
@@ -103,7 +103,10 @@ describe('save envelopes', () => {
     await manager.save('a', world);
     await expect(manager.save('b', world)).rejects.toBeInstanceOf(StorageFullError);
     const loaded = await manager.load('a');
-    expect(loaded?.world).toEqual(world);
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') {
+      expect(loaded.save.world).toEqual(world);
+    }
   });
 
   it('[SAVE-05] WebKvStore maps quota failures to StorageFullError', async () => {
@@ -122,5 +125,96 @@ describe('save envelopes', () => {
 
     const store = new WebKvStore(storage);
     await expect(store.set('a', 'b')).rejects.toBeInstanceOf(StorageFullError);
+  });
+
+  it('[SAVE-06] five manual slots each restore an identical world hash', async () => {
+    const kv = new MemoryKvStore();
+    const manager = new SaveManager(kv);
+    let world = createWorld(88);
+    for (let i = 0; i < 50; i += 1) {
+      world = step(world, []);
+    }
+    const savedHash = hashWorld(world);
+    for (let index = 1; index <= 5; index += 1) {
+      await manager.save(`manual-${index}`, world);
+    }
+    for (let index = 1; index <= 5; index += 1) {
+      const loaded = await manager.load(`manual-${index}`);
+      expect(loaded.status).toBe('ok');
+      if (loaded.status === 'ok') {
+        expect(hashWorld(loaded.save.world)).toBe(savedHash);
+      }
+    }
+  });
+
+  it('[SAVE-07] autosave cursor survives relaunch and never overwrites the newest autosave first', async () => {
+    const kv = new MemoryKvStore();
+    let clock = 0;
+    const first = new SaveManager(kv, {
+      now: () => new Date(1700000000000 + clock++ * 1000),
+    });
+    const base = createWorld(51);
+    await first.autosave({ ...base, counter: 0 });
+    await first.autosave({ ...base, counter: 1 });
+
+    const relaunched = new SaveManager(kv, {
+      now: () => new Date(1700000000000 + clock++ * 1000),
+    });
+    await relaunched.autosave({ ...base, counter: 2 });
+
+    const auto0 = await relaunched.load('auto-0');
+    const auto1 = await relaunched.load('auto-1');
+    const auto2 = await relaunched.load('auto-2');
+    expect(auto0.status).toBe('ok');
+    expect(auto1.status).toBe('ok');
+    expect(auto2.status).toBe('ok');
+    if (auto0.status === 'ok' && auto1.status === 'ok' && auto2.status === 'ok') {
+      expect(auto0.save.world.counter).toBe(0);
+      expect(auto1.save.world.counter).toBe(1);
+      expect(auto2.save.world.counter).toBe(2);
+    }
+  });
+
+  it('[SAVE-08] load returns typed results for missing, corrupt and incompatible saves', async () => {
+    const kv = new MemoryKvStore();
+    const manager = new SaveManager(kv);
+    expect(await manager.load('manual-1')).toEqual({ status: 'missing' });
+
+    await kv.set('save:manual-1', 'not a save');
+    expect(await manager.load('manual-1')).toEqual({ status: 'corrupt' });
+
+    const valid = encodeSave(createWorld(9), {
+      gameVersion: '0.1.0',
+      savedAtIso: '2026-11-01T00:00:00.000Z',
+    });
+    const parsed = JSON.parse(valid) as { schema: number };
+    parsed.schema = 999;
+    await kv.set('save:manual-1', JSON.stringify(parsed));
+    expect(await manager.load('manual-1')).toEqual({ status: 'incompatible' });
+  });
+
+  it('[SAVE-10] export/import round-trips a save and storage full is reported', async () => {
+    const kv = new MemoryKvStore();
+    const manager = new SaveManager(kv);
+    let world = createWorld(12);
+    for (let i = 0; i < 25; i += 1) {
+      world = step(world, []);
+    }
+    await manager.save('manual-1', world);
+    const exported = await manager.exportSlot('manual-1');
+    expect(exported).not.toBeNull();
+    if (!exported) {
+      return;
+    }
+    const imported = await manager.importText('manual-2', exported);
+    expect(imported.status).toBe('ok');
+    const loaded = await manager.load('manual-2');
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') {
+      expect(hashWorld(loaded.save.world)).toBe(hashWorld(world));
+    }
+
+    const tiny = new SaveManager(kv, { maxBytes: 10 });
+    await expect(tiny.save('manual-3', world)).rejects.toBeInstanceOf(StorageFullError);
   });
 });

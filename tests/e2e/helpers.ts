@@ -174,8 +174,54 @@ export interface HudSnapshot {
   placementActive: boolean;
 }
 
+export interface TestSettings {
+  masterVolume: number;
+  musicVolume: number;
+  effectsVolume: number;
+  graphicsQuality: 'low' | 'medium' | 'high' | 'auto';
+  healthBars: 'damaged' | 'always';
+  edgeScroll: boolean;
+  edgeScrollSpeed: number;
+  cameraSensitivity: number;
+  keyBindings: Record<string, string>;
+  leftHanded: boolean;
+  textSize: 'normal' | 'large';
+  colourBlind: boolean;
+  haptics: boolean;
+}
+
+export interface AlertView {
+  id: number;
+  kind: string;
+  message: string;
+  x: number;
+  z: number;
+  at: number;
+}
+
+export interface AudioStatus {
+  unlocked: boolean;
+  contextAvailable: boolean;
+  masterVolume: number;
+  musicVolume: number;
+  effectsVolume: number;
+  played: string[];
+}
+
+export interface SaveSlotSummaryView {
+  slot: string;
+  savedAtIso: string | null;
+  status: 'ok' | 'missing' | 'corrupt' | 'incompatible';
+}
+
+export interface SaveOutcomeView {
+  status: string;
+  message: string;
+}
+
 export interface TestHook {
   snapshot(): TestSnapshot;
+  worldHash(): string;
   sendCommand(command: unknown): boolean;
   screen(): string;
   renderStats(): RenderStats;
@@ -219,6 +265,21 @@ export interface TestHook {
   alerts(): Array<{ x: number; z: number }>;
   setSimSpeed(multiplier: number): void;
   setCamera(info: Partial<TestCamera>): void;
+  simSpeed(): number;
+  isSimPaused(): boolean;
+  settings(): TestSettings;
+  audioStatus(): AudioStatus;
+  listSaveSlots(): Promise<SaveSlotSummaryView[]>;
+  requestAutosave(): Promise<void>;
+  lastSaveOutcome(): SaveOutcomeView | null;
+  lastLoadOutcome(): SaveOutcomeView | null;
+  lastImportOutcome(): SaveOutcomeView | null;
+  writeRawSave(slot: string, text: string): Promise<void>;
+  lastBugReport(): { fileName: string; content: string } | null;
+  raiseAlert(kind: string, x: number, z: number): void;
+  alertList(): AlertView[];
+  setStorageFullForTest(value: boolean): void;
+  pressAndroidBack(): void;
 }
 
 declare global {

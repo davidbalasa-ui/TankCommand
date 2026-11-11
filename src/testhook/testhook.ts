@@ -16,6 +16,15 @@ import type {
 } from '../sim/types';
 import type { WatchdogReport } from '../platform/watchdog';
 import type { RenderStats, ScreenBounds } from '../render/renderer';
+import type {
+  ImportSaveResult,
+  LoadSlotResult,
+  SaveActionResult,
+  SaveSlotSummary,
+} from '../game/api';
+import type { AlertKind, AlertSnapshot } from '../ui/alerts';
+import type { AudioStatusView } from '../audio/audio';
+import type { SettingsState } from '../platform/settings';
 
 export interface StructureView {
   id: number;
@@ -38,6 +47,7 @@ export interface DropStateView {
 
 export interface TestHook {
   snapshot(): WorldState;
+  worldHash(): string;
   sendCommand(command: unknown): boolean;
   screen(): string;
   renderStats(): RenderStats;
@@ -76,11 +86,27 @@ export interface TestHook {
   alerts(): Array<{ x: number; z: number }>;
   setSimSpeed(multiplier: number): void;
   setCamera(info: Partial<CameraView>): void;
+  simSpeed(): number;
+  isSimPaused(): boolean;
+  settings(): SettingsState;
+  audioStatus(): AudioStatusView;
+  listSaveSlots(): Promise<SaveSlotSummary[]>;
+  requestAutosave(): Promise<void>;
+  lastSaveOutcome(): SaveActionResult | null;
+  lastLoadOutcome(): LoadSlotResult | null;
+  lastImportOutcome(): ImportSaveResult | null;
+  writeRawSave(slot: string, text: string): Promise<void>;
+  lastBugReport(): { fileName: string; content: string } | null;
+  raiseAlert(kind: AlertKind, x: number, z: number): void;
+  alertList(): AlertSnapshot[];
+  setStorageFullForTest(value: boolean): void;
+  pressAndroidBack(): void;
 }
 
 export function installTestHook(app: App): void {
   const hook: TestHook = {
     snapshot: () => app.snapshot(),
+    worldHash: () => app.worldHash(),
     sendCommand: (command) => app.sendCommand(command),
     screen: () => app.router.current(),
     renderStats: () => app.renderStats(),
@@ -134,6 +160,27 @@ export function installTestHook(app: App): void {
     },
     setCamera: (info) => {
       app.setCamera(info);
+    },
+    simSpeed: () => app.simSpeed(),
+    isSimPaused: () => app.isSimPaused(),
+    settings: () => app.settings(),
+    audioStatus: () => app.audioStatus(),
+    listSaveSlots: () => app.listSaveSlots(),
+    requestAutosave: () => app.requestAutosave(),
+    lastSaveOutcome: () => app.lastSaveOutcome(),
+    lastLoadOutcome: () => app.lastLoadOutcome(),
+    lastImportOutcome: () => app.lastImportOutcome(),
+    writeRawSave: (slot, text) => app.writeRawSave(slot, text),
+    lastBugReport: () => app.lastBugReport(),
+    raiseAlert: (kind, x, z) => {
+      app.raiseAlertForTest(kind, x, z);
+    },
+    alertList: () => app.alerts(),
+    setStorageFullForTest: (value) => {
+      app.setStorageFullForTest(value);
+    },
+    pressAndroidBack: () => {
+      app.pressAndroidBack();
     },
   };
 

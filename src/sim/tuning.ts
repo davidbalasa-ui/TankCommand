@@ -37,6 +37,15 @@ export const CAMERA_FOV_DEG = 48; // placeholder until Stage 0
 export const CAMERA_MAP_FIT_MARGIN = 1.08; // placeholder until Stage 0
 export const ATTACK_MOVE_ENGAGE_FACTOR = 1; // placeholder until Stage 0
 
+export const SIM_SPEED_SLOW = 0.5; // placeholder until Stage 0
+export const SIM_SPEED_NORMAL = 1; // placeholder until Stage 0
+export const SIM_SPEED_FAST = 2; // placeholder until Stage 0
+
+export const AUTOSAVE_CHECK_INTERVAL_MS = 15_000; // placeholder until Stage 0
+export const ALERT_RATE_LIMIT_MS = 2_000; // placeholder until Stage 0
+export const ALERT_TOAST_TTL_MS = 6_000; // placeholder until Stage 0
+export const ALERT_MAX_TOASTS = 3; // placeholder until Stage 0
+export const AUDIO_MUSIC_CROSSFADE_SEC = 0.25; // placeholder until Stage 0
 export const UNIT_CAP = 200; // placeholder until Stage 0
 export const DEPOSIT_REACH = 2; // placeholder until Stage 0
 export const PAD_REACH = 4; // placeholder until Stage 0

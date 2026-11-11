@@ -27,6 +27,10 @@ body {
   font-size: 14px;
 }
 
+html.text-large {
+  font-size: 16px;
+}
+
 #app {
   position: relative;
 }
@@ -291,6 +295,16 @@ p {
   touch-action: none;
 }
 
+/*
+ * Two columns, three rows instead of one five-high column.
+ *
+ * On the 915x412 phone a single column of five 44 px buttons plus 6 px gaps is
+ * 244 px tall, which ran from the bottom edge of the viewport up to the top bar
+ * and put the last button flush against the screen edge (and, on the 412 px
+ * layout, past it). The grid is 118x144, so the whole command bar sits well
+ * clear of the bottom edge and covers roughly a quarter of the area the column
+ * did, keeping more of the battlefield visible.
+ */
 .hud-commandbar {
   position: absolute;
   right: 8px;
@@ -610,6 +624,233 @@ p {
 .hud-shell.left-handed .hud-groups {
   right: auto;
   left: 72px;
+}
+
+/* The speed button is deliberately outside .hud-shell so it can sit below the
+   existing top bar without changing hud.ts. */
+.hud-speed-button {
+  position: absolute;
+  top: 56px;
+  left: 8px;
+  z-index: 6;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.alert-toasts {
+  position: fixed;
+  top: 56px;
+  right: 8px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.alert-toast {
+  pointer-events: auto;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 300px;
+  padding: 8px 12px;
+  font-size: 13px;
+  text-align: left;
+  background: rgba(72, 31, 31, 0.96);
+  border-color: #d98080;
+}
+
+/* Pause menu: two columns so all nine buttons fit a 412 px-tall phone screen. */
+.pause-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  gap: 8px;
+  width: 100%;
+}
+
+/* Quit confirmation is one inline row, so it fits under the grid. */
+.pause-confirm {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+  background: rgba(15, 26, 44, 0.96);
+}
+
+.pause-confirm p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pause-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Settings: sliders left, toggles right, actions underneath. */
+.settings-form,
+.bug-report-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.settings-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-toggles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
+}
+
+.settings-toggles button {
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.setting-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.setting-row input[type='range'] {
+  flex: 1;
+  min-height: 44px;
+}
+
+.setting-row input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+}
+
+.setting-value {
+  min-width: 48px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.settings-status,
+.save-status,
+.bug-status {
+  min-height: 18px;
+  font-size: 13px;
+  margin: 0;
+}
+
+.hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.save-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.save-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bug report: two columns so Save and Back stay above the fold. */
+.bug-report-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.bug-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bug-meta,
+.bug-logs {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: rgba(15, 26, 44, 0.9);
+  border: 1px solid #2c4972;
+  border-radius: 6px;
+}
+
+.bug-text {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  padding: 8px;
+  font-size: 14px;
+  color: #e8edf5;
+  background: #0f1a2c;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+
+.bug-logs {
+  max-height: 200px;
+  overflow: auto;
 }
 
 @media (min-width: 1000px) {

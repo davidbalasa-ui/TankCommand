@@ -69,10 +69,6 @@ test('[HOOK-02] test hook validates commands and invalid commands change nothing
 
 test('[REND-01] canvas is non-blank and frames increase', async ({ page }) => {
   await enterGame(page);
-  // The in-game HUD owns a second canvas (the minimap), so the 3D surface has to
-  // be addressed by class rather than by tag. `document.querySelector('canvas')`
-  // still resolves to the game canvas inside `page.evaluate` because the in-game
-  // screen appends it before it builds the HUD.
   const canvas = page.locator('canvas.game-canvas');
   await canvas.waitFor({ state: 'visible' });
   const screenshot = await canvas.screenshot();
@@ -120,9 +116,6 @@ test('[WD-04] a frozen sim records a freeze report and only the 5 s recover mark
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
 
-  // WP-01 §5.4: the 2 s freeze threshold records a report, and nothing else.
-  // Asserting the report first is what distinguishes the two thresholds; the
-  // recovery screen must not be what a merely slow frame produces.
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.lastFreezeReport() !== null), {
       timeout: 4500,
@@ -175,6 +168,9 @@ test('[UI-05] all controls meet touch size and do not overlap across the main fl
   await page.keyboard.press('Escape');
   await assertButtonLayout(page);
   await page.getByRole('button', { name: 'Quit to title', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Quit without saving', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'title');
   await assertButtonLayout(page);
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
