@@ -30,7 +30,7 @@
     "unlocks": [
       "structure.alien.air_base",
       "unit.alien.glider",
-      "unit.alien.dropper"
+      "unit.alien.fighter"
     ],
     "upgrades": [],
     "placeholder": false

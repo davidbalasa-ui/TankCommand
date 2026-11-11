@@ -147,3 +147,14 @@ David's rule: one unit mines out of the ground, another delivers to the landing 
 - **Visuals.** Loose raw ore everywhere (David: no boxes): a rock-chunk heap grows in the miner bin while it grinds, dug ore piles up in a mound beside the deposit, haulers carry it heaped in their bed, and it lifts off the pad as loose ore. Metal still travels in containers. ("Crates" is only the sim name for the dug-ore pile.)
 - **Missions.** Mining training mission gets a hauler and new briefing text.
 - **Tests.** ECO-01/02 rewritten for the new flow, ECO-01b (full stack stops digging), ECO-01c (save/load hash with crates), ECO-01d (haul command validation); PAD-04 uses haulers. AI-07 hard beats easy 10/10.
+
+## C-07 Aircraft redesign (2026-11-11)
+
+David's direction: Terran aircraft must not look human (unmanned sci-fi, no cockpit); the Kesh saucer is the Kesh bomber; the Kesh get a fighter. Quick blockout sketches (three ideas each) went to David; his picks were built with the hero bake pipeline (`tools/art/aircraft2.py`, one material, four 512 maps):
+
+- **Falcon** (Terran fighter): Hornet + Trident. Armoured spine, three-prong nose around a floating energy core, four floating wings (front pair jagged and raked forward, rear pair swept back), ring engine. 2,496 triangles.
+- **Condor** (Terran bomber): Hammerhead. Wide sensor head, jagged canards, broad swept wing with two rotary bomb drums. 2,292 triangles.
+- **Halo** (new Kesh fighter, replaces the Dropper row, id `unit.alien.fighter`): open ring hull with a forked spike cannon, the Moth's three floating gold rings in the middle, scythe blades. Fighter stats mirror the Falcon; weapon id `lightning`. 2,548 triangles.
+- **Disc** (Kesh saucer) is now the Kesh bomber: competition model, weapon `ground_beam` (damage 140, splash 3.5, 3 shots).
+
+Next: weapon effects (Terran lasers and bombs, Kesh lightning, the saucer's ground-blasting beam), blade sweep animation on the Halo.

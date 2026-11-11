@@ -87,7 +87,7 @@ describe('enemy AI air', () => {
       throw new Error('no fighter');
     }
     assignHome(world, fighter);
-    const intruder = addUnit(world, { owner: 2, typeId: 'unit.alien.dropper', x: pad.x + 6, z: pad.z + 6 });
+    const intruder = addUnit(world, { owner: 2, typeId: 'unit.alien.fighter', x: pad.x + 6, z: pad.z + 6 });
     if (!intruder?.air) {
       throw new Error('no intruder');
     }

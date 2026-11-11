@@ -808,16 +808,15 @@
     "turretTurnDegPerSec": 0,
     "weapons": [
       {
-        "id": "plasma",
-        "damage": 35,
-        "range": 14,
-        "reloadSec": 1.5,
-        "projectileSpeed": 45,
-        "accuracy": 0.9,
-        "splashRadius": 0.5,
+        "id": "ground_beam",
+        "damage": 140,
+        "range": 4,
+        "reloadSec": 4,
+        "projectileSpeed": 60,
+        "accuracy": 0.95,
+        "splashRadius": 3.5,
         "targets": [
           "ground",
-          "air",
           "structure"
         ]
       }
@@ -837,7 +836,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 12,
+      "ammo": 3,
       "fuelSec": 75,
       "rearmSec": 12,
       "cruiseHeight": 6
@@ -845,36 +844,36 @@
     "visualScale": 1.25
   },
   {
-    "id": "unit.alien.dropper",
-    "name": "Dropper",
+    "id": "unit.alien.fighter",
+    "name": "Halo",
     "faction": "alien",
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 220,
-      "metal": 120
+      "ore": 180,
+      "metal": 100
     },
-    "deliverySec": 18,
-    "hp": 130,
+    "deliverySec": 15,
+    "hp": 90,
     "armor": 2,
     "speed": {
-      "top": 12,
-      "accel": 6,
-      "turnDegPerSec": 120
+      "top": 18,
+      "accel": 10,
+      "turnDegPerSec": 200
     },
     "turretTurnDegPerSec": 0,
     "weapons": [
       {
-        "id": "bombs",
-        "damage": 120,
-        "range": 3,
-        "reloadSec": 4,
-        "projectileSpeed": 20,
-        "accuracy": 0.8,
-        "splashRadius": 3,
+        "id": "lightning",
+        "damage": 18,
+        "range": 14,
+        "reloadSec": 1.5,
+        "projectileSpeed": 45,
+        "accuracy": 0.9,
+        "splashRadius": 0,
         "targets": [
-          "ground",
-          "structure"
+          "air",
+          "ground"
         ]
       }
     ],
@@ -887,18 +886,18 @@
       "armor"
     ],
     "movement": "air",
-    "modelAssetId": "unit.alien.dropper",
+    "modelAssetId": "unit.alien.halo",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 2,
+      "ammo": 8,
       "fuelSec": 60,
       "rearmSec": 10,
-      "cruiseHeight": 7
+      "cruiseHeight": 6
     },
-    "visualScale": 1.4
+    "visualScale": 1.2
   },
   {
     "id": "unit.human.heavy_tank",

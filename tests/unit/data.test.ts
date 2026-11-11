@@ -29,7 +29,7 @@ describe('unit data containers', () => {
     expect(table.size).toBe(28);
     expect([...table.keys()].sort()).toEqual([
       'unit.alien.artillery',
-      'unit.alien.dropper',
+      'unit.alien.fighter',
       'unit.alien.glider',
       'unit.alien.heavy_tank',
       'unit.alien.light_skimmer',

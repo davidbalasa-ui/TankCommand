@@ -21,10 +21,10 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
 | unit.alien.disc | TankCommand project (scripted Blender) | ORIGINAL | - | Disc (saucer) |
-| unit.alien.dropper | TankCommand project (scripted Blender) | ORIGINAL | - | Dropper (dropper) |
 | unit.alien.ferrier | TankCommand project (scripted Blender) | ORIGINAL | - | Ferrier (tug) |
 | unit.alien.glider | TankCommand project (scripted Blender) | ORIGINAL | - | Glider (glider) |
 | unit.alien.gorger | TankCommand project (scripted Blender) | ORIGINAL | - | Gorger (ore miner) |
+| unit.alien.halo | TankCommand project (scripted Blender) | ORIGINAL | - | Halo (fighter) |
 | unit.alien.mortar_beast | TankCommand project (scripted Blender) | ORIGINAL | - | Mortar Beast (artillery) |
 | unit.alien.seer | TankCommand project (scripted Blender) | ORIGINAL | - | Seer (radar) |
 | unit.alien.spitter | TankCommand project (scripted Blender) | ORIGINAL | - | Spitter (missile tank) |

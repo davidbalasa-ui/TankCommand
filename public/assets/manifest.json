@@ -125,12 +125,12 @@
       "id": "unit.human.falcon",
       "kind": "model",
       "path": "assets/models/human/falcon.glb",
-      "bytes": 56776,
+      "bytes": 325016,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Falcon",
+        "title": "Falcon (Hornet-Trident design)",
         "usedFor": "Falcon (fighter)"
       }
     },
@@ -138,12 +138,12 @@
       "id": "unit.human.condor",
       "kind": "model",
       "path": "assets/models/human/condor.glb",
-      "bytes": 80112,
+      "bytes": 303636,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Condor",
+        "title": "Condor (Hammerhead design)",
         "usedFor": "Condor (bomber)"
       }
     },
@@ -314,19 +314,6 @@
         "author": "TankCommand project (scripted Blender)",
         "title": "Disc (competition winner, procedural textures)",
         "usedFor": "Disc (saucer)"
-      }
-    },
-    {
-      "id": "unit.alien.dropper",
-      "kind": "model",
-      "path": "assets/models/alien/dropper.glb",
-      "bytes": 135220,
-      "faction": "alien",
-      "credit": {
-        "license": "ORIGINAL",
-        "author": "TankCommand project (scripted Blender)",
-        "title": "Dropper",
-        "usedFor": "Dropper (dropper)"
       }
     },
     {
@@ -561,6 +548,19 @@
         "author": "TankCommand project (scripted Blender)",
         "title": "Spore Tower",
         "usedFor": "Spore Tower (structure)"
+      }
+    },
+    {
+      "id": "unit.alien.halo",
+      "kind": "model",
+      "path": "assets/models/alien/halo.glb",
+      "bytes": 360484,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Halo (ring blade fighter)",
+        "usedFor": "Halo (fighter)"
       }
     }
   ]
