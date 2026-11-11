@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
-import { CAMERA_FOV_DEG, MAX_SLOPE, ORE_CRATE_SIZE, TANK_LENGTH } from '../sim/tuning';
+import { CAMERA_FOV_DEG, MAX_SLOPE, ORE_CRATE_SIZE, ORE_MAX_CRATES, TANK_LENGTH } from '../sim/tuning';
 import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
-import { crateCount } from '../sim/economy';
+import { crateOre } from '../sim/economy';
 import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, UnitState, WorldState } from '../sim/types';
@@ -84,6 +85,63 @@ export interface OrderPathInfo {
 
 interface MaterialHost {
   material: THREE.Material | THREE.Material[];
+}
+
+// Loose ore: a mound of jagged rock chunks, dark stone flecked with orange ore and a few bright
+// nuggets, built once and shared. Unit size: about 2 wide and 0.9 high.
+let oreHeapGeometry: THREE.BufferGeometry | null = null;
+function buildOreHeapGeometry(): THREE.BufferGeometry {
+  if (oreHeapGeometry) {
+    return oreHeapGeometry;
+  }
+  let seed = 7;
+  const rand = (): number => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const parts: THREE.BufferGeometry[] = [];
+  const stone = new THREE.Color(0.16, 0.13, 0.12);
+  const ore = new THREE.Color(0.62, 0.26, 0.07);
+  const nugget = new THREE.Color(1.0, 0.62, 0.18);
+  for (let i = 0; i < 40; i += 1) {
+    const r = Math.sqrt(rand()) * 0.8;
+    const a = rand() * Math.PI * 2;
+    const size = 0.17 + rand() * 0.18 + (1 - r) * 0.1;
+    const chunk = new THREE.IcosahedronGeometry(size, 0);
+    // Jag the chunk: push each vertex in or out a little so no two rocks match.
+    const pos = chunk.getAttribute('position');
+    const jag = new Map<string, number>();
+    for (let v = 0; v < pos.count; v += 1) {
+      const key = `${pos.getX(v).toFixed(3)},${pos.getY(v).toFixed(3)},${pos.getZ(v).toFixed(3)}`;
+      let k = jag.get(key);
+      if (k === undefined) {
+        k = 0.7 + rand() * 0.6;
+        jag.set(key, k);
+      }
+      pos.setXYZ(v, pos.getX(v) * k * 1.2, pos.getY(v) * k * 0.8, pos.getZ(v) * k);
+    }
+    chunk.rotateY(rand() * Math.PI);
+    chunk.rotateX((rand() - 0.5) * 0.8);
+    chunk.translate(Math.cos(a) * r, Math.max(0.04, (1 - r * r) * 0.5) + size * 0.2, Math.sin(a) * r);
+    const pick = rand();
+    const base = pick < 0.08 ? nugget : pick < 0.5 ? ore : stone;
+    const colors: number[] = [];
+    for (let v = 0; v < pos.count; v += 3) {
+      const shade = 0.8 + rand() * 0.35;
+      for (let k = 0; k < 3; k += 1) {
+        colors.push(base.r * shade, base.g * shade, base.b * shade);
+      }
+    }
+    chunk.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    chunk.deleteAttribute('uv');
+    parts.push(chunk);
+  }
+  oreHeapGeometry = mergeGeometries(parts, false) ?? new THREE.IcosahedronGeometry(0.6, 0);
+  oreHeapGeometry.computeVertexNormals();
+  for (const part of parts) {
+    part.dispose();
+  }
+  return oreHeapGeometry;
 }
 
 // A small painted texture so cargo reads at a glance: a dark steel frame around an ore (orange,
@@ -1731,7 +1789,30 @@ export class RenderView {
     return material;
   }
 
+  private oreHeapMaterial: THREE.Material | null = null;
+
+  /** A mound of loose ore about `size` wide. */
+  private oreHeap(size: number): THREE.Mesh {
+    if (!this.oreHeapMaterial) {
+      this.oreHeapMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        flatShading: true,
+        roughness: 0.75,
+        metalness: 0.25,
+        emissive: 0x2a1204,
+      });
+    }
+    const mesh = new THREE.Mesh(buildOreHeapGeometry(), this.oreHeapMaterial);
+    mesh.scale.setScalar(size / 2);
+    mesh.castShadow = true;
+    mesh.name = 'OreHeap';
+    return mesh;
+  }
+
   private cargoMesh(kind: 'ore' | 'metal' | 'kit', size: number): THREE.Mesh {
+    if (kind === 'ore') {
+      return this.oreHeap(size * 1.2);
+    }
     if (!this.cargoGeometry) {
       this.cargoGeometry = new THREE.BoxGeometry(1, 1, 1);
     }
@@ -1891,7 +1972,6 @@ export class RenderView {
   // metal containers on their back, and full crates stack up beside each ore deposit.
   private readonly workerCargo = new Map<string, THREE.Mesh>();
   private readonly unitTopCache = new Map<string, { top: number; ax: number; az: number; length: number }>();
-  private oreChunkGeometry: THREE.BufferGeometry | null = null;
 
   // Where cargo sits on a unit model, in the unit's own frame: the deck height (a little under the
   // highest point, which is usually an antenna) and the middle of the body.
@@ -1928,15 +2008,6 @@ export class RenderView {
     return mesh;
   }
 
-  private oreChunk(): THREE.Mesh {
-    if (!this.oreChunkGeometry) {
-      this.oreChunkGeometry = new THREE.IcosahedronGeometry(0.5, 0);
-    }
-    const mesh = new THREE.Mesh(this.oreChunkGeometry, this.cargoMaterial('ore'));
-    mesh.castShadow = true;
-    return mesh;
-  }
-
   private syncWorkerCargo(world: WorldState, alpha: number): void {
     const live = new Set<string>();
     const time = (world.tick + alpha) / SIM_TICK_HZ;
@@ -1950,8 +2021,9 @@ export class RenderView {
       const anchor = this.unitTop(unit.typeId, visual.root);
       const top = anchor.top;
       const turn = visual.root.rotation.y;
-      // Both factions' miners carry their hopper (bin or ore sac) behind the middle of the body.
-      const ax = anchor.ax - (job.kind === 'oreMiner' ? anchor.length * 0.22 : 0);
+      // Both factions' miners carry their hopper (bin or ore sac) and haulers their bed behind the
+      // middle of the body.
+      const ax = anchor.ax - anchor.length * (job.kind === 'oreMiner' ? 0.22 : 0.17);
       const base = new THREE.Vector3(
         visual.root.position.x + Math.cos(turn) * ax + Math.sin(turn) * anchor.az,
         visual.root.position.y,
@@ -1962,12 +2034,13 @@ export class RenderView {
         const fill = Math.min(1, job.load / hopper);
         const grinding = job.stage === 'digging';
         if (fill > 0.02 || grinding) {
-          const heap = this.workerMesh(live, `m${unit.id}`, () => this.oreChunk());
-          const size = 0.5 + fill * 1.3;
-          heap.scale.set(size * 1.4, size * 0.75, size * 1.1);
-          const shake = grinding ? Math.sin(time * 31 + unit.id) * 0.06 : 0;
-          heap.position.set(base.x + shake, base.y + top, base.z - shake);
-          heap.rotation.set(0, grinding ? time * 2.2 : visual.root.rotation.y, 0);
+          const heap = this.workerMesh(live, `m${unit.id}`, () => this.oreHeap(2));
+          // The heap rises out of the bin as it fills; grinding makes it churn.
+          const size = 0.5 + fill * 0.9;
+          heap.scale.set(size * 1.2, 0.35 + fill * 0.9, size);
+          const shake = grinding ? Math.sin(time * 31 + unit.id) * 0.05 : 0;
+          heap.position.set(base.x + shake, base.y + top - 0.45 + fill * 0.25, base.z - shake);
+          heap.rotation.set(0, visual.root.rotation.y + (grinding ? Math.sin(time * 9) * 0.15 : 0), 0);
         }
         // Grinding: the miner body judders while it chews through the deposit.
         if (grinding) {
@@ -1976,42 +2049,43 @@ export class RenderView {
         continue;
       }
       if (job.load > 0 && job.stage !== 'unloading') {
-        const kind = job.cargo ?? 'metal';
-        const crates = Math.min(3, Math.max(1, Math.round(job.load / ORE_CRATE_SIZE)));
-        for (let i = 0; i < crates; i += 1) {
-          const crate = this.workerMesh(live, `t${unit.id}:${i}`, () => this.cargoMesh(kind, 1.2));
-          crate.material = this.cargoMaterial(kind);
-          const heading = visual.root.rotation.y;
-          const along = (i - (crates - 1) / 2) * 1.3;
-          crate.position.set(
-            base.x + Math.cos(heading) * along,
-            base.y + top + 0.3,
-            base.z - Math.sin(heading) * along,
-          );
-          crate.rotation.y = heading;
+        const heading = visual.root.rotation.y;
+        const fill = Math.min(1, job.load / Math.max(ORE_CRATE_SIZE, type?.carryCapacity ?? ORE_CRATE_SIZE));
+        if ((job.cargo ?? 'metal') === 'ore') {
+          // Raw ore heaped in the hauler's bed, bigger the more it carries.
+          const heap = this.workerMesh(live, `t${unit.id}:ore`, () => this.oreHeap(2));
+          heap.scale.set(0.75 + fill * 0.55, 0.55 + fill * 0.65, 0.6 + fill * 0.35);
+          heap.position.set(base.x, base.y + top - 0.8, base.z);
+          heap.rotation.y = heading;
+        } else {
+          const crates = Math.min(3, Math.max(1, Math.round(job.load / ORE_CRATE_SIZE)));
+          for (let i = 0; i < crates; i += 1) {
+            const crate = this.workerMesh(live, `t${unit.id}:${i}`, () => this.cargoMesh('metal', 1.2));
+            const along = (i - (crates - 1) / 2) * 1.3;
+            crate.position.set(
+              base.x + Math.cos(heading) * along,
+              base.y + top + 0.3,
+              base.z - Math.sin(heading) * along,
+            );
+            crate.rotation.y = heading;
+          }
         }
       }
     }
-    // Crate stacks beside ore deposits, one stack per side, two rows deep.
+    // Dug ore piles up in a loose mound beside the deposit (one per side), growing as miners dump
+    // their bins and shrinking as haulers scoop it away.
     for (const deposit of world.deposits) {
       for (const pile of deposit.crates ?? []) {
-        const count = crateCount(deposit, pile.owner);
+        const fill = Math.min(1, crateOre(deposit, pile.owner) / (ORE_MAX_CRATES * ORE_CRATE_SIZE));
         const pad = world.structures.find((item) => item.owner === pile.owner && item.hp > 0);
         const towards = pad ? Math.atan2(pad.z - deposit.z, pad.x - deposit.x) : pile.owner;
-        const cx = deposit.x + Math.cos(towards) * 2.6;
-        const cz = deposit.z + Math.sin(towards) * 2.6;
-        const sideX = -Math.sin(towards);
-        const sideZ = Math.cos(towards);
-        for (let i = 0; i < count; i += 1) {
-          const crate = this.workerMesh(live, `d${deposit.id}:${pile.owner}:${i}`, () => this.cargoMesh('ore', 1.1));
-          // Bottom row of three, then two on top in the gaps.
-          const layer = i < 3 ? 0 : 1;
-          const offset = layer === 0 ? (i - 1) * 1.2 : (i - 3.5) * 1.2;
-          const x = cx + sideX * offset;
-          const z = cz + sideZ * offset;
-          crate.position.set(x, heightAt(world.map, x, z) + 0.42 + layer * 0.83, z);
-          crate.rotation.y = -towards;
-        }
+        const x = deposit.x + Math.cos(towards) * 2.8;
+        const z = deposit.z + Math.sin(towards) * 2.8;
+        const heap = this.workerMesh(live, `d${deposit.id}:${pile.owner}`, () => this.oreHeap(2));
+        const spread = 0.8 + fill * 1.0;
+        heap.scale.set(spread, 0.5 + fill * 1.1, spread * 0.9);
+        heap.position.set(x, heightAt(world.map, x, z) - 0.05, z);
+        heap.rotation.y = -towards + deposit.id;
       }
     }
     for (const [key, mesh] of this.workerCargo) {
