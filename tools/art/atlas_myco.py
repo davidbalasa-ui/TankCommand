@@ -2,7 +2,7 @@
   flesh  (  0,  0)-(256,256)  pale cream fungal skin with soft fibres (painterly strokes)
   cap    (256,  0)-(512,256)  red cap with white spots
   gill   (  0,256)-(256,384)  warm glowing gill lines (emissive)
-  myc    (256,256)-(512,384)  mycelium: pale root threads on dark brown
+  myc    (256,256)-(512,384)  root bark: lengthwise fibres, cream at the stem end to soil brown at tips
   bulb   (  0,384)-(128,512)  glowing gold spore sac (emissive)
   ruffle (128,384)-(256,512)  purple bracket fungus with growth rings
   moss   (256,384)-(384,512)  green vine and moss
@@ -41,21 +41,38 @@ def main(out):
     strokes(d, (0, 0, 256, 256), rng, (150, 118, 92), 320, 30, 3, jitter=14, angle=math.pi / 2)
     strokes(d, (0, 0, 256, 256), rng, (110, 88, 62), 160, 40, 2, jitter=10, angle=math.pi / 2)
     # Cap: red with white spots and stroke texture.
-    d.rectangle((256, 0, 511, 255), fill=(196, 50, 36))
-    strokes(d, (256, 0, 512, 256), rng, (205, 60, 40), 700, 18, 3)
+    # Deep, weathered red; warts are small, irregular and off-white (not cartoon polka dots).
+    d.rectangle((256, 0, 511, 255), fill=(132, 34, 26))
+    strokes(d, (256, 0, 512, 256), rng, (150, 44, 32), 900, 18, 3, jitter=20)
+    strokes(d, (256, 0, 512, 256), rng, (105, 28, 22), 110, 16, 2, jitter=10)
+    # Warts: soft rounded flakes (irregular ellipses with a lighter centre), some in small clusters.
     for _ in range(46):
-        cx, cy, r = rng.uniform(268, 502), rng.uniform(12, 244), rng.uniform(9, 17)
-        d.ellipse((cx - r, cy - r * 0.8, cx + r, cy + r * 0.8), fill=(245, 236, 215))
-        d.ellipse((cx - r * 0.5, cy - r * 0.4, cx + r * 0.3, cy), fill=(255, 250, 238))
+        cx, cy = rng.uniform(266, 502), rng.uniform(10, 246)
+        for _ in range(rng.choice((1, 1, 2, 3))):
+            x, y = cx + rng.uniform(-9, 9), cy + rng.uniform(-9, 9)
+            rx, ry = rng.uniform(3, 8), rng.uniform(3, 7)
+            d.ellipse((x - rx, y - ry, x + rx, y + ry), fill=(186, 170, 140))
+            d.ellipse((x - rx * 0.6, y - ry * 0.6, x + rx * 0.5, y + ry * 0.5), fill=(222, 210, 182))
     # Gill: radiating warm lines (glow).
-    for dd, k in ((d, 1.0), (e, 0.85)):
-        dd.rectangle((0, 256, 255, 383), fill=(int(210 * k), int(120 * k), int(45 * k)))
+    # Emission is strong on the gill ridges and weak between them, so the gill folds still read in depth.
+    for dd, kb, kl in ((d, 1.0, 1.0), (e, 0.25, 0.85)):
+        dd.rectangle((0, 256, 255, 383), fill=(int(190 * kb), int(95 * kb), int(35 * kb)))
         for x in range(0, 256, 7):
-            dd.line((x, 256, 128 + (x - 128) * 0.3, 383), fill=(int(255 * k), int(225 * k), int(140 * k)), width=3)
-    # Mycelium: pale root threads over dark soil-brown.
-    d.rectangle((256, 256, 511, 383), fill=(70, 52, 38))
-    strokes(d, (256, 256, 512, 384), rng, (225, 215, 195), 500, 30, 1, jitter=20)
-    strokes(d, (256, 256, 512, 384), rng, (160, 140, 110), 300, 20, 2, jitter=20)
+            dd.line((x, 256, 128 + (x - 128) * 0.3, 383), fill=(int(255 * kl), int(185 * kl), int(70 * kl)), width=3)
+    # Root bark: lengthwise fibres, pale cream at the stem end (bottom of tile) fading to soil-stained
+    # brown at the tips (top of tile), so roots read as the stem splitting into the earth.
+    for yy in range(256, 384):
+        t = (383 - yy) / 127  # 0 at stem end, 1 at tip
+        c = tuple(int(a + (b - a) * t ** 0.8) for a, b in zip((182, 160, 128), (62, 44, 30)))
+        d.line((256, yy, 511, yy), fill=c)
+    for _ in range(900):
+        x, y = rng.uniform(256, 512), rng.uniform(256, 384)
+        t = (383 - y) / 127
+        base = tuple(int(a + (b - a) * t) for a, b in zip((205, 185, 150), (85, 62, 42)))
+        L = rng.uniform(10, 30)
+        c = tuple(max(0, min(255, int(v + rng.uniform(-18, 18)))) for v in base)
+        d.line((x, y, x + rng.uniform(-1.5, 1.5), y + L), fill=c, width=2)
+    strokes(d, (256, 256, 512, 384), rng, (40, 28, 18), 260, 26, 2, jitter=8, angle=math.pi / 2)
     # Bulb: glowing gold spore sac (emissive), with soft rings.
     for r in range(64, 0, -2):
         t = r / 64
