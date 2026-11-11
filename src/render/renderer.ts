@@ -1258,22 +1258,22 @@ export class RenderView {
         ids.add(type.modelId);
       }
     }
-    let loaded = false;
-    for (const id of [...ids].sort()) {
-      try {
-        const asset = await this.loader.load(id);
-        if (this.disposed) {
-          return;
-        }
-        if (asset instanceof THREE.Object3D) {
-          this.templates.set(id, this.prepareTemplate(asset));
-          this.loadedModels.push(id);
-          loaded = true;
-        }
-      } catch {
-        // Unknown or broken model: those units keep the fallback tank.
-      }
+    // Fetch and decode in parallel (about 40 small files), then register in a fixed order.
+    const sorted = [...ids].sort();
+    const results = await Promise.allSettled(sorted.map((id) => this.loader.load(id)));
+    if (this.disposed) {
+      return;
     }
+    let loaded = false;
+    sorted.forEach((id, index) => {
+      const result = results[index];
+      // A rejected load (unknown or broken model) leaves those units on the fallback tank.
+      if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
+        this.templates.set(id, this.prepareTemplate(result.value));
+        this.loadedModels.push(id);
+        loaded = true;
+      }
+    });
     if (loaded) {
       this.rebuildUnitVisuals();
     }

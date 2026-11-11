@@ -7,12 +7,378 @@
       "path": "assets/models/human/poc_tank.glb",
       "bytes": 111064,
       "faction": "human",
-      "tags": ["poc"],
+      "tags": [
+        "poc"
+      ],
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
         "title": "Proof-of-concept tank",
         "usedFor": "Placeholder human tank"
+      }
+    },
+    {
+      "id": "unit.human.lancer",
+      "kind": "model",
+      "path": "assets/models/human/lancer.glb",
+      "bytes": 151856,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Lancer",
+        "usedFor": "Lancer (light tank)"
+      }
+    },
+    {
+      "id": "unit.human.outrider",
+      "kind": "model",
+      "path": "assets/models/human/outrider.glb",
+      "bytes": 75604,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Outrider",
+        "usedFor": "Outrider (scout)"
+      }
+    },
+    {
+      "id": "unit.human.prospector",
+      "kind": "model",
+      "path": "assets/models/human/prospector.glb",
+      "bytes": 135852,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Prospector",
+        "usedFor": "Prospector (ore miner)"
+      }
+    },
+    {
+      "id": "unit.human.hauler",
+      "kind": "model",
+      "path": "assets/models/human/hauler.glb",
+      "bytes": 97232,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Hauler",
+        "usedFor": "Hauler (tug)"
+      }
+    },
+    {
+      "id": "unit.human.mender",
+      "kind": "model",
+      "path": "assets/models/human/mender.glb",
+      "bytes": 102356,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Mender",
+        "usedFor": "Mender (repair)"
+      }
+    },
+    {
+      "id": "unit.human.bastion_packed",
+      "kind": "model",
+      "path": "assets/models/human/bastion_packed.glb",
+      "bytes": 43360,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Bastion (packed)",
+        "usedFor": "Bastion (packed) (turret packed)"
+      }
+    },
+    {
+      "id": "unit.human.watchman",
+      "kind": "model",
+      "path": "assets/models/human/watchman.glb",
+      "bytes": 97952,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Watchman",
+        "usedFor": "Watchman (radar)"
+      }
+    },
+    {
+      "id": "unit.human.skimmer",
+      "kind": "model",
+      "path": "assets/models/human/skimmer.glb",
+      "bytes": 55308,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Skimmer",
+        "usedFor": "Skimmer (hover tank)"
+      }
+    },
+    {
+      "id": "unit.human.falcon",
+      "kind": "model",
+      "path": "assets/models/human/falcon.glb",
+      "bytes": 56776,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Falcon",
+        "usedFor": "Falcon (fighter)"
+      }
+    },
+    {
+      "id": "unit.human.condor",
+      "kind": "model",
+      "path": "assets/models/human/condor.glb",
+      "bytes": 80112,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Condor",
+        "usedFor": "Condor (bomber)"
+      }
+    },
+    {
+      "id": "unit.human.bulwark",
+      "kind": "model",
+      "path": "assets/models/human/bulwark.glb",
+      "bytes": 178836,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Bulwark",
+        "usedFor": "Bulwark (heavy tank)"
+      }
+    },
+    {
+      "id": "unit.human.javelin",
+      "kind": "model",
+      "path": "assets/models/human/javelin.glb",
+      "bytes": 106280,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Javelin",
+        "usedFor": "Javelin (missile tank)"
+      }
+    },
+    {
+      "id": "unit.human.longbow",
+      "kind": "model",
+      "path": "assets/models/human/longbow.glb",
+      "bytes": 109244,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Longbow",
+        "usedFor": "Longbow (artillery)"
+      }
+    },
+    {
+      "id": "unit.human.spire_packed",
+      "kind": "model",
+      "path": "assets/models/human/spire_packed.glb",
+      "bytes": 46364,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spire (packed)",
+        "usedFor": "Spire (packed) (missile battery packed)"
+      }
+    },
+    {
+      "id": "unit.alien.stinger",
+      "kind": "model",
+      "path": "assets/models/alien/stinger.glb",
+      "bytes": 161120,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Stinger",
+        "usedFor": "Stinger (light tank)"
+      }
+    },
+    {
+      "id": "unit.alien.darter",
+      "kind": "model",
+      "path": "assets/models/alien/darter.glb",
+      "bytes": 139008,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Darter",
+        "usedFor": "Darter (light skimmer)"
+      }
+    },
+    {
+      "id": "unit.alien.gorger",
+      "kind": "model",
+      "path": "assets/models/alien/gorger.glb",
+      "bytes": 128492,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Gorger",
+        "usedFor": "Gorger (ore miner)"
+      }
+    },
+    {
+      "id": "unit.alien.ferrier",
+      "kind": "model",
+      "path": "assets/models/alien/ferrier.glb",
+      "bytes": 121920,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Ferrier",
+        "usedFor": "Ferrier (tug)"
+      }
+    },
+    {
+      "id": "unit.alien.weaver",
+      "kind": "model",
+      "path": "assets/models/alien/weaver.glb",
+      "bytes": 129488,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Weaver",
+        "usedFor": "Weaver (repair)"
+      }
+    },
+    {
+      "id": "unit.alien.thornmound_packed",
+      "kind": "model",
+      "path": "assets/models/alien/thornmound_packed.glb",
+      "bytes": 108896,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Thornmound (packed)",
+        "usedFor": "Thornmound (packed) (turret packed)"
+      }
+    },
+    {
+      "id": "unit.alien.seer",
+      "kind": "model",
+      "path": "assets/models/alien/seer.glb",
+      "bytes": 124868,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Seer",
+        "usedFor": "Seer (radar)"
+      }
+    },
+    {
+      "id": "unit.alien.glider",
+      "kind": "model",
+      "path": "assets/models/alien/glider.glb",
+      "bytes": 112176,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Glider",
+        "usedFor": "Glider (glider)"
+      }
+    },
+    {
+      "id": "unit.alien.disc",
+      "kind": "model",
+      "path": "assets/models/alien/disc.glb",
+      "bytes": 119732,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Disc",
+        "usedFor": "Disc (saucer)"
+      }
+    },
+    {
+      "id": "unit.alien.dropper",
+      "kind": "model",
+      "path": "assets/models/alien/dropper.glb",
+      "bytes": 135220,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Dropper",
+        "usedFor": "Dropper (dropper)"
+      }
+    },
+    {
+      "id": "unit.alien.carapace",
+      "kind": "model",
+      "path": "assets/models/alien/carapace.glb",
+      "bytes": 171796,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Carapace",
+        "usedFor": "Carapace (heavy tank)"
+      }
+    },
+    {
+      "id": "unit.alien.spitter",
+      "kind": "model",
+      "path": "assets/models/alien/spitter.glb",
+      "bytes": 130352,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spitter",
+        "usedFor": "Spitter (missile tank)"
+      }
+    },
+    {
+      "id": "unit.alien.mortar_beast",
+      "kind": "model",
+      "path": "assets/models/alien/mortar_beast.glb",
+      "bytes": 153548,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Mortar Beast",
+        "usedFor": "Mortar Beast (artillery)"
+      }
+    },
+    {
+      "id": "unit.alien.spore_tower_packed",
+      "kind": "model",
+      "path": "assets/models/alien/spore_tower_packed.glb",
+      "bytes": 114696,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spore Tower (packed)",
+        "usedFor": "Spore Tower (packed) (missile battery packed)"
       }
     }
   ]

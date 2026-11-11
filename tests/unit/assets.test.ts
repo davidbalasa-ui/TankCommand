@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import rawManifest from '../../public/assets/manifest.json';
+import rawUnits from '../../src/data/units.placeholder.json';
 import {
   AssetManifestError,
   parseAssetManifest,
@@ -56,8 +57,18 @@ function registryWith(assets: AssetEntry[]): AssetRegistry {
 describe('asset containers', () => {
   it('[ASSET-01] real public asset manifest validates', () => {
     const parsed = parseAssetManifest(rawManifest);
-    expect(parsed.assets).toHaveLength(1);
-    expect(parsed.assets[0]?.id).toBe('unit.human.poc_tank');
+    const ids = new Set(parsed.assets.map((a) => a.id));
+    expect(ids.has('unit.human.poc_tank')).toBe(true);
+    // every unit type points at a model that is in the manifest
+    for (const unit of rawUnits as Array<{ id: string; modelAssetId: string }>) {
+      expect(ids.has(unit.modelAssetId), `${unit.id} -> ${unit.modelAssetId}`).toBe(true);
+    }
+    // every listed file exists with the recorded size
+    for (const entry of parsed.assets) {
+      const file = join('public', entry.path);
+      expect(existsSync(file), file).toBe(true);
+      expect(statSync(file).size, file).toBe(entry.bytes);
+    }
   });
 
   it('[ASSET-02] duplicate id is rejected with the offending id in the message', () => {
