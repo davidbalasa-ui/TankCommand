@@ -28,6 +28,14 @@ def tilt(obj, rx=0.0, ry=0.0, rz=0.0, about=(0, 0, 0)):
     return obj
 
 
+def placed(obj, rz, at):
+    """Turn a part built around the origin by rz degrees about Z, then move it to `at`."""
+    obj.rotation_euler = (0, 0, math.radians(rz))
+    obj.location = at
+    kit._apply(obj)
+    return obj
+
+
 # ---------------------------------------------------------------- Terran Falcon
 def falcon():
     """Forward-swept interceptor: long chined nose, canards, cranked forward-swept wing with a
@@ -57,19 +65,19 @@ def falcon():
     for s in (1, -1):
         # Raised inner wing armour and the cyan leading-edge light.
         p.append(plate(f'WingArmour{s}', [(-2.6, s * 0.9), (0.6, s * 0.9), (-0.5, s * 2.4), (-2.2, s * 2.4)][::s], Z + 0.06, Z + 0.14, 'turret', bevel=0.03))
-        p.append(tilt(box(f'LeadGlow{s}', (0.0, 0.0, 0.0), (1.27, 0.035, 0.03), 'glow'), rz=-s * 66.5, about=(0.1, s * 3.75, Z + 0.07)))
-        p.append(tilt(box(f'RootGlow{s}', (0.0, 0.0, 0.0), (0.82, 0.03, 0.025), 'glow'), rz=s * 33, about=(1.1, s * 1.15, Z + 0.07)))
+        p.append(placed(box(f'LeadGlow{s}', (0.0, 0.0, 0.0), (1.2, 0.04, 0.03), 'glow'), s * 66.5, (0.1, s * 3.75, Z + 0.07)))
+        p.append(placed(box(f'RootGlow{s}', (0.0, 0.0, 0.0), (0.78, 0.035, 0.025), 'glow'), s * 147, (1.1, s * 1.15, Z + 0.07)))
         # Wingtip rail with a missile and orange nav light.
         p.append(box(f'TipRail{s}', (-0.2, s * 5.05, Z - 0.12), (1.0, 0.07, 0.07), 'dark', bevel=0.02))
         p.append(cyl(f'TipMissile{s}', (-1.3, s * 5.05, Z - 0.24), (0.9, s * 5.05, Z - 0.24), 0.09, 8, 'barrel'))
-        p.append(cyl(f'TipSeeker{s}', (0.9, s * 5.05, Z - 0.24), (1.15, s * 5.05, Z - 0.24), 0.09, 8, 'amber', r1=0.01))
+        p.append(cyl(f'TipSeeker{s}', (0.9, s * 5.05, Z - 0.24), (1.15, s * 5.05, Z - 0.24), 0.09, 8, 'barrel', r1=0.01))
         p.append(box(f'NavLight{s}', (-0.3, s * 5.15, Z + 0.02), (0.18, 0.05, 0.05), 'amber'))
         # Under-wing pylon with two missiles.
         p.append(box(f'Pylon{s}', (-1.0, s * 2.9, Z - 0.26), (0.7, 0.06, 0.12), 'dark', bevel=0.02))
         for k, dy in enumerate((-0.18, 0.18)):
             y = s * 2.9 + dy
             p.append(cyl(f'Msl{s}{k}', (-2.0, y, Z - 0.46), (0.2, y, Z - 0.46), 0.1, 8, 'turret'))
-            p.append(cyl(f'MslTip{s}{k}', (0.2, y, Z - 0.46), (0.5, y, Z - 0.46), 0.1, 8, 'amber', r1=0.01))
+            p.append(cyl(f'MslTip{s}{k}', (0.2, y, Z - 0.46), (0.5, y, Z - 0.46), 0.1, 8, 'barrel', r1=0.01))
         # Canards.
         can = [(2.3, s * 0.7), (3.3, s * 0.7), (2.5, s * 1.9), (2.0, s * 1.9)]
         p.append(plate(f'Canard{s}', can if s > 0 else can[::-1], Z + 0.12, Z + 0.2, 'turret', bevel=0.025))
@@ -98,7 +106,7 @@ def falcon():
         # Nose cannon.
         p.append(cyl(f'Gun{s}', (3.0, s * 0.5, Z - 0.1), (4.2, s * 0.5, Z - 0.1), 0.05, 6, 'barrel'))
         # Chine glow strips along the nose.
-        p.append(tilt(box(f'Chine{s}', (0, 0, 0), (1.1, 0.03, 0.02), 'glow'), rz=s * 13, about=(3.4, s * 0.38, Z + 0.06)))
+        p.append(placed(box(f'Chine{s}', (0, 0, 0), (0.9, 0.03, 0.02), 'glow'), -s * 12.5, (3.5, s * 0.47, Z + 0.06)))
     return p
 
 

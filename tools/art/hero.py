@@ -24,8 +24,8 @@ import kit
 
 ZONES = {
     'terran': {
-        'hull': dict(kind='panel', base=(0.045, 0.05, 0.058), rough=0.42, metal=0.75, seam=1.7, wear=0.10),
-        'turret': dict(kind='panel', base=(0.07, 0.075, 0.085), rough=0.38, metal=0.8, seam=2.6, wear=0.14),
+        'hull': dict(kind='panel', base=(0.035, 0.04, 0.048), rough=0.42, metal=0.6, seam=1.1, wear=0.1),
+        'turret': dict(kind='panel', base=(0.06, 0.065, 0.075), rough=0.38, metal=0.65, seam=1.8, wear=0.12),
         'track': dict(kind='panel', base=(0.03, 0.032, 0.036), rough=0.6, metal=0.6, seam=3.5, wear=0.05),
         'barrel': dict(kind='panel', base=(0.09, 0.095, 0.1), rough=0.3, metal=0.9, seam=6.0, wear=0.25),
         'dark': dict(kind='panel', base=(0.018, 0.02, 0.024), rough=0.55, metal=0.5, seam=4.0, wear=0.04),
@@ -34,17 +34,18 @@ ZONES = {
         'canopy': dict(kind='canopy', base=(0.02, 0.06, 0.08), emit=(0.15, 0.6, 0.85), strength=1.6),
     },
     'kesh': {
-        'shell': dict(kind='etched', base=(0.62, 0.5, 0.36), rough=0.28, metal=0.95, veins=0.35),
-        'fin': dict(kind='etched', base=(0.5, 0.36, 0.22), rough=0.3, metal=0.95, veins=0.55),
+        'shell': dict(kind='etched', base=(0.62, 0.5, 0.36), rough=0.34, metal=0.75, veins=0.35),
+        'fin': dict(kind='etched', base=(0.55, 0.42, 0.26), rough=0.32, metal=0.8, veins=0.55),
         'under': dict(kind='etched', base=(0.2, 0.15, 0.11), rough=0.45, metal=0.85, veins=0.2),
         'barrel': dict(kind='etched', base=(0.7, 0.58, 0.4), rough=0.22, metal=1.0, veins=0.0),
         'dark': dict(kind='etched', base=(0.08, 0.06, 0.05), rough=0.4, metal=0.8, veins=0.6),
         'glow': dict(kind='glow', base=(0.4, 0.28, 0.05), emit=(1.0, 0.72, 0.18), strength=6.0),
-        'core': dict(kind='orb', base=(0.5, 0.35, 0.05), emit=(1.0, 0.78, 0.3), strength=7.0),
+        'core': dict(kind='orb', base=(0.5, 0.35, 0.05), emit=(1.0, 0.62, 0.12), strength=4.0),
     },
 }
 
 H = {}
+EMIT_SCALE = 8.0  # emissive map = baked emission / EMIT_SCALE; the material multiplies it back
 
 
 def begin(faction):
@@ -105,7 +106,7 @@ def _seams(nt, coord, scale):
             c = _math(nt, 'ADD', c, _math(nt, 'MULTIPLY', _math(nt, 'FLOOR', _math(nt, 'MULTIPLY', sep.outputs[0], scale)), 0.5))
         f = _math(nt, 'FRACT', c)
         d = _math(nt, 'ABSOLUTE', _math(nt, 'SUBTRACT', f, 0.5))
-        masks.append(_math(nt, 'GREATER_THAN', d, 0.475))
+        masks.append(_math(nt, 'GREATER_THAN', d, 0.485))
     m = _math(nt, 'MAXIMUM', masks[0], masks[1])
     return _math(nt, 'MAXIMUM', m, masks[2])
 
@@ -149,8 +150,8 @@ def zone_material(zone):
         nt.links.new(_math(nt, 'MULTIPLY', wear, z['wear'] * 6, clamp=True), mix.inputs['Factor'])
         dark = nt.nodes.new('ShaderNodeMix'); dark.data_type = 'RGBA'
         nt.links.new(mix.outputs['Result'], dark.inputs['A'])
-        dark.inputs['B'].default_value = (0.004, 0.004, 0.005, 1)
-        nt.links.new(seams, dark.inputs['Factor'])
+        dark.inputs['B'].default_value = (0.006, 0.006, 0.007, 1)
+        nt.links.new(_math(nt, 'MULTIPLY', seams, 0.7), dark.inputs['Factor'])
         nt.links.new(dark.outputs['Result'], bsdf.inputs['Base Color'])
         rough = _math(nt, 'ADD', _math(nt, 'MULTIPLY', noise.outputs['Fac'], 0.25), z['rough'] - 0.12)
         nt.links.new(rough, bsdf.inputs['Roughness'])
@@ -159,12 +160,14 @@ def zone_material(zone):
         etch = _n(nt, 'ShaderNodeTexVoronoi', (-600, 0), Scale=5.5)
         etch.feature = 'DISTANCE_TO_EDGE'
         nt.links.new(coord, etch.inputs['Vector'])
-        lines = _math(nt, 'LESS_THAN', etch.outputs['Distance'], 0.025)
-        vein = _n(nt, 'ShaderNodeTexVoronoi', (-600, -200), Scale=2.2)
+        lines = _math(nt, 'LESS_THAN', etch.outputs['Distance'], 0.018)
+        vein = _n(nt, 'ShaderNodeTexVoronoi', (-600, -200), Scale=1.4)
         vein.feature = 'DISTANCE_TO_EDGE'
         nt.links.new(coord, vein.inputs['Vector'])
-        vmask = _math(nt, 'LESS_THAN', vein.outputs['Distance'], 0.03)
-        vsel = _math(nt, 'GREATER_THAN', noise.outputs['Fac'], 1.0 - z['veins'] * 0.9)
+        vmask = _math(nt, 'LESS_THAN', vein.outputs['Distance'], 0.014)
+        broad = _n(nt, 'ShaderNodeTexNoise', (-600, -400), Scale=1.2, Detail=1.0)
+        nt.links.new(coord, broad.inputs['Vector'])
+        vsel = _math(nt, 'GREATER_THAN', broad.outputs['Fac'], 0.62 - z['veins'] * 0.2)
         veins = _math(nt, 'MULTIPLY', vmask, vsel)
         height = _math(nt, 'SUBTRACT', _math(nt, 'MULTIPLY', noise.outputs['Fac'], 0.1),
                        _math(nt, 'MAXIMUM', lines, veins))
@@ -241,31 +244,48 @@ def _bake(obj, kind, size, margin=6, **kw):
         img.colorspace_settings.name = 'Non-Color'
     _target(obj, img)
     bpy.ops.object.bake(type=kind, margin=margin, use_clear=True, **kw)
-    return np.array(img.pixels[:], dtype=np.float32).reshape(size, size, 4)
+    arr = np.array(img.pixels[:], dtype=np.float32).reshape(size, size, 4)
+    return arr
 
 
-def _metal_emit_swap(obj, on):
-    """Temporarily route Metallic into emission so it can be baked with an EMIT pass."""
+def _route_to_emission(obj, socket):
+    """Feed a Principled input (Base Color or Metallic) into emission so an EMIT bake captures it
+    exactly (a DIFFUSE bake darkens metals, since metals have no diffuse colour)."""
     for slot in obj.material_slots:
         nt = slot.material.node_tree
         bsdf = nt.nodes['Principled BSDF']
-        if on:
-            for link in list(nt.links):
-                if link.to_socket in (bsdf.inputs['Emission Color'], bsdf.inputs['Emission Strength']):
-                    nt.links.remove(link)
-            m = bsdf.inputs['Metallic'].default_value
-            bsdf.inputs['Emission Color'].default_value = (m, m, m, 1)
-            bsdf.inputs['Emission Strength'].default_value = 1.0
+        ec, es = bsdf.inputs['Emission Color'], bsdf.inputs['Emission Strength']
+        for link in list(nt.links):
+            if link.to_socket in (ec, es):
+                nt.links.remove(link)
+        es.default_value = 1.0
+        src = bsdf.inputs[socket]
+        if src.is_linked:
+            nt.links.new(src.links[0].from_socket, ec)
+        else:
+            v = src.default_value
+            ec.default_value = (v[0], v[1], v[2], 1) if hasattr(v, '__len__') else (v, v, v, 1)
+
+
+def _write_png(path, arr):
+    """8-bit RGB PNG straight from a float array (Blender's in-memory image save is unreliable headless)."""
+    import struct
+    import zlib
+    rgb = (np.clip(arr[..., :3], 0, 1) * 255 + 0.5).astype(np.uint8)[::-1]  # Blender rows are bottom-up
+    h, w = rgb.shape[:2]
+    raw = b''.join(b'\x00' + rgb[y].tobytes() for y in range(h))
+
+    def chunk(tag, data):
+        return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
+    with open(path, 'wb') as f:
+        f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
 
 
 def _save(arr, path, srgb):
-    size = arr.shape[0]
-    img = bpy.data.images.new(os.path.basename(path), size, size, alpha=False)
-    img.pixels = np.clip(arr, 0, 1).ravel().tolist()
+    _write_png(path, arr)
+    img = bpy.data.images.load(path)
     img.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'
-    img.filepath_raw = path
-    img.file_format = 'PNG'
-    img.save()
     return img
 
 
@@ -279,6 +299,10 @@ def bake_unit(name, parts, out_glb, bake_dir, size=512, samples=24):
         obj.data.materials.clear()
         obj.data.materials.append(zone_material(obj.get('zone', 'hull')))
     obj = kit.join(parts, name)
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(obj.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(obj.data); bm.free()
     _unwrap(obj)
     os.makedirs(bake_dir, exist_ok=True)
     for o in bpy.context.view_layer.objects:
@@ -287,24 +311,20 @@ def bake_unit(name, parts, out_glb, bake_dir, size=512, samples=24):
     # Need a world for AO.
     if scene.world is None:
         scene.world = bpy.data.worlds.new('w')
-    scene.render.bake.use_pass_direct = False
-    scene.render.bake.use_pass_indirect = False
-    scene.render.bake.use_pass_color = True
-    diffuse = _bake(obj, 'DIFFUSE', size, pass_filter={'COLOR'})
     scene.cycles.samples = 64
     ao = _bake(obj, 'AO', size)
     scene.cycles.samples = samples
     rough = _bake(obj, 'ROUGHNESS', size)
     normal = _bake(obj, 'NORMAL', size, normal_space='TANGENT')
     emit = _bake(obj, 'EMIT', size)
-    # Metallic: bake via emission after swapping the zone materials' emission inputs.
-    _metal_emit_swap(obj, True)
+    _route_to_emission(obj, 'Base Color')
+    diffuse = _bake(obj, 'EMIT', size)
+    _route_to_emission(obj, 'Metallic')
     metal = _bake(obj, 'EMIT', size)
-    a = np.clip(0.35 + 0.65 * ao[..., :3], 0, 1)
+    a = np.clip(0.45 + 0.55 * ao[..., :3], 0, 1)
     base = diffuse[..., :3] * a
-    # Diffuse bake returns linear values; store sRGB.
     base_srgb = np.where(base <= 0.0031308, base * 12.92, 1.055 * np.power(np.clip(base, 0, 1), 1 / 2.4) - 0.055)
-    em = np.clip(emit[..., :3] / 6.0, 0, 1)  # 6 = emission strength we restore in the material
+    em = np.clip(emit[..., :3] / EMIT_SCALE, 0, 1)
     em_srgb = np.where(em <= 0.0031308, em * 12.92, 1.055 * np.power(em, 1 / 2.4) - 0.055)
     orm = np.stack([ao[..., 0], rough[..., 0], metal[..., 0]], axis=-1)
 
@@ -334,7 +354,7 @@ def bake_unit(name, parts, out_glb, bake_dir, size=512, samples=24):
     nt.links.new(sep.outputs['Green'], bsdf.inputs['Roughness'])
     nt.links.new(sep.outputs['Blue'], bsdf.inputs['Metallic'])
     nt.links.new(te.outputs['Color'], bsdf.inputs['Emission Color'])
-    bsdf.inputs['Emission Strength'].default_value = 6.0
+    bsdf.inputs['Emission Strength'].default_value = EMIT_SCALE
     obj.data.materials.clear()
     obj.data.materials.append(mat)
     for p in obj.data.polygons:
@@ -350,4 +370,4 @@ def export(obj, out_glb):
     for o in bpy.context.view_layer.objects:
         o.select_set(o == obj)
     bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', use_selection=True,
-                              export_yup=True, export_image_format='WEBP' if False else 'AUTO')
+                              export_yup=True, export_image_format='JPEG', export_jpeg_quality=90)
