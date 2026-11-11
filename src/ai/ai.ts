@@ -137,6 +137,36 @@ function isFighter(type: SimUnitType | undefined, desperate = false): boolean {
   return isFightingUnitType(type) && (type?.role === 'tank' || type?.role === 'artillery' || (desperate && type?.role === 'scout'));
 }
 
+// Metal deposits the AI believes are taken by someone else's station: only stations it can see now
+// or remembers as ghosts count (perception API), never hidden ones.
+function foreignStationDeposits(planner: Planner): Set<number> {
+  const { world } = planner;
+  const view = perceivedUnits(world, planner.player);
+  const spots = [
+    ...view.structures.filter((st) => st.owner !== planner.player && st.hp > 0),
+    ...view.ghosts.filter((g) => g.owner !== planner.player),
+  ].filter((st) => world.structureTypes.get(st.typeId)?.kind === 'metalStation');
+  const taken = new Set<number>();
+  for (const deposit of world.deposits) {
+    if (deposit.kind === 'metal' && spots.some((st) => Math.hypot(st.x - deposit.x, st.z - deposit.z) < 3)) {
+      taken.add(deposit.id);
+    }
+  }
+  return taken;
+}
+
+// A deposit we could still build a station on, as far as we know.
+function freeMetalDeposit(planner: Planner, depositId: number, taken: ReadonlySet<number>): boolean {
+  const deposit = planner.world.deposits.find((d) => d.id === depositId);
+  return (
+    deposit !== undefined &&
+    deposit.kind === 'metal' &&
+    deposit.amount > 1 &&
+    !taken.has(deposit.id) &&
+    !planner.ownStructures().some((st) => st.depositId === deposit.id && planner.structureKind(st) === 'metalStation')
+  );
+}
+
 function placeKits(planner: Planner): void {
   const { world } = planner;
   const pad = planner.ownStructures().find((s) => planner.structureKind(s) === 'pad');
@@ -146,9 +176,9 @@ function placeKits(planner: Planner): void {
       continue;
     }
     if (type.buildOnMetalDeposit) {
-      const used = planner.ownStructures().filter((s) => planner.structureKind(s) === 'metalStation');
+      const taken = foreignStationDeposits(planner);
       const deposit = world.deposits
-        .filter((d) => d.kind === 'metal' && d.amount > 0 && !used.some((s) => s.depositId === d.id))
+        .filter((d) => freeMetalDeposit(planner, d.id, taken))
         .sort(
           (a, b) =>
             Math.hypot(a.x - pad.x, a.z - pad.z) - Math.hypot(b.x - pad.x, b.z - pad.z) || a.id - b.id,
@@ -383,12 +413,8 @@ function strategic(planner: Planner): void {
   assignWorkers(planner);
 
   const stationTypeEarly = planner.myStructureTypes().find((t) => t.kind === 'metalStation');
-  const freeMetal = world.deposits.some(
-    (d) =>
-      d.kind === 'metal' &&
-      d.amount > 1 &&
-      !structures.some((s) => s.depositId === d.id && planner.structureKind(s) === 'metalStation'),
-  );
+  const taken = foreignStationDeposits(planner);
+  const freeMetal = world.deposits.some((d) => freeMetalDeposit(planner, d.id, taken));
   const stationCount = structures.filter((s) => planner.structureKind(s) === 'metalStation').length;
   if (stationTypeEarly && stationCount < data.maxStations && freeMetal && !world.pendingKits.some((k) => k.owner === planner.player)) {
     planner.metalReserve = stationTypeEarly.cost.metal;
@@ -407,18 +433,18 @@ function strategic(planner: Planner): void {
     const deposit = world.deposits.find((d) => d.id === s.depositId);
     return deposit !== undefined && deposit.amount > 1;
   });
-  const hasKit = world.pendingKits.some((k) => k.owner === planner.player);
+  // A station kit with nowhere left to go must not block every other purchase forever.
+  const hasKit = world.pendingKits.some(
+    (k) =>
+      k.owner === planner.player &&
+      !(world.structureTypes.get(k.structureTypeId)?.buildOnMetalDeposit === true && !freeMetal),
+  );
   if (
     stationType &&
     stationCount < data.maxStations &&
     !hasKit &&
     planner.queued(stationType.id) === 0 &&
-    world.deposits.some(
-      (d) =>
-        d.kind === 'metal' &&
-        d.amount > 1 &&
-        !structures.some((s) => s.depositId === d.id && planner.structureKind(s) === 'metalStation'),
-    )
+    freeMetal
   ) {
     planner.buyStructure(stationType, 0, false);
   }
@@ -429,13 +455,14 @@ function strategic(planner: Planner): void {
 
   // Metal is still reachable if one of our stations sits on a non-empty deposit or a free deposit
   // is left to build on. Deposits held by an enemy station don't count.
-  const metalLeft = world.deposits.some(
-    (d) =>
-      d.kind === 'metal' &&
-      d.amount > 1 &&
-      (structures.some((st) => st.depositId === d.id && planner.structureKind(st) === 'metalStation') ||
-        !world.structures.some((st) => st.hp > 0 && st.depositId === d.id && world.structureTypes.get(st.typeId)?.kind === 'metalStation')),
-  );
+  const metalLeft =
+    freeMetal ||
+    world.deposits.some(
+      (d) =>
+        d.kind === 'metal' &&
+        d.amount > 1 &&
+        structures.some((st) => st.depositId === d.id && planner.structureKind(st) === 'metalStation'),
+    );
   const cheapestTankMetal = Math.min(...types.filter((t) => isFighter(t)).map((t) => t.metalCost), Infinity);
   const desperate = !metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false;
   const fighters = units.filter((u) => isFighter(planner.unitType(u), desperate));

@@ -23,6 +23,7 @@ describe('mission markers', () => {
     const triggers: Trigger[] = [
       { id: 'reach', when: { t: 'areaEntered', side: 1, x: -25, z: -25, radius: 7 }, do: win },
       { id: 'enemy', when: { t: 'areaEntered', side: 2, x: 10, z: 10, radius: 5 }, do: win },
+      { id: 'trap', when: { t: 'areaEntered', side: 1, x: 40, z: 40, radius: 6 }, do: [{ t: 'lose', reason: 'mines' }] },
       { id: 'avoid', when: { t: 'not', cond: { t: 'areaEntered', side: 1, x: 30, z: 0, radius: 4 } }, do: win },
       {
         id: 'escort',

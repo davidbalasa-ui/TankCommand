@@ -19,6 +19,7 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
     const weapon = row.weapons[0];
     result.set(row.id, {
       id: row.id,
+      modelId: row.modelAssetId,
       faction: row.faction,
       role: row.role,
       hp: row.hp,

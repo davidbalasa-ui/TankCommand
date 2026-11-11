@@ -283,6 +283,8 @@ export class RenderView {
   private pickTargets: THREE.Object3D[] = [];
   private skyTexture: THREE.Texture | null = null;
   private templateRoot: THREE.Group | null = null;
+  // Per-model templates keyed by asset id (unit type modelId); units without one use templateRoot.
+  private readonly templates = new Map<string, THREE.Group>();
   private directional: THREE.DirectionalLight;
   private lightTarget: THREE.Object3D;
   private marker: THREE.Mesh | null = null;
@@ -802,6 +804,19 @@ export class RenderView {
       return;
     }
     this.disposed = true;
+    for (const group of this.markerMeshes) {
+      group.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          const mesh = object as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        }
+      });
+    }
+    for (const mesh of this.contactMeshes) {
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
     this.observer.disconnect();
     this.overlay.remove();
     this.clearPlacement();
@@ -1220,17 +1235,53 @@ export class RenderView {
       if (asset instanceof THREE.Object3D) {
         this.templateRoot = this.prepareTemplate(asset);
         this.loadedModels.push(TANK_ASSET_ID);
-        this.rebuildUnitVisuals();
       } else {
         this.templateRoot = this.prepareFallback();
-        this.rebuildUnitVisuals();
       }
     } catch {
       if (!this.disposed) {
         this.templateRoot = this.prepareFallback();
-        this.rebuildUnitVisuals();
       }
     }
+    if (this.disposed) {
+      return;
+    }
+    this.rebuildUnitVisuals();
+    await this.loadUnitModels();
+  }
+
+  // Load every distinct unit model the world's unit types name (besides the shared fallback tank).
+  private async loadUnitModels(): Promise<void> {
+    const ids = new Set<string>();
+    for (const type of this.world.unitTypes.values()) {
+      if (type.modelId && type.modelId !== TANK_ASSET_ID) {
+        ids.add(type.modelId);
+      }
+    }
+    let loaded = false;
+    for (const id of [...ids].sort()) {
+      try {
+        const asset = await this.loader.load(id);
+        if (this.disposed) {
+          return;
+        }
+        if (asset instanceof THREE.Object3D) {
+          this.templates.set(id, this.prepareTemplate(asset));
+          this.loadedModels.push(id);
+          loaded = true;
+        }
+      } catch {
+        // Unknown or broken model: those units keep the fallback tank.
+      }
+    }
+    if (loaded) {
+      this.rebuildUnitVisuals();
+    }
+  }
+
+  private templateFor(typeId: string): THREE.Group | null {
+    const modelId = this.world.unitTypes.get(typeId)?.modelId;
+    return (modelId ? this.templates.get(modelId) : undefined) ?? this.templateRoot;
   }
 
   private prepareTemplate(model: THREE.Object3D): THREE.Group {
@@ -1241,15 +1292,18 @@ export class RenderView {
     }
 
     model.updateMatrixWorld(true);
-    const pivot = new THREE.Object3D();
-    pivot.name = 'TurretPivot';
-    pivot.position.set(TURRET_PIVOT_X, 0, 0);
-    model.add(pivot);
-    model.updateMatrixWorld(true);
-    for (const name of TURRET_NODES) {
-      const node = model.getObjectByName(name);
-      if (node && node !== pivot) {
-        pivot.attach(node);
+    // New models (tools/art) ship their own TurretPivot; the proof-of-concept tank needs one built.
+    if (!model.getObjectByName('TurretPivot')) {
+      const pivot = new THREE.Object3D();
+      pivot.name = 'TurretPivot';
+      pivot.position.set(TURRET_PIVOT_X, 0, 0);
+      model.add(pivot);
+      model.updateMatrixWorld(true);
+      for (const name of TURRET_NODES) {
+        const node = model.getObjectByName(name);
+        if (node && node !== pivot) {
+          pivot.attach(node);
+        }
       }
     }
     model.updateMatrixWorld(true);
@@ -1292,8 +1346,9 @@ export class RenderView {
 
   private createUnitVisual(unit: UnitState): UnitVisual {
     let root: THREE.Object3D;
-    if (this.templateRoot) {
-      root = this.templateRoot.clone(true);
+    const template = this.templateFor(unit.typeId);
+    if (template) {
+      root = template.clone(true);
     } else {
       root = this.prepareFallback();
     }

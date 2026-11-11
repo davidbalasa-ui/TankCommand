@@ -298,8 +298,8 @@ export interface MissionMarker {
 
 /**
  * Areas the player is meant to reach: every areaEntered (for the player's side) or unitEscorted
- * condition in a trigger that hasn't fired yet. Conditions under `not` are skipped because they
- * describe places to avoid. Read-only; the renderer and minimap draw these as goal rings.
+ * condition in a trigger that hasn't fired yet. Conditions under `not`, and triggers that lose the
+ * mission or fail an objective, are skipped because they describe places to avoid. Read-only; the renderer and minimap draw these as goal rings.
  */
 export function missionMarkers(mission: MissionState | null): MissionMarker[] {
   if (!mission || mission.failReason !== null) {
@@ -321,7 +321,9 @@ export function missionMarkers(mission: MissionState | null): MissionMarker[] {
     }
   };
   for (const trigger of mission.def.triggers) {
-    if (!mission.fired.includes(trigger.id)) {
+    // A trigger that loses the mission or fails an objective marks a place to avoid, not a goal.
+    const bad = trigger.do.some((a) => a.t === 'lose' || (a.t === 'setObjective' && a.status === 'failed'));
+    if (!mission.fired.includes(trigger.id) && !bad) {
       visit(trigger.when);
     }
   }
