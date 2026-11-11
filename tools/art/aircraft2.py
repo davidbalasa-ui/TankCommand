@@ -209,8 +209,7 @@ def halo():
     p.append(plate('Spike', spike, Z + 0.02, Z + 0.2, 'fin', bevel=0.03))
     p.append(orb('SpikePort', (3.35, 0, Z + 0.11), 0.09, 'core', seg=(8, 5)))
     p.append(placed(box('SpikeVein', (0, 0, 0), (0.6, 0.02, 0.01), 'glow'), 0, (2.5, 0, Z + 0.205)))
-    # The scythe blades are not baked: the game draws them (src/render/haloBlades.ts) so they can
-    # sweep around the ring, flashing through the open front and back and vanishing at the sides.
+    # No scythe blades: a live sweeping version was tried and dropped (David: did not fit the style).
     return p
 
 

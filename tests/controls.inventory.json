@@ -70,6 +70,7 @@
   "settings.fog",
   "settings.graphicsQuality",
   "settings.haptics",
+  "settings.showFps",
   "settings.healthBars",
   "settings.import",
   "settings.leftHanded",

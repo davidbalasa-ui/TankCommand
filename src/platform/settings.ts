@@ -22,6 +22,7 @@ export const settingsSchema = z.object({
   textSize: z.enum(['normal', 'large']),
   colourBlind: z.boolean(),
   haptics: z.boolean(),
+  showFps: z.boolean(),
 });
 
 export type SettingsState = z.infer<typeof settingsSchema>;
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   textSize: 'normal',
   colourBlind: false,
   haptics: true,
+  showFps: false,
 };
 
 const partialSettingsSchema = settingsSchema.partial();

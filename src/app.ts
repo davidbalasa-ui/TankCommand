@@ -75,7 +75,8 @@ import type {
   SaveSlotSummary,
 } from './game/api';
 import { GameServices } from './game/services';
-import { placementValidity, structureAtPoint } from './sim/spawn';
+import { FpsMeter } from './ui/fpsMeter';
+import { addUnit, placementValidity, structureAtPoint } from './sim/spawn';
 import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
@@ -164,6 +165,7 @@ export class App {
   private readonly mapData: MapRow;
   private readonly mapRows: MapRow[];
   private world: WorldState;
+  private readonly fpsMeter = new FpsMeter();
   private viewCache: { source: WorldState; view: WorldState } | null = null;
   private pendingCommands: Command[] = [];
   private readonly fixed: FixedStepLoop;
@@ -1276,7 +1278,8 @@ export class App {
 
   renderStats(): RenderStats {
     if (!this.renderView) {
-      return { loadedModels: [], meshCount: 0, drawCalls: 0, frame: 0, units: 0 };
+      return { loadedModels: [], meshCount: 0, drawCalls: 0,
+        triangles: 0, frame: 0, units: 0 };
     }
     return this.renderView.stats();
   }
@@ -1325,6 +1328,39 @@ export class App {
 
   setStorageFullForTest(value: boolean): void {
     this.services?.setStorageFullForTest(value);
+  }
+
+  /**
+   * Test-only stress scene: fills the map with `perSide` ground units for the player and twice
+   * that for the enemy (standing in for two NPC teams), lined up to fight across the middle.
+   * Returns how many units were added.
+   */
+  stressSpawnForTest(perSide: number): number {
+    const world = this.world;
+    const ground = (faction: string) =>
+      [...world.unitTypes.values()].filter((type) => type.faction === faction && !type.air && type.weapon && !type.workerKind);
+    const human = ground('human');
+    const alien = ground('alien');
+    const half = world.map.size / 2;
+    let added = 0;
+    const place = (owner: number, types: typeof human, count: number, z0: number, dir: number) => {
+      const columns = 16;
+      for (let i = 0; i < count; i += 1) {
+        const type = types[i % types.length];
+        if (!type) {
+          return;
+        }
+        const x = (-columns / 2 + (i % columns) + 0.5) * (half / 10);
+        const z = z0 + dir * Math.floor(i / columns) * 5;
+        if (addUnit(world, { owner, typeId: type.id, x, z, heading: dir > 0 ? Math.PI / 2 : -Math.PI / 2 })) {
+          added += 1;
+        }
+      }
+    };
+    place(1, human, perSide, half * 0.12, 1);
+    place(2, alien, perSide, -half * 0.12, -1);
+    place(2, human, perSide, -half * 0.12 - Math.ceil(perSide / 16) * 5, -1);
+    return added;
   }
 
   raiseAlertForTest(kind: AlertKind, x: number, z: number): void {
@@ -1682,6 +1718,7 @@ export class App {
     this.renderView?.setQualityPreference(settings.graphicsQuality);
     this.renderView?.setHealthBarsMode(settings.healthBars);
     this.renderView?.setColorBlindMode(settings.colourBlind);
+    this.fpsMeter.setEnabled(settings.showFps);
     this.renderView?.getCamera().setSensitivity(settings.cameraSensitivity);
     this.hud?.refresh();
   }
@@ -1745,6 +1782,10 @@ export class App {
     );
     this.renderView.setObjectiveMarkers(missionMarkers(this.world.mission));
     this.renderView.render(alpha, this.viewWorld());
+    this.fpsMeter.frame(now, () => {
+      const stats = this.renderView?.stats();
+      return stats ? `${this.world.units.length} units · ${stats.drawCalls} draws · ${Math.round(stats.triangles / 1000)}k tris` : '';
+    });
     this.raf = window.requestAnimationFrame(this.frame);
   };
 

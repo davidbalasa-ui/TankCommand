@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Effects } from '../../../src/render/effects.ts';
-import { attachHaloBlades, updateHaloBlades } from '../../../src/render/haloBlades.ts';
 
 const TANK_LENGTH = 4.5;
 const W = 1280;
@@ -95,7 +94,7 @@ loader.load('/assets/models/human/lancer.glb', (gltf) => {
 for (const s of spec) {
   loader.load(s.file, (gltf) => {
     const holder = prepare(gltf, s.scale);
-    units.push({ ...s, holder, cool: 0, halo: s.file.endsWith('halo.glb') ? attachHaloBlades(holder) : null });
+    units.push({ ...s, holder, cool: 0 });
     loaded += 1;
   });
 }
@@ -129,7 +128,6 @@ window.__advance = (dt) => {
   time += dt;
   for (const u of units) {
     fly(u, time);
-    if (u.halo) updateHaloBlades(u.halo, dt, true);
     const target = targets[u.lane];
     u.cool -= dt;
     const dz = Math.abs(u.holder.position.z - target.position.z);
@@ -174,7 +172,7 @@ window.__advance = (dt) => {
   }
   effects.update(dt);
   if (CLOSE) {
-    const h = units.find((u) => u.halo);
+    const h = units.find((u) => u.file.endsWith('halo.glb'));
     if (h) {
       camera.position.set(h.holder.position.x + 7, h.holder.position.y + 6, h.holder.position.z + 7);
       camera.lookAt(h.holder.position);

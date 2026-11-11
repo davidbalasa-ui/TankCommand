@@ -241,7 +241,20 @@ export class Effects {
     this.add(ring, life, { grow: 1 / 0.15, fade: 0.85, kind: 'ring' });
   }
 
+  /**
+   * Each particle is its own draw call, so in a big battle the optional bits (sparks, debris, smoke)
+   * thin out: full detail up to 60 live particles, then fewer, none past 200.
+   */
+  private thin(count: number): number {
+    const live = this.particles.length;
+    if (live < 60) {
+      return count;
+    }
+    return live > 200 ? 0 : Math.max(1, Math.round(count * (1 - (live - 60) / 140)));
+  }
+
   private sparks(x: number, y: number, z: number, count: number, color: number, speed: number): void {
+    count = this.thin(count);
     for (let i = 0; i < count; i += 1) {
       const spark = new THREE.Mesh(this.sphere, additive(color, 1));
       spark.position.set(x, y, z);
@@ -259,6 +272,7 @@ export class Effects {
   }
 
   private debris(x: number, gy: number, z: number, count: number, size: number, speed: number, glowing: boolean): void {
+    count = this.thin(count);
     for (let i = 0; i < count; i += 1) {
       const rock = new THREE.Mesh(this.chunk, glowing && i % 3 === 0 ? this.glowChunkMaterial : this.chunkMaterial);
       rock.castShadow = true;
@@ -279,6 +293,7 @@ export class Effects {
   }
 
   private smoke(x: number, y: number, z: number, size: number, count: number): void {
+    count = this.thin(count);
     for (let i = 0; i < count; i += 1) {
       const puff = new THREE.Mesh(
         this.sphere,

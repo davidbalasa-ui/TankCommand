@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { HALO_MODEL_ID, attachHaloBlades, disposeHaloBlades, updateHaloBlades, type HaloBlades } from './haloBlades';
+import { UnitInstances, isInstancedPart, markInstanced } from './unitInstances';
 import { Effects } from './effects';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
@@ -68,6 +68,7 @@ export interface RenderStats {
   loadedModels: string[];
   meshCount: number;
   drawCalls: number;
+  triangles: number;
   frame: number;
   units: number;
 }
@@ -197,7 +198,8 @@ interface UnitVisual {
   turretPivot: THREE.Object3D | null;
   owner: number;
   lift: number;
-  halo: HaloBlades | null;
+  /** Instancing batch: model and look shared by every unit drawn in the same InstancedMesh. */
+  batchKey: string;
 }
 
 interface PositionSnapshot {
@@ -255,8 +257,9 @@ function unitBounds(root: THREE.Object3D): THREE.Box3 {
   root.updateMatrixWorld(true);
   const bounds = new THREE.Box3();
   const meshBounds = new THREE.Box3();
-  root.traverseVisible((object) => {
-    if (!(object instanceof THREE.Mesh)) {
+  // Model meshes drawn by instancing are hidden on the unit itself but still count.
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || (!object.visible && !isInstancedPart(object))) {
       return;
     }
     meshBounds.setFromObject(object);
@@ -387,7 +390,8 @@ export class RenderView {
       aim: number;
     }
   >();
-  private lastUnitSync: number | null = null;
+  private readonly unitInstances = new UnitInstances(this.scene);
+  private readonly wreckInstances = new UnitInstances(this.scene);
   private readonly effects = new Effects(this.scene);
   private readonly wrecksGroup = new THREE.Group();
   private readonly wreckMeshes: THREE.Object3D[] = [];
@@ -929,6 +933,7 @@ export class RenderView {
       loadedModels: [...this.loadedModels],
       meshCount,
       drawCalls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
       frame: this.frame,
       units: this.unitRoots.size,
     };
@@ -940,6 +945,8 @@ export class RenderView {
     }
     this.disposed = true;
     this.effects.dispose();
+    this.unitInstances.clear();
+    this.wreckInstances.clear();
     for (const group of this.markerMeshes) {
       group.traverse((object) => {
         if (object instanceof THREE.Mesh) {
@@ -1493,6 +1500,7 @@ export class RenderView {
       this.scene.remove(visual.root);
     }
     this.unitRoots.clear();
+    this.unitInstances.clear();
     this.syncUnits(0);
     // Structures created before their models arrived are rebuilt with the model.
     for (const visual of this.structureVisuals.values()) {
@@ -1554,14 +1562,15 @@ export class RenderView {
         object.receiveShadow = true;
       }
     });
-    const halo = template && this.world.unitTypes.get(unit.typeId)?.modelId === HALO_MODEL_ID ? attachHaloBlades(root) : null;
+    const enemy = isHostile(this.world, 1, unit.owner);
+    markInstanced(root);
     this.scene.add(root);
     return {
       root,
       turretPivot: root.getObjectByName('TurretPivot') ?? null,
       owner: unit.owner,
       lift: 0,
-      halo,
+      batchKey: `${template ? unit.typeId : 'fallback'}|${enemy ? 'enemy' : 'own'}`,
     };
   }
 
@@ -1570,15 +1579,10 @@ export class RenderView {
     for (const [id, visual] of this.unitRoots) {
       if (!alive.has(id)) {
         this.scene.remove(visual.root);
-        if (visual.halo) {
-          disposeHaloBlades(visual.halo);
-        }
         this.unitRoots.delete(id);
       }
     }
-    const now = performance.now() / 1000;
-    const frameDt = this.lastUnitSync === null ? 0 : Math.min(0.1, now - this.lastUnitSync);
-    this.lastUnitSync = now;
+    this.unitInstances.begin();
 
     for (const unit of this.world.units) {
       let visual = this.unitRoots.get(unit.id);
@@ -1608,10 +1612,12 @@ export class RenderView {
       if (visual.turretPivot) {
         visual.turretPivot.rotation.y = heading - turretHeading;
       }
-      if (visual.halo) {
-        updateHaloBlades(visual.halo, frameDt, visual.lift > 0.5);
+      if (visual.root.visible) {
+        visual.root.updateMatrixWorld(true);
+        this.unitInstances.add(visual.batchKey, visual.root);
       }
     }
+    this.unitInstances.end(this.shadowsEnabled);
   }
 
   private syncStructures(world: WorldState): void {
@@ -2368,10 +2374,12 @@ export class RenderView {
   }
 
   private syncWrecks(): void {
+    this.wreckInstances.begin();
     while (this.wreckMeshes.length < this.world.wrecks.length) {
       const source = this.templateRoot ?? this.prepareFallback();
       const root = source.clone(true);
       darkenMaterials(root);
+      markInstanced(root);
       root.scale.y = 0.55;
       this.wrecksGroup.add(root);
       this.wreckMeshes.push(root);
@@ -2393,7 +2401,10 @@ export class RenderView {
         heightAt(this.world.map, wreck.x, wreck.z) - 0.25,
         wreck.z,
       );
+      mesh.updateMatrixWorld(true);
+      this.wreckInstances.add('wreck', mesh);
     }
+    this.wreckInstances.end(this.shadowsEnabled);
   }
 
   private updateFlashes(): void {

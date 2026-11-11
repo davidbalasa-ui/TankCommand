@@ -157,4 +157,13 @@ David's direction: Terran aircraft must not look human (unmanned sci-fi, no cock
 - **Halo** (new Kesh fighter, replaces the Dropper row, id `unit.alien.fighter`): open ring hull with a forked spike cannon, the Moth's three floating gold rings in the middle, scythe blades. Fighter stats mirror the Falcon; weapon id `lightning`. 2,548 triangles.
 - **Disc** (Kesh saucer) is now the Kesh bomber: competition model, weapon `ground_beam` (damage 140, splash 3.5, 3 shots).
 
-Next: weapon effects (Terran lasers and bombs, Kesh lightning, the saucer's ground-blasting beam), blade sweep animation on the Halo.
+Weapon effects (`src/render/effects.ts`, demo `tools/art/viewer/weapons.html`): each weapon kind has its own projectile and impact. Terran lasers (cyan bolts), Terran bombs (fireball, shock ring, dirt, scorch), Kesh lightning (jagged arc re-drawn each frame), the saucer's ground beam (gold beam, eruption column, glowing rock, deep scorch) and a spore pod that bursts into a lingering cloud. David: effects "look pretty solid" from gameplay height. A live sweeping-blade version of the Halo was tried and dropped (David: cheesy, off-style); the Halo now has no scythe blades (2,292 triangles).
+
+## C-08 192-unit stress test (2026-11-11)
+
+David's cap: 64 player units plus two 64-unit NPC teams on screen. Test hook `stressSpawn(64)` lines them up across the map; `[PERF-01]` checks the draw count.
+
+- Units of the same model and side now draw as one `InstancedMesh` per model part (`src/render/unitInstances.ts`); each unit keeps its own hidden hierarchy for position, bounds and effects. Wrecks are instanced the same way. 192 units: 423 draw calls before, about 40 for the units after.
+- Optional particles (sparks, debris, smoke) thin out past 60 live particles and stop past 200, since each is a draw call.
+- Settings > Show FPS shows fps, slowest frame, unit count, draw calls and triangles, for checking a real phone.
+- CPU profile of the 192-unit battle: the main thread is about 98% idle, so game logic and scene updates are cheap; the GPU is the limit. The cloud browser renders in software, so real fps has to be read on David's phone. Scene is about 330k triangles without shadows (650k with the shadow pass) at 192 units, inside the ~2,500-triangle unit budget.

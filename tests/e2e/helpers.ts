@@ -150,6 +150,7 @@ export interface RenderStats {
   drawCalls: number;
   frame: number;
   units: number;
+  triangles: number;
 }
 
 export interface HudSnapshot {
@@ -282,6 +283,7 @@ export interface TestHook {
   alertList(): AlertView[];
   setStorageFullForTest(value: boolean): void;
   pressAndroidBack(): void;
+  stressSpawn(perSide: number): number;
 }
 
 declare global {

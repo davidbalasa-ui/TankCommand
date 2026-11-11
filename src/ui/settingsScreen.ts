@@ -119,7 +119,11 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     ctx.setFogOn?.(!(ctx.isFogOn?.() ?? true));
     refreshLabels();
   });
-  toggles.append(quality, health, edgeScroll, textSize, colourBlind, haptics, leftHanded, fog);
+  const fps = button('settings', 'showFps', 'Show FPS: off', () => {
+    api?.setSetting('showFps', !current().showFps);
+    refreshLabels();
+  });
+  toggles.append(quality, health, edgeScroll, textSize, colourBlind, haptics, leftHanded, fog, fps);
 
   let listeningFor: 'move' | null = null;
   const rebind = button('settings', 'rebind', 'Rebind keys', () => {
@@ -185,6 +189,7 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     quality.textContent = `Graphics: ${values.graphicsQuality}`;
     health.textContent = `Health bars: ${values.healthBars}`;
     edgeScroll.textContent = `Edge scroll: ${values.edgeScroll ? 'on' : 'off'}`;
+    fps.textContent = `Show FPS: ${values.showFps ? 'on' : 'off'}`;
     textSize.textContent = `Text size: ${values.textSize}`;
     colourBlind.textContent = `Colour-blind: ${values.colourBlind ? 'on' : 'off'}`;
     haptics.textContent = `Haptics: ${values.haptics ? 'on' : 'off'}`;
