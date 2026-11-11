@@ -81,6 +81,7 @@ import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
 import { perceivedUnits } from './sim/vision';
 import { stepWithAi } from './ai/driver';
+import { missionMarkers } from './sim/triggers';
 import type { StructureState } from './sim/types';
 import type { BaseAction, BaseView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
@@ -1481,6 +1482,13 @@ export class App {
 
   private loadWorld(world: WorldState, startMatch: boolean): void {
     this.world = world;
+    // A save remembers whether it was a mission, so Retry, Next and progress work after loading.
+    this.mode = world.mission ? { kind: 'mission', id: world.mission.def.id } : { kind: 'skirmish' };
+    if (world.mission) {
+      this.selectedMissionId = world.mission.def.id;
+      this.campaignValue = MISSIONS.find((item) => item.id === world.mission?.def.id)?.campaign ?? this.campaignValue;
+    }
+    this.resultRecorded = world.result !== null;
     this.pendingCommands = [];
     this.selectedIds = [];
     this.fixed.reset();
@@ -1712,6 +1720,7 @@ export class App {
         : null,
       vision?.contacts ?? [],
     );
+    this.renderView.setObjectiveMarkers(missionMarkers(this.world.mission));
     this.renderView.render(alpha, this.viewWorld());
     this.raf = window.requestAnimationFrame(this.frame);
   };

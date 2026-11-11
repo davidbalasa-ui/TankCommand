@@ -289,3 +289,41 @@ export function updateMission(world: WorldState, deps: TriggerDeps): void {
     world.result = { winner: null };
   }
 }
+
+export interface MissionMarker {
+  x: number;
+  z: number;
+  radius: number;
+}
+
+/**
+ * Areas the player is meant to reach: every areaEntered (for the player's side) or unitEscorted
+ * condition in a trigger that hasn't fired yet. Conditions under `not` are skipped because they
+ * describe places to avoid. Read-only; the renderer and minimap draw these as goal rings.
+ */
+export function missionMarkers(mission: MissionState | null): MissionMarker[] {
+  if (!mission || mission.failReason !== null) {
+    return [];
+  }
+  const result: MissionMarker[] = [];
+  const seen = new Set<string>();
+  const visit = (cond: Condition): void => {
+    if (cond.t === 'and' || cond.t === 'or') {
+      cond.conds.forEach(visit);
+      return;
+    }
+    if ((cond.t === 'areaEntered' && cond.side === mission.humanSide) || cond.t === 'unitEscorted') {
+      const key = `${cond.x},${cond.z},${cond.radius}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ x: cond.x, z: cond.z, radius: cond.radius });
+      }
+    }
+  };
+  for (const trigger of mission.def.triggers) {
+    if (!mission.fired.includes(trigger.id)) {
+      visit(trigger.when);
+    }
+  }
+  return result;
+}

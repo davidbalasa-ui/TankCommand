@@ -99,3 +99,17 @@ Enemy AI (written directly by Claude).
 - **Skirmish.** `createSkirmishWorld` now takes map, resources and start force, and adds corner starts for a third and fourth side.
 - **Tests.** `tests/unit/wp09.test.ts` (MSN-01..05, 07, DET-07), `tests/e2e/wp09.spec.ts` (MSN-05, MSN-06, SKR-01). MSN-03 wins use a scripted command stream (explicit attack on structures).
 - **Not done.** The training area is not marked in the 3D view yet; revealArea uses a circle, not a rectangle; best result per difficulty is just best time; mission AI is not shown any briefing art.
+
+## WP-10 merge (2026-11-11)
+
+WP-10 (pause, speed, five save slots, settings, generated audio, alerts, offline bug report) was built against WP-04 and is now merged on top of WP-05..09. The settings screen keeps WP-06's fog toggle; units are tinted by hostility with the colour-blind palette; the controls inventory is the union of both.
+
+## C-01 Stage 0 research, first pass (2026-11-11)
+
+`docs/research/` holds the first pass. The sandbox could only see search-result summaries (page fetches to Wikipedia, GameSpot, MobyGames and similar were refused), so almost every Measure item is settled as **Decided** with a reason, and `datasheet-proposal.md` is a tuned balance rather than measured values. A second pass is worth doing if those sites become reachable.
+
+## C-02 Engine gaps (2026-11-11)
+
+- **AI air.** Normal and hard AIs build an air base once their army reaches 5 / 4 fighting units (and aviation is researched), buy aircraft while a slot is free (an anti-air type first when enemy aircraft have been seen), launch interceptors at enemy aircraft near the base, and launch strikes of two or more at radar, turrets, stations, then pads (or workers when no structure is known). Easy never uses aircraft. Hover tanks were already bought as tanks once unlocked. Kits now try six rings around the pad, so large structures such as the air base are placed instead of blocking all further building. Test: `tests/unit/ai-air.test.ts` (AI-10).
+- **Goal markers.** `missionMarkers()` in `sim/triggers.ts` lists the player's unfired areaEntered and unitEscorted areas; the 3D view draws a pulsing ring with a tall beam, and the minimap a yellow circle. Test: `tests/unit/markers.test.ts` (MSN-08).
+- **Mission saves.** Loading a save restores mission mode, the selected mission and campaign, so Retry, Next and progress recording work after a load.

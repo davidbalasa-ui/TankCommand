@@ -275,6 +275,8 @@ export class RenderView {
   };
   private fogCells: string | null = null;
   private readonly contactMeshes: THREE.Mesh[] = [];
+  private readonly markerMeshes: THREE.Group[] = [];
+  private objectiveMarkers: Array<{ x: number; z: number; radius: number }> = [];
   private contacts: Array<{ x: number; z: number }> = [];
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
@@ -662,6 +664,7 @@ export class RenderView {
     this.syncProjectiles();
     this.syncWrecks();
     this.syncContacts();
+    this.syncObjectiveMarkers();
     this.syncSelection();
     this.syncOrderLines();
     this.syncHealthBars();
@@ -704,6 +707,53 @@ export class RenderView {
       texture.needsUpdate = true;
     }
     this.fogUniforms.uFogOn.value = 1;
+  }
+
+  // Mission goal areas (sim/triggers missionMarkers): a pulsing ring on the ground plus a tall beam
+  // so the spot can be found at any zoom.
+  setObjectiveMarkers(markers: Array<{ x: number; z: number; radius: number }>): void {
+    this.objectiveMarkers = markers;
+  }
+
+  objectiveMarkerCount(): number {
+    return this.markerMeshes.filter((group) => group.visible).length;
+  }
+
+  private syncObjectiveMarkers(): void {
+    while (this.markerMeshes.length < this.objectiveMarkers.length) {
+      const group = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.92, 1, 48),
+        new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.name = 'ring';
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 30, 8, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.35, depthWrite: false }),
+      );
+      beam.position.y = 15;
+      group.add(ring, beam);
+      this.scene.add(group);
+      this.markerMeshes.push(group);
+    }
+    const pulse = 0.65 + 0.3 * Math.sin(this.frame * 0.08);
+    for (let i = 0; i < this.markerMeshes.length; i += 1) {
+      const group = this.markerMeshes[i];
+      const marker = this.objectiveMarkers[i];
+      if (!group) {
+        continue;
+      }
+      group.visible = marker !== undefined;
+      if (marker) {
+        group.position.set(marker.x, heightAt(this.world.map, marker.x, marker.z) + 0.3, marker.z);
+        const ring = group.getObjectByName('ring');
+        if (ring instanceof THREE.Mesh) {
+          ring.scale.setScalar(marker.radius);
+          (ring.material as THREE.MeshBasicMaterial).opacity = pulse;
+        }
+      }
+    }
   }
 
   private syncContacts(): void {

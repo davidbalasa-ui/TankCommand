@@ -1,3 +1,4 @@
+import { missionMarkers } from '../sim/triggers';
 import { isHostile } from '../sim/diplomacy';
 import { cellState } from '../sim/vision';
 import { heightAt } from '../sim/map';
@@ -867,6 +868,16 @@ export class Hud implements HudHandle {
         context.arc(point.x, point.y, 3, 0, Math.PI * 2);
         context.fill();
       }
+    }
+
+    for (const marker of missionMarkers(world.mission)) {
+      const point = toMap(marker.x, marker.z);
+      const edge = toMap(marker.x + marker.radius, marker.z);
+      context.strokeStyle = '#ffd23f';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(point.x, point.y, Math.max(4, Math.hypot(edge.x - point.x, edge.y - point.y)), 0, Math.PI * 2);
+      context.stroke();
     }
 
     for (const unit of world.units) {

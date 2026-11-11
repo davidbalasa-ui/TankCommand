@@ -12,6 +12,10 @@ export interface AiDifficultyData {
   useLab: boolean;
   maxStations: number;
   defends: boolean;
+  // Air: build an air base once the army has this many fighting units (0 = never use aircraft).
+  airBaseAfterFighters: number;
+  // Aircraft launch together once this many are parked and ready.
+  airStrikeSize: number;
 }
 
 export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
@@ -26,6 +30,8 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     useLab: false,
     maxStations: 1,
     defends: false,
+    airBaseAfterFighters: 0,
+    airStrikeSize: 2,
   },
   normal: {
     strategicEveryTicks: 40,
@@ -38,6 +44,8 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     useLab: true,
     maxStations: 2,
     defends: true,
+    airBaseAfterFighters: 5,
+    airStrikeSize: 2,
   },
   hard: {
     strategicEveryTicks: 30,
@@ -50,6 +58,8 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     useLab: true,
     maxStations: 2,
     defends: true,
+    airBaseAfterFighters: 4,
+    airStrikeSize: 2,
   },
 };
 

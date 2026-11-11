@@ -140,6 +140,7 @@
 | AI-07 | Hard beats easy in at least 8 of 10 fixed-seed matches. |
 | AI-08 | No unit stays stuck longer than the re-plan time in any of the 10 matches. |
 | AI-09 | The AI never attacks allied or neutral units and attacks a neutral side only after it is hostile; with three sides it handles two hostile opponents. |
+| AI-10 | With aviation researched, the AI builds an air base, buys aircraft and launches them at enemy targets; interceptors go after enemy aircraft near its base. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |
@@ -155,6 +156,7 @@
 | MSN-05 | Completing a mission unlocks the next; progress persists across reload; reached missions can be replayed. |
 | MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
+| MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
 | SKR-01 | Skirmish setup options all take effect, with 1 to 3 AI opponents. |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |
