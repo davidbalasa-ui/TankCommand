@@ -214,6 +214,22 @@ export class Effects {
     }
   }
 
+  /**
+   * A packed tower unfolding into its structure: a dust ring and a puff of smoke for Terran
+   * builds, a gold glow ring and sparks for Kesh ones. `size` is the structure's width.
+   */
+  deploy(x: number, gy: number, z: number, size: number, alien: boolean): void {
+    if (alien) {
+      this.shockRing(x, gy + 0.2, z, size * 1.3, 'gold', 0.8);
+      this.burst(x, gy + 0.6, z, size * 0.5, 'gold', 0.5);
+      this.sparks(x, gy + 0.5, z, 10, 0xffe08a, 5);
+    } else {
+      this.shockRing(x, gy + 0.15, z, size * 1.3, 'fire', 0.6);
+      this.smoke(x, gy + 0.4, z, size * 0.3, 3);
+      this.debris(x, gy, z, 8, 0.14, 6, false);
+    }
+  }
+
   /** A short muzzle flash where a shot leaves the gun. */
   muzzle(x: number, y: number, z: number, kind: string | undefined): void {
     const palette: Palette = kind === 'laser' ? 'cyan' : kind === 'lightning' || kind === 'ground_beam' ? 'gold' : 'fire';

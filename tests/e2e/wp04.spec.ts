@@ -244,8 +244,12 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
   if (!station || !tug) {
     return;
   }
-  // Haulers drive off to work by themselves; at normal speed the tap still lands on this one.
-  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(1));
+  // Haulers drive off to work by themselves: hold the sim still while tapping so the tap lands on
+  // this one (on a slow software-rendered browser it could drive past another worker first).
+  await page.evaluate(() => {
+    window.__TC_TEST__?.setSimSpeed(1);
+    window.__TC_TEST__?.pauseSim(true);
+  });
   await tapUnit(page, tug.id);
   await expect
     .poll(async () =>
@@ -256,6 +260,7 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
     .toBe(false);
   await page.locator('[data-control-id="inGame.assign"]').tap();
   await tapWorldPoint(page, station.x, station.z);
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
   await expect
     .poll(async () =>
       page.evaluate((id) => {

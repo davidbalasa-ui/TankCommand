@@ -191,3 +191,7 @@ David: the approved ore/metal art was not in the game, there were no rocks, the 
 - Ground texture: `tools/art/terrain_detail.py` makes one tileable 512 image (grass / dirt / rock detail in R / G / B); the terrain shader picks the channel per vertex by slope and height and adds broad colour patches. Terrain is now smooth-shaded.
 - Landing pads rebuilt with the hero bake (`tools/art/pads_hero.py`): Terran pad 161 parts, 3,884 triangles (stepped deck, buttresses, hazard ring, vents, ramp treads, lift well with crane, control tower, fuel tanks, flood masts, crates); Kesh nest 62 parts, 4,920 triangles (layered etched bowl, floating leaf petals, hovering halo and crown, raised cargo cradle). Layout unchanged (exit +X, lift on -Y). The old versions were 43 and 20 parts.
 - Test `tests/unit/landscape.test.ts` (LND-01).
+
+## C-11 Structure unfold (2026-11-11)
+
+New structures (deployed towers, placed kits) no longer pop in: the model rises out of its footprint over 1.2 s with a slight overshoot, with a dust ring and smoke (Terran) or a gold ring and sparks (Kesh). Structures present when a map loads do not animate. David wants the packed towers to flow smoothly into their deployed shape; the art thread is making the four tower models with named parts and packed/deployed poses, and the renderer will tween those parts when they arrive. HUD-05 now pauses the sim while tapping the tug (it was flaky on the slower software renderer).

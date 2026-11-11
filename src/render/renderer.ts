@@ -26,6 +26,8 @@ import {
 
 const TANK_ASSET_ID = 'unit.human.poc_tank';
 const TERRAIN_DETAIL_ID = 'texture.terrain.detail';
+/** How long a newly deployed structure takes to unfold. */
+const UNFOLD_MS = 1200;
 /** Metres covered by one repeat of the ground detail texture. */
 const DETAIL_TILE = 7;
 const TURRET_NODES = [
@@ -232,6 +234,8 @@ interface StructureVisual {
   model: THREE.Object3D | null;
   modelPivot: THREE.Object3D | null;
   modelColors: Array<{ material: THREE.MeshStandardMaterial; base: THREE.Color }>;
+  /** Model scale once fully unfolded (the rise animation scales up to it). */
+  modelScale: number;
 }
 
 function structureHeight(kind: string): number {
@@ -435,6 +439,10 @@ export class RenderView {
   private basePixelRatio = 1;
   private shadowsEnabled = true;
   private frame = 0;
+  // Structures seen so far, and when the ones that appeared mid-game came up (performance.now()),
+  // for the unfold animation. Kept outside the visuals, which are rebuilt when models load.
+  private readonly structureSeen = new Set<number>();
+  private readonly structureBorn = new Map<number, number>();
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
@@ -1602,6 +1610,25 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     return root;
   }
 
+  /** New structures rise out of the ground footprint and settle with a slight overshoot. */
+  private animateUnfold(id: number, visual: StructureVisual): void {
+    const born = this.structureBorn.get(id);
+    if (born === undefined || !visual.model) {
+      return;
+    }
+    const t = (performance.now() - born) / UNFOLD_MS;
+    if (t >= 1) {
+      visual.model.scale.setScalar(visual.modelScale);
+      this.structureBorn.delete(id);
+      return;
+    }
+    // Rise smoothly to a little past full height over the first three quarters, then settle.
+    const smooth = (x: number): number => x * x * (3 - 2 * x);
+    const k = t < 0.75 ? 1.06 * smooth(t / 0.75) : 1.06 - 0.06 * smooth((t - 0.75) / 0.25);
+    const s = visual.modelScale;
+    visual.model.scale.set(s * (0.6 + 0.4 * k), s * Math.max(0.05, k), s * (0.6 + 0.4 * k));
+  }
+
   private disposeStructureVisual(visual: StructureVisual): void {
     this.scene.remove(visual.mesh);
     visual.mesh.geometry.dispose();
@@ -1765,9 +1792,26 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           model,
           modelPivot,
           modelColors,
+          modelScale: model ? model.scale.x : 1,
         };
         this.structureVisuals.set(structure.id, visual);
       }
+      if (!this.structureSeen.has(structure.id)) {
+        this.structureSeen.add(structure.id);
+        // Anything already there on the first frame was placed with the map, not deployed.
+        if (this.frame > 1) {
+          this.structureBorn.set(structure.id, performance.now());
+          const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize;
+          this.effects.deploy(
+            structure.x,
+            heightAt(world.map, structure.x, structure.z),
+            structure.z,
+            size,
+            structure.typeId.includes('.alien.'),
+          );
+        }
+      }
+      this.animateUnfold(structure.id, visual);
       visual.mesh.position.set(
         structure.x,
         heightAt(world.map, structure.x, structure.z) + visual.height / 2,
