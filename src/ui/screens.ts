@@ -16,6 +16,9 @@ import { mountSpeedButton } from './speedButton';
 import { SIM_SPEED_FAST, SIM_SPEED_NORMAL, SIM_SPEED_SLOW } from '../sim/tuning';
 import { SIM_TICK_HZ } from '../sim/constants';
 
+// Working faction names (C-03). Final public names need David's approval.
+export const FACTION_NAMES = { human: 'Terran Coalition', alien: 'Kesh' } as const;
+
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
 
 function makeScreen(id: ScreenId, title: string, build?: Build): ScreenModule {
@@ -106,8 +109,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
     campaignSelect: makeScreen('campaignSelect', 'Campaign', (root, ctx) => {
       const choices: Array<[CampaignId, string]> = [
         ['training', 'Training'],
-        ['human', 'Human campaign'],
-        ['alien', 'Alien campaign'],
+        ['human', `${FACTION_NAMES.human} campaign`],
+        ['alien', `${FACTION_NAMES.alien} campaign`],
       ];
       for (const [id, label] of choices) {
         addButton(root, 'campaignSelect', id, label, () => {
@@ -198,7 +201,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         const index = values.indexOf(current);
         return values[(index + 1) % values.length] ?? current;
       };
-      const label = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+      const label = (text: string): string =>
+        text === 'human' || text === 'alien' ? FACTION_NAMES[text] : text.charAt(0).toUpperCase() + text.slice(1);
       const render = (): void => {
         grid.replaceChildren();
         const set = (next: SkirmishConfig): void => {

@@ -30,6 +30,9 @@ function setUp(): WorldState {
   // A passive, sturdy enemy (no AI) so the match lasts long enough to see aircraft fly.
   world.aiStates = world.aiStates.filter((state) => state.player === 1);
   const enemyPad = world.structures.find((s) => s.owner === 2);
+  if (enemyPad) {
+    enemyPad.hp = 1_000_000; // can't fall, so the match outlasts the test window
+  }
   for (let i = 0; i < 12; i += 1) {
     addUnit(world, {
       typeId: 'unit.alien.light_tank',

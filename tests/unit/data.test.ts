@@ -26,22 +26,30 @@ function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>>
 describe('unit data containers', () => {
   it('[DATA-01] placeholder table loads against the real asset manifest', () => {
     const table = loadUnitTable(units, registry);
-    expect(table.size).toBe(20);
+    expect(table.size).toBe(28);
     expect([...table.keys()].sort()).toEqual([
+      'unit.alien.artillery',
       'unit.alien.dropper',
       'unit.alien.glider',
+      'unit.alien.heavy_tank',
       'unit.alien.light_skimmer',
       'unit.alien.light_tank',
+      'unit.alien.missile_battery_packed',
+      'unit.alien.missile_tank',
       'unit.alien.ore_miner',
       'unit.alien.radar',
       'unit.alien.repair',
       'unit.alien.saucer',
       'unit.alien.tug',
       'unit.alien.turret_packed',
+      'unit.human.artillery',
       'unit.human.bomber',
       'unit.human.fighter',
+      'unit.human.heavy_tank',
       'unit.human.hover_tank',
       'unit.human.light_tank',
+      'unit.human.missile_battery_packed',
+      'unit.human.missile_tank',
       'unit.human.ore_miner',
       'unit.human.radar',
       'unit.human.repair',
@@ -50,7 +58,7 @@ describe('unit data containers', () => {
       'unit.human.turret_packed',
     ]);
     const structureTable = loadStructureTable(structures);
-    expect(structureTable.size).toBe(12);
+    expect(structureTable.size).toBe(14);
     const mapTable = loadMapTable(maps);
     expect(mapTable).toHaveLength(2);
     expect(mapTable[0]?.deposits.filter((d) => d.kind === 'ore')).toHaveLength(8);
@@ -110,28 +118,8 @@ describe('unit data containers', () => {
 
   it('[DATA-03] placeholderReport lists placeholder rows and drops tuned rows', () => {
     const table = loadUnitTable(units, registry);
-    expect(placeholderReport(table)).toEqual([
-      'unit.alien.dropper',
-      'unit.alien.glider',
-      'unit.alien.light_skimmer',
-      'unit.alien.light_tank',
-      'unit.alien.ore_miner',
-      'unit.alien.radar',
-      'unit.alien.repair',
-      'unit.alien.saucer',
-      'unit.alien.tug',
-      'unit.alien.turret_packed',
-      'unit.human.bomber',
-      'unit.human.fighter',
-      'unit.human.hover_tank',
-      'unit.human.light_tank',
-      'unit.human.ore_miner',
-      'unit.human.radar',
-      'unit.human.repair',
-      'unit.human.scout',
-      'unit.human.tug',
-      'unit.human.turret_packed',
-    ]);
+    // Every shipped row is tuned now (C-03); the report must be empty.
+    expect(placeholderReport(table)).toEqual([]);
 
     const row = table.get('unit.human.light_tank');
     expect(row).toBeDefined();
@@ -139,27 +127,7 @@ describe('unit data containers', () => {
       return;
     }
     const changed = new Map(table);
-    changed.set(row.id, { ...row, source: { kind: 'tuned', ref: 'x' } });
-    expect(placeholderReport(changed)).toEqual([
-      'unit.alien.dropper',
-      'unit.alien.glider',
-      'unit.alien.light_skimmer',
-      'unit.alien.light_tank',
-      'unit.alien.ore_miner',
-      'unit.alien.radar',
-      'unit.alien.repair',
-      'unit.alien.saucer',
-      'unit.alien.tug',
-      'unit.alien.turret_packed',
-      'unit.human.bomber',
-      'unit.human.fighter',
-      'unit.human.hover_tank',
-      'unit.human.ore_miner',
-      'unit.human.radar',
-      'unit.human.repair',
-      'unit.human.scout',
-      'unit.human.tug',
-      'unit.human.turret_packed',
-    ]);
+    changed.set(row.id, { ...row, source: { kind: 'placeholder' } });
+    expect(placeholderReport(changed)).toEqual(['unit.human.light_tank']);
   });
 });

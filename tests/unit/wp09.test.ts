@@ -302,7 +302,10 @@ describe('placeholder missions', () => {
           const army = w.units
             .filter((u) => u.owner === 1 && u.typeId === tankId && u.hp > 0)
             .map((u) => u.id);
-          const foe = w.structures.find((st) => st.owner === 2 && st.hp > 0);
+          // Structures first, then hunt down whatever enemy units are left (scouts wander far).
+          const foe =
+            w.structures.find((st) => st.owner === 2 && st.hp > 0) ??
+            w.units.find((u) => u.owner === 2 && u.hp > 0);
           if (army.length > 0 && w.tick >= 4800 && foe) {
             commands.push({ kind: 'attack', issuer: 1, tick: w.tick + 1, unitIds: army, targetId: foe.id });
           } else if (army.length > 0) {

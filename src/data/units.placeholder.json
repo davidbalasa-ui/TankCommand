@@ -1,7 +1,7 @@
 [
   {
     "id": "unit.human.light_tank",
-    "name": "Light Tank",
+    "name": "Lancer",
     "faction": "human",
     "role": "tank",
     "techLevel": 1,
@@ -9,7 +9,7 @@
       "ore": 100,
       "metal": 50
     },
-    "deliverySec": 12.5,
+    "deliverySec": 12,
     "hp": 220,
     "armor": 4,
     "speed": {
@@ -33,7 +33,7 @@
         ]
       }
     ],
-    "fireOnMove": false,
+    "fireOnMove": true,
     "sightRange": 14,
     "sensorRange": 15,
     "abilities": [],
@@ -43,12 +43,13 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.scout",
-    "name": "Scout",
+    "name": "Outrider",
     "faction": "human",
     "role": "scout",
     "techLevel": 1,
@@ -81,8 +82,8 @@
       }
     ],
     "fireOnMove": true,
-    "sightRange": 12,
-    "sensorRange": 12,
+    "sightRange": 14,
+    "sensorRange": 18,
     "abilities": [],
     "upgrades": [
       "fireRate",
@@ -90,12 +91,13 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.ore_miner",
-    "name": "Ore Miner",
+    "name": "Prospector",
     "faction": "human",
     "role": "worker",
     "techLevel": 1,
@@ -126,12 +128,13 @@
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.tug",
-    "name": "Tug",
+    "name": "Hauler",
     "faction": "human",
     "role": "worker",
     "techLevel": 1,
@@ -140,7 +143,7 @@
       "metal": 20
     },
     "deliverySec": 8,
-    "hp": 120,
+    "hp": 100,
     "armor": 1,
     "speed": {
       "top": 7,
@@ -161,12 +164,13 @@
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.light_tank",
-    "name": "Alien Tank",
+    "name": "Stinger",
     "faction": "alien",
     "role": "tank",
     "techLevel": 1,
@@ -174,7 +178,7 @@
       "ore": 100,
       "metal": 50
     },
-    "deliverySec": 12.5,
+    "deliverySec": 12,
     "hp": 220,
     "armor": 4,
     "speed": {
@@ -198,7 +202,7 @@
         ]
       }
     ],
-    "fireOnMove": false,
+    "fireOnMove": true,
     "sightRange": 14,
     "sensorRange": 15,
     "abilities": [],
@@ -208,12 +212,13 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.light_skimmer",
-    "name": "Alien Scout",
+    "name": "Darter",
     "faction": "alien",
     "role": "scout",
     "techLevel": 1,
@@ -232,7 +237,7 @@
     "turretTurnDegPerSec": 180,
     "weapons": [
       {
-        "id": "pulse",
+        "id": "autocannon",
         "damage": 10,
         "range": 8,
         "reloadSec": 1.2,
@@ -246,8 +251,8 @@
       }
     ],
     "fireOnMove": true,
-    "sightRange": 12,
-    "sensorRange": 12,
+    "sightRange": 14,
+    "sensorRange": 18,
     "abilities": [],
     "upgrades": [
       "fireRate",
@@ -255,12 +260,13 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.ore_miner",
-    "name": "Alien Ore Miner",
+    "name": "Gorger",
     "faction": "alien",
     "role": "worker",
     "techLevel": 1,
@@ -291,12 +297,13 @@
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.tug",
-    "name": "Alien Tug",
+    "name": "Ferrier",
     "faction": "alien",
     "role": "worker",
     "techLevel": 1,
@@ -305,7 +312,7 @@
       "metal": 20
     },
     "deliverySec": 8,
-    "hp": 120,
+    "hp": 100,
     "armor": 1,
     "speed": {
       "top": 7,
@@ -326,21 +333,22 @@
     "salvageRefundPercent": 50,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.repair",
-    "name": "Human Repair Vehicle",
+    "name": "Mender",
     "faction": "human",
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 90,
-      "metal": 30
+      "ore": 120,
+      "metal": 40
     },
-    "deliverySec": 9,
-    "hp": 140,
+    "deliverySec": 12,
+    "hp": 120,
     "armor": 2,
     "speed": {
       "top": 7,
@@ -359,17 +367,18 @@
       "armor"
     ],
     "repair": {
-      "radius": 9,
-      "ratePerSec": 8
+      "radius": 8,
+      "ratePerSec": 12
     },
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.turret_packed",
-    "name": "Human Packed Turret",
+    "name": "Bastion (packed)",
     "faction": "human",
     "role": "structure",
     "techLevel": 2,
@@ -401,21 +410,22 @@
     "deploySec": 4,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.repair",
-    "name": "Alien Repair Vehicle",
+    "name": "Weaver",
     "faction": "alien",
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 90,
-      "metal": 30
+      "ore": 120,
+      "metal": 40
     },
-    "deliverySec": 9,
-    "hp": 140,
+    "deliverySec": 12,
+    "hp": 120,
     "armor": 2,
     "speed": {
       "top": 7,
@@ -434,17 +444,18 @@
       "armor"
     ],
     "repair": {
-      "radius": 9,
-      "ratePerSec": 8
+      "radius": 8,
+      "ratePerSec": 12
     },
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.turret_packed",
-    "name": "Alien Packed Turret",
+    "name": "Thornmound (packed)",
     "faction": "alien",
     "role": "structure",
     "techLevel": 2,
@@ -476,22 +487,23 @@
     "deploySec": 4,
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.radar",
-    "name": "Human Radar Vehicle",
+    "name": "Watchman",
     "faction": "human",
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 90,
-      "metal": 30
+      "ore": 120,
+      "metal": 60
     },
-    "deliverySec": 9,
-    "hp": 140,
-    "armor": 2,
+    "deliverySec": 12,
+    "hp": 100,
+    "armor": 1,
     "speed": {
       "top": 7,
       "accel": 4,
@@ -510,22 +522,23 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.radar",
-    "name": "Alien Radar Vehicle",
+    "name": "Seer",
     "faction": "alien",
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 90,
-      "metal": 30
+      "ore": 120,
+      "metal": 60
     },
-    "deliverySec": 9,
-    "hp": 140,
-    "armor": 2,
+    "deliverySec": 12,
+    "hp": 100,
+    "armor": 1,
     "speed": {
       "top": 7,
       "accel": 4,
@@ -544,32 +557,33 @@
     ],
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.hover_tank",
-    "name": "Hover Tank",
+    "name": "Skimmer",
     "faction": "human",
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 130,
+      "ore": 140,
       "metal": 60
     },
-    "deliverySec": 14,
-    "hp": 200,
+    "deliverySec": 13,
+    "hp": 180,
     "armor": 3,
     "speed": {
-      "top": 9,
-      "accel": 5,
-      "turnDegPerSec": 100
+      "top": 10,
+      "accel": 6,
+      "turnDegPerSec": 110
     },
     "turretTurnDegPerSec": 130,
     "weapons": [
       {
         "id": "cannon",
-        "damage": 26,
+        "damage": 24,
         "range": 11,
         "reloadSec": 2.2,
         "projectileSpeed": 42,
@@ -592,36 +606,37 @@
     "movement": "hover",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.human.fighter",
-    "name": "Fighter",
+    "name": "Falcon",
     "faction": "human",
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 180,
+      "metal": 100
     },
-    "deliverySec": 12,
+    "deliverySec": 15,
     "hp": 90,
-    "armor": 1,
+    "armor": 2,
     "speed": {
-      "top": 16,
+      "top": 18,
       "accel": 10,
       "turnDegPerSec": 200
     },
     "turretTurnDegPerSec": 0,
     "weapons": [
       {
-        "id": "guns",
-        "damage": 8,
-        "range": 9,
-        "reloadSec": 0.6,
-        "projectileSpeed": 60,
-        "accuracy": 0.8,
+        "id": "air_missiles",
+        "damage": 18,
+        "range": 14,
+        "reloadSec": 1.5,
+        "projectileSpeed": 45,
+        "accuracy": 0.9,
         "splashRadius": 0,
         "targets": [
           "air",
@@ -630,8 +645,8 @@
       }
     ],
     "fireOnMove": true,
-    "sightRange": 14,
-    "sensorRange": 14,
+    "sightRange": 18,
+    "sensorRange": 18,
     "abilities": [],
     "upgrades": [
       "fireRate",
@@ -640,30 +655,31 @@
     "movement": "air",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 40,
+      "ammo": 8,
       "fuelSec": 60,
-      "rearmSec": 8,
+      "rearmSec": 10,
       "cruiseHeight": 6
     }
   },
   {
     "id": "unit.human.bomber",
-    "name": "Bomber",
+    "name": "Condor",
     "faction": "human",
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 160,
-      "metal": 80
+      "ore": 220,
+      "metal": 120
     },
-    "deliverySec": 15,
-    "hp": 140,
+    "deliverySec": 18,
+    "hp": 130,
     "armor": 2,
     "speed": {
-      "top": 11,
+      "top": 12,
       "accel": 6,
       "turnDegPerSec": 120
     },
@@ -671,12 +687,12 @@
     "weapons": [
       {
         "id": "bombs",
-        "damage": 70,
+        "damage": 120,
         "range": 3,
-        "reloadSec": 1.2,
-        "projectileSpeed": 30,
-        "accuracy": 0.9,
-        "splashRadius": 2.5,
+        "reloadSec": 4,
+        "projectileSpeed": 20,
+        "accuracy": 0.8,
+        "splashRadius": 3,
         "targets": [
           "ground",
           "structure"
@@ -694,38 +710,39 @@
     "movement": "air",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 6,
-      "fuelSec": 70,
-      "rearmSec": 12,
-      "cruiseHeight": 8
+      "ammo": 2,
+      "fuelSec": 60,
+      "rearmSec": 10,
+      "cruiseHeight": 7
     }
   },
   {
     "id": "unit.alien.glider",
-    "name": "Alien Glider",
+    "name": "Glider",
     "faction": "alien",
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 130,
+      "ore": 140,
       "metal": 60
     },
-    "deliverySec": 14,
-    "hp": 200,
+    "deliverySec": 13,
+    "hp": 180,
     "armor": 3,
     "speed": {
-      "top": 9,
-      "accel": 5,
-      "turnDegPerSec": 100
+      "top": 10,
+      "accel": 6,
+      "turnDegPerSec": 110
     },
     "turretTurnDegPerSec": 130,
     "weapons": [
       {
         "id": "cannon",
-        "damage": 26,
+        "damage": 24,
         "range": 11,
         "reloadSec": 2.2,
         "projectileSpeed": 42,
@@ -748,46 +765,48 @@
     "movement": "hover",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   },
   {
     "id": "unit.alien.saucer",
-    "name": "Alien Saucer",
+    "name": "Disc",
     "faction": "alien",
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 320,
+      "metal": 200
     },
-    "deliverySec": 12,
-    "hp": 90,
-    "armor": 1,
+    "deliverySec": 24,
+    "hp": 260,
+    "armor": 4,
     "speed": {
-      "top": 16,
-      "accel": 10,
-      "turnDegPerSec": 200
+      "top": 14,
+      "accel": 8,
+      "turnDegPerSec": 160
     },
     "turretTurnDegPerSec": 0,
     "weapons": [
       {
-        "id": "guns",
-        "damage": 8,
-        "range": 9,
-        "reloadSec": 0.6,
-        "projectileSpeed": 60,
-        "accuracy": 0.8,
-        "splashRadius": 0,
+        "id": "plasma",
+        "damage": 35,
+        "range": 14,
+        "reloadSec": 1.5,
+        "projectileSpeed": 45,
+        "accuracy": 0.9,
+        "splashRadius": 0.5,
         "targets": [
+          "ground",
           "air",
-          "ground"
+          "structure"
         ]
       }
     ],
     "fireOnMove": true,
-    "sightRange": 14,
-    "sensorRange": 14,
+    "sightRange": 16,
+    "sensorRange": 16,
     "abilities": [],
     "upgrades": [
       "fireRate",
@@ -796,30 +815,31 @@
     "movement": "air",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 40,
-      "fuelSec": 60,
-      "rearmSec": 8,
+      "ammo": 12,
+      "fuelSec": 75,
+      "rearmSec": 12,
       "cruiseHeight": 6
     }
   },
   {
     "id": "unit.alien.dropper",
-    "name": "Alien Dropper",
+    "name": "Dropper",
     "faction": "alien",
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 160,
-      "metal": 80
+      "ore": 220,
+      "metal": 120
     },
-    "deliverySec": 15,
-    "hp": 140,
+    "deliverySec": 18,
+    "hp": 130,
     "armor": 2,
     "speed": {
-      "top": 11,
+      "top": 12,
       "accel": 6,
       "turnDegPerSec": 120
     },
@@ -827,12 +847,12 @@
     "weapons": [
       {
         "id": "bombs",
-        "damage": 70,
+        "damage": 120,
         "range": 3,
-        "reloadSec": 1.2,
-        "projectileSpeed": 30,
-        "accuracy": 0.9,
-        "splashRadius": 2.5,
+        "reloadSec": 4,
+        "projectileSpeed": 20,
+        "accuracy": 0.8,
+        "splashRadius": 3,
         "targets": [
           "ground",
           "structure"
@@ -850,13 +870,380 @@
     "movement": "air",
     "modelAssetId": "unit.human.poc_tank",
     "source": {
-      "kind": "placeholder"
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     },
     "air": {
-      "ammo": 6,
-      "fuelSec": 70,
-      "rearmSec": 12,
-      "cruiseHeight": 8
+      "ammo": 2,
+      "fuelSec": 60,
+      "rearmSec": 10,
+      "cruiseHeight": 7
+    }
+  },
+  {
+    "id": "unit.human.heavy_tank",
+    "name": "Bulwark",
+    "faction": "human",
+    "role": "tank",
+    "techLevel": 3,
+    "cost": {
+      "ore": 220,
+      "metal": 120
+    },
+    "deliverySec": 20,
+    "hp": 520,
+    "armor": 9,
+    "speed": {
+      "top": 5,
+      "accel": 2.5,
+      "turnDegPerSec": 60
+    },
+    "turretTurnDegPerSec": 80,
+    "weapons": [
+      {
+        "id": "heavy_cannon",
+        "damage": 60,
+        "range": 13,
+        "reloadSec": 3,
+        "projectileSpeed": 38,
+        "accuracy": 0.85,
+        "splashRadius": 1,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 15,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.human.missile_tank",
+    "name": "Javelin",
+    "faction": "human",
+    "role": "tank",
+    "techLevel": 2,
+    "cost": {
+      "ore": 140,
+      "metal": 80
+    },
+    "deliverySec": 14,
+    "hp": 150,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 3.5,
+      "turnDegPerSec": 90
+    },
+    "turretTurnDegPerSec": 120,
+    "weapons": [
+      {
+        "id": "missile",
+        "damage": 28,
+        "range": 18,
+        "reloadSec": 3.5,
+        "projectileSpeed": 30,
+        "accuracy": 0.9,
+        "splashRadius": 0.8,
+        "targets": [
+          "ground",
+          "air",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 16,
+    "sensorRange": 18,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.human.artillery",
+    "name": "Longbow",
+    "faction": "human",
+    "role": "artillery",
+    "techLevel": 3,
+    "cost": {
+      "ore": 260,
+      "metal": 160
+    },
+    "deliverySec": 22,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 4,
+      "accel": 2,
+      "turnDegPerSec": 60
+    },
+    "turretTurnDegPerSec": 60,
+    "weapons": [
+      {
+        "id": "shell",
+        "damage": 90,
+        "range": 34,
+        "reloadSec": 6,
+        "projectileSpeed": 25,
+        "accuracy": 0.6,
+        "splashRadius": 3,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 12,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.human.missile_battery_packed",
+    "name": "Spire (packed)",
+    "faction": "human",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 400,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "deploysTo": "structure.human.missile_battery",
+    "deploySec": 4,
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.alien.heavy_tank",
+    "name": "Carapace",
+    "faction": "alien",
+    "role": "tank",
+    "techLevel": 3,
+    "cost": {
+      "ore": 220,
+      "metal": 120
+    },
+    "deliverySec": 20,
+    "hp": 520,
+    "armor": 9,
+    "speed": {
+      "top": 5,
+      "accel": 2.5,
+      "turnDegPerSec": 60
+    },
+    "turretTurnDegPerSec": 80,
+    "weapons": [
+      {
+        "id": "heavy_cannon",
+        "damage": 60,
+        "range": 13,
+        "reloadSec": 3,
+        "projectileSpeed": 38,
+        "accuracy": 0.85,
+        "splashRadius": 1,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": true,
+    "sightRange": 14,
+    "sensorRange": 15,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.alien.missile_tank",
+    "name": "Spitter",
+    "faction": "alien",
+    "role": "tank",
+    "techLevel": 2,
+    "cost": {
+      "ore": 140,
+      "metal": 80
+    },
+    "deliverySec": 14,
+    "hp": 150,
+    "armor": 2,
+    "speed": {
+      "top": 7,
+      "accel": 3.5,
+      "turnDegPerSec": 90
+    },
+    "turretTurnDegPerSec": 120,
+    "weapons": [
+      {
+        "id": "missile",
+        "damage": 28,
+        "range": 18,
+        "reloadSec": 3.5,
+        "projectileSpeed": 30,
+        "accuracy": 0.9,
+        "splashRadius": 0.8,
+        "targets": [
+          "ground",
+          "air",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 16,
+    "sensorRange": 18,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.alien.artillery",
+    "name": "Mortar Beast",
+    "faction": "alien",
+    "role": "artillery",
+    "techLevel": 3,
+    "cost": {
+      "ore": 260,
+      "metal": 160
+    },
+    "deliverySec": 22,
+    "hp": 140,
+    "armor": 2,
+    "speed": {
+      "top": 4,
+      "accel": 2,
+      "turnDegPerSec": 60
+    },
+    "turretTurnDegPerSec": 60,
+    "weapons": [
+      {
+        "id": "shell",
+        "damage": 90,
+        "range": 34,
+        "reloadSec": 6,
+        "projectileSpeed": 25,
+        "accuracy": 0.6,
+        "splashRadius": 3,
+        "targets": [
+          "ground",
+          "structure"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 12,
+    "sensorRange": 14,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    }
+  },
+  {
+    "id": "unit.alien.missile_battery_packed",
+    "name": "Spore Tower (packed)",
+    "faction": "alien",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 400,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "deploysTo": "structure.alien.missile_battery",
+    "deploySec": 4,
+    "modelAssetId": "unit.human.poc_tank",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
     }
   }
 ]

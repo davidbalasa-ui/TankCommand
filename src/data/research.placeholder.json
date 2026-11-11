@@ -1,111 +1,5 @@
 [
   {
-    "id": "research.human.armor_plating",
-    "name": "Armor Plating",
-    "faction": "human",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "armor"
-    ],
-    "placeholder": true
-  },
-  {
-    "id": "research.human.fire_control",
-    "name": "Fire Control",
-    "faction": "human",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "fireRate"
-    ],
-    "placeholder": true
-  },
-  {
-    "id": "research.human.fortifications",
-    "name": "Fortifications",
-    "faction": "human",
-    "cost": {
-      "ore": 120,
-      "metal": 40
-    },
-    "timeSec": 30,
-    "requires": [
-      "research.human.armor_plating"
-    ],
-    "unlocks": [
-      "structure.human.turret"
-    ],
-    "upgrades": [],
-    "placeholder": true
-  },
-  {
-    "id": "research.human.sensors",
-    "name": "Sensors",
-    "faction": "human",
-    "cost": {
-      "ore": 120,
-      "metal": 40
-    },
-    "timeSec": 30,
-    "requires": [
-      "research.human.fire_control"
-    ],
-    "unlocks": [
-      "structure.human.radar",
-      "unit.human.radar"
-    ],
-    "upgrades": [
-      "stealth"
-    ],
-    "placeholder": true
-  },
-  {
-    "id": "research.human.field_repair",
-    "name": "Field Repair",
-    "faction": "human",
-    "cost": {
-      "ore": 150,
-      "metal": 60
-    },
-    "timeSec": 40,
-    "requires": [
-      "research.human.fortifications"
-    ],
-    "unlocks": [
-      "unit.human.repair"
-    ],
-    "upgrades": [],
-    "placeholder": true
-  },
-  {
-    "id": "research.human.heavy_ordnance",
-    "name": "Heavy Ordnance",
-    "faction": "human",
-    "cost": {
-      "ore": 200,
-      "metal": 100
-    },
-    "timeSec": 60,
-    "requires": [
-      "research.human.sensors",
-      "research.human.fortifications"
-    ],
-    "unlocks": [],
-    "upgrades": [],
-    "placeholder": true
-  },
-  {
     "id": "research.alien.armor_plating",
     "name": "Armor Plating",
     "faction": "alien",
@@ -119,7 +13,63 @@
     "upgrades": [
       "armor"
     ],
-    "placeholder": true
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.aviation",
+    "name": "Aviation",
+    "faction": "alien",
+    "cost": {
+      "ore": 220,
+      "metal": 100
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.alien.sensors"
+    ],
+    "unlocks": [
+      "structure.alien.air_base",
+      "unit.alien.glider",
+      "unit.alien.dropper"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.disc_flight",
+    "faction": "alien",
+    "name": "Disc Flight",
+    "cost": {
+      "ore": 300,
+      "metal": 150
+    },
+    "timeSec": 60,
+    "requires": [
+      "research.alien.aviation"
+    ],
+    "unlocks": [
+      "unit.alien.saucer"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.field_repair",
+    "name": "Field Repair",
+    "faction": "alien",
+    "cost": {
+      "ore": 150,
+      "metal": 60
+    },
+    "timeSec": 35,
+    "requires": [
+      "research.alien.fortifications"
+    ],
+    "unlocks": [
+      "unit.alien.repair"
+    ],
+    "upgrades": [],
+    "placeholder": false
   },
   {
     "id": "research.alien.fire_control",
@@ -135,7 +85,7 @@
     "upgrades": [
       "fireRate"
     ],
-    "placeholder": true
+    "placeholder": false
   },
   {
     "id": "research.alien.fortifications",
@@ -153,7 +103,63 @@
       "structure.alien.turret"
     ],
     "upgrades": [],
-    "placeholder": true
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.heavy_armor",
+    "faction": "alien",
+    "name": "Heavy Armor",
+    "cost": {
+      "ore": 200,
+      "metal": 80
+    },
+    "timeSec": 40,
+    "requires": [
+      "research.alien.armor_plating",
+      "research.alien.fortifications"
+    ],
+    "unlocks": [
+      "unit.alien.heavy_tank"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.heavy_ordnance",
+    "name": "Heavy Ordnance",
+    "faction": "alien",
+    "cost": {
+      "ore": 200,
+      "metal": 100
+    },
+    "timeSec": 40,
+    "requires": [
+      "research.alien.missiles"
+    ],
+    "unlocks": [
+      "unit.alien.artillery"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.missiles",
+    "faction": "alien",
+    "name": "Missiles",
+    "cost": {
+      "ore": 120,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [
+      "research.alien.fire_control"
+    ],
+    "unlocks": [
+      "unit.alien.missile_tank",
+      "structure.alien.missile_battery"
+    ],
+    "upgrades": [],
+    "placeholder": false
   },
   {
     "id": "research.alien.sensors",
@@ -174,83 +180,172 @@
     "upgrades": [
       "stealth"
     ],
-    "placeholder": true
+    "placeholder": false
   },
   {
-    "id": "research.alien.field_repair",
-    "name": "Field Repair",
-    "faction": "alien",
+    "id": "research.human.armor_plating",
+    "name": "Armor Plating",
+    "faction": "human",
     "cost": {
-      "ore": 150,
-      "metal": 60
+      "ore": 80,
+      "metal": 20
     },
-    "timeSec": 40,
-    "requires": [
-      "research.alien.fortifications"
-    ],
-    "unlocks": [
-      "unit.alien.repair"
-    ],
-    "upgrades": [],
-    "placeholder": true
-  },
-  {
-    "id": "research.alien.heavy_ordnance",
-    "name": "Heavy Ordnance",
-    "faction": "alien",
-    "cost": {
-      "ore": 200,
-      "metal": 100
-    },
-    "timeSec": 60,
-    "requires": [
-      "research.alien.sensors",
-      "research.alien.fortifications"
-    ],
+    "timeSec": 20,
+    "requires": [],
     "unlocks": [],
-    "upgrades": [],
-    "placeholder": true
+    "upgrades": [
+      "armor"
+    ],
+    "placeholder": false
   },
   {
     "id": "research.human.aviation",
     "name": "Aviation",
     "faction": "human",
     "cost": {
-      "ore": 180,
-      "metal": 80
+      "ore": 220,
+      "metal": 100
     },
     "timeSec": 45,
+    "requires": [
+      "research.human.sensors"
+    ],
+    "unlocks": [
+      "structure.human.air_base",
+      "unit.human.hover_tank",
+      "unit.human.bomber",
+      "unit.human.fighter"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.field_repair",
+    "name": "Field Repair",
+    "faction": "human",
+    "cost": {
+      "ore": 150,
+      "metal": 60
+    },
+    "timeSec": 35,
+    "requires": [
+      "research.human.fortifications"
+    ],
+    "unlocks": [
+      "unit.human.repair"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.fire_control",
+    "name": "Fire Control",
+    "faction": "human",
+    "cost": {
+      "ore": 80,
+      "metal": 20
+    },
+    "timeSec": 20,
+    "requires": [],
+    "unlocks": [],
+    "upgrades": [
+      "fireRate"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.fortifications",
+    "name": "Fortifications",
+    "faction": "human",
+    "cost": {
+      "ore": 120,
+      "metal": 40
+    },
+    "timeSec": 30,
+    "requires": [
+      "research.human.armor_plating"
+    ],
+    "unlocks": [
+      "structure.human.turret"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.heavy_armor",
+    "faction": "human",
+    "name": "Heavy Armor",
+    "cost": {
+      "ore": 200,
+      "metal": 80
+    },
+    "timeSec": 40,
+    "requires": [
+      "research.human.armor_plating",
+      "research.human.fortifications"
+    ],
+    "unlocks": [
+      "unit.human.heavy_tank"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.heavy_ordnance",
+    "name": "Heavy Ordnance",
+    "faction": "human",
+    "cost": {
+      "ore": 200,
+      "metal": 100
+    },
+    "timeSec": 40,
+    "requires": [
+      "research.human.missiles"
+    ],
+    "unlocks": [
+      "unit.human.artillery"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.missiles",
+    "faction": "human",
+    "name": "Missiles",
+    "cost": {
+      "ore": 120,
+      "metal": 50
+    },
+    "timeSec": 30,
     "requires": [
       "research.human.fire_control"
     ],
     "unlocks": [
-      "structure.human.air_base",
-      "unit.human.fighter",
-      "unit.human.bomber",
-      "unit.human.hover_tank"
+      "unit.human.missile_tank",
+      "structure.human.missile_battery"
     ],
     "upgrades": [],
-    "placeholder": true
+    "placeholder": false
   },
   {
-    "id": "research.alien.aviation",
-    "name": "Aviation",
-    "faction": "alien",
+    "id": "research.human.sensors",
+    "name": "Sensors",
+    "faction": "human",
     "cost": {
-      "ore": 180,
-      "metal": 80
+      "ore": 120,
+      "metal": 40
     },
-    "timeSec": 45,
+    "timeSec": 30,
     "requires": [
-      "research.alien.fire_control"
+      "research.human.fire_control"
     ],
     "unlocks": [
-      "structure.alien.air_base",
-      "unit.alien.saucer",
-      "unit.alien.dropper",
-      "unit.alien.glider"
+      "structure.human.radar",
+      "unit.human.radar"
     ],
-    "upgrades": [],
-    "placeholder": true
+    "upgrades": [
+      "stealth"
+    ],
+    "placeholder": false
   }
 ]

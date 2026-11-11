@@ -108,14 +108,22 @@ describe('enemy AI', () => {
 
   it('[AI-02] moving a hidden enemy unit never changes the AI commands', () => {
     let world = aiMatch(2, 'normal', 'normal');
+    const findHidden = (): WorldState['units'][number] | undefined => {
+      const view = perceivedUnits(world, 1);
+      const seen = new Set(view.units.map((u) => u.id));
+      const contactsNear = (x: number, z: number): boolean =>
+        view.contacts.some((c) => Math.hypot(c.x - x, c.z - z) < 1);
+      return world.units.find((u) => u.owner === 2 && !seen.has(u.id) && !contactsNear(u.x, u.z));
+    };
+    // Step past the opening, then until some enemy unit is out of sight and off sensors.
     for (let i = 0; i < 20 * 45; i += 1) {
       world = stepWithAi(world);
     }
-    const view = perceivedUnits(world, 1);
-    const seen = new Set(view.units.map((u) => u.id));
-    const contactsNear = (x: number, z: number): boolean =>
-      view.contacts.some((c) => Math.hypot(c.x - x, c.z - z) < 1);
-    const hidden = world.units.find((u) => u.owner === 2 && !seen.has(u.id) && !contactsNear(u.x, u.z));
+    let hidden = findHidden();
+    for (let i = 0; i < 20 * 120 && !hidden; i += 1) {
+      world = stepWithAi(world);
+      hidden = findHidden();
+    }
     expect(hidden).toBeDefined();
     if (!hidden) {
       return;

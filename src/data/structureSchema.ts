@@ -31,6 +31,7 @@ export const structureRowSchema = z
         projectileSpeed: z.number().positive(),
         accuracy: z.number().min(0).max(1),
         splashRadius: z.number().nonnegative(),
+        targets: z.array(z.enum(['ground', 'air', 'structure'])).min(1).optional(),
       })
       .optional(),
     turretTurnDegPerSec: z.number().positive().optional(),

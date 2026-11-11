@@ -113,3 +113,12 @@ WP-10 (pause, speed, five save slots, settings, generated audio, alerts, offline
 - **AI air.** Normal and hard AIs build an air base once their army reaches 5 / 4 fighting units (and aviation is researched), buy aircraft while a slot is free (an anti-air type first when enemy aircraft have been seen), launch interceptors at enemy aircraft near the base, and launch strikes of two or more at radar, turrets, stations, then pads (or workers when no structure is known). Easy never uses aircraft. Hover tanks were already bought as tanks once unlocked. Kits now try six rings around the pad, so large structures such as the air base are placed instead of blocking all further building. Test: `tests/unit/ai-air.test.ts` (AI-10).
 - **Goal markers.** `missionMarkers()` in `sim/triggers.ts` lists the player's unfired areaEntered and unitEscorted areas; the 3D view draws a pulsing ring with a tall beam, and the minimap a yellow circle. Test: `tests/unit/markers.test.ts` (MSN-08).
 - **Mission saves.** Loading a save restores mission mode, the selected mission and campaign, so Retry, Next and progress recording work after a load.
+
+## C-03 Roster, data and working names (2026-11-11)
+
+- **Data.** Every unit and structure row is now `tuned` from `docs/research/datasheet-proposal.md` (no placeholders left). New per faction: heavy tank, missile tank (hits air), artillery (range 34, can't fire on the move), missile battery (packable, hits air) and its packed unit. Aliens get the saucer as their signature aircraft behind Disc Flight; humans keep fighter and bomber. Turret weapons now carry `targets`.
+- **Research.** Three tiers (see decisions log). Aviation now needs Sensors.
+- **Names.** Working names: Terran Coalition vs the Kesh, unit call-signs in the data. Final public names need David's approval.
+- **AI.** Builds a missile battery for every other defence once enemy aircraft have been seen; desperation counts only metal it can still reach.
+- **Sim fix.** A tug at a dry station moves itself to a station that still has metal.
+- **Tests.** DATA-01/03 updated for the new roster; AI-02 waits until an enemy is genuinely hidden; MSN-03's scripted player finishes off stray units; the two placeholder combat missions start with 300 metal.

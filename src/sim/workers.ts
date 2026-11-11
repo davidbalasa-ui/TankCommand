@@ -15,7 +15,7 @@ import {
   nearestPad,
   structureTypeOf,
 } from './economy';
-import type { SimUnitType, UnitState, WorldState } from './types';
+import type { SimUnitType, StructureState, UnitState, WorldState } from './types';
 
 const DT = 1 / SIM_TICK_HZ;
 
@@ -146,6 +146,40 @@ function updateMiner(world: WorldState, unit: UnitState, type: SimUnitType): voi
   }
 }
 
+// A station that has nothing to hand over now and never will again.
+function stationDry(world: WorldState, station: StructureState): boolean {
+  if (station.containers > 0) {
+    return false;
+  }
+  const deposit = world.deposits.find((item) => item.id === station.depositId);
+  return !deposit || deposit.amount <= 1e-6;
+}
+
+// Move an empty-handed tug to the nearest own station that still has or will have metal.
+function retargetTug(world: WorldState, unit: UnitState, job: { targetId: number; stage: string }): boolean {
+  let best: StructureState | null = null;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const candidate of world.structures) {
+    if (candidate.owner !== unit.owner || candidate.hp <= 0 || candidate.id === job.targetId) {
+      continue;
+    }
+    if (structureTypeOf(world, candidate)?.kind !== 'metalStation' || stationDry(world, candidate)) {
+      continue;
+    }
+    const d = Math.hypot(candidate.x - unit.x, candidate.z - unit.z);
+    if (d < bestD || (d === bestD && best !== null && candidate.id < best.id)) {
+      best = candidate;
+      bestD = d;
+    }
+  }
+  if (!best) {
+    return false;
+  }
+  job.targetId = best.id;
+  job.stage = 'toStation';
+  return true;
+}
+
 function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void {
   const job = unit.job;
   if (!job || job.kind !== 'tug') {
@@ -158,6 +192,9 @@ function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void 
 
   if (job.stage === 'waiting') {
     stopMoving(unit, type);
+    if (job.load <= 0 && (!station || stationDry(world, station))) {
+      retargetTug(world, unit, job);
+    }
     return;
   }
 
@@ -188,6 +225,8 @@ function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void 
       station.containers -= 1;
       job.load = stationType.containerSize;
       job.stage = 'toPad';
+    } else if (job.load <= 0 && stationDry(world, station)) {
+      retargetTug(world, unit, job);
     }
     return;
   }

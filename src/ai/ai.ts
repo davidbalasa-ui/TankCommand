@@ -427,7 +427,15 @@ function strategic(planner: Planner): void {
     planner.buyUnit(tugType, 0);
   }
 
-  const metalLeft = world.deposits.some((d) => d.kind === 'metal' && d.amount > 1);
+  // Metal is still reachable if one of our stations sits on a non-empty deposit or a free deposit
+  // is left to build on. Deposits held by an enemy station don't count.
+  const metalLeft = world.deposits.some(
+    (d) =>
+      d.kind === 'metal' &&
+      d.amount > 1 &&
+      (structures.some((st) => st.depositId === d.id && planner.structureKind(st) === 'metalStation') ||
+        !world.structures.some((st) => st.hp > 0 && st.depositId === d.id && world.structureTypes.get(st.typeId)?.kind === 'metalStation')),
+  );
   const cheapestTankMetal = Math.min(...types.filter((t) => isFighter(t)).map((t) => t.metalCost), Infinity);
   const desperate = !metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false;
   const fighters = units.filter((u) => isFighter(planner.unitType(u), desperate));
@@ -472,9 +480,22 @@ function strategic(planner: Planner): void {
       planner.commands.push({ kind: 'research', labId: lab.id, nodeId: node.id });
     }
   }
-  const turretType = planner.myStructureTypes().find((t) => t.kind === 'turret');
-  const turrets = structures.filter((s) => planner.structureKind(s) === 'turret').length;
-  if (turretType && !hasKit && turrets < Math.floor(fighters.length / data.fightersPerTurret) && planner.queued(turretType.id) === 0) {
+  // Every other defence is anti-air once enemy aircraft have shown up (and it is unlocked).
+  const turretTypes = planner
+    .myStructureTypes()
+    .filter((t) => t.kind === 'turret' && isItemUnlocked(world, planner.player, t.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const ownTurrets = structures.filter((s) => planner.structureKind(s) === 'turret');
+  const turrets = ownTurrets.length;
+  const enemyAirSeen = perceivedUnits(world, planner.player).units.some(
+    (u) => isHostile(world, planner.player, u.owner) && u.air !== null,
+  );
+  const antiAir = turretTypes.find((t) => t.weapon?.targets?.includes('air'));
+  const groundGun = turretTypes.find((t) => !t.weapon?.targets?.includes('air')) ?? turretTypes[0];
+  const antiAirCount = ownTurrets.filter((s) => s.typeId === antiAir?.id).length;
+  const turretType = enemyAirSeen && antiAir && antiAirCount * 2 <= turrets ? antiAir : groundGun;
+  const turretQueued = turretTypes.some((t) => planner.queued(t.id) > 0);
+  if (turretType && !hasKit && turrets < Math.floor(fighters.length / data.fightersPerTurret) && !turretQueued) {
     planner.buyStructure(turretType, data.reserveOre + 100);
   }
   const combat = types
