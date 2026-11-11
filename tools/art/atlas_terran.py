@@ -39,13 +39,14 @@ def plates(draw, emit, box, rng, base, size_range, stencil=False):
         x = x0
         while x < x1:
             w = rng.randint(size_range[0], size_range[1] * 2)
-            tone = rng.randint(-6, 8)
+            tone = rng.randint(-10, 14)
             c = tuple(max(0, min(255, v + tone)) for v in base)
             r = (x + 1, y + 1, min(x + w, x1) - 2, min(y + h, y1) - 2)
             if r[2] > r[0] and r[3] > r[1]:
                 draw.rectangle(r, fill=c)
-                draw.line((r[0], r[1], r[2], r[1]), fill=tuple(min(255, v + 22) for v in c))
-                draw.line((r[0], r[3], r[2], r[3]), fill=tuple(max(0, v - 18) for v in c))
+                draw.line((r[0], r[1], r[2], r[1]), fill=tuple(min(255, v + 40) for v in c), width=2)
+                draw.line((r[0], r[3], r[2], r[3]), fill=(14, 15, 18), width=2)
+                draw.line((r[2], r[1], r[2], r[3]), fill=(14, 15, 18))
                 if rng.random() < 0.35:  # bolts
                     for bx, by in ((r[0] + 3, r[1] + 3), (r[2] - 3, r[1] + 3), (r[0] + 3, r[3] - 3), (r[2] - 3, r[3] - 3)):
                         draw.point((bx, by), fill=(90, 96, 104))

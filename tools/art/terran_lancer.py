@@ -123,7 +123,7 @@ parts.append(prism('HullCore', hull_profile, -1.25, 1.25, 'hull'))
 deck = [(-2.6, 1.45), (2.2, 1.45), (1.6, 1.75), (-2.3, 1.75)]
 parts.append(prism('HullDeck', deck, -1.05, 1.05, 'hull'))
 # Track pods: chamfered ends, outside the hull.
-pod = [(-3.25, 0.05), (2.95, 0.05), (3.4, 0.55), (3.0, 1.05), (-3.2, 1.05), (-3.45, 0.55)]
+pod = [(-3.25, 0.1), (2.95, 0.1), (3.4, 0.5), (3.0, 0.9), (-3.2, 0.9), (-3.45, 0.5)]
 for side, y in (('L', 1.62), ('R', -1.62)):
     parts.append(prism(f'Track{side}', pod, y - 0.42, y + 0.42, 'track'))
     # Angled side skirt over the upper track.
@@ -139,21 +139,46 @@ for y in (0.8, -0.8):
 # Rear engine block.
 parts.append(box('Engine', (-2.75, 0, 1.6), (0.35, 0.8, 0.2), 'dark'))
 
-# --- Turret: wedge, set back of centre; everything above the ring rotates.
+# Road wheels peeking out under the skirts (8-sided, along Y).
+def cylinder_y(name, x, y, z, r, w, sides, tile):
+    o = cylinder_x(name, -w / 2, w / 2, 0, 0, r, sides, tile)
+    o.rotation_euler = (0, 0, math.radians(90))
+    o.location = (x, y, z)
+    bpy.context.view_layer.objects.active = o
+    o.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    o.select_set(False)
+    return o
+
+for y in (1.62, -1.62):
+    sign = 1 if y > 0 else -1
+    for i, x in enumerate((-2.5, -1.5, -0.5, 0.5, 1.5, 2.4)):
+        parts.append(cylinder_y(f'Wheel{y}{i}', x, y + sign * 0.43, 0.45, 0.36, 0.08, 8, 'dark'))
+        parts.append(cylinder_y(f'Hub{y}{i}', x, y + sign * 0.48, 0.45, 0.12, 0.04, 6, 'glow' if i % 2 == 0 else 'dark'))
+
+# --- Turret: low faceted wedge set back of centre, rear bustle, side pods.
 tx = -0.4
-turret_profile = [(tx - 1.6, 1.75), (tx + 1.5, 1.75), (tx + 2.0, 2.15), (tx + 1.4, 2.6), (tx - 1.4, 2.6), (tx - 1.8, 2.2)]
-turret = [prism('TurretBody', turret_profile, -1.0, 1.0, 'turret')]
-cheek = [(tx + 0.4, 1.85), (tx + 2.2, 1.95), (tx + 1.6, 2.45), (tx + 0.4, 2.45)]
-for y in (0.95, -0.95):
-    turret.append(prism(f'Cheek{y}', cheek, y - 0.18, y + 0.18, 'turret'))
-turret.append(box('Sensor', (tx - 0.6, 0.55, 2.8), (0.25, 0.2, 0.2), 'dark'))
-turret.append(box('SensorLens', (tx - 0.33, 0.55, 2.82), (0.03, 0.12, 0.09), 'glow'))
-turret.append(box('TurretSeam', (tx + 0.3, 0, 2.62), (1.2, 0.03, 0.02), 'glow'))
-# Twin barrels with energy coils (coil band is in the barrel tile's middle third).
-for y in (0.32, -0.32):
-    turret.append(cylinder_x(f'Barrel{y}', tx + 1.6, tx + 6.6, y, 2.2, 0.17, 8, 'barrel'))
-    turret.append(cylinder_x(f'Muzzle{y}', tx + 6.4, tx + 7.0, y, 2.2, 0.23, 8, 'dark'))
-    turret.append(cylinder_x(f'Coil{y}', tx + 2.2, tx + 3.6, y, 2.2, 0.22, 8, 'glow'))
+turret_profile = [(tx - 1.7, 1.75), (tx + 1.3, 1.75), (tx + 2.1, 2.05), (tx + 1.5, 2.5),
+                  (tx - 1.2, 2.55), (tx - 1.9, 2.2)]
+turret = [prism('TurretBody', turret_profile, -1.05, 1.05, 'turret')]
+roof = [(tx - 1.0, 2.5), (tx + 1.2, 2.5), (tx + 0.9, 2.68), (tx - 0.8, 2.68)]
+turret.append(prism('TurretRoof', roof, -0.7, 0.7, 'turret'))
+bustle = [(tx - 2.5, 1.95), (tx - 1.7, 1.85), (tx - 1.7, 2.45), (tx - 2.3, 2.4)]
+turret.append(prism('Bustle', bustle, -0.85, 0.85, 'turret'))
+for y in (1.2, -1.2):
+    pod = [(tx - 1.2, 1.9), (tx + 0.6, 1.9), (tx + 0.9, 2.15), (tx + 0.5, 2.4), (tx - 1.1, 2.4)]
+    turret.append(prism(f'Pod{y}', pod, y - 0.2, y + 0.2, 'hull'))
+    turret.append(box(f'PodLight{y}', (tx + 0.82, y, 2.15), (0.03, 0.12, 0.05), 'amber'))
+turret.append(box('Sensor', (tx - 0.6, 0.45, 2.85), (0.22, 0.16, 0.17), 'dark'))
+turret.append(box('SensorLens', (tx - 0.37, 0.45, 2.87), (0.02, 0.1, 0.07), 'glow'))
+turret.append(box('Antenna', (tx - 1.6, -0.6, 3.2), (0.02, 0.02, 0.6), 'dark'))
+turret.append(box('TurretSeam', (tx + 0.2, 0, 2.69), (0.9, 0.02, 0.01), 'glow'))
+# Twin long barrels: slim tubes, a shroud with energy coils near the mantlet, short muzzle brakes.
+turret.append(box('Mantlet', (tx + 2.05, 0, 2.2), (0.25, 0.62, 0.22), 'dark'))
+for y in (0.3, -0.3):
+    turret.append(cylinder_x(f'Barrel{y}', tx + 2.2, tx + 8.2, y, 2.2, 0.11, 8, 'dark'))
+    turret.append(cylinder_x(f'Shroud{y}', tx + 2.2, tx + 4.6, y, 2.2, 0.17, 8, 'barrel'))
+    turret.append(cylinder_x(f'Muzzle{y}', tx + 7.8, tx + 8.3, y, 2.2, 0.15, 6, 'dark'))
 
 # Join into two meshes: Hull and Turret (fewer draw calls), pivot at the turret ring.
 def join(objs, name):
