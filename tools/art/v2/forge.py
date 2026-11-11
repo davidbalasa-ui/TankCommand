@@ -41,6 +41,31 @@ def group(name):
         ST['group'] = old
 
 
+def trs(t=(0, 0, 0), r=(0, 0, 0), s=(1, 1, 1), about=(0, 0, 0)):
+    """Rigid pose matrix: scale then rotate (XYZ euler, degrees) about a point, then translate."""
+    from mathutils import Euler
+    R = Euler([math.radians(a) for a in r], 'XYZ').to_matrix().to_4x4()
+    S = Matrix.Diagonal((s[0], s[1], s[2], 1.0))
+    A = Matrix.Translation(Vector(about))
+    return Matrix.Translation(Vector(t)) @ A @ R @ S @ A.inverted()
+
+
+def apply_poses(poses, into='Hull'):
+    """Bake pose matrices into the parts of the named groups and fold them into one group."""
+    for o in ST['parts']:
+        m = poses.get(o['group'])
+        if m is not None:
+            xf(o, m)
+        o['group'] = into
+
+
+def _gltf_trs(m):
+    loc, q, sc = m.decompose()
+    return dict(p=[round(loc.x, 5), round(loc.z, 5), round(-loc.y, 5)],
+                r=[round(q.x, 6), round(q.z, 6), round(-q.y, 6), round(q.w, 6)],
+                s=[round(sc.x, 5), round(sc.z, 5), round(sc.y, 5)])
+
+
 # ------------------------------------------------------------------ geometry
 def _new(verts, faces, zone, bevel=0.0, seg=1, sharp=35.0, name=None, merge=True, recalc=True):
     ST['seq'] += 1
@@ -895,7 +920,8 @@ def tri_count(obj):
 
 
 def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=None, label=None,
-           ao_floor=0.35, views=None, report=None, crevice=None, supersample=2, edge_color=None):
+           ao_floor=0.35, views=None, report=None, crevice=None, supersample=2, edge_color=None,
+           poses=None, bake_offset=None, clip=None):
     """pivot = (group_name, (x, y, z)) puts that group under an empty called TurretPivot.
     single = one mesh named `name` with no parent (props). gem = zone name kept as a second
     material called OreGem (deposits)."""
@@ -903,6 +929,10 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
     scene.render.engine = 'CYCLES'
     scene.cycles.device = 'CPU'
     parts = ST['parts']
+    for o in parts:   # keep parts that overlap in the finished pose apart while baking
+        d = (bake_offset or {}).get(o['group'])
+        if d:
+            move(o, d)
     groups = []
     for o in parts:
         if o['group'] not in groups:
@@ -1050,6 +1080,9 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
             o.data.name = g
             made[g] = o
         bpy.data.objects.remove(obj)
+    for g, d in (bake_offset or {}).items():
+        if g in made:
+            made[g].data.transform(Matrix.Translation(-Vector(d)))
     for o in made.values():
         if 'grp' in o.data.attributes:
             o.data.attributes.remove(o.data.attributes['grp'])
@@ -1070,8 +1103,23 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
             made[g].location = tuple(-c for c in loc)
             pivots[g] = e
     bpy.context.view_layer.update()
+    # Unfold poses: the node transform is the finished (deployed) pose, extras.packed the folded one.
+    anim = {}
+    for g, ps in (poses or {}).items():
+        node = pivots.get(g) or made[g]
+        rest = node.matrix_local.copy()
+        if 'deployed' in ps:
+            packed, deployed = rest, ps['deployed'] @ rest
+            node.matrix_local = deployed
+            node['hideWhenDeployed'] = 1
+        else:
+            packed, deployed = ps['packed'] @ rest, rest
+        node['packed'] = _gltf_trs(packed)
+        anim[node] = (packed, deployed)
+    bpy.context.view_layer.update()
     bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', export_yup=True, export_apply=True,
-                              export_image_format='JPEG', export_jpeg_quality=88, export_animations=False)
+                              export_image_format='JPEG', export_jpeg_quality=88, export_animations=False,
+                              export_extras=bool(poses))
     info = dict(name=name, file=os.path.basename(out_glb), triangles=tris, texture=size,
                 bytes=os.path.getsize(out_glb), parts=len(made))
     print('FORGE', json.dumps(info))
@@ -1080,12 +1128,12 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         with open(report, 'w') as f:
             json.dump(info, f)
     if render:
-        preview(list(made.values()), pivots, render, label or name, tris, views)
+        preview(list(made.values()), pivots, render, label or name, tris, views, clip=(clip, anim) if clip else None)
     return info
 
 
 # ------------------------------------------------------------------ preview
-def preview(meshes, pivots, path, label, tris, views=None, res=(960, 640), samples=32):
+def preview(meshes, pivots, path, label, tris, views=None, res=(960, 640), samples=32, clip=None):
     scene = bpy.context.scene
     for e in pivots.values():
         e.rotation_euler = (0, 0, math.radians(-18))
@@ -1179,3 +1227,42 @@ def preview(meshes, pivots, path, label, tris, views=None, res=(960, 640), sampl
             os.remove(p)
     except ImportError:
         pass
+    if clip:
+        _unfold_clip(clip[0], clip[1], pivots, cam, c, rad)
+
+
+def _unfold_clip(path, anim, pivots, cam, c, rad, frames=30):
+    """Render the fold-out from packed to deployed pose as a short looping video."""
+    import subprocess
+    scene = bpy.context.scene
+    for e in pivots.values():
+        e.rotation_euler = (0, 0, 0)
+    scene.render.resolution_x, scene.render.resolution_y = 720, 480
+    scene.cycles.samples = 14
+    d = Vector((1.0, -0.85, 0.55)).normalized() * rad * 3.9
+    cc = c + Vector((0, 0, rad * 0.15))
+    cam.location = cc + d
+    dd = cc - cam.location
+    cam.rotation_euler = (math.atan2(math.hypot(dd.x, dd.y), -dd.z), 0, math.atan2(dd.y, dd.x) - math.pi / 2)
+    cam.data.lens = 55
+    tmp = path[:-4] + '_frames'
+    os.makedirs(tmp, exist_ok=True)
+    keys = {n: (a.decompose(), b.decompose()) for n, (a, b) in anim.items()}
+    for f in range(frames):
+        t = f / (frames - 1)
+        t = t * t * (3 - 2 * t)
+        for n, ((l0, q0, s0), (l1, q1, s1)) in keys.items():
+            n.rotation_mode = 'QUATERNION'
+            n.location = l0.lerp(l1, t)
+            n.rotation_quaternion = q0.slerp(q1, t)
+            n.scale = s0.lerp(s1, t)
+        bpy.context.view_layer.update()
+        scene.render.filepath = os.path.join(tmp, f'f{f:03d}.png')
+        bpy.ops.render.render(write_still=True)
+    # Hold the first and last frames so the loop reads clearly.
+    seq = [0] * 10 + list(range(frames)) + [frames - 1] * 14
+    for i, f in enumerate(seq):
+        if not os.path.exists(os.path.join(tmp, f's{i:03d}.png')):
+            os.symlink(os.path.join(tmp, f'f{f:03d}.png'), os.path.join(tmp, f's{i:03d}.png'))
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', '15', '-i', os.path.join(tmp, 's%03d.png'),
+                    '-pix_fmt', 'yuv420p', '-crf', '20', path], check=False)

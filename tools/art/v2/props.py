@@ -74,14 +74,14 @@ def leaf(base, length, width, yaw, pitch, zone, curl=0.5, n=5):
 
 @asset('props/shrub.glb', 'Shrub')
 def shrub():
+    # A spray of broad blades round a low dark heart, like a desert agave thicket.
     rnd = random.Random(9)
-    for i, (x, y, r) in enumerate(((0, 0, 0.6), (0.6, 0.2, 0.45), (-0.55, 0.25, 0.42), (0.15, -0.55, 0.4), (-0.3, -0.4, 0.3), (0.45, 0.6, 0.28))):
-        rock((x, y, r * 0.75), r, 'leaf', sq=(1, 1, 0.85), seed=60 + i, rough=0.5, cuts=0, sharp=70, floor=0.0)
-    for k in range(14):
-        a = rnd.uniform(0, 360)
-        leaf((rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), rnd.uniform(0.2, 0.7)), rnd.uniform(0.5, 0.8), 0.14, a, rnd.uniform(25, 70), 'grass')
-    for k in range(3):
-        cyl((rnd.uniform(-0.3, 0.3), rnd.uniform(-0.3, 0.3), 0), (rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), 0.6), 0.04, 5, 'bark')
+    rock((0, 0, 0.14), 0.36, 'leaf', sq=(1, 1, 0.6), seed=60, rough=0.4, cuts=0, sharp=70, floor=0.0)
+    for ring, (count, pitch, ln, wd) in enumerate(((7, 78, 0.95, 0.2), (10, 58, 1.0, 0.24), (12, 36, 0.9, 0.24), (10, 16, 0.7, 0.2))):
+        for k in range(count):
+            a = 360.0 * k / count + rnd.uniform(-14, 14) + ring * 17
+            leaf((rnd.uniform(-0.08, 0.08), rnd.uniform(-0.08, 0.08), 0.05), ln * rnd.uniform(0.8, 1.15), wd, a,
+                 pitch + rnd.uniform(-8, 8), 'leaf' if (k + ring) % 3 else 'grass', curl=rnd.uniform(0.5, 0.9), n=5)
     return dict(name='Shrub')
 
 
@@ -99,7 +99,7 @@ def grass():
 def dead_tree():
     rnd = random.Random(6)
     trunk = [(0, 0, -0.05), (0.06, 0.02, 0.5), (-0.03, 0.05, 1.1), (0.08, -0.02, 1.7), (0.02, 0.03, 2.3)]
-    sweep(trunk, [0.2, 0.15, 0.12, 0.08, 0.02], 'bark', sides=7)
+    sweep(trunk, [0.2, 0.15, 0.12, 0.08, 0.02], 'bark', sides=7, up=(1, 0, 0))
     for k, (h, a, ln) in enumerate(((0.9, 30, 0.9), (1.25, 160, 1.0), (1.55, 265, 0.75), (1.9, 80, 0.6), (0.6, 210, 0.5))):
         ca, sa = math.cos(math.radians(a)), math.sin(math.radians(a))
         p0 = (0.03, 0.03, h)

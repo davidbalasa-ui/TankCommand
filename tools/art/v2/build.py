@@ -15,7 +15,7 @@ sys.path.insert(0, HERE)
 
 def registry():
     reg = {}
-    for modname in ('terran_units', 'kesh_units', 'terran_structures', 'kesh_structures', 'props'):
+    for modname in ('terran_units', 'kesh_units', 'terran_structures', 'kesh_structures', 'props', 'towers'):
         try:
             mod = __import__(modname)
         except ModuleNotFoundError as e:
