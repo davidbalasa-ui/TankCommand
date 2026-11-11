@@ -95,20 +95,38 @@ s_h = np.maximum(stones(int(70), 6, 13), np.maximum(stones(int(420), 2.5, 5), st
 soil = band(3, 12) * 0.07 + band(25 * K, 90 * K, 0.5) * 0.045
 ck = band(4, 14)
 crack = np.clip(1 - np.abs(ck) / 0.035, 0, 1) * (band(2, 5) > 0.3)
-dirt = 0.48 + soil + 0.13 * s_h + shade(blur(s_h, 0.7 * K), 0.9) - 0.1 * blur(np.clip(s_h * 4, 0, 1), 2.5 * K) * (s_h < 0.05) - 0.16 * crack
+dirt = 0.48 + soil + 0.13 * s_h + shade(blur(s_h, 0.7 * K), 0.9) - 0.1 * blur(np.clip(s_h * 4, 0, 1), 2.5 * K) * (s_h < 0.05) - 0.03 * crack
 
 # Rock
 yy = np.mgrid[0:N, 0:N][0] / N
 warp = band(2, 5) * 1.3 + band(6, 14) * 0.35
 lay = np.sin(yy * 2 * np.pi * 11 + warp)
 strata_h = np.tanh(lay * 2.5) * 0.5
-c = band(3, 9)
-c2 = band(5, 16)
-cr = np.clip(1 - np.abs(c) / 0.03, 0, 1) + np.clip(1 - np.abs(c2) / 0.025, 0, 1) * (band(2, 4) > 0.2)
+def cells(count, jitter=0.0):
+    """Wrapped Voronoi: distance to the nearest cell border (angular fracture lines)."""
+    yy_, xx_ = np.mgrid[0:N, 0:N].astype(np.float32)
+    xx_ = xx_ + band(3, 8) * jitter * K
+    yy_ = yy_ + band(3, 8) * jitter * K
+    d1 = np.full((N, N), 1e9, np.float32)
+    d2 = np.full((N, N), 1e9, np.float32)
+    for px, py in rng.random((count, 2)) * N:
+        dx = np.abs(xx_ - px)
+        dx = np.minimum(dx, N - dx)
+        dy = np.abs(yy_ - py)
+        dy = np.minimum(dy, N - dy) * 1.8   # blocks lie flat along the strata
+        d = np.sqrt(dx * dx + dy * dy)
+        d2 = np.where(d < d1, d1, np.minimum(d2, d))
+        d1 = np.minimum(d1, d)
+    return (d2 - d1) / K
+
+
+e1 = cells(26, 10.0)
+e2 = cells(110, 5.0)
+cr = np.clip(1 - e1 / 2.2, 0, 1) + 0.6 * np.clip(1 - e2 / 1.3, 0, 1) * (band(2, 4) > -0.2)
 cr = np.clip(cr, 0, 1)
-r_h = strata_h * 0.5 + band(8, 30) * 0.25 - cr * 1.2
+r_h = strata_h * 1.1 + band(8, 30) * 0.3 - cr * 1.3
 lichen = (band(20 * K, 60 * K, 0.4) > 1.6) * 0.07
-rock = 0.52 + 0.05 * strata_h + shade(blur(r_h, 0.9 * K), 0.22) - 0.2 * cr + band(90 * K, 240 * K, 0.2) * 0.035 + band(4, 12) * 0.05 + lichen
+rock = 0.52 + 0.09 * strata_h + shade(blur(r_h, 0.9 * K), 0.3) - 0.22 * cr + band(90 * K, 240 * K, 0.2) * 0.035 + band(4, 12) * 0.05 + lichen
 
 img = np.stack([np.clip(grass, 0, 1), np.clip(dirt, 0, 1), np.clip(rock, 0, 1)], axis=-1)
 img = 0.5 + (img - img.mean(axis=(0, 1), keepdims=True))   # centre each channel exactly on mid-grey
