@@ -16,7 +16,7 @@
       "cellsZ": 3
     },
     "sightRange": 18,
-    "modelId": "structure.landing_pad",
+    "modelId": "structure.human.landing_pad",
     "buildOnMetalDeposit": false,
     "placeholder": false
   },
@@ -37,7 +37,7 @@
       "cellsZ": 2
     },
     "sightRange": 10,
-    "modelId": "structure.metal_station",
+    "modelId": "structure.human.metal_station",
     "buildOnMetalDeposit": true,
     "metalRatePerSec": 1.5,
     "containerSize": 10,
@@ -61,7 +61,7 @@
       "cellsZ": 3
     },
     "sightRange": 18,
-    "modelId": "structure.landing_pad",
+    "modelId": "structure.alien.landing_pad",
     "buildOnMetalDeposit": false,
     "placeholder": false
   },
@@ -82,7 +82,7 @@
       "cellsZ": 2
     },
     "sightRange": 10,
-    "modelId": "structure.metal_station",
+    "modelId": "structure.alien.metal_station",
     "buildOnMetalDeposit": true,
     "metalRatePerSec": 1.5,
     "containerSize": 10,
@@ -108,7 +108,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.turret",
+    "modelId": "structure.human.turret",
     "weapon": {
       "damage": 25,
       "range": 14,
@@ -150,7 +150,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.radar",
+    "modelId": "structure.human.radar",
     "sensorRange": 30,
     "dismantleSec": 3,
     "dismantleRefundPercent": 70
@@ -174,7 +174,7 @@
       "cellsZ": 2
     },
     "sightRange": 10,
-    "modelId": "structure.lab",
+    "modelId": "structure.human.lab",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70
   },
@@ -197,7 +197,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.turret",
+    "modelId": "structure.alien.turret",
     "weapon": {
       "damage": 25,
       "range": 14,
@@ -239,7 +239,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.radar",
+    "modelId": "structure.alien.radar",
     "sensorRange": 30,
     "dismantleSec": 3,
     "dismantleRefundPercent": 70
@@ -263,7 +263,7 @@
       "cellsZ": 2
     },
     "sightRange": 10,
-    "modelId": "structure.lab",
+    "modelId": "structure.alien.lab",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70
   },
@@ -286,7 +286,7 @@
       "cellsZ": 3
     },
     "sightRange": 10,
-    "modelId": "structure.pad",
+    "modelId": "structure.human.air_base",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
     "airCapacity": 4
@@ -310,7 +310,7 @@
       "cellsZ": 3
     },
     "sightRange": 10,
-    "modelId": "structure.pad",
+    "modelId": "structure.alien.air_base",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
     "airCapacity": 4
@@ -334,7 +334,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.turret",
+    "modelId": "structure.human.missile_battery",
     "weapon": {
       "damage": 25,
       "range": 20,
@@ -377,7 +377,7 @@
       "cellsZ": 1
     },
     "sightRange": 14,
-    "modelId": "structure.turret",
+    "modelId": "structure.alien.missile_battery",
     "weapon": {
       "damage": 25,
       "range": 20,

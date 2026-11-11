@@ -4,6 +4,20 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 
 | Asset | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
+| structure.alien.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Hive Roost (structure) |
+| structure.alien.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Gene Vault (structure) |
+| structure.alien.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Nest (structure) |
+| structure.alien.metal_station | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Siphon (structure) |
+| structure.alien.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spore Tower (structure) |
+| structure.alien.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Seer Spire (structure) |
+| structure.alien.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Thornmound (structure) |
+| structure.human.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Airfield (structure) |
+| structure.human.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Research Lab (structure) |
+| structure.human.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Pad (structure) |
+| structure.human.metal_station | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Station (structure) |
+| structure.human.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spire Missile Battery (structure) |
+| structure.human.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Radar Tower (structure) |
+| structure.human.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion Gun (structure) |
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
 | unit.alien.disc | TankCommand project (scripted Blender) | ORIGINAL | - | Disc (saucer) |

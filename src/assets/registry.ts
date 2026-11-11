@@ -25,6 +25,10 @@ export class AssetRegistry {
     }
   }
 
+  has(id: string): boolean {
+    return this.byId.has(id);
+  }
+
   get(id: string): AssetEntry {
     const entry = this.byId.get(id);
     if (!entry) {

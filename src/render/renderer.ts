@@ -111,6 +111,10 @@ interface StructureVisual {
   height: number;
   barrel: THREE.Mesh | null;
   baseColor: THREE.Color;
+  // Set when the structure type has a loaded model: the box stays as an invisible picking body.
+  model: THREE.Object3D | null;
+  modelPivot: THREE.Object3D | null;
+  modelColors: Array<{ material: THREE.MeshStandardMaterial; base: THREE.Color }>;
 }
 
 function structureHeight(kind: string): number {
@@ -285,6 +289,7 @@ export class RenderView {
   private templateRoot: THREE.Group | null = null;
   // Per-model templates keyed by asset id (unit type modelId); units without one use templateRoot.
   private readonly templates = new Map<string, THREE.Group>();
+  private readonly registry: AssetRegistry;
   private directional: THREE.DirectionalLight;
   private lightTarget: THREE.Object3D;
   private marker: THREE.Mesh | null = null;
@@ -304,6 +309,7 @@ export class RenderView {
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
     this.world = world;
+    this.registry = registry;
     this.renderer = createRenderer(canvas);
     this.basePixelRatio = Math.min(globalThis.devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(this.basePixelRatio);
@@ -1250,11 +1256,17 @@ export class RenderView {
     await this.loadUnitModels();
   }
 
-  // Load every distinct unit model the world's unit types name (besides the shared fallback tank).
+  // Load every distinct unit and structure model the world's types name (besides the shared fallback tank).
+  // Structure types whose model is not in the asset manifest keep their plain box.
   private async loadUnitModels(): Promise<void> {
     const ids = new Set<string>();
     for (const type of this.world.unitTypes.values()) {
       if (type.modelId && type.modelId !== TANK_ASSET_ID) {
+        ids.add(type.modelId);
+      }
+    }
+    for (const type of this.world.structureTypes.values()) {
+      if (type.modelId && this.registry.has(type.modelId)) {
         ids.add(type.modelId);
       }
     }
@@ -1269,7 +1281,10 @@ export class RenderView {
       const result = results[index];
       // A rejected load (unknown or broken model) leaves those units on the fallback tank.
       if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
-        this.templates.set(id, this.prepareTemplate(result.value));
+        const template = id.startsWith('structure.')
+          ? this.prepareStructureTemplate(result.value)
+          : this.prepareTemplate(result.value);
+        this.templates.set(id, template);
         this.loadedModels.push(id);
         loaded = true;
       }
@@ -1342,6 +1357,46 @@ export class RenderView {
     }
     this.unitRoots.clear();
     this.syncUnits(0);
+    // Structures created before their models arrived are rebuilt with the model.
+    for (const visual of this.structureVisuals.values()) {
+      this.disposeStructureVisual(visual);
+    }
+    this.structureVisuals.clear();
+    this.syncStructures(this.world);
+  }
+
+  // Structure models are normalised to a 1 x 1 footprint, centred, standing on y = 0.
+  private prepareStructureTemplate(model: THREE.Object3D): THREE.Group {
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    if (!bounds.isEmpty()) {
+      const size = new THREE.Vector3();
+      bounds.getSize(size);
+      model.scale.multiplyScalar(1 / Math.max(size.x, size.z, 0.0001));
+      model.updateMatrixWorld(true);
+      const scaled = new THREE.Box3().setFromObject(model);
+      const centre = new THREE.Vector3();
+      scaled.getCenter(centre);
+      model.position.x -= centre.x;
+      model.position.z -= centre.z;
+      model.position.y -= scaled.min.y;
+    }
+    const root = new THREE.Group();
+    root.add(model);
+    root.updateMatrixWorld(true);
+    return root;
+  }
+
+  private disposeStructureVisual(visual: StructureVisual): void {
+    this.scene.remove(visual.mesh);
+    visual.mesh.geometry.dispose();
+    const material = visual.mesh.material;
+    if (material instanceof THREE.Material) {
+      material.dispose();
+    }
+    for (const entry of visual.modelColors) {
+      entry.material.dispose();
+    }
   }
 
   private createUnitVisual(unit: UnitState): UnitVisual {
@@ -1444,11 +1499,41 @@ export class RenderView {
           barrel.userData.pivot = pivot;
         }
         this.scene.add(mesh);
+        let model: THREE.Object3D | null = null;
+        let modelPivot: THREE.Object3D | null = null;
+        const modelColors: StructureVisual['modelColors'] = [];
+        const template = type.modelId ? this.templates.get(type.modelId) : undefined;
+        if (template) {
+          model = template.clone(true);
+          cloneMaterials(model, isHostile(this.world, 1, structure.owner), this.colorBlind);
+          model.scale.setScalar(size * 0.96);
+          model.position.y = -height / 2;
+          model.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+              object.castShadow = true;
+              object.receiveShadow = true;
+              const own = object.material;
+              if (own instanceof THREE.MeshStandardMaterial) {
+                modelColors.push({ material: own, base: own.color.clone() });
+              }
+            }
+          });
+          modelPivot = model.getObjectByName('TurretPivot') ?? null;
+          mesh.add(model);
+          // The box stays as the picking and selection body, but is not drawn.
+          material.visible = false;
+          if (barrel) {
+            barrel.visible = false;
+          }
+        }
         visual = {
           mesh,
           height,
           barrel,
           baseColor: new THREE.Color(structure.owner === 1 ? FRIENDLY_STRUCTURE_COLOR : ENEMY_STRUCTURE_COLOR),
+          model,
+          modelPivot,
+          modelColors,
         };
         this.structureVisuals.set(structure.id, visual);
       }
@@ -1464,6 +1549,13 @@ export class RenderView {
         material.color.copy(visual.baseColor).multiplyScalar(shade);
         material.emissive.setRGB(damage === 'critical' ? 0.35 : 0, 0, 0);
       }
+      for (const entry of visual.modelColors) {
+        entry.material.color.copy(entry.base).multiplyScalar(shade);
+      }
+      if (visual.modelPivot) {
+        // Model weapons point along +X, like the units: same heading convention as unit turrets.
+        visual.modelPivot.rotation.y = -structure.turretHeading;
+      }
       const pivot = visual.barrel?.userData.pivot as THREE.Object3D | undefined;
       if (pivot) {
         pivot.rotation.y = structure.turretHeading;
@@ -1474,12 +1566,7 @@ export class RenderView {
     this.syncRubble(world);
     for (const [id, visual] of this.structureVisuals) {
       if (!alive.has(id)) {
-        this.scene.remove(visual.mesh);
-        visual.mesh.geometry.dispose();
-        const material = visual.mesh.material;
-        if (material instanceof THREE.Material) {
-          material.dispose();
-        }
+        this.disposeStructureVisual(visual);
         this.structureVisuals.delete(id);
       }
     }
