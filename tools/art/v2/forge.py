@@ -609,7 +609,7 @@ ZONES = {
         'barrel': dict(kind='etched', base=(0.72, 0.62, 0.45), base2=(0.55, 0.4, 0.2), rough=0.22, veins=0.0, fine=True),
         'slat': dict(kind='ribs', emit=GOLD, strength=1.7, freq=6.0),
         'glow': dict(kind='glow', emit=GOLD, strength=2.0),
-        'core': dict(kind='orb', emit=GOLD, strength=1.5),
+        'core': dict(kind='orb', emit=GOLD, strength=1.1),
         'violet': dict(kind='glow', emit=(0.35, 0.08, 1.0), strength=2.0),
     },
     'nature': {
@@ -733,7 +733,7 @@ def zone_mat(zone):
             w2 = n.wave(3.4, 5.0, 2.0, 2.2, n.vscale(n.co, (1.0, 1.3, 0.8)))
             sw2 = n.m('SUBTRACT', 1.0, n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', w2, 0.5)), 0.02, 0.06))
             cr = n.m('SUBTRACT', 1.0, n.smooth(n.voronoi(2.2, 'DISTANCE_TO_EDGE').outputs['Distance'], 0.006, 0.02))
-            eng = n.m('MAXIMUM', sw, n.m('MAXIMUM', n.m('MULTIPLY', sw2, 0.6), n.m('MULTIPLY', cr, 0.35)))
+            eng = n.m('MAXIMUM', sw, n.m('MAXIMUM', n.m('MULTIPLY', sw2, 0.6), n.m('MULTIPLY', cr, 0.12)))
             sel = n.smooth(n.noise(0.7, 2.0), 0.74 - z['veins'] * 0.3, 0.8 - z['veins'] * 0.3)
             vein = n.m('MULTIPLY', sw, sel)
         col = n.mix(n.m('MULTIPLY', eng, 0.92), col, (b2[0] * 0.1, b2[1] * 0.08, b2[2] * 0.07))
@@ -742,23 +742,23 @@ def zone_mat(zone):
               0.92, GOLD, n.m('MULTIPLY', vein, 1.7) if vein != 0.0 else 0.0)
         n.bump(n.m('SUBTRACT', n.m('MULTIPLY', fine, 0.05), eng), 0.6, 0.025)
     elif kind == 'ribs':
+        # Dark bronze inner body with thin glowing seams across it.
         x = n.sep(n.co)[0]
         f = n.m('FRACT', n.m('MULTIPLY', x, z['freq']))
-        on = n.m('ADD', 0.45, n.m('MULTIPLY', n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.5, 0.38), 0.55))
-        flick = n.m('ADD', 0.35, n.m('MULTIPLY', n.noise(1.2, 3.0), 1.1))
+        on = n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.13, 0.05)
         e = z['emit']
-        n.out(n.mix(on, (0.03, 0.018, 0.01), (e[0] * 0.6, e[1] * 0.6, e[2] * 0.6)), 0.4, 0.6, e,
-              n.m('MULTIPLY', n.m('MULTIPLY', on, flick), z['strength']))
-        n.bump(n.m('SUBTRACT', 1.0, on), 0.9, 0.04)
+        n.out(n.mix(on, (0.05, 0.032, 0.018), (e[0] * 0.6, e[1] * 0.6, e[2] * 0.6)),
+              n.m('ADD', 0.38, n.m('MULTIPLY', fine, 0.15)), 0.8, e, n.m('MULTIPLY', on, z['strength']))
+        n.bump(n.m('SUBTRACT', 1.0, on), 0.7, 0.03)
     elif kind == 'orb':
         lw = n.nt.nodes.new('ShaderNodeLayerWeight')
         lw.inputs['Blend'].default_value = 0.4
         core = n.m('SUBTRACT', 1.0, lw.outputs[1])
-        swirl = n.smooth(n.wave(3.0, 6.0, 2.0, 1.0), 0.3, 0.7)
+        swirl = n.smooth(n.noise(2.6, 4.0), 0.3, 0.75)
         e = z['emit']
         n.out((e[0] * 0.7, e[1] * 0.7, e[2] * 0.7), 0.2, 0.0,
-              n.mix(core, e, (1.0, 0.7, 0.25)),
-              n.m('ADD', z['strength'] * 0.8, n.m('MULTIPLY', core, z['strength'])))
+              n.mix(n.m('MULTIPLY', core, swirl), (e[0], e[1] * 0.6, e[2]), (1.0, 0.5, 0.1)),
+              n.m('ADD', z['strength'] * 0.5, n.m('MULTIPLY', n.m('MULTIPLY', core, swirl), z['strength'] * 0.6)))
     elif kind == 'rock':
         b, b2 = z['base'], z['base2']
         big = n.noise(1.4, 6.0)
