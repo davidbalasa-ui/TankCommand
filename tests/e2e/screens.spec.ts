@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { enterGame, winSkirmish } from './helpers';
+import { enterGame, toggleLeftHandedViaSettings, winSkirmish } from './helpers';
 
 const PHONE_ONLY = 'screens are captured on the phone project only';
 
@@ -80,9 +80,7 @@ test('[screens] wp03-4-groups-open', async ({ page }, testInfo) => {
 test('[screens] wp03-5-left-handed', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   await enterGame(page);
-  await page.evaluate(() => {
-    document.querySelector<HTMLButtonElement>('[data-control-id="inGame.leftHanded"]')?.click();
-  });
+  await toggleLeftHandedViaSettings(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.leftHanded ?? false))
     .toBe(true);

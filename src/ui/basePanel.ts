@@ -1,4 +1,5 @@
 import { button } from './controls';
+import { icon } from './icons';
 
 export interface ResearchNodeView {
   id: string;
@@ -101,15 +102,17 @@ export class BasePanel {
     this.element.className = 'hud-base-panel';
     this.element.dataset.hudItem = 'basePanel';
     const header = document.createElement('div');
-    header.className = 'build-header';
-    const title = document.createElement('span');
-    title.textContent = 'Base and research';
-    header.append(
-      title,
-      button('inGame', 'baseClose', 'Close', () => {
-        onClose();
-      }),
-    );
+    header.className = 'drawer-header';
+    const title = document.createElement('h2');
+    title.className = 'drawer-title';
+    title.textContent = 'Base';
+    const close = button('inGame', 'baseClose', 'Close', () => {
+      onClose();
+    });
+    close.classList.add('drawer-close');
+    close.setAttribute('aria-label', 'Close');
+    close.replaceChildren(icon('x'));
+    header.append(title, close);
     this.content = document.createElement('div');
     this.content.className = 'build-content';
     this.element.append(header, this.content);

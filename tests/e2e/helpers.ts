@@ -586,3 +586,19 @@ export async function gotoQuiet(page: Page): Promise<void> {
   });
   await page.goto('/');
 }
+
+/** Toggles the left-handed layout the way a player does: Pause → Settings → Layout, then back to the game. */
+export async function toggleLeftHandedViaSettings(page: Page): Promise<void> {
+  const click = async (id: string): Promise<void> => {
+    await page.locator(`[data-control-id="${id}"]`).first().click();
+  };
+  await click('inGame.pause');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'pause');
+  await click('pause.settings');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'settings');
+  await click('settings.leftHanded');
+  await click('settings.back');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'pause');
+  await click('pause.resume');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+}

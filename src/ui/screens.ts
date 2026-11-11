@@ -15,7 +15,6 @@ import type {
 import { mountBugReport } from './bugReport';
 import { mountSaveSlots } from './saveSlots';
 import { mountSettings } from './settingsScreen';
-import { mountSpeedButton } from './speedButton';
 import { SIM_SPEED_FAST, SIM_SPEED_NORMAL, SIM_SPEED_SLOW } from '../sim/tuning';
 import { SIM_TICK_HZ } from '../sim/constants';
 
@@ -197,6 +196,38 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       version.className = 'title-version';
       version.textContent = `v${APP_VERSION}`;
       root.append(backdrop, shade, logo, menu, small, version);
+
+      // Live 3D background. Automated browsers skip it unless asked (keeps e2e runs fast).
+      let disposeBackdrop: (() => void) | null = null;
+      let closed = false;
+      let wanted = true;
+      try {
+        wanted = !navigator.webdriver || window.localStorage.getItem('tc.titleBackdrop') === 'on';
+      } catch {
+        wanted = !navigator.webdriver;
+      }
+      if (wanted && ctx.attachTitleBackdrop) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'title-canvas';
+        backdrop.append(canvas);
+        void ctx
+          .attachTitleBackdrop(canvas)
+          .then((dispose) => {
+            if (closed) {
+              dispose();
+            } else {
+              disposeBackdrop = dispose;
+              backdrop.classList.add('live');
+            }
+          })
+          .catch(() => {
+            canvas.remove();
+          });
+      }
+      return () => {
+        closed = true;
+        disposeBackdrop?.();
+      };
     }),
 
     campaignSelect: makeScreen('campaignSelect', 'Campaign', (root, ctx) => {
@@ -593,11 +624,17 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           salvageSelected: () => {
             ctx.salvageSelected?.();
           },
+          getAlerts: () => ctx.api?.alerts() ?? [],
+          simSpeed: () => ctx.api?.simSpeed() ?? 1,
+          cycleSpeed: () => {
+            ctx.api?.cycleSpeed();
+          },
+          thumbnail: (kind, typeId) => ctx.thumbnail?.(kind, typeId) ?? null,
+          itemName: (typeId) => ctx.itemName?.(typeId) ?? typeId,
         });
         ctx.registerHud?.(hud);
       }
 
-      const disposeSpeedButton = mountSpeedButton(root, ctx.api);
 
       let disposed = false;
       let handle: RendererHandle | null = null;
@@ -649,7 +686,6 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.registerHud?.(null);
         hud?.dispose();
         handle?.dispose();
-        disposeSpeedButton();
       };
     }),
 

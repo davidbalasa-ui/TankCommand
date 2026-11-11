@@ -190,6 +190,8 @@ export interface ScreenContext {
   groupMembers?: (group: number) => number[];
   registerHud?: (hud: HudHandle | null) => void;
   getBuildItems?: () => BuildItemView[];
+  /** Draws the live 3D title background into the canvas; resolves to its dispose function. */
+  attachTitleBackdrop?: (canvas: HTMLCanvasElement) => Promise<() => void>;
   /** Portrait of a unit or structure type rendered from its model; null until loaded. */
   thumbnail?: (kind: 'unit' | 'structure', typeId: string) => string | null;
   /** Friendly name of a unit or structure type. */

@@ -354,6 +354,43 @@ function createFallbackTank(): THREE.Group {
   return group;
 }
 
+const WORKER_LABEL_ZOOM = 32;
+
+function workerLabelText(kind: string, capacity: number, job: UnitState['job']): string {
+  const load = job && capacity > 0 ? ` ${Math.floor(job.load)}/${capacity}` : '';
+  if (kind === 'oreMiner') {
+    switch (job?.stage) {
+      case 'digging':
+        return `Mining${load}`;
+      case 'toDeposit':
+        return 'Miner · to ore';
+      case 'toPad':
+        return `To pad${load}`;
+      case 'waiting':
+        return `Waiting at pad${load}`;
+      case 'unloading':
+        return 'Unloading';
+      default:
+        return job ? 'Miner' : 'Miner · idle';
+    }
+  }
+  switch (job?.stage) {
+    case 'toStation':
+    case 'toDeposit':
+      return 'Hauler · to pickup';
+    case 'loading':
+      return `Hauler · loading${load}`;
+    case 'toPad':
+      return `Hauler · to pad${load}`;
+    case 'waiting':
+      return 'Hauler · waiting';
+    case 'unloading':
+      return 'Hauler · unloading';
+    default:
+      return job ? 'Hauler' : 'Hauler · idle';
+  }
+}
+
 const THUMB_WIDTH = 112;
 const THUMB_HEIGHT = 104;
 
@@ -380,6 +417,7 @@ export class RenderView {
   private readonly raycaster = new THREE.Raycaster();
   private readonly overlay: HTMLDivElement;
   private readonly healthBars = new Map<number, HealthBar>();
+  private readonly workerLabels = new Map<number, HTMLDivElement>();
   private readonly unitRoots = new Map<number, UnitVisual>();
   private readonly structureVisuals = new Map<number, StructureVisual>();
   private landscape: Landscape | null = null;
@@ -823,6 +861,7 @@ export class RenderView {
     this.syncSelection();
     this.syncOrderLines();
     this.syncHealthBars();
+    this.syncWorkerLabels();
     this.updateMarker();
     this.updateFlashes();
     this.effects.update(1 / 60);
@@ -983,6 +1022,11 @@ export class RenderView {
     this.skyTexture?.dispose();
     this.loader.release(TANK_ASSET_ID);
     this.renderer.dispose();
+  }
+
+  /** Frees the WebGL context right away (title backdrop), instead of waiting for garbage collection. */
+  releaseContext(): void {
+    this.renderer.forceContextLoss();
   }
 
   private effectiveQualityLevel(): number {
@@ -1556,7 +1600,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     bounds.getSize(size);
     const radius = Math.max(0.001, size.length() / 2);
     const camera = new THREE.PerspectiveCamera(30, width / height, 0.01, 100);
-    const distance = radius / Math.sin(THREE.MathUtils.degToRad(15)) * 0.92;
+    const distance = (radius / Math.sin(THREE.MathUtils.degToRad(15))) * 0.7;
     const direction = new THREE.Vector3(1, 0.75, 1.15).normalize();
     camera.position.copy(centre).addScaledVector(direction, distance);
     camera.lookAt(centre);
@@ -2470,6 +2514,48 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       if (!alive.has(id)) {
         bar.outer.remove();
         this.healthBars.delete(id);
+      }
+    }
+  }
+
+  /**
+   * Floating status tags over the player's workers ("Mining 18/30", "Hauler · to pad"), shown
+   * while a worker is selected or the camera is zoomed in, so mining is readable at a glance.
+   */
+  private syncWorkerLabels(): void {
+    const zoomedIn = this.rtsCamera.distance <= WORKER_LABEL_ZOOM;
+    const shown = new Set<number>();
+    for (const unit of this.world.units) {
+      if (unit.owner !== 1 || unit.hp <= 0) {
+        continue;
+      }
+      const type = this.world.unitTypes.get(unit.typeId);
+      if (!type?.workerKind || (!zoomedIn && !this.selection.includes(unit.id))) {
+        continue;
+      }
+      const screen = this.projectPoint(unit.x, heightAt(this.world.map, unit.x, unit.z) + 3.2, unit.z);
+      if (!screen) {
+        continue;
+      }
+      shown.add(unit.id);
+      let label = this.workerLabels.get(unit.id);
+      if (!label) {
+        label = document.createElement('div');
+        label.className = `worker-label ${type.workerKind === 'oreMiner' ? 'miner' : 'hauler'}`;
+        this.overlay.append(label);
+        this.workerLabels.set(unit.id, label);
+      }
+      const text = workerLabelText(type.workerKind, type.carryCapacity, unit.job);
+      if (label.textContent !== text) {
+        label.textContent = text;
+      }
+      label.style.left = `${screen.x}px`;
+      label.style.top = `${screen.y - 12}px`;
+    }
+    for (const [id, label] of this.workerLabels) {
+      if (!shown.has(id)) {
+        label.remove();
+        this.workerLabels.delete(id);
       }
     }
   }

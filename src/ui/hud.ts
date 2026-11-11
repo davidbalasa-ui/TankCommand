@@ -7,6 +7,9 @@ import { UNIT_CAP } from '../sim/tuning';
 import type { WorldState } from '../sim/types';
 import { button } from './controls';
 import { BasePanel, type BaseAction, type BaseView } from './basePanel';
+import { BuildDrawer } from './buildDrawer';
+import { ensureIconSprite, icon, resourceIcon, type IconName } from './icons';
+import type { AlertSnapshot } from './alerts';
 import type {
   BuildItemView,
   DropQueueView,
@@ -61,10 +64,16 @@ export interface HudContext {
   salvageSelected?: () => void;
   getBaseView?: () => BaseView;
   baseAction?: (action: BaseAction) => boolean;
+  /** Recent alerts (newest last) for the bell and its unread badge. */
+  getAlerts?: () => AlertSnapshot[];
+  simSpeed?: () => number;
+  cycleSpeed?: () => void;
+  thumbnail?: (kind: 'unit' | 'structure', typeId: string) => string | null;
+  itemName?: (typeId: string) => string;
 }
 
 const MINIMAP_SIZE = 240;
-const MINIMAP_MARGIN = 10;
+const MINIMAP_MARGIN = 4;
 const MINIMAP_INTERVAL_MS = 200;
 
 interface WorldPoint {
@@ -151,16 +160,95 @@ function clipToMapSquare(points: readonly WorldPoint[], half: number): WorldPoin
   return polygon;
 }
 
+const WORKER_STAGE_TEXT: Record<string, string> = {
+  toDeposit: 'Driving to the field',
+  digging: 'Mining',
+  toPad: 'Delivering to pad',
+  toStation: 'Driving to station',
+  loading: 'Loading',
+  unloading: 'Unloading',
+  waiting: 'Waiting in line',
+};
+
+const ORDER_TEXT: Record<string, string> = {
+  idle: 'Idle',
+  move: 'Moving',
+  attackMove: 'Attack-moving',
+  attack: 'Attacking',
+};
+
+const ROLE_TEXT: Record<string, string> = {
+  scout: 'Scout',
+  tank: 'Tank',
+  artillery: 'Artillery',
+  support: 'Support',
+  air: 'Aircraft',
+  structure: 'Packed structure',
+};
+
+const ROLE_PLURAL: Record<string, [string, string]> = {
+  tank: ['tank', 'tanks'],
+  scout: ['scout', 'scouts'],
+  air: ['aircraft', 'aircraft'],
+  artillery: ['gun', 'guns'],
+  worker: ['worker', 'workers'],
+};
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) {
+    node.textContent = text;
+  }
+  return node;
+}
+
+function hpColour(fraction: number): string {
+  return fraction > 0.6 ? 'var(--green)' : fraction > 0.3 ? 'var(--amber)' : 'var(--red)';
+}
+
+/** Command button: line icon over a caption, accessible name = caption. */
+function commandButton(name: string, label: string, iconName: IconName, onClick: () => void): HTMLButtonElement {
+  const node = button('inGame', name, label, onClick);
+  node.classList.add('hud-cmd');
+  node.setAttribute('aria-label', label);
+  node.replaceChildren(icon(iconName), el('span', 'hud-cmd-label', label));
+  return node;
+}
+
+interface SelectionKinds {
+  any: boolean;
+  combat: boolean;
+  air: boolean;
+}
+
 export class Hud implements HudHandle {
   private readonly root: HTMLDivElement;
   private readonly ctx: HudContext;
-  private readonly resources: HTMLSpanElement;
-  private readonly workers: HTMLSpanElement;
-  private readonly unitsLabel: HTMLSpanElement;
+  private readonly oreValue: HTMLSpanElement;
+  private readonly metalValue: HTMLSpanElement;
+  private readonly workersValue: HTMLSpanElement;
+  private readonly unitsValue: HTMLSpanElement;
   private readonly clock: HTMLSpanElement;
+  private readonly speedButton: HTMLButtonElement;
+  private readonly alertButton: HTMLButtonElement;
+  private readonly alertBadge: HTMLSpanElement;
+  private lastSeenAlertId = 0;
   private readonly minimap: HTMLCanvasElement;
   private readonly selectionPanel: HTMLDivElement;
+  private readonly selectionBody: HTMLDivElement;
+  private selectionSignature = '';
+  private readonly selectionRefs = new Map<number, { fill: HTMLElement; img: HTMLElement }>();
+  private singleRefs: {
+    hp: HTMLElement;
+    status: HTMLElement;
+    cargo: HTMLElement;
+    cargoFill: HTMLElement;
+    cargoText: HTMLElement;
+    img: HTMLElement;
+  } | null = null;
   private readonly groupsStrip: HTMLDivElement;
+  private readonly commandBar: HTMLDivElement;
   private readonly attackButton: HTMLButtonElement;
   private readonly holdButton: HTMLButtonElement;
   private readonly airButton: HTMLButtonElement;
@@ -176,20 +264,18 @@ export class Hud implements HudHandle {
   private readonly mineButton: HTMLButtonElement;
   private readonly assignButton: HTMLButtonElement;
   private readonly salvageButton: HTMLButtonElement;
-  private readonly buildPanel: HTMLDivElement;
+  private readonly buildDrawer: BuildDrawer;
   private readonly basePanel: BasePanel;
   private readonly baseButton: HTMLButtonElement;
   private baseOpen = false;
-  private readonly buildContent: HTMLDivElement;
   private readonly placementBar: HTMLDivElement;
   private readonly confirmPlacement: HTMLButtonElement;
   private readonly cancelPlacement: HTMLButtonElement;
   private readonly groupButtons: HTMLButtonElement[] = [];
-  private readonly queueProgressRefs = new Map<number, HTMLSpanElement>();
   private readonly timer: number;
+  /** "Set group" armed: the next tap on a group tile saves the selection there. */
   private groupsOpen = false;
   private buildMenuOpen = false;
-  private lastBuildSignature = '';
   private minimapRedraws = 0;
   private lastFootprint: Array<{ x: number; z: number }> = [];
   private minimapPointer: number | null = null;
@@ -197,52 +283,88 @@ export class Hud implements HudHandle {
 
   constructor(host: HTMLElement, ctx: HudContext) {
     this.ctx = ctx;
+    ensureIconSprite();
     this.root = document.createElement('div');
     this.root.className = 'hud-shell';
     this.root.dataset.hudShell = 'true';
 
-    const topbar = document.createElement('div');
-    topbar.className = 'hud-topbar';
-    topbar.dataset.hudItem = 'topbar';
+    // Top-left: resources, workers and unit count.
+    const resources = el('div', 'hud-resbar panel');
+    resources.dataset.hudItem = 'resources';
+    const stat = (glyph: SVGSVGElement, title: string): HTMLSpanElement => {
+      const wrap = el('span', 'hud-res');
+      wrap.title = title;
+      const value = el('span', 'hud-res-value', '0');
+      wrap.append(glyph, value);
+      resources.append(wrap);
+      return value;
+    };
+    this.oreValue = stat(resourceIcon('ore', 16), 'Ore');
+    this.metalValue = stat(resourceIcon('metal', 16), 'Metal');
+    this.workersValue = stat(icon('worker', 'hud-res-ico'), 'Workers');
+    this.unitsValue = stat(icon('unit', 'hud-res-ico'), 'Units');
 
-    this.resources = document.createElement('span');
-    this.resources.className = 'hud-resources';
-    this.resources.textContent = 'O 0 · M 0';
-    this.workers = document.createElement('span');
-    this.workers.className = 'hud-workers';
-    this.workers.textContent = 'W 0';
-    this.unitsLabel = document.createElement('span');
-    this.unitsLabel.className = 'hud-units';
-    this.unitsLabel.textContent = `U 0/${UNIT_CAP}`;
-    this.clock = document.createElement('span');
-    this.clock.className = 'hud-clock';
-    this.clock.textContent = '00:00';
-    topbar.append(this.resources, this.workers, this.unitsLabel, this.clock);
+    // Top-centre: game clock and speed chip.
+    const clockBar = el('div', 'hud-clockbar panel');
+    clockBar.dataset.hudItem = 'clock';
+    this.clock = el('span', 'hud-clock', '00:00');
+    this.speedButton = button('inGame', 'speed', 'Speed 1×', () => {
+      this.ctx.cycleSpeed?.();
+      this.refreshSpeed();
+    });
+    this.speedButton.classList.add('hud-speed');
+    clockBar.append(this.clock, this.speedButton);
 
-    const deselect = button('inGame', 'deselect', 'Deselect', () => {
-      ctx.setSelection([]);
+    // Top-right: alerts, objectives (missions only) and pause.
+    const corner = el('div', 'hud-corner');
+    corner.dataset.hudItem = 'corner';
+    this.alertButton = button('inGame', 'alerts', 'Alerts', () => {
+      this.openLatestAlert();
     });
-    const lefty = button('inGame', 'leftHanded', 'Lefty', () => {
-      this.toggleLeftHanded();
-    });
-    const pause = button('inGame', 'pause', 'Pause', () => {
-      ctx.pause();
-    });
+    this.alertButton.classList.add('hud-icon-button');
+    this.alertButton.setAttribute('aria-label', 'Alerts');
+    this.alertBadge = el('span', 'hud-badge');
+    this.alertBadge.hidden = true;
+    this.alertButton.replaceChildren(icon('bell'), this.alertBadge);
     this.objectivesButton = button('inGame', 'objectives', 'Objectives', () => {
       ctx.openObjectives?.();
     });
+    this.objectivesButton.classList.add('hud-icon-button');
+    this.objectivesButton.setAttribute('aria-label', 'Objectives');
+    this.objectivesButton.replaceChildren(icon('list'));
     this.objectivesButton.hidden = true;
-    topbar.append(deselect, lefty, this.objectivesButton, pause);
-    this.toast = document.createElement('div');
-    this.toast.className = 'hud-toast';
+    const pause = button('inGame', 'pause', 'Pause', () => {
+      ctx.pause();
+    });
+    pause.classList.add('hud-icon-button');
+    pause.setAttribute('aria-label', 'Pause');
+    pause.replaceChildren(icon('pause'));
+    corner.append(this.alertButton, this.objectivesButton, pause);
+
+    this.toast = el('div', 'hud-toast');
     this.toast.dataset.hudItem = 'toast';
     this.toast.hidden = true;
 
-    const minimapWrap = document.createElement('div');
-    minimapWrap.className = 'hud-minimap';
+    // Left edge: control-group tiles, always visible.
+    this.groupsStrip = el('div', 'hud-groups');
+    this.groupsStrip.dataset.hudItem = 'groups';
+    for (let group = 1; group <= 5; group += 1) {
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.className = 'hud-group-button';
+      element.dataset.controlId = `inGame.group${group}`;
+      element.dataset.group = String(group);
+      element.setAttribute('aria-label', `Group ${group}`);
+      element.append(el('b', 'group-number', String(group)), el('span', 'group-caption', 'empty'));
+      this.attachGroupHandlers(element, group);
+      this.groupButtons.push(element);
+      this.groupsStrip.append(element);
+    }
+
+    // Bottom-left: minimap.
+    const minimapWrap = el('div', 'hud-minimap panel');
     minimapWrap.dataset.hudItem = 'minimap';
-    this.minimap = document.createElement('canvas');
-    this.minimap.className = 'minimap-canvas';
+    this.minimap = el('canvas', 'minimap-canvas');
     this.minimap.width = MINIMAP_SIZE;
     this.minimap.height = MINIMAP_SIZE;
     this.minimap.setAttribute('aria-label', 'Minimap');
@@ -253,127 +375,132 @@ export class Hud implements HudHandle {
     this.minimap.addEventListener('pointercancel', this.onMinimapUp);
     this.minimap.addEventListener('contextmenu', this.onMinimapContext);
 
-    const commandBar = document.createElement('div');
-    commandBar.className = 'hud-commandbar';
-    commandBar.dataset.hudItem = 'commandbar';
-
-    this.attackButton = button('inGame', 'attackMove', 'Atk Move', () => {
+    // Right: command grid with only the commands the selection can use.
+    this.commandBar = el('div', 'hud-commandbar');
+    this.commandBar.dataset.hudItem = 'commandbar';
+    this.attackButton = commandButton('attackMove', 'Attack', 'attack', () => {
       ctx.setAttackMoveArmed(!ctx.isAttackMoveArmed());
       this.refresh();
     });
-    this.holdButton = button('inGame', 'hold', 'Hold', () => {
-      this.issueHold();
+    this.mineButton = commandButton('mine', 'Mine', 'mine', () => {
+      this.refresh();
     });
-    this.airButton = button('inGame', 'air', 'Launch', () => {
-      this.issueAir();
+    this.assignButton = commandButton('assign', 'Haul', 'haul', () => {
+      this.refresh();
     });
-    this.airButton.hidden = true;
-    this.airInfo = document.createElement('span');
-    this.airInfo.className = 'hud-airinfo';
-    this.airInfo.hidden = true;
-    this.stopButton = button('inGame', 'stop', 'Stop', () => {
+    this.stopButton = commandButton('stop', 'Stop', 'stop', () => {
       this.issueStop();
     });
-    this.queueButton = button('inGame', 'queue', 'Queue', () => {
+    this.holdButton = commandButton('hold', 'Hold', 'hold', () => {
+      this.issueHold();
+    });
+    this.queueButton = commandButton('queue', 'Waypoints', 'way', () => {
       ctx.setQueueMode(!ctx.isQueueMode());
       this.refresh();
     });
-    this.groupsButton = button('inGame', 'groups', 'Groups', () => {
-      this.groupsOpen = !this.groupsOpen;
-      this.groupsStrip.classList.toggle('open', this.groupsOpen);
-      this.refresh();
-    });
-    this.buildButton = button('inGame', 'buildMenu', 'Build', () => {
-      this.setBuildMenu(!this.buildMenuOpen);
-    });
-    this.mineButton = button('inGame', 'mine', 'Mine', () => {
-      this.refresh();
-    });
-    this.assignButton = button('inGame', 'assign', 'Assign', () => {
-      this.refresh();
-    });
-    this.salvageButton = button('inGame', 'salvage', 'Salvage', () => {
+    this.salvageButton = commandButton('salvage', 'Salvage', 'salvage', () => {
       ctx.salvageSelected?.();
       this.refresh();
     });
+    this.airButton = commandButton('air', 'Launch', 'air', () => {
+      this.issueAir();
+    });
+    this.airButton.hidden = true;
+    this.groupsButton = commandButton('groups', 'Set group', 'group', () => {
+      this.groupsOpen = !this.groupsOpen;
+      this.refresh();
+    });
+    this.airInfo = el('span', 'hud-airinfo');
+    this.airInfo.hidden = true;
+    this.commandBar.append(
+      this.airInfo,
+      this.attackButton,
+      this.mineButton,
+      this.assignButton,
+      this.stopButton,
+      this.holdButton,
+      this.queueButton,
+      this.salvageButton,
+      this.airButton,
+      this.groupsButton,
+    );
+
+    // Bottom-right dock: Base and the big Build button, always visible.
+    const dock = el('div', 'hud-dock');
+    dock.dataset.hudItem = 'dock';
     this.baseButton = button('inGame', 'base', 'Base', () => {
       this.setBase(!this.baseOpen);
     });
-    commandBar.append(
-      this.buildButton,
-      this.baseButton,
-      this.attackButton,
-      this.holdButton,
-      this.airButton,
-      this.airInfo,
-      this.stopButton,
-      this.queueButton,
-      this.groupsButton,
-      this.mineButton,
-      this.assignButton,
-      this.salvageButton,
-    );
-
-    this.groupsStrip = document.createElement('div');
-    this.groupsStrip.className = 'hud-groups';
-    this.groupsStrip.dataset.hudItem = 'groups';
-    for (let group = 1; group <= 5; group += 1) {
-      const element = document.createElement('button');
-      element.type = 'button';
-      element.className = 'hud-group-button';
-      element.textContent = String(group);
-      element.dataset.controlId = `inGame.group${group}`;
-      element.dataset.group = String(group);
-      this.attachGroupHandlers(element, group);
-      this.groupButtons.push(element);
-      this.groupsStrip.append(element);
-    }
-
-    this.selectionPanel = document.createElement('div');
-    this.selectionPanel.className = 'hud-selection';
-    this.selectionPanel.dataset.hudItem = 'selection';
-
-    this.buildPanel = document.createElement('div');
-    this.buildPanel.className = 'hud-build-panel';
-    this.buildPanel.dataset.hudItem = 'buildPanel';
-    const buildHeader = document.createElement('div');
-    buildHeader.className = 'build-header';
-    const buildTitle = document.createElement('span');
-    buildTitle.textContent = 'Orbital Drops';
-    const buildClose = button('inGame', 'buildClose', 'Close', () => {
-      this.setBuildMenu(false);
+    this.baseButton.classList.add('hud-base-button');
+    this.baseButton.setAttribute('aria-label', 'Base');
+    this.baseButton.replaceChildren(icon('base'), el('span', 'hud-cmd-label', 'Base'));
+    this.buildButton = button('inGame', 'buildMenu', 'Build', () => {
+      this.setBuildMenu(!this.buildMenuOpen);
     });
-    buildHeader.append(buildTitle, buildClose);
-    this.buildContent = document.createElement('div');
-    this.buildContent.className = 'build-content';
-    this.buildPanel.append(buildHeader, this.buildContent);
+    this.buildButton.classList.add('hud-build-button');
+    this.buildButton.setAttribute('aria-label', 'Build');
+    this.buildButton.replaceChildren(icon('build'), 'BUILD');
+    dock.append(this.baseButton, this.buildButton);
+
+    // Bottom-centre: selection panel (portraits, or one unit's details).
+    this.selectionPanel = el('div', 'hud-selection panel');
+    this.selectionPanel.dataset.hudItem = 'selection';
+    this.selectionBody = el('div', 'hud-selection-body');
+    const deselect = button('inGame', 'deselect', 'Deselect', () => {
+      ctx.setSelection([]);
+    });
+    deselect.classList.add('hud-deselect');
+    deselect.setAttribute('aria-label', 'Deselect');
+    deselect.replaceChildren(icon('x'));
+    this.selectionPanel.append(this.selectionBody, deselect);
+
+    this.buildDrawer = new BuildDrawer({
+      getBuildItems: () => this.ctx.getBuildItems?.() ?? [],
+      getOwnPads: () => this.ctx.getOwnPads?.() ?? [],
+      getSelectedPadId: () => this.ctx.getSelectedPadId?.() ?? null,
+      setSelectedPad: (id) => {
+        this.ctx.setSelectedPad?.(id);
+      },
+      buyItem: (itemId) => this.ctx.buyItem?.(itemId) ?? false,
+      getDropQueue: () => this.ctx.getDropQueue?.() ?? [],
+      cancelOrder: (orderId) => {
+        this.ctx.cancelOrder?.(orderId);
+      },
+      getKits: () => this.ctx.getKits?.() ?? [],
+      startPlacement: (kitId) => this.ctx.startPlacement?.(kitId) ?? false,
+      getBaseView: () => this.baseView(),
+      baseAction: (action) => this.ctx.baseAction?.(action) ?? false,
+      getResources: () => {
+        const stats = this.ctx.getWorld().resources.find((item) => item.player === 1);
+        return { ore: stats?.ore ?? 0, metal: stats?.metal ?? 0 };
+      },
+      thumbnail: (kind, typeId) => this.ctx.thumbnail?.(kind, typeId) ?? null,
+      close: () => {
+        this.setBuildMenu(false);
+      },
+      openBase: () => {
+        this.setBase(true);
+      },
+    });
 
     this.basePanel = new BasePanel(
       {
-        getView: () =>
-          this.ctx.getBaseView?.() ?? {
-            labId: null,
-            labBusy: false,
-            nodes: [],
-            structures: [],
-            units: [],
-            ore: 0,
-            metal: 0,
-          },
+        getView: () => this.baseView(),
         act: (action) => this.ctx.baseAction?.(action) ?? false,
       },
       () => {
         this.setBase(false);
       },
     );
+    this.basePanel.element.classList.add('hud-drawer');
 
-    this.placementBar = document.createElement('div');
-    this.placementBar.className = 'hud-placement';
+    this.placementBar = el('div', 'hud-placement panel');
     this.placementBar.dataset.hudItem = 'placementBar';
     this.confirmPlacement = button('inGame', 'placeConfirm', 'Confirm', () => {
       this.ctx.confirmPlacement?.();
       this.refresh();
     });
+    this.confirmPlacement.classList.add('primary');
     this.cancelPlacement = button('inGame', 'placeCancel', 'Cancel', () => {
       this.ctx.cancelPlacement?.();
       this.refresh();
@@ -381,18 +508,22 @@ export class Hud implements HudHandle {
     this.placementBar.append(this.confirmPlacement, this.cancelPlacement);
 
     this.root.append(
-      topbar,
+      resources,
+      clockBar,
+      corner,
       this.toast,
-      minimapWrap,
-      commandBar,
       this.groupsStrip,
+      minimapWrap,
       this.selectionPanel,
-      this.buildPanel,
+      this.commandBar,
+      dock,
+      this.buildDrawer.element,
       this.basePanel.element,
       this.placementBar,
     );
     host.append(this.root);
 
+    this.lastSeenAlertId = Math.max(0, ...(this.ctx.getAlerts?.() ?? []).map((alert) => alert.id));
     this.update();
     this.timer = window.setInterval(() => {
       this.update();
@@ -438,51 +569,84 @@ export class Hud implements HudHandle {
     this.root.remove();
   }
 
+  private baseView(): BaseView {
+    return (
+      this.ctx.getBaseView?.() ?? {
+        labId: null,
+        labBusy: false,
+        nodes: [],
+        structures: [],
+        units: [],
+        ore: 0,
+        metal: 0,
+      }
+    );
+  }
+
+  private selectionKinds(selection: readonly number[]): SelectionKinds {
+    const world = this.ctx.getWorld();
+    const kinds: SelectionKinds = { any: false, combat: false, air: false };
+    for (const id of selection) {
+      const unit = world.units.find((item) => item.id === id);
+      if (!unit || unit.hp <= 0) {
+        continue;
+      }
+      kinds.any = true;
+      const type = world.unitTypes.get(unit.typeId);
+      if (!type?.workerKind) {
+        kinds.combat = true;
+      }
+      if (unit.air) {
+        kinds.air = true;
+      }
+    }
+    return kinds;
+  }
+
   refresh(): void {
     const selection = this.ctx.getSelection();
     const hasSelection = selection.length > 0;
+    const kinds = this.selectionKinds(selection);
     const actions: WorkerActions = this.ctx.getWorkerActions?.() ?? {
       canMine: false,
       canAssign: false,
       canSalvage: false,
     };
-    this.attackButton.disabled = !hasSelection;
-    this.holdButton.disabled = !hasSelection;
-    this.stopButton.disabled = !hasSelection;
+    // Only the commands this selection can use are shown; hidden ones are also disabled.
+    const show = (node: HTMLButtonElement, visible: boolean): void => {
+      node.hidden = !visible;
+      node.disabled = !visible;
+    };
+    const combat = hasSelection && (kinds.combat || !kinds.any);
+    show(this.attackButton, combat);
+    show(this.holdButton, combat);
+    show(this.queueButton, combat);
+    show(this.stopButton, hasSelection);
+    show(this.groupsButton, hasSelection);
+    show(this.mineButton, actions.canMine);
+    show(this.assignButton, actions.canAssign);
+    show(this.salvageButton, actions.canSalvage);
     this.refreshAir(selection);
     this.refreshMission();
-    this.queueButton.disabled = !hasSelection;
-    this.groupsButton.disabled = !hasSelection;
     this.buildButton.disabled = false;
-    this.mineButton.disabled = !actions.canMine;
-    this.assignButton.disabled = !actions.canAssign;
-    this.salvageButton.disabled = !actions.canSalvage;
     this.queueButton.classList.toggle('active', this.ctx.isQueueMode());
     this.attackButton.classList.toggle('active', this.ctx.isAttackMoveArmed());
+    if (!hasSelection) {
+      this.groupsOpen = false;
+    }
     this.groupsButton.classList.toggle('active', this.groupsOpen);
+    this.groupsStrip.classList.toggle('open', this.groupsOpen);
+    this.commandBar.hidden = !hasSelection;
     this.root.classList.toggle('left-handed', this.ctx.isLeftHanded());
     this.root.classList.toggle('build-open', this.buildMenuOpen);
     this.root.classList.toggle('base-open', this.baseOpen);
     const placing = this.ctx.getPlacement?.() !== null;
     this.root.classList.toggle('placing', placing);
     this.placementBar.classList.toggle('open', placing);
-    this.groupsStrip.classList.toggle('open', this.groupsOpen);
-    if (!hasSelection) {
-      this.groupsOpen = false;
-      this.groupsStrip.classList.remove('open');
-    }
-
-    for (const element of this.groupButtons) {
-      const group = Number(element.dataset.group ?? '0');
-      const members = this.ctx.groupMembers(group).slice().sort((a, b) => a - b);
-      const selected = selection.slice().sort((a, b) => a - b);
-      const same =
-        members.length > 0 &&
-        members.length === selected.length &&
-        members.every((id, index) => id === selected[index]);
-      element.classList.toggle('selected', same);
-    }
-    this.renderBuildMenu();
+    this.refreshGroups(selection);
+    this.refreshSpeed();
+    this.refreshAlerts();
+    this.buildDrawer.refresh();
     this.basePanel.refresh();
   }
 
@@ -497,18 +661,86 @@ export class Hud implements HudHandle {
       const type = world.unitTypes.get(unit.typeId);
       return type?.workerKind !== null && type?.workerKind !== undefined;
     }).length;
-    this.resources.textContent = `O ${stats?.ore ?? 0} · M ${stats?.metal ?? 0}`;
-    this.workers.textContent = `W ${workers}`;
-    this.unitsLabel.textContent = `U ${ownUnits.length}/${UNIT_CAP}`;
+    this.oreValue.textContent = String(stats?.ore ?? 0);
+    this.metalValue.textContent = String(stats?.metal ?? 0);
+    this.workersValue.textContent = String(workers);
+    this.unitsValue.replaceChildren(String(ownUnits.length), el('small', 'hud-res-cap', `/${UNIT_CAP}`));
     this.refresh();
     this.renderSelection(world, selection);
     this.drawMinimap(world);
+  }
+
+  private refreshSpeed(): void {
+    const multiplier = this.ctx.simSpeed?.() ?? 1;
+    const text = `${multiplier % 1 === 0 ? multiplier.toFixed(0) : multiplier.toFixed(1)}×`;
+    if (this.speedButton.textContent !== text) {
+      this.speedButton.textContent = text;
+    }
+    this.speedButton.setAttribute('aria-label', `Speed ${text}`);
+  }
+
+  private refreshAlerts(): void {
+    const alerts = this.ctx.getAlerts?.() ?? [];
+    const unread = alerts.filter((alert) => alert.id > this.lastSeenAlertId).length;
+    this.alertBadge.hidden = unread === 0;
+    this.alertBadge.textContent = unread > 9 ? '9+' : String(unread);
+    this.alertButton.classList.toggle('has-unread', unread > 0);
+  }
+
+  /** Bell: jump the camera to the newest alert and mark everything read. */
+  private openLatestAlert(): void {
+    const alerts = this.ctx.getAlerts?.() ?? [];
+    const latest = alerts[alerts.length - 1];
+    if (latest) {
+      this.ctx.setCameraTarget(latest.x, latest.z);
+      this.lastSeenAlertId = Math.max(this.lastSeenAlertId, ...alerts.map((alert) => alert.id));
+    }
+    this.refreshAlerts();
+  }
+
+  private refreshGroups(selection: readonly number[]): void {
+    const world = this.ctx.getWorld();
+    const selected = selection.slice().sort((a, b) => a - b);
+    for (const element of this.groupButtons) {
+      const group = Number(element.dataset.group ?? '0');
+      const members = this.ctx
+        .groupMembers(group)
+        .filter((id) => world.units.some((unit) => unit.id === id && unit.hp > 0))
+        .sort((a, b) => a - b);
+      const same =
+        members.length > 0 &&
+        members.length === selected.length &&
+        members.every((id, index) => id === selected[index]);
+      element.classList.toggle('selected', same);
+      element.classList.toggle('empty', members.length === 0);
+      const caption = element.querySelector('.group-caption');
+      if (caption) {
+        const text = members.length === 0 ? 'empty' : this.groupCaption(world, members);
+        if (caption.textContent !== text) {
+          caption.textContent = text;
+        }
+      }
+    }
+  }
+
+  private groupCaption(world: WorldState, members: readonly number[]): string {
+    const roles = new Set<string>();
+    for (const id of members) {
+      const unit = world.units.find((item) => item.id === id);
+      const role = unit ? world.unitTypes.get(unit.typeId)?.role : undefined;
+      roles.add(role ?? 'unit');
+    }
+    const n = members.length;
+    const only = roles.size === 1 ? [...roles][0] : undefined;
+    const words = (only ? ROLE_PLURAL[only] : undefined) ?? ['unit', 'units'];
+    return `${n} ${n === 1 ? words[0] : words[1]}`;
   }
 
   private setBase(open: boolean): void {
     this.baseOpen = open;
     if (open) {
       this.buildMenuOpen = false;
+      this.buildDrawer.setOpen(false);
       this.groupsOpen = false;
     }
     this.basePanel.setOpen(open);
@@ -522,251 +754,199 @@ export class Hud implements HudHandle {
     }
     this.buildMenuOpen = open;
     this.groupsOpen = false;
-    this.groupsStrip.classList.remove('open');
+    this.buildDrawer.setOpen(open);
     this.root.classList.toggle('build-open', open);
     this.refresh();
   }
 
-  /**
-   * Structural signature of the build menu: everything that requires the panel
-   * to be rebuilt. Live values that only need in-place updates (queue progress)
-   * are intentionally excluded.
-   *
-   * The panel used to be torn down and rebuilt on every 200 ms HUD tick, which
-   * detached every button a few times per second. Playwright's `locator.tap()`
-   * performs actionability checks across multiple frames; if the button was
-   * detached mid-check the tap was retried forever and the test hung on
-   * `build.item.*` and `build.place.*` clicks. Rebuilding only when the sig-
-   * nature changes keeps the buttons stable across ticks.
-   */
-  private computeBuildSignature(): string {
-    const items = this.ctx.getBuildItems?.() ?? [];
-    const pads = this.ctx.getOwnPads?.() ?? [];
-    const queue = this.ctx.getDropQueue?.() ?? [];
-    const kits = this.ctx.getKits?.() ?? [];
-    const selectedPad = this.ctx.getSelectedPadId?.() ?? null;
-    const parts: string[] = [selectedPad === null ? 'pad:' : `pad:${selectedPad}`];
-    parts.push(pads.map((pad) => pad.id).join(','));
-    for (const item of items) {
-      parts.push(
-        `${item.id}|${item.name}|${item.kind}|${item.ore}|${item.metal}|${item.deliverySec}|${item.disabledReason ?? ''}`,
-      );
-    }
-    parts.push('::queue::');
-    for (const order of queue) {
-      parts.push(`${order.id}|${order.itemId}|${order.name}`);
-    }
-    parts.push('::kits::');
-    for (const kit of kits) {
-      parts.push(`${kit.id}|${kit.name}`);
-    }
-    return parts.join(';');
+  private unitLabel(typeId: string): string {
+    return this.ctx.itemName?.(typeId) ?? typeId.split('.').pop() ?? typeId;
   }
 
-  /**
-   * Section order (top to bottom) inside the bottom sheet:
-   *   1. "Receive at" pad row — cheap context.
-   *   2. "Ready to place" (only when a kit is waiting) — a delivered kit is the
-   *      most urgent action; putting it above the catalogue means the Place
-   *      button lands in the visible first screenful.
-   *   3. "Queue" (only when non-empty) — a placed order needs a visible
-   *      progress bar and Cancel button, again without scrolling.
-   *   4. "Units" / "Structures" catalogue — scroll target for new buys.
-   *
-   * The previous layout pushed both "Queue" and "Ready to place" below the item
-   * list, so on a 220 px phone sheet a purchase or a delivered kit left the
-   * player staring at the top of the catalogue.
-   */
-  private renderBuildMenu(): void {
-    if (!this.buildMenuOpen) {
-      if (this.lastBuildSignature !== '') {
-        this.buildContent.replaceChildren();
-        this.queueProgressRefs.clear();
-        this.lastBuildSignature = '';
-      }
+  private portrait(className: string, typeId: string): HTMLSpanElement {
+    const slot = el('span', className);
+    const url = this.ctx.thumbnail?.('unit', typeId) ?? null;
+    if (url) {
+      slot.style.backgroundImage = `url(${url})`;
+      slot.dataset.loaded = 'true';
+    } else {
+      slot.append(icon('unit', 'thumb-fallback'));
+    }
+    slot.dataset.typeId = typeId;
+    return slot;
+  }
+
+  private fillPortrait(slot: HTMLElement): void {
+    if (slot.dataset.loaded === 'true') {
       return;
     }
-    const signature = this.computeBuildSignature();
-    if (signature === this.lastBuildSignature) {
-      const queue = this.ctx.getDropQueue?.() ?? [];
-      for (const order of queue) {
-        const bar = this.queueProgressRefs.get(order.id);
-        if (bar) {
-          const pct = Math.round(Math.min(1, Math.max(0, order.progress)) * 100);
-          bar.style.width = `${pct}%`;
-        }
-      }
-      return;
+    const typeId = slot.dataset.typeId ?? '';
+    const url = this.ctx.thumbnail?.('unit', typeId) ?? null;
+    if (url) {
+      slot.replaceChildren();
+      slot.style.backgroundImage = `url(${url})`;
+      slot.dataset.loaded = 'true';
     }
-    this.lastBuildSignature = signature;
-    this.queueProgressRefs.clear();
-    this.buildContent.replaceChildren();
+  }
 
-    const items = this.ctx.getBuildItems?.() ?? [];
-    const pads = this.ctx.getOwnPads?.() ?? [];
-    const selectedPad = this.ctx.getSelectedPadId?.() ?? null;
-
-    const padRow = document.createElement('div');
-    padRow.className = 'build-pad-row';
-    const padLabel = document.createElement('span');
-    padLabel.className = 'build-section-title';
-    padLabel.textContent = 'Receive at';
-    padRow.append(padLabel);
-    for (const [index, pad] of pads.entries()) {
-      const padButton = document.createElement('button');
-      padButton.type = 'button';
-      padButton.className = `build-pad${pad.id === selectedPad ? ' active' : ''}`;
-      padButton.textContent = `Pad ${index + 1}`;
-      padButton.dataset.controlId = `build.pad.${pad.id}`;
-      padButton.addEventListener('click', () => {
-        this.ctx.setSelectedPad?.(pad.id);
-        this.renderBuildMenu();
-      });
-      padRow.append(padButton);
-    }
-    this.buildContent.append(padRow);
-
-    const kits = this.ctx.getKits?.() ?? [];
-    if (kits.length > 0) {
-      const kitSection = document.createElement('div');
-      kitSection.className = 'build-section';
-      const kitTitle = document.createElement('div');
-      kitTitle.className = 'build-section-title';
-      kitTitle.textContent = 'Ready to place';
-      kitSection.append(kitTitle);
-      for (const kit of kits) {
-        const place = document.createElement('button');
-        place.type = 'button';
-        place.className = 'build-place';
-        place.textContent = `Place ${kit.name}`;
-        place.dataset.controlId = `build.place.${kit.id}`;
-        place.addEventListener('click', () => {
-          if (this.ctx.startPlacement?.(kit.id)) {
-            this.setBuildMenu(false);
-          }
-        });
-        kitSection.append(place);
-      }
-      this.buildContent.append(kitSection);
-    }
-
-    const queue = this.ctx.getDropQueue?.() ?? [];
-    if (queue.length > 0) {
-      const queueSection = document.createElement('div');
-      queueSection.className = 'build-section';
-      const queueTitle = document.createElement('div');
-      queueTitle.className = 'build-section-title';
-      queueTitle.textContent = 'Queue';
-      queueSection.append(queueTitle);
-      for (const order of queue) {
-        const row = document.createElement('div');
-        row.className = 'build-queue-row';
-        const info = document.createElement('span');
-        info.className = 'build-queue-name';
-        info.textContent = order.name;
-        const bar = document.createElement('span');
-        bar.className = 'queue-bar';
-        const fill = document.createElement('span');
-        fill.className = 'queue-fill';
-        fill.style.width = `${Math.round(Math.min(1, Math.max(0, order.progress)) * 100)}%`;
-        bar.append(fill);
-        this.queueProgressRefs.set(order.id, fill);
-        const cancel = document.createElement('button');
-        cancel.type = 'button';
-        cancel.className = 'build-cancel';
-        cancel.textContent = 'Cancel';
-        cancel.dataset.controlId = `build.cancel.${order.id}`;
-        cancel.addEventListener('click', () => {
-          this.ctx.cancelOrder?.(order.id);
-          this.renderBuildMenu();
-        });
-        row.append(info, bar, cancel);
-        queueSection.append(row);
-      }
-      this.buildContent.append(queueSection);
-    }
-
-    const groups: Array<{ label: string; kind: 'unit' | 'structure' }> = [
-      { label: 'Units', kind: 'unit' },
-      { label: 'Structures', kind: 'structure' },
-    ];
-    for (const group of groups) {
-      const section = document.createElement('div');
-      section.className = 'build-section';
-      const title = document.createElement('div');
-      title.className = 'build-section-title';
-      title.textContent = group.label;
-      section.append(title);
-      const list = document.createElement('div');
-      list.className = 'build-items';
-      for (const item of items.filter((entry) => entry.kind === group.kind)) {
-        const itemButton = document.createElement('button');
-        itemButton.type = 'button';
-        itemButton.className = 'build-item';
-        itemButton.dataset.controlId = `build.item.${item.id}`;
-        itemButton.disabled = item.disabledReason !== null;
-        const name = document.createElement('span');
-        name.className = 'build-item-name';
-        name.textContent = item.name;
-        const cost = document.createElement('span');
-        cost.className = 'build-item-cost';
-        cost.textContent = `${item.ore} ore · ${item.metal} metal · ${item.deliverySec.toFixed(0)}s`;
-        itemButton.append(name, cost);
-        if (item.disabledReason) {
-          const reason = document.createElement('span');
-          reason.className = 'build-reason';
-          reason.textContent = item.disabledReason;
-          itemButton.append(reason);
-        }
-        itemButton.addEventListener('click', () => {
-          this.ctx.buyItem?.(item.id);
-          this.renderBuildMenu();
-        });
-        list.append(itemButton);
-      }
-      section.append(list);
-      this.buildContent.append(section);
-    }
+  /** How many portraits fit between the minimap and the right-hand dock. */
+  private portraitCapacity(): number {
+    const width = this.root.clientWidth || window.innerWidth;
+    const available = width - 158 - 8 - 200 - 104;
+    return Math.max(1, Math.floor(available / 62));
   }
 
   private renderSelection(world: WorldState, selection: number[]): void {
-    this.selectionPanel.style.display = selection.length === 0 ? 'none' : '';
-    this.selectionPanel.replaceChildren();
+    const alive = selection
+      .map((id) => world.units.find((item) => item.id === id))
+      .filter((unit): unit is NonNullable<typeof unit> => unit !== undefined);
+    this.selectionPanel.hidden = selection.length === 0;
     if (selection.length === 0) {
+      if (this.selectionSignature !== '') {
+        this.selectionBody.replaceChildren();
+        this.selectionRefs.clear();
+        this.singleRefs = null;
+        this.selectionSignature = '';
+      }
       return;
     }
-    const count = document.createElement('span');
-    count.className = 'hud-selection-count';
-    count.textContent = `Selected: ${selection.length}`;
-    const list = document.createElement('div');
-    list.className = 'hud-selection-list';
-
-    for (const id of selection) {
-      const unit = world.units.find((item) => item.id === id);
-      if (!unit) {
-        continue;
+    const capacity = this.portraitCapacity();
+    const signature = `${alive.length === 1 ? 'one' : 'many'}:${capacity}:${alive.map((unit) => `${unit.id}/${unit.typeId}`).join(',')}`;
+    if (signature !== this.selectionSignature) {
+      this.selectionSignature = signature;
+      this.selectionRefs.clear();
+      this.singleRefs = null;
+      this.selectionBody.replaceChildren();
+      this.selectionPanel.classList.toggle('single', alive.length === 1);
+      const only = alive[0];
+      if (alive.length === 1 && only) {
+        this.buildSingle(world, only);
+      } else {
+        this.buildMany(alive, capacity);
       }
-      const type = world.unitTypes.get(unit.typeId);
-      const maxHp = type?.hp ?? Math.max(1, unit.hp);
-      const icon = document.createElement('button');
-      icon.type = 'button';
-      icon.className = 'selection-icon';
-      icon.dataset.unitId = String(id);
-      icon.setAttribute('aria-label', `Select unit ${id}`);
-      const bar = document.createElement('span');
-      bar.className = 'selection-hp';
-      const fill = document.createElement('span');
-      fill.className = 'selection-hp-fill';
-      fill.style.width = `${clamp01(unit.hp / Math.max(1, maxHp)) * 100}%`;
-      bar.append(fill);
-      icon.append(bar);
-      icon.addEventListener('click', () => {
-        this.ctx.setSelection([id]);
-      });
-      list.append(icon);
     }
+    // Live values: HP, status line, cargo, late-loading portraits.
+    for (const unit of alive) {
+      const refs = this.selectionRefs.get(unit.id);
+      if (refs) {
+        const max = world.unitTypes.get(unit.typeId)?.hp ?? Math.max(1, unit.hp);
+        const fraction = clamp01(unit.hp / Math.max(1, max));
+        refs.fill.style.width = `${fraction * 100}%`;
+        refs.fill.style.background = hpColour(fraction);
+        this.fillPortrait(refs.img);
+      }
+    }
+    const only = alive[0];
+    if (this.singleRefs && only) {
+      this.updateSingle(world, only);
+    }
+  }
 
-    this.selectionPanel.append(count, list);
+  private buildMany(units: ReadonlyArray<WorldState['units'][number]>, capacity: number): void {
+    const count = el('div', 'hud-selection-count');
+    count.append(el('b', '', String(units.length)), el('span', '', 'selected'));
+    const list = el('div', 'hud-selection-list');
+    const shown = units.length > capacity ? capacity - 1 : units.length;
+    for (const unit of units) {
+      const tile = el('button', 'selection-icon');
+      tile.type = 'button';
+      tile.dataset.unitId = String(unit.id);
+      tile.setAttribute('aria-label', `Select ${this.unitLabel(unit.typeId)} ${unit.id}`);
+      const img = this.portrait('selection-thumb', unit.typeId);
+      const bar = el('span', 'selection-hp');
+      const fill = el('span', 'selection-hp-fill');
+      bar.append(fill);
+      tile.append(img, bar);
+      tile.addEventListener('click', () => {
+        this.ctx.setSelection([unit.id]);
+      });
+      this.selectionRefs.set(unit.id, { fill, img });
+      // Tiles past the visible count stay in the DOM (tests and keyboard can reach them) but hidden.
+      if (list.childElementCount >= shown) {
+        tile.hidden = true;
+      }
+      list.append(tile);
+    }
+    if (units.length > shown) {
+      list.append(el('span', 'selection-more', `+${units.length - shown}`));
+    }
+    this.selectionBody.append(count, list);
+  }
+
+  private buildSingle(world: WorldState, unit: WorldState['units'][number]): void {
+    const type = world.unitTypes.get(unit.typeId);
+    const tile = el('button', 'selection-icon selection-single-portrait');
+    tile.type = 'button';
+    tile.dataset.unitId = String(unit.id);
+    tile.setAttribute('aria-label', `Centre on ${this.unitLabel(unit.typeId)}`);
+    tile.addEventListener('click', () => {
+      this.ctx.setCameraTarget(unit.x, unit.z);
+    });
+    const img = this.portrait('selection-thumb', unit.typeId);
+    const hpBar = el('span', 'selection-hp');
+    const hpFill = el('span', 'selection-hp-fill');
+    hpBar.append(hpFill);
+    tile.append(img, hpBar);
+    this.selectionRefs.set(unit.id, { fill: hpFill, img });
+
+    const info = el('div', 'selection-info');
+    const role =
+      type?.workerKind === 'oreMiner'
+        ? 'Ore miner'
+        : type?.workerKind === 'tug'
+          ? 'Hauler'
+          : (ROLE_TEXT[type?.role ?? ''] ?? 'Unit');
+    const head = el('div', 'selection-head');
+    head.append(el('span', 'selection-name', this.unitLabel(unit.typeId)), el('span', 'selection-role', role));
+    const hp = el('div', 'bar');
+    const hpInner = el('i', '');
+    hp.append(hpInner);
+    const statusRow = el('div', 'selection-status');
+    const status = el('span', '');
+    const cargoText = el('span', 'selection-cargo-text');
+    statusRow.append(status, cargoText);
+    const cargo = el('div', 'bar thin');
+    const cargoFill = el('i', '');
+    cargo.append(cargoFill);
+    info.append(head, hp, statusRow, cargo);
+    this.selectionBody.append(tile, info);
+    this.singleRefs = { hp: hpInner, status, cargo, cargoFill, cargoText, img };
+  }
+
+  private updateSingle(world: WorldState, unit: WorldState['units'][number]): void {
+    const refs = this.singleRefs;
+    if (!refs) {
+      return;
+    }
+    const type = world.unitTypes.get(unit.typeId);
+    const fraction = clamp01(unit.hp / Math.max(1, type?.hp ?? unit.hp));
+    refs.hp.style.width = `${fraction * 100}%`;
+    refs.hp.style.background = hpColour(fraction);
+    let status = unit.stance === 'hold' ? 'Holding position' : (ORDER_TEXT[unit.order.kind] ?? 'Idle');
+    let cargo: { have: number; max: number; colour: string; noun: string } | null = null;
+    if (unit.job) {
+      status = WORKER_STAGE_TEXT[unit.job.stage] ?? status;
+      const max = type?.carryCapacity ?? 0;
+      if (max > 0) {
+        const noun = unit.job.kind === 'oreMiner' ? 'ore' : (unit.job.cargo ?? 'metal');
+        cargo = { have: Math.floor(unit.job.load), max, colour: noun === 'ore' ? 'var(--ore)' : '#b8c7d9', noun };
+      }
+    } else if (type?.workerKind) {
+      status = type.workerKind === 'oreMiner' ? 'Idle · tap Mine, then an ore field' : 'Idle · tap Haul, then a station';
+    }
+    if (unit.air) {
+      status = `${unit.air.mode === 'flying' ? 'Flying' : unit.air.mode === 'returning' ? 'Returning' : unit.air.mode === 'rearming' ? 'Rearming' : 'Landed'}`;
+      cargo = null;
+    }
+    if (refs.status.textContent !== status) {
+      refs.status.textContent = status;
+    }
+    refs.cargo.hidden = cargo === null;
+    refs.cargoText.textContent = cargo ? `${cargo.have}/${cargo.max} ${cargo.noun}` : '';
+    if (cargo) {
+      refs.cargoFill.style.width = `${clamp01(cargo.have / cargo.max) * 100}%`;
+      refs.cargoFill.style.background = cargo.colour;
+    }
   }
 
   private drawMinimap(world: WorldState): void {
@@ -950,12 +1130,19 @@ export class Hud implements HudHandle {
     const craft = this.selectedAircraft(selection);
     const any = craft.length > 0;
     this.airButton.hidden = !any;
+    this.airButton.disabled = !any;
     this.airInfo.hidden = !any;
     if (!any) {
       return;
     }
     const flying = craft.some((unit) => unit.air?.mode === 'flying' || unit.air?.mode === 'returning');
-    this.airButton.textContent = flying ? 'Recall' : 'Launch';
+    const label = flying ? 'Recall' : 'Launch';
+    const caption = this.airButton.querySelector('.hud-cmd-label');
+    if (caption && caption.textContent !== label) {
+      caption.textContent = label;
+      this.airButton.setAttribute('aria-label', label);
+    }
+    this.airButton.disabled = false;
     const first = craft[0]?.air;
     if (first) {
       this.airInfo.textContent = `Ammo ${first.ammo} · Fuel ${Math.max(0, Math.round(first.fuelLeft))}s${
@@ -1007,9 +1194,13 @@ export class Hud implements HudHandle {
     });
   }
 
-  private toggleLeftHanded(): void {
-    this.ctx.setLeftHanded(!this.ctx.isLeftHanded());
-    this.root.classList.toggle('left-handed', this.ctx.isLeftHanded());
+  private assignGroup(group: number, element: HTMLButtonElement): void {
+    this.ctx.assignGroup(group);
+    element.classList.add('assigned');
+    window.setTimeout(() => {
+      element.classList.remove('assigned');
+    }, 600);
+    this.groupsOpen = false;
     this.refresh();
   }
 
@@ -1029,8 +1220,7 @@ export class Hud implements HudHandle {
       timer = window.setTimeout(() => {
         timer = null;
         longFired = true;
-        this.ctx.assignGroup(group);
-        element.classList.add('assigned');
+        this.assignGroup(group, element);
       }, 450);
     });
     element.addEventListener('pointerup', (event) => {
@@ -1038,6 +1228,11 @@ export class Hud implements HudHandle {
       clear();
       if (longFired) {
         longFired = false;
+        return;
+      }
+      // "Set group" armed: a plain tap saves the selection to this tile.
+      if (this.groupsOpen && this.ctx.getSelection().length > 0) {
+        this.assignGroup(group, element);
         return;
       }
       const now = performance.now();

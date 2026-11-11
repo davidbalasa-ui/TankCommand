@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { countDistinctPngColors, enterGame, gotoQuiet } from './helpers';
+import { countDistinctPngColors, enterGame, gotoQuiet, toggleLeftHandedViaSettings } from './helpers';
 
 const PHONE_ONLY = 'phone-only gesture test';
 const DESKTOP_ONLY = 'desktop-only input test';
@@ -946,6 +946,10 @@ test('[HUD-02] in-game HUD has no overlaps, ≥ 44 px touch targets and ≥ 12 p
 
 test('[HUD-03] left-handed layout mirrors minimap and command bar and persists across reload', async ({ page }) => {
   await enterGame(page);
+  // The command grid only shows while something is selected (UI redesign v1).
+  const firstOwn = await page.evaluate(() => window.__TC_TEST__?.units().find((u) => u.owner === 1)?.id ?? null);
+  expect(firstOwn).not.toBeNull();
+  await page.evaluate((id) => window.__TC_TEST__?.setSelection(id === null ? [] : [id]), firstOwn);
 
   const before = await page.evaluate(() => {
     const minimap = document.querySelector('.hud-minimap')?.getBoundingClientRect();
@@ -964,12 +968,12 @@ test('[HUD-03] left-handed layout mirrors minimap and command bar and persists a
   expect(before.mmLeft).toBeLessThan(before.width / 2);
   expect(before.cbLeft).toBeGreaterThan(before.width / 2);
 
-  await page.evaluate(() => {
-    document.querySelector<HTMLButtonElement>('[data-control-id="inGame.leftHanded"]')?.click();
-  });
+  // The layout switch lives in Settings (the HUD no longer has a Lefty button).
+  await toggleLeftHandedViaSettings(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.leftHanded ?? false))
     .toBe(true);
+  await page.evaluate((id) => window.__TC_TEST__?.setSelection(id === null ? [] : [id]), firstOwn);
 
   const after = await page.evaluate(() => {
     const minimap = document.querySelector('.hud-minimap')?.getBoundingClientRect();

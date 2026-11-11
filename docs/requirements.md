@@ -84,9 +84,9 @@
 | TCH-04 | No page scroll, browser zoom, text selection or context menu during any gesture. |
 | MM-01 | Minimap shows terrain, own and visible enemy units, and the camera footprint, and updates as the camera moves. |
 | MM-02 | Tapping/clicking or dragging the minimap moves the camera target to that map point; right click orders a move. |
-| HUD-01 | Command bar buttons (attack-move, hold, stop, queue, groups) work by touch and are disabled with no selection. |
+| HUD-01 | Command bar buttons (attack-move, hold, stop, queue, groups) work by touch and are hidden and disabled with no selection; the grid shows only commands the selection can use (UI redesign v1). |
 | HUD-02 | On phone, tablet and desktop, no two HUD elements overlap, touch targets are ≥ 44×44 px and text is ≥ 12 px (measured from bounding boxes in e2e). |
-| HUD-03 | Left-handed layout mirrors minimap and command bar and persists across reload. |
+| HUD-03 | Left-handed layout (set in Settings) mirrors minimap, groups, command grid and dock, and persists across reload. |
 | HUD-04 | Selection panel shows selected units and narrows selection on tap. |
 | ORD-01 | Hold: unit fires at enemies in range and never moves, even when attacked. |
 | ORD-02 | Attack-move: unit moves to the point but engages enemies met on the way, then continues. |

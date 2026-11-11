@@ -154,6 +154,8 @@ function isPlayerOrder(command: Command): boolean {
   return command.kind !== 'noop' && !command.kind.startsWith('debug.');
 }
 
+const TITLE_SIDE_OFFSET = 11;
+
 export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
@@ -267,6 +269,7 @@ export class App {
         this.pauseSim(paused);
       },
       attachRenderer: (canvas) => this.attachRenderer(canvas),
+      attachTitleBackdrop: (canvas) => this.attachTitleBackdrop(canvas),
       getWorld: () => this.viewWorld(),
       selection: () => this.selection(),
       setSelection: (ids) => {
@@ -1590,6 +1593,69 @@ export class App {
       tick: this.world.tick + 1,
       issuer: 1,
     });
+  }
+
+  /**
+   * Title screen background: a separate demo skirmish (own pad and starting force, no fog) drawn
+   * by its own renderer with the camera slowly orbiting the pad. Nothing is simulated. It only
+   * draws while the title is the top screen and is skipped on the low quality level.
+   */
+  private attachTitleBackdrop(canvas: HTMLCanvasElement): Promise<() => void> {
+    const settings = this.services?.settings();
+    if (settings?.graphicsQuality === 'low') {
+      return Promise.resolve(() => undefined);
+    }
+    return import('./render/renderer').then(
+      (mod) => {
+        const world = createSkirmishWorld(
+          this.simData,
+          7,
+          [
+            { player: 1, faction: 'human', controller: 'human' },
+            { player: 2, faction: 'alien', controller: 'ai', difficulty: 'normal' },
+          ],
+          { fog: false, mapId: this.mapIdValue, resources: 'normal', force: 'padForce' },
+        );
+        world.aiStates = [];
+        const view = new mod.RenderView(canvas, this.registry, world);
+        const pad = world.structures.find((item) => item.owner === 1);
+        const centreX = pad?.x ?? 0;
+        const centreZ = pad?.z ?? 0;
+        const started = performance.now();
+        let raf = 0;
+        let disposed = false;
+        const frame = (now: number): void => {
+          raf = 0;
+          if (disposed) {
+            return;
+          }
+          if (this.router.current() === 'title' && document.visibilityState === 'visible') {
+            const t = (now - started) / 1000;
+            const yaw = 0.6 + t * 0.035;
+            // Drift round the pad. The target sits to the pad's screen-left so the pad stays in the
+            // right-hand part of the picture, clear of the menu column.
+            view.setCamera({
+              targetX: centreX + Math.cos(yaw) * TITLE_SIDE_OFFSET,
+              targetZ: centreZ - Math.sin(yaw) * TITLE_SIDE_OFFSET,
+              distance: 34,
+              yaw,
+            });
+            view.render(0, world);
+          }
+          raf = window.requestAnimationFrame(frame);
+        };
+        raf = window.requestAnimationFrame(frame);
+        return () => {
+          disposed = true;
+          if (raf !== 0) {
+            window.cancelAnimationFrame(raf);
+          }
+          view.dispose();
+          view.releaseContext();
+        };
+      },
+      () => () => undefined,
+    );
   }
 
   private attachRenderer(canvas: HTMLCanvasElement): Promise<RendererHandle> {

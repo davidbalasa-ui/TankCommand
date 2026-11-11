@@ -335,420 +335,6 @@ p {
   color: #e88;
 }
 
-.hud-topbar {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  right: 8px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  pointer-events: auto;
-}
-
-.hud-resources,
-.hud-workers,
-.hud-units,
-.hud-clock {
-  box-sizing: border-box;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: rgba(9, 13, 22, 0.78);
-  border: 1px solid rgba(75, 104, 146, 0.7);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.hud-resources {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 28%;
-  overflow: hidden;
-}
-
-.hud-workers {
-  flex: 0 0 auto;
-}
-
-.hud-units {
-  flex: 0 0 auto;
-}
-
-.hud-clock {
-  flex: 0 0 auto;
-  margin-right: auto;
-}
-
-.hud-minimap {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  width: 120px;
-  height: 120px;
-  padding: 2px;
-  box-sizing: border-box;
-  border-radius: 6px;
-  background: rgba(9, 13, 22, 0.88);
-  border: 1px solid rgba(75, 104, 146, 0.8);
-  pointer-events: auto;
-}
-
-.minimap-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
-}
-
-/*
- * Two columns, three rows instead of one five-high column.
- *
- * On the 915x412 phone a single column of five 44 px buttons plus 6 px gaps is
- * 244 px tall, which ran from the bottom edge of the viewport up to the top bar
- * and put the last button flush against the screen edge (and, on the 412 px
- * layout, past it). The grid is 118x144, so the whole command bar sits well
- * clear of the bottom edge and covers roughly a quarter of the area the column
- * did, keeping more of the battlefield visible.
- */
-.hud-commandbar {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: grid;
-  grid-template-columns: repeat(2, 56px);
-  gap: 6px;
-  pointer-events: auto;
-}
-
-.hud-airinfo {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: #dfe8ef;
-  text-align: right;
-}
-
-.hud-commandbar button {
-  width: 56px;
-  height: 44px;
-  padding: 2px;
-  line-height: 1.15;
-}
-
-.hud-selection {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  transform: translateX(-50%);
-  width: min(420px, calc(100% - 300px));
-  height: 68px;
-  padding: 4px 6px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-radius: 6px;
-  background: rgba(9, 13, 22, 0.84);
-  border: 1px solid rgba(75, 104, 146, 0.8);
-  pointer-events: auto;
-  overflow: hidden;
-}
-
-.hud-selection-count {
-  font-size: 12px;
-  line-height: 14px;
-}
-
-.hud-selection-list {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.selection-icon {
-  position: relative;
-  box-sizing: border-box;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  background: #16243a;
-  border: 1px solid #4a6c9a;
-  border-radius: 4px;
-}
-
-.selection-hp {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 5px;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  box-sizing: border-box;
-}
-
-.selection-hp-fill {
-  display: block;
-  height: 100%;
-  background: #5ee07a;
-}
-
-.hud-groups {
-  position: absolute;
-  right: 72px;
-  bottom: 260px;
-  display: none;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 6px;
-  background: rgba(9, 13, 22, 0.9);
-  border: 1px solid rgba(75, 104, 146, 0.8);
-  pointer-events: auto;
-}
-
-.hud-groups.open {
-  display: flex;
-}
-
-.hud-group-button {
-  box-sizing: border-box;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  font-size: 14px;
-}
-
-.hud-group-button.selected {
-  background: #2e6aa6;
-  border-color: #8fd3ff;
-}
-
-.hud-group-button.assigned {
-  border-color: #6cf58a;
-}
-
-.hud-build-panel,
-.hud-base-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-height: 220px;
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  border-radius: 8px 8px 0 0;
-  background: rgba(9, 13, 22, 0.96);
-  border: 1px solid rgba(75, 104, 146, 0.9);
-  pointer-events: auto;
-  z-index: 6;
-}
-
-.hud-shell.build-open .hud-build-panel,
-.hud-shell.base-open .hud-base-panel {
-  display: flex;
-}
-
-.build-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  background: rgba(9, 13, 22, 0.98);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.build-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.build-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.build-section-title {
-  font-size: 12px;
-  color: #9fb6d8;
-}
-
-.build-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 6px;
-}
-
-.build-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  height: auto;
-  min-height: 44px;
-  padding: 4px 8px;
-  text-align: left;
-}
-
-.build-item-name {
-  font-size: 12px;
-}
-
-.build-item-cost,
-.build-reason,
-.build-empty {
-  font-size: 12px;
-  color: #b9c8df;
-}
-
-.build-reason {
-  color: #ffb4b4;
-}
-
-.build-pad-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.build-pad {
-  min-height: 44px;
-}
-
-.build-pad.active {
-  background: #2e6aa6;
-  border-color: #8fd3ff;
-}
-
-.build-queue-row {
-  display: grid;
-  grid-template-columns: minmax(80px, 1fr) minmax(80px, 2fr) 68px;
-  gap: 6px;
-  align-items: center;
-  min-height: 44px;
-}
-
-.build-queue-name {
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.queue-bar {
-  height: 10px;
-  border-radius: 5px;
-  background: #16243a;
-  border: 1px solid #3d5f8f;
-  overflow: hidden;
-}
-
-.queue-fill {
-  display: block;
-  height: 100%;
-  background: #8fd3ff;
-}
-
-.build-cancel {
-  width: 68px;
-  height: 44px;
-  padding: 2px;
-}
-
-.build-place {
-  min-height: 44px;
-  width: 100%;
-}
-
-.hud-placement {
-  position: absolute;
-  left: 50%;
-  bottom: 84px;
-  display: none;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 6px;
-  transform: translateX(-50%);
-  background: rgba(9, 13, 22, 0.94);
-  border: 1px solid rgba(75, 104, 146, 0.9);
-  pointer-events: auto;
-  z-index: 7;
-}
-
-.hud-placement.open {
-  display: flex;
-}
-
-/* A placement ghost is a focused mode: hide competing HUD blocks. */
-.hud-shell.placing .hud-minimap,
-.hud-shell.placing .hud-commandbar,
-.hud-shell.placing .hud-groups,
-.hud-shell.placing .hud-selection,
-.hud-shell.placing .hud-base-panel,
-.hud-shell.placing .hud-build-panel {
-  display: none;
-}
-
-/* Build sheet is modal: hide the underlying bottom HUD blocks. */
-.hud-shell.base-open .hud-minimap,
-.hud-shell.base-open .hud-commandbar,
-.hud-shell.base-open .hud-groups,
-.hud-shell.base-open .hud-selection,
-.hud-shell.build-open .hud-minimap,
-.hud-shell.build-open .hud-commandbar,
-.hud-shell.build-open .hud-groups,
-.hud-shell.build-open .hud-selection {
-  display: none;
-}
-
-.hud-shell.left-handed .hud-minimap {
-  left: auto;
-  right: 8px;
-}
-
-.hud-shell.left-handed .hud-commandbar {
-  right: auto;
-  left: 8px;
-}
-
-.hud-shell.left-handed .hud-groups {
-  right: auto;
-  left: 72px;
-}
-
-/* The speed button is deliberately outside .hud-shell so it can sit below the
-   existing top bar without changing hud.ts. */
-.hud-speed-button {
-  position: absolute;
-  top: 56px;
-  left: 8px;
-  z-index: 6;
-  box-sizing: border-box;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
 .alert-toasts {
   position: fixed;
   top: 56px;
@@ -960,21 +546,6 @@ p {
 .bug-logs {
   max-height: 200px;
   overflow: auto;
-}
-
-@media (min-width: 1000px) {
-  .hud-minimap {
-    width: 180px;
-    height: 180px;
-  }
-  .hud-build-panel {
-    left: auto;
-    right: 0;
-    bottom: 0;
-    width: min(520px, 48vw);
-    max-height: min(520px, calc(100vh - 60px));
-    border-radius: 8px;
-  }
 }
 
 .base-row {
@@ -1708,4 +1279,985 @@ button.corner-action {
 
 .pause-grid {
   max-width: 540px;
+}
+
+/* ---------- In-game HUD (redesign v1) ---------- */
+.hud-shell [hidden] {
+  display: none !important;
+}
+
+.hud-shell .panel,
+.hud-shell .hud-icon-button,
+.hud-shell .hud-group-button,
+.hud-shell .hud-cmd,
+.hud-shell .hud-base-button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: var(--panel-blur);
+}
+
+.hud-resbar {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  pointer-events: auto;
+}
+
+.hud-res {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-res + .hud-res {
+  border-left: 1px solid var(--line);
+}
+
+.hud-res .ico.hud-res-ico {
+  width: 18px;
+  height: 18px;
+  color: #9fd8ff;
+}
+
+.hud-res-cap {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.hud-clockbar {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  height: 46px;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 0 12px;
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.hud-shell button.hud-speed {
+  min-width: 52px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(30, 46, 72, 0.95);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 9px 9px 0;
+}
+
+.hud-corner {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-icon-button {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.hud-toast {
+  top: 60px;
+  border-color: var(--line);
+  border-radius: 10px;
+}
+
+/* Control-group tiles down the left edge. 1-4 on a phone, 1-5 when there is room. */
+.hud-groups {
+  position: absolute;
+  left: 8px;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-group-button {
+  width: 66px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 9px;
+  line-height: 1;
+}
+
+.group-number {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.group-caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.hud-shell .hud-group-button.empty {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.hud-shell .hud-group-button.selected {
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 0 1px var(--cyan);
+}
+
+.hud-groups.open .hud-group-button {
+  opacity: 1;
+  border-color: var(--orange);
+  border-style: solid;
+  animation: group-arm 1s ease-in-out infinite alternate;
+}
+
+.hud-shell .hud-group-button.assigned {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+@keyframes group-arm {
+  from {
+    box-shadow: inset 0 0 0 1px rgba(255, 154, 46, 0.2);
+  }
+  to {
+    box-shadow: inset 0 0 0 1px var(--orange), 0 0 10px rgba(255, 154, 46, 0.45);
+  }
+}
+
+@media (max-height: 469px) {
+  .hud-groups .hud-group-button[data-group='5'] {
+    display: none;
+  }
+}
+
+.hud-minimap {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  width: 140px;
+  height: 140px;
+  padding: 5px;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.minimap-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 6px;
+  touch-action: none;
+}
+
+/* Selection panel: portraits for a group, details for one unit. */
+.hud-selection {
+  position: absolute;
+  left: 158px;
+  bottom: 8px;
+  height: 76px;
+  max-width: calc(100% - 158px - 216px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  pointer-events: auto;
+}
+
+.hud-selection-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+}
+
+.hud-selection.single .hud-selection-body {
+  width: 300px;
+}
+
+.hud-selection-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  flex: none;
+  line-height: 1;
+}
+
+.hud-selection-count b {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hud-selection-count span {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-selection-list {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.hud-shell button.selection-icon {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 62px;
+  padding: 0;
+  overflow: hidden;
+  background: #0e1726;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.selection-thumb,
+.card-thumb,
+.queue-thumb,
+.place-thumb {
+  position: absolute;
+  inset: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: center / cover no-repeat;
+  color: var(--dim);
+}
+
+.thumb-fallback {
+  opacity: 0.6;
+}
+
+.selection-hp {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.selection-hp-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--green);
+}
+
+.selection-more {
+  flex: none;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--soft);
+  padding: 0 4px;
+}
+
+.hud-shell button.selection-single-portrait {
+  width: 64px;
+  height: 64px;
+}
+
+.selection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.selection-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.selection-name {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-role {
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.hud-shell .bar {
+  position: relative;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.hud-shell .bar.thin {
+  height: 5px;
+}
+
+.hud-shell .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.selection-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.selection-status span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-cargo-text {
+  font-weight: 700;
+}
+
+.hud-shell button.hud-deselect {
+  flex: none;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-button);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.hud-deselect .ico {
+  width: 18px;
+  height: 18px;
+}
+
+/* Command grid: two columns above the dock, only the commands that apply. */
+.hud-commandbar {
+  position: absolute;
+  right: 8px;
+  bottom: 84px;
+  display: grid;
+  grid-template-columns: repeat(2, 60px);
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-cmd {
+  width: 60px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 10px;
+}
+
+.hud-cmd-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.hud-shell button.hud-cmd.active {
+  border-color: var(--orange);
+  box-shadow: inset 0 0 0 1px var(--orange);
+}
+
+.hud-cmd.active .ico {
+  color: var(--orange);
+}
+
+.hud-airinfo {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--soft);
+  text-align: right;
+  text-shadow: 0 1px 2px #000;
+}
+
+.hud-dock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-base-button {
+  width: 60px;
+  height: 68px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 12px;
+}
+
+.hud-shell button.hud-build-button {
+  width: 126px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #1b0e02;
+  background: linear-gradient(135deg, var(--orange), #d9651a);
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 14px rgba(255, 154, 46, 0.35);
+}
+
+.hud-build-button .ico {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.4;
+}
+
+/* Build and Base drawers: right side, full height, map stays visible on the left. */
+.hud-build-panel,
+.hud-base-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(470px, 100%);
+  box-sizing: border-box;
+  display: none;
+  flex-direction: column;
+  background: rgba(8, 13, 22, 0.94);
+  border-left: 1px solid var(--line);
+  pointer-events: auto;
+  z-index: 6;
+}
+
+.hud-shell.build-open .hud-build-panel,
+.hud-shell.base-open .hud-base-panel {
+  display: flex;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 6px 12px;
+  flex: none;
+}
+
+.drawer-title {
+  margin: 0 auto 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.drawer-pads {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drawer-pad-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  margin-right: 2px;
+}
+
+.hud-shell button.build-pad {
+  height: 44px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--panel-button);
+}
+
+.hud-shell button.build-pad.active {
+  border-color: var(--cyan-hi);
+  background: var(--cyan-d);
+}
+
+.hud-shell button.drawer-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-button);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  flex: none;
+}
+
+.hud-shell button.drawer-tab {
+  flex: 1;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dim);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+}
+
+.hud-shell button.drawer-tab.on {
+  color: #fff;
+  border-bottom-color: var(--orange);
+  background: rgba(255, 154, 46, 0.08);
+}
+
+.drawer-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 7px;
+  padding: 8px 12px;
+  align-content: start;
+}
+
+.hud-shell button.build-card {
+  position: relative;
+  height: 118px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  text-align: left;
+  overflow: hidden;
+  background: rgba(22, 34, 54, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.hud-shell button.build-card:disabled {
+  opacity: 1;
+}
+
+.build-card .card-thumb {
+  inset: 0 0 50px;
+  background-color: #111c2c;
+}
+
+.build-card:disabled .card-thumb,
+.build-card:disabled .card-name,
+.build-card:disabled .card-cost {
+  opacity: 0.5;
+}
+
+.card-name {
+  padding: 0 7px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 7px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cost-part {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cost-time {
+  color: var(--dim);
+}
+
+.card-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--orange);
+  color: #1b0e02;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.card-reason {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.card-reason .ico {
+  width: 12px;
+  height: 12px;
+}
+
+.card-reason.afford {
+  color: #ffb0b0;
+}
+
+.card-reason.done {
+  color: var(--green);
+}
+
+.research-card .research-icon {
+  position: absolute;
+  inset: 0 0 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+}
+
+.research-card .research-icon .ico {
+  width: 30px;
+  height: 30px;
+}
+
+.research-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.hud-shell button.research-more {
+  grid-column: 1 / -1;
+  height: 44px;
+}
+
+.build-empty {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.drawer-queue {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 62px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.queue-label {
+  flex: none;
+  width: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-shell button.queue-tile {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 46px;
+  padding: 0;
+  overflow: hidden;
+  background: #0e1726;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.queue-tile .queue-thumb {
+  inset: 0;
+}
+
+.queue-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.queue-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 0;
+  background: var(--orange);
+}
+
+.queue-eta {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.3;
+}
+
+.hud-shell button.build-place {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 46px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.build-place .place-thumb {
+  inset: 2px auto 2px 2px;
+  width: 40px;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Base drawer content (research, structures, vehicles) keeps its rows. */
+.hud-base-panel .build-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px 12px;
+  font-size: 12px;
+}
+
+.build-section-title {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.base-row {
+  padding: 6px 8px;
+  background: rgba(22, 34, 54, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.hud-placement {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  display: none;
+  gap: 6px;
+  padding: 4px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+.hud-placement.open {
+  display: flex;
+}
+
+.hud-placement button {
+  min-width: 110px;
+}
+
+/* Focused modes: placing a kit, or a drawer open. */
+.hud-shell.placing .hud-groups,
+.hud-shell.placing .hud-commandbar,
+.hud-shell.placing .hud-selection,
+.hud-shell.placing .hud-dock,
+.hud-shell.placing .hud-build-panel,
+.hud-shell.placing .hud-base-panel,
+.hud-shell.build-open .hud-groups,
+.hud-shell.build-open .hud-commandbar,
+.hud-shell.build-open .hud-selection,
+.hud-shell.build-open .hud-dock,
+.hud-shell.build-open .hud-clockbar,
+.hud-shell.build-open .hud-corner,
+.hud-shell.base-open .hud-groups,
+.hud-shell.base-open .hud-commandbar,
+.hud-shell.base-open .hud-selection,
+.hud-shell.base-open .hud-dock,
+.hud-shell.base-open .hud-clockbar,
+.hud-shell.base-open .hud-corner {
+  display: none;
+}
+
+/* Left-handed: command grid and dock on the left, groups and minimap on the right. */
+.hud-shell.left-handed .hud-minimap {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-groups {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-commandbar {
+  right: auto;
+  left: 8px;
+}
+
+.hud-shell.left-handed .hud-dock {
+  right: auto;
+  left: 8px;
+  flex-direction: row-reverse;
+}
+
+.hud-shell.left-handed .hud-selection {
+  left: auto;
+  right: 158px;
+}
+
+.hud-shell.left-handed .hud-build-panel,
+.hud-shell.left-handed .hud-base-panel {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+}
+
+@media (min-width: 1100px) and (min-height: 700px) {
+  .hud-minimap {
+    width: 180px;
+    height: 180px;
+  }
+  .hud-selection {
+    left: 198px;
+    max-width: calc(100% - 198px - 216px);
+  }
+  .hud-shell.left-handed .hud-selection {
+    right: 198px;
+  }
+}
+
+.worker-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(9, 14, 24, 0.85);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.worker-label.miner {
+  color: #ff9fdc;
+}
+
+.worker-label.hauler {
+  color: #9fd8ff;
 }
