@@ -1404,6 +1404,9 @@ export class RenderView {
     const template = this.templateFor(unit.typeId);
     if (template) {
       root = template.clone(true);
+      // Templates are normalised to one tank length; heavies, bombers and scouts differ.
+      const scale = this.world.unitTypes.get(unit.typeId)?.visualScale ?? 1;
+      root.scale.setScalar(scale);
     } else {
       root = this.prepareFallback();
     }

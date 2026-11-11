@@ -45,7 +45,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.human.scout",
@@ -93,7 +94,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.85
   },
   {
     "id": "unit.human.ore_miner",
@@ -130,7 +132,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.1
   },
   {
     "id": "unit.human.tug",
@@ -166,7 +169,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.05
   },
   {
     "id": "unit.alien.light_tank",
@@ -214,7 +218,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.alien.light_skimmer",
@@ -262,7 +267,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.9
   },
   {
     "id": "unit.alien.ore_miner",
@@ -299,7 +305,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.1
   },
   {
     "id": "unit.alien.tug",
@@ -335,7 +342,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.05
   },
   {
     "id": "unit.human.repair",
@@ -374,7 +382,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.human.turret_packed",
@@ -412,7 +421,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.85
   },
   {
     "id": "unit.alien.repair",
@@ -451,7 +461,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.alien.turret_packed",
@@ -489,7 +500,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.85
   },
   {
     "id": "unit.human.radar",
@@ -524,7 +536,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.alien.radar",
@@ -559,7 +572,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.0
   },
   {
     "id": "unit.human.hover_tank",
@@ -608,7 +622,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.95
   },
   {
     "id": "unit.human.fighter",
@@ -663,7 +678,8 @@
       "fuelSec": 60,
       "rearmSec": 10,
       "cruiseHeight": 6
-    }
+    },
+    "visualScale": 1.15
   },
   {
     "id": "unit.human.bomber",
@@ -718,7 +734,8 @@
       "fuelSec": 60,
       "rearmSec": 10,
       "cruiseHeight": 7
-    }
+    },
+    "visualScale": 1.7
   },
   {
     "id": "unit.alien.glider",
@@ -767,7 +784,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.15
   },
   {
     "id": "unit.alien.saucer",
@@ -823,7 +841,8 @@
       "fuelSec": 75,
       "rearmSec": 12,
       "cruiseHeight": 6
-    }
+    },
+    "visualScale": 1.25
   },
   {
     "id": "unit.alien.dropper",
@@ -878,7 +897,8 @@
       "fuelSec": 60,
       "rearmSec": 10,
       "cruiseHeight": 7
-    }
+    },
+    "visualScale": 1.4
   },
   {
     "id": "unit.human.heavy_tank",
@@ -926,7 +946,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.3
   },
   {
     "id": "unit.human.missile_tank",
@@ -975,7 +996,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.05
   },
   {
     "id": "unit.human.artillery",
@@ -1023,7 +1045,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.35
   },
   {
     "id": "unit.human.missile_battery_packed",
@@ -1061,7 +1084,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.85
   },
   {
     "id": "unit.alien.heavy_tank",
@@ -1109,7 +1133,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.3
   },
   {
     "id": "unit.alien.missile_tank",
@@ -1158,7 +1183,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.05
   },
   {
     "id": "unit.alien.artillery",
@@ -1206,7 +1232,8 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 1.35
   },
   {
     "id": "unit.alien.missile_battery_packed",
@@ -1244,6 +1271,7 @@
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
-    }
+    },
+    "visualScale": 0.85
   }
 ]

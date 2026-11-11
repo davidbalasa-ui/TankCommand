@@ -20,6 +20,7 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
     result.set(row.id, {
       id: row.id,
       modelId: row.modelAssetId,
+      visualScale: row.visualScale,
       faction: row.faction,
       role: row.role,
       hp: row.hp,

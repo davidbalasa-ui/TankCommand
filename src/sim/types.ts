@@ -78,6 +78,8 @@ export interface SimUnitType {
   id: string;
   // Render-only: the asset id of the unit's model. The sim never reads it.
   modelId?: string;
+  // Render-only: drawn length relative to a light tank.
+  visualScale?: number;
   faction: Faction;
   role: UnitRole;
   hp: number;

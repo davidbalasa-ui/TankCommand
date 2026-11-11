@@ -56,6 +56,8 @@ export const unitRowSchema = z
     deploysTo: z.string().optional(),
     deploySec: z.number().positive().optional(),
     modelAssetId: z.string(),
+    // Render-only: drawn length relative to a light tank (1). The sim never reads it.
+    visualScale: z.number().positive().optional(),
     source: z.object({
       kind: z.enum(['placeholder', 'video', 'manual', 'tuned']),
       ref: z.string().optional(),
