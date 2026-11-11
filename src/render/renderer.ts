@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { HALO_MODEL_ID, attachHaloBlades, disposeHaloBlades, updateHaloBlades, type HaloBlades } from './haloBlades';
+import { Effects } from './effects';
 import { AssetLoader } from '../assets/loader';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
@@ -195,6 +197,7 @@ interface UnitVisual {
   turretPivot: THREE.Object3D | null;
   owner: number;
   lift: number;
+  halo: HaloBlades | null;
 }
 
 interface PositionSnapshot {
@@ -370,9 +373,22 @@ export class RenderView {
   private readonly depositMeshes = new Map<number, THREE.Mesh>();
   private readonly beamPool: THREE.Mesh[] = [];
   private readonly selectionRings = new Map<number, THREE.Mesh>();
-  private readonly projectileMeshes = new Map<number, THREE.Mesh>();
-  private readonly projectilePositions = new Map<number, { x: number; y: number; z: number }>();
   private readonly flashes: Flash[] = [];
+  private readonly projectileVisuals = new Map<
+    number,
+    {
+      object: THREE.Object3D;
+      kind: string | undefined;
+      splash: number;
+      offset: number;
+      startX: number;
+      startZ: number;
+      shooterId: number | undefined;
+      aim: number;
+    }
+  >();
+  private lastUnitSync: number | null = null;
+  private readonly effects = new Effects(this.scene);
   private readonly wrecksGroup = new THREE.Group();
   private readonly wreckMeshes: THREE.Object3D[] = [];
   private readonly selection: number[] = [];
@@ -790,6 +806,7 @@ export class RenderView {
     this.syncHealthBars();
     this.updateMarker();
     this.updateFlashes();
+    this.effects.update(1 / 60);
     this.frame += 1;
     this.renderer.render(this.scene, this.camera);
   }
@@ -922,6 +939,7 @@ export class RenderView {
       return;
     }
     this.disposed = true;
+    this.effects.dispose();
     for (const group of this.markerMeshes) {
       group.traverse((object) => {
         if (object instanceof THREE.Mesh) {
@@ -1536,12 +1554,14 @@ export class RenderView {
         object.receiveShadow = true;
       }
     });
+    const halo = template && this.world.unitTypes.get(unit.typeId)?.modelId === HALO_MODEL_ID ? attachHaloBlades(root) : null;
     this.scene.add(root);
     return {
       root,
       turretPivot: root.getObjectByName('TurretPivot') ?? null,
       owner: unit.owner,
       lift: 0,
+      halo,
     };
   }
 
@@ -1550,9 +1570,15 @@ export class RenderView {
     for (const [id, visual] of this.unitRoots) {
       if (!alive.has(id)) {
         this.scene.remove(visual.root);
+        if (visual.halo) {
+          disposeHaloBlades(visual.halo);
+        }
         this.unitRoots.delete(id);
       }
     }
+    const now = performance.now() / 1000;
+    const frameDt = this.lastUnitSync === null ? 0 : Math.min(0.1, now - this.lastUnitSync);
+    this.lastUnitSync = now;
 
     for (const unit of this.world.units) {
       let visual = this.unitRoots.get(unit.id);
@@ -1581,6 +1607,9 @@ export class RenderView {
       visual.root.rotation.y = -heading;
       if (visual.turretPivot) {
         visual.turretPivot.rotation.y = heading - turretHeading;
+      }
+      if (visual.halo) {
+        updateHaloBlades(visual.halo, frameDt, visual.lift > 0.5);
       }
     }
   }
@@ -2273,45 +2302,68 @@ export class RenderView {
 
   private syncProjectiles(): void {
     const ids = new Set(this.world.projectiles.map((projectile) => projectile.id));
-    for (const [id, mesh] of this.projectileMeshes) {
+    for (const [id, visual] of this.projectileVisuals) {
       if (!ids.has(id)) {
-        const position = this.projectilePositions.get(id);
-        if (position) {
-          this.createFlash(position.x, position.y, position.z);
-        }
-        this.scene.remove(mesh);
-        this.projectileMeshes.delete(id);
-        this.projectilePositions.delete(id);
+        const at = visual.object.position;
+        const ground = heightAt(this.world.map, at.x, at.z);
+        this.effects.impact(visual.kind, at.x, at.y, at.z, ground, visual.splash);
+        this.scene.remove(visual.object);
+        this.effects.disposeProjectileMesh(visual.object);
+        this.projectileVisuals.delete(id);
       }
     }
 
     for (const projectile of this.world.projectiles) {
-      let mesh = this.projectileMeshes.get(projectile.id);
-      if (!mesh) {
-        const geometry = new THREE.BoxGeometry(0.14, 0.14, 1.4);
-        const material = new THREE.MeshBasicMaterial({ color: 0xfff2a0 });
-        mesh = new THREE.Mesh(geometry, material);
-        this.scene.add(mesh);
-        this.projectileMeshes.set(projectile.id, mesh);
+      let visual = this.projectileVisuals.get(projectile.id);
+      if (!visual) {
+        // Where the shot visibly leaves from: an aircraft fires from up in the air, so the visual
+        // starts at the aircraft and closes onto the sim's path by the time it reaches the target.
+        const shooter = projectile.shooterId === undefined ? undefined : this.unitRoots.get(projectile.shooterId);
+        const airborne = shooter !== undefined && shooter.lift > 0.5;
+        const offset = airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
+        const human = this.world.factions.find((item) => item.player === projectile.owner)?.faction !== 'alien';
+        const object = this.effects.projectileMesh(projectile.kind, human);
+        this.scene.add(object);
+        visual = {
+          object,
+          kind: projectile.kind,
+          splash: projectile.splashRadius,
+          offset,
+          startX: projectile.x,
+          startZ: projectile.z,
+          shooterId: projectile.shooterId,
+          aim: projectile.aimDistance ?? 0,
+        };
+        this.projectileVisuals.set(projectile.id, visual);
+        this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind);
       }
-      mesh.position.set(projectile.x, projectile.y, projectile.z);
-      const direction = new THREE.Vector3(
-        projectile.vx,
-        projectile.vy,
-        projectile.vz,
-      ).normalize();
-      if (direction.lengthSq() > 0.001) {
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          direction,
-        );
-        mesh.quaternion.copy(quaternion);
+      const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
+      const progress = visual.aim > 0.01 ? Math.min(1, travelled / visual.aim) : 1;
+      // Bombs fall (slow at first, then faster); energy shots fly straight from the gun.
+      const left = visual.kind === 'bombs' ? 1 - progress * progress : 1 - progress;
+      const y = projectile.y + visual.offset * left;
+      const previous = visual.object.position.clone();
+      visual.object.position.set(projectile.x, y, projectile.z);
+      const direction = new THREE.Vector3().subVectors(visual.object.position, previous);
+      if (direction.lengthSq() < 1e-6 || previous.lengthSq() === 0) {
+        direction.set(projectile.vx, projectile.vy, projectile.vz);
       }
-      this.projectilePositions.set(projectile.id, {
-        x: projectile.x,
-        y: projectile.y,
-        z: projectile.z,
-      });
+      if (direction.lengthSq() > 0.000001) {
+        visual.object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.normalize());
+      }
+      // Lightning and the ground beam are drawn from the gun to the shot's head every frame.
+      if (visual.kind === 'lightning' || visual.kind === 'ground_beam') {
+        const shooter = visual.shooterId === undefined ? undefined : this.unitRoots.get(visual.shooterId);
+        if (shooter?.root.visible) {
+          const from = shooter.root.position.clone();
+          from.y -= visual.kind === 'ground_beam' ? 0.5 : 0.2;
+          if (visual.kind === 'lightning') {
+            this.effects.lightning(from, visual.object.position, 0xffd27a, 0.05, 10, 0.55);
+          } else {
+            this.effects.beam(from, visual.object.position, 0.9, 0.05);
+          }
+        }
+      }
     }
   }
 
@@ -2342,19 +2394,6 @@ export class RenderView {
         wreck.z,
       );
     }
-  }
-
-  private createFlash(x: number, y: number, z: number): void {
-    const geometry = new THREE.SphereGeometry(0.55, 8, 6);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffc46b,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    this.scene.add(mesh);
-    this.flashes.push({ mesh, ttl: 0.18 });
   }
 
   private updateFlashes(): void {

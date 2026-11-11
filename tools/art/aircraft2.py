@@ -209,21 +209,8 @@ def halo():
     p.append(plate('Spike', spike, Z + 0.02, Z + 0.2, 'fin', bevel=0.03))
     p.append(orb('SpikePort', (3.35, 0, Z + 0.11), 0.09, 'core', seg=(8, 5)))
     p.append(placed(box('SpikeVein', (0, 0, 0), (0.6, 0.02, 0.01), 'glow'), 0, (2.5, 0, Z + 0.205)))
-    # Scythe blades held around the ring: front and back pair solid (they sweep and fade in game).
-    for k, a in enumerate((0, 180, 40, 220)):
-        pts_o, pts_i = [], []
-        n = 7
-        for i in range(n):
-            t = i / (n - 1)
-            ang = math.radians(a - 32 + 64 * t)
-            w = 0.05 + 0.32 * math.sin(math.pi * t ** 0.8)
-            pts_o.append((3.6 * math.cos(ang), 3.6 * math.sin(ang)))
-            pts_i.append(((3.6 - w) * math.cos(ang), (3.6 - w) * math.sin(ang)))
-        outline = pts_o + pts_i[::-1]
-        b = plate(f'Scythe{k}', outline, Z + 0.0, Z + 0.07, 'fin')
-        p.append(tilt(b, rx=0, ry=0))
-        mid = math.radians(a)
-        p.append(placed(box(f'ScytheEdge{k}', (0, 0, 0), (0.9, 0.022, 0.012), 'glow'), a + 90, (3.62 * math.cos(mid), 3.62 * math.sin(mid), Z + 0.075)))
+    # The scythe blades are not baked: the game draws them (src/render/haloBlades.ts) so they can
+    # sweep around the ring, flashing through the open front and back and vanishing at the sides.
     return p
 
 

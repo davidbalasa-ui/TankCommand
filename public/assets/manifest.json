@@ -554,7 +554,7 @@
       "id": "unit.alien.halo",
       "kind": "model",
       "path": "assets/models/alien/halo.glb",
-      "bytes": 360484,
+      "bytes": 335892,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",

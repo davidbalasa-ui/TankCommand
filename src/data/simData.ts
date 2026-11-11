@@ -34,6 +34,7 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
       sensorRange: row.sensorRange,
       weapon: weapon
         ? {
+            kind: weapon.id,
             damage: weapon.damage,
             range: weapon.range,
             reloadSec: weapon.reloadSec,

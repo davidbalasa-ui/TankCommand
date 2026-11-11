@@ -75,6 +75,8 @@ export interface UnitState {
 export type WeaponTarget = 'ground' | 'air' | 'structure';
 
 export interface WeaponStats {
+  // Render-only: which effect to draw (laser, bombs, lightning, ground_beam ...). The sim never reads it.
+  kind?: string;
   targets?: WeaponTarget[];
   damage: number;
   range: number;
@@ -203,6 +205,11 @@ export interface ProjectileState {
   // near a target unit soaks every shot aimed at that unit and the unit can
   // never take damage at all.
   targetStructureId?: number;
+  // Render-only: the firing weapon's kind and the shooter, so the view can draw the right effect
+  // from the right place (an aircraft's gun is up in the air).
+  kind?: string;
+  shooterId?: number;
+  aimDistance?: number;
 }
 
 export interface RubbleState {

@@ -757,7 +757,7 @@ function followPath(
 
 function fireProjectile(
   world: WorldState,
-  shooter: { owner: PlayerId; x: number; z: number },
+  shooter: { owner: PlayerId; x: number; z: number; id?: number },
   targetX: number,
   targetZ: number,
   weapon: WeaponStats,
@@ -792,6 +792,13 @@ function fireProjectile(
   };
   if (targetStructureId !== undefined) {
     projectile.targetStructureId = targetStructureId;
+  }
+  if (weapon.kind !== undefined) {
+    projectile.kind = weapon.kind;
+  }
+  if (shooter.id !== undefined) {
+    projectile.shooterId = shooter.id;
+    projectile.aimDistance = distance;
   }
   world.projectiles.push(projectile);
   world.nextId += 1;
