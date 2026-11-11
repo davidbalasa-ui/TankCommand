@@ -18,6 +18,7 @@ import bmesh
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
 atlas_dir, out_glb = args[0], args[1]
 render_dir = args[2] if len(args) > 2 else None
+anim_dir = args[3] if len(args) > 3 else None  # optional: render a looping preview animation here
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -322,3 +323,65 @@ if render_dir:
 
     look('crystal_front', (15, -15, 2.5), target=(0, 0, 8.0), lens_mm=26)
     look('crystal_rts', (16, -16, 30), target=(0, 0, 4), lens_mm=35)
+
+    if anim_dir:
+        # Looping preview: crystal turns once, ribbons the other way twice, shards orbit twice,
+        # the core pulses, the crystal bobs, and it fires one beam at the ground mid-loop.
+        # In game the same motion is plain rigid rotation plus a material pulse: no extra geometry.
+        N = 96
+        scene.frame_start, scene.frame_end = 1, N
+        scene.render.fps = 24
+        bpy.context.preferences.edit.keyframe_new_interpolation_type = 'LINEAR'
+        spin = [(crystal, 1), (core, 1), (ribbons, -2), (shards, 2)]
+        for f in (1, N + 1):
+            t = (f - 1) / N
+            for o, turns in spin:
+                o.rotation_euler = (0, 0, 2 * math.pi * turns * t)
+                o.keyframe_insert('rotation_euler', frame=f)
+        cb = core_mat.node_tree.nodes['Principled BSDF'].inputs['Emission Strength']
+        for f in range(1, N + 2, 4):
+            t = (f - 1) / N
+            cb.default_value = 30 + 25 * math.sin(4 * math.pi * t) ** 2
+            cb.keyframe_insert('default_value', frame=f)
+            for o in (crystal, core, ribbons, shards):
+                o.location = (0, 0, 0.35 * math.sin(2 * math.pi * t))
+                o.keyframe_insert('location', frame=f)
+        # The beam: core to a point on the ground, on for frames 52-66, with an impact flash.
+        tgt = (9.0, -4.0, 0.0)
+        cz = FLOAT + H * 0.48
+        import mathutils
+        a, b = mathutils.Vector((0, 0, cz)), mathutils.Vector(tgt)
+        mid, d = (a + b) / 2, b - a
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.22, depth=d.length, location=mid)
+        beam = bpy.context.object
+        beam.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
+        bm_ = bpy.data.materials.new('Beam'); bm_.use_nodes = True
+        bb = bm_.node_tree.nodes['Principled BSDF']
+        bb.inputs['Base Color'].default_value = (0, 0, 0, 1)
+        bb.inputs['Emission Color'].default_value = (0.8, 0.45, 1.0, 1)
+        bb.inputs['Emission Strength'].default_value = 40
+        beam.data.materials.append(bm_)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.2, location=tgt)
+        flash = bpy.context.object
+        flash.data.materials.append(bm_)
+        for o in (beam, flash):
+            for f, on in ((1, False), (52, True), (67, False)):
+                o.hide_render = not on
+                o.keyframe_insert('hide_render', frame=f)
+        hit = bpy.data.objects.new('HitLight', bpy.data.lights.new('HitLight', 'POINT'))
+        hit.data.color = (0.8, 0.45, 1.0); hit.location = (tgt[0], tgt[1], 1.0)
+        scene.collection.objects.link(hit)
+        for f, e in ((1, 0), (51, 0), (52, 9000), (66, 9000), (67, 0)):
+            hit.data.energy = e
+            hit.data.keyframe_insert('energy', frame=f)
+        scene.render.resolution_x, scene.render.resolution_y = 800, 500
+        scene.cycles.samples = 24
+        scene.cycles.use_denoising = True
+        look_at = (0, 0, 7.0)
+        cam.location = (15, -18, 4.0)
+        dd = [t_ - l for t_, l in zip(look_at, cam.location)]
+        cam.rotation_euler = (math.atan2(math.hypot(dd[0], dd[1]), -dd[2]), 0, math.atan2(dd[1], dd[0]) - math.pi / 2)
+        cam.data.lens = 24
+        scene.render.filepath = f'{anim_dir}/f_'
+        scene.render.image_settings.file_format = 'PNG'
+        bpy.ops.render.render(animation=True)

@@ -36,10 +36,10 @@ def main(out):
     emit = Image.new('RGB', (S, S), (0, 0, 0))
     d, e = ImageDraw.Draw(img), ImageDraw.Draw(emit)
     # Flesh: pale cream fungal skin, soft fibrous streaks, faint pink blush (fully organic, no carving).
-    d.rectangle((0, 0, 255, 255), fill=(226, 212, 190))
-    strokes(d, (0, 0, 256, 256), rng, (232, 218, 196), 1100, 26, 3, jitter=14, angle=math.pi / 2)
-    strokes(d, (0, 0, 256, 256), rng, (214, 180, 170), 220, 30, 3, jitter=12, angle=math.pi / 2)
-    strokes(d, (0, 0, 256, 256), rng, (190, 170, 140), 120, 40, 1, jitter=10, angle=math.pi / 2)
+    d.rectangle((0, 0, 255, 255), fill=(190, 170, 140))
+    strokes(d, (0, 0, 256, 256), rng, (200, 182, 152), 1100, 26, 3, jitter=16, angle=math.pi / 2)
+    strokes(d, (0, 0, 256, 256), rng, (150, 118, 92), 320, 30, 3, jitter=14, angle=math.pi / 2)
+    strokes(d, (0, 0, 256, 256), rng, (110, 88, 62), 160, 40, 2, jitter=10, angle=math.pi / 2)
     # Cap: red with white spots and stroke texture.
     d.rectangle((256, 0, 511, 255), fill=(196, 50, 36))
     strokes(d, (256, 0, 512, 256), rng, (205, 60, 40), 700, 18, 3)

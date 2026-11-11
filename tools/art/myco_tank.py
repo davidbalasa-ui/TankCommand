@@ -1,4 +1,4 @@
-"""Third faction (mushroom tanks, working name Myco) sample tank, phone budget <= 2,500 triangles.
+"""Third faction (mushroom tanks, working name Myco) sample tank, big-unit phone budget <= 5,000 triangles.
 
 Style target: David's reference, made completely organic at his request (no wheels, tracks or
 banner): a lumpy fungal bulb that crawls on thick mycelium root legs, a big red white-spotted cap
@@ -20,6 +20,7 @@ import bmesh
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
 atlas_dir, out_glb = args[0], args[1]
 render_dir = args[2] if len(args) > 2 else None
+anim_dir = args[3] if len(args) > 3 else None  # optional: render the root-crawl animation here
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -212,16 +213,75 @@ for v in body.data.vertices:  # stretch along X and add lumps, so it reads as gr
     v.co.x *= 1.45 * bump
     v.co.y *= 1.0 * bump
 parts.append(body)
-# Root legs: thick mycelium roots splay out and grip the ground; the tank crawls on them.
-for side in (1, -1):
-    for i, x in enumerate((-2.4, -1.2, 0.0, 1.2, 2.4)):
-        lean = 0.35 * x / 2.4
-        pts = [(x * 0.9, side * 1.3, 1.1),
-               (x * 0.95 + lean * 0.3, side * 1.95, 0.95),
-               (x + lean * 0.6, side * 2.45, 0.55),
-               (x + lean, side * 2.7, 0.18),
-               (x + lean * 1.3, side * 2.85, 0.02)]
-        parts.append(tube(f'Root{side}{i}', pts, 0.32, 0.08, 6, 'myc'))
+# Root legs: massive gnarled roots. Each one arches out of the body and plunges into the soil, so the
+# tank looks like a huge fungus that tore itself out of the ground. Tips stay buried (no points) except
+# while a root swings forward, when it trails frayed rootlets. In game each root is 3 rigid segments.
+import mathutils
+# (x along body, side, size): 5 main roots per side plus 4 smaller ones between them.
+ROOT_HOME = ([(x, sd, 1.0) for sd in (1, -1) for x in (-2.6, -1.3, 0.0, 1.3, 2.6)]
+             + [(x, sd, 0.6) for sd in (1, -1) for x in (-1.95, -0.65, 0.65, 1.95)])
+STRIDE = 2.6
+GNARL = [[(rng.uniform(-1, 1), rng.uniform(-1, 1)) for _ in range(10)] for _ in ROOT_HOME]
+
+
+def make_root(i, body_x, rel, tip_z, lift):
+    """Build root i for a body at body_x. rel: tip offset along X from home; tip_z: tip height;
+    lift: 0 planted .. 1 mid-swing (raises the arch)."""
+    hx, side, sz = ROOT_HOME[i]
+    hip = mathutils.Vector((body_x + hx * 0.75, side * 1.05, 0.75))
+    tip = mathutils.Vector((body_x + hx + rel, side * (1.6 + 2.2 * sz), tip_z))
+    knee = (hip + tip) / 2 + mathutils.Vector((0, side * 0.35, (0.55 + 0.9 * lift) * sz))
+    pts, n = [], 7
+    for k in range(n):
+        t = k / (n - 1)
+        p = (1 - t) ** 2 * hip + 2 * (1 - t) * t * knee + t ** 2 * tip
+        gx, gz = GNARL[i][k]
+        w = math.sin(math.pi * t) * 0.22
+        pts.append(tuple(p + mathutils.Vector((gx * w, 0, gz * w))))
+    objs = [tube(f'Root{i}', pts, 0.72 * sz, 0.22 * sz, 6, 'myc')]
+    # Side rootlets branching off the arch, and frayed rootlets at the tip.
+    for k, (t, ln) in enumerate(((0.45, 1.1 * sz), (0.65, 0.9 * sz))[:2 if sz > 0.8 else 1]):
+        j = int(t * (n - 1))
+        base = mathutils.Vector(pts[j])
+        d = mathutils.Vector((GNARL[i][k][0] * 0.6, side * 0.5, -0.9)).normalized()
+        objs.append(tube(f'Rootlet{i}_{k}', [tuple(base), tuple(base + d * ln * 0.5), tuple(base + d * ln)],
+                         0.16, 0.05, 5, 'myc'))
+    if tip_z > -0.3:
+        d0 = (mathutils.Vector(pts[-1]) - mathutils.Vector(pts[-2])).normalized()
+        for k in range(3):
+            d = (d0 + mathutils.Vector((GNARL[i][k + 3][0], GNARL[i][k + 3][1], -0.3)) * 0.8).normalized()
+            b0 = mathutils.Vector(pts[-1])
+            objs.append(tube(f'Fray{i}_{k}', [tuple(b0), tuple(b0 + d * 0.4), tuple(b0 + d * 0.8)], 0.1, 0.03, 4,
+                             'myc'))
+    # Torn-up soil mound where the root enters the ground.
+    if tip_z < 0.2:
+        c = tip
+        mr = 0.6 + 0.5 * sz
+        mound = [(c.x + mr * math.cos(a) * (1.15 if k % 2 else 0.75), c.y + mr * math.sin(a) * (1.15 if k % 2 else 0.75), 0.0)
+                 for k, a in enumerate([2 * math.pi * q / 8 for q in range(8)])]
+        mound.append((c.x, c.y, 0.18 * sz + 0.08))
+        mf = [[k, (k + 1) % 8, 8] for k in range(8)]
+        objs.append(mesh_from(f'Mound{i}', mound, mf, 'myc'))
+    return objs
+
+
+def root_pose(i, frame, T, body_x):
+    """Gait: tip planted (buried) for 70% of the cycle while the body drives forward, then it rips out
+    at the back, swings forward through the air and plunges into the soil at the front."""
+    hx, side, sz = ROOT_HOME[i]
+    p = ((frame / T) + 0.4 * ((hx + 2.6) / 1.3) + (0.5 if side < 0 else 0.0) + (0.25 if sz < 1 else 0.0)) % 1.0
+    duty = 0.7
+    if p < duty:
+        return STRIDE / 2 - STRIDE * p / duty, -0.6, 0.0, p
+    s_ = (p - duty) / (1 - duty)
+    e = s_ * s_ * (3 - 2 * s_)
+    return -STRIDE / 2 + STRIDE * e, -0.6 + (0.9 + 1.5 * sz) * math.sin(math.pi * s_), math.sin(math.pi * s_), p
+
+
+root_parts = []
+for i in range(len(ROOT_HOME)):
+    rel, tz_, lift, _ = root_pose(i, 0, 48, 0.0)
+    root_parts += make_root(i, 0.0, rel, tz_, lift)
 # Mycelium mat spreading on the ground under the body.
 mat_pts = []
 for k in range(16):
@@ -289,6 +349,7 @@ def join(objs, name):
 
 
 hull = join(parts, 'Hull')
+roots_obj = join(root_parts, 'Roots')
 turret_obj = join(turret, 'Turret')
 pivot = bpy.data.objects.new('TurretPivot', None)
 scene.collection.objects.link(pivot)
@@ -299,13 +360,14 @@ root = bpy.data.objects.new('Sporecaller', None)
 scene.collection.objects.link(root)
 hull.parent = root
 pivot.parent = root
+roots_obj.parent = root
 
 tris = 0
-for o in (hull, turret_obj):
+for o in (hull, turret_obj, roots_obj):
     o.data.calc_loop_triangles()
     tris += len(o.data.loop_triangles)
 print('TRIANGLES', tris)
-assert tris <= 2500, tris
+assert tris <= 5000, tris  # big-unit budget: the roots are the point of this faction
 
 bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', export_apply=True, export_yup=True)
 
@@ -331,17 +393,23 @@ if render_dir:
 
     world = bpy.data.worlds.new('W'); scene.world = world
     world.use_nodes = True
-    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.12, 0.2, 0.42, 1)
-    world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.9
+    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.1, 0.12, 0.2, 1)
+    world.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.7
     sun = bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN'))
-    sun.data.energy = 4.0
-    sun.data.color = (1.0, 0.9, 0.7)
-    sun.rotation_euler = (math.radians(50), math.radians(15), math.radians(35))
+    sun.data.energy = 3.5
+    sun.data.color = (1.0, 0.8, 0.6)
+    sun.rotation_euler = (math.radians(62), math.radians(10), math.radians(-40))
     scene.collection.objects.link(sun)
-    bpy.ops.mesh.primitive_plane_add(size=60)
+    bpy.ops.mesh.primitive_plane_add(size=200)
     ground = bpy.context.object
     gm = bpy.data.materials.new('Ground'); gm.use_nodes = True
-    gm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.2, 0.3, 0.1, 1)
+    gt = gm.node_tree
+    noise = gt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 3.0
+    ramp = gt.nodes.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].color = (0.07, 0.05, 0.03, 1)
+    ramp.color_ramp.elements[1].color = (0.16, 0.2, 0.07, 1)
+    gt.links.new(noise.outputs['Fac'], ramp.inputs['Fac'])
+    gt.links.new(ramp.outputs['Color'], gt.nodes['Principled BSDF'].inputs['Base Color'])
     ground.data.materials.append(gm)
     pivot.rotation_euler = (0, 0, math.radians(-12))
     scene.render.engine = 'CYCLES'
@@ -363,3 +431,62 @@ if render_dir:
     look('myco_front34', (13, -11, 6.5), target=(0.8, 0, 3.0), lens_mm=38)
     look('myco_side', (1.5, -17, 3.5), target=(1.5, 0, 3.0), lens_mm=38)
     look('myco_rts', (10, -10, 18), target=(0.6, 0, 1.5), lens_mm=40)
+
+    if anim_dir:
+        # Crawl cycle preview. Body drives forward while planted roots hold; each root rips out at
+        # the back with a burst of dirt, swings forward and plunges back in. Spore cloud hidden here.
+        for o in list(scene.objects):
+            if o.name.startswith('Ico'):
+                bpy.data.objects.remove(o, do_unlink=True)
+        T, N = 48, 96
+        v = STRIDE / (0.7 * T)
+        dirt = bpy.data.materials.new('Dirt'); dirt.use_nodes = True
+        dirt.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.09, 0.06, 0.035, 1)
+        dirt.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 1.0
+        bpy.data.objects.remove(roots_obj, do_unlink=True)
+        scene.render.resolution_x, scene.render.resolution_y = 800, 500
+        scene.cycles.samples = 20
+        scene.cycles.use_denoising = True
+        pivot.rotation_euler = (0, 0, 0)
+        live = []
+        events = {}  # root index -> list of (frame, x, y) when its tip broke or entered the ground
+        for f in range(-40, N):
+            bx = v * f
+            for i in range(len(ROOT_HOME)):
+                rel, tz_, lift, p = root_pose(i, f, T, bx)
+                rel0, tz0, _, _ = root_pose(i, f - 1, T, v * (f - 1))
+                if (tz0 <= 0 < tz_) or (tz0 > 0 >= tz_):
+                    hx, side, sz = ROOT_HOME[i]
+                    events.setdefault(i, []).append((f, bx + hx + rel, side * (1.6 + 2.2 * sz)))
+        for f in range(N):
+            for o in live:
+                bpy.data.objects.remove(o, do_unlink=True)
+            live = []
+            bx = v * f
+            root.location = (bx, 0, 0.06 * math.sin(2 * math.pi * f / (T / 2)))
+            root.rotation_euler = (0.02 * math.sin(2 * math.pi * f / T), 0, 0)
+            for i in range(len(ROOT_HOME)):
+                rel, tz_, lift, _ = root_pose(i, f, T, bx)
+                live += make_root(i, bx, rel, tz_, lift)
+                for (e, ex, ey) in events.get(i, []):
+                    age = f - e
+                    if 0 <= age < 16:
+                        r_ = random.Random(i * 1000 + e)
+                        for k in range(12):
+                            vx, vy, vz = r_.uniform(-2, 2), r_.uniform(-2, 2), r_.uniform(3, 7)
+                            t_ = age / 24
+                            z = 0.1 + vz * t_ - 9.8 * t_ * t_ / 2
+                            if z <= 0:
+                                continue
+                            bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r_.uniform(0.08, 0.2),
+                                                                  location=(ex + vx * t_, ey + vy * t_, z))
+                            o = bpy.context.object
+                            o.data.materials.append(dirt)
+                            live.append(o)
+            cam.location = (bx + 9, -15, 6.5)
+            tgt = (bx + 0.5, 0, 2.2)
+            dd = [t_ - l for t_, l in zip(tgt, cam.location)]
+            cam.rotation_euler = (math.atan2(math.hypot(dd[0], dd[1]), -dd[2]), 0, math.atan2(dd[1], dd[0]) - math.pi / 2)
+            cam.data.lens = 30
+            scene.render.filepath = f'{anim_dir}/f_{f:04d}.png'
+            bpy.ops.render.render(write_still=True)
