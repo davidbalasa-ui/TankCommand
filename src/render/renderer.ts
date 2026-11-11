@@ -1512,7 +1512,7 @@ export class RenderView {
             if (object instanceof THREE.Mesh) {
               object.castShadow = true;
               object.receiveShadow = true;
-              const own = object.material;
+              const own: unknown = object.material;
               if (own instanceof THREE.MeshStandardMaterial) {
                 modelColors.push({ material: own, base: own.color.clone() });
               }
