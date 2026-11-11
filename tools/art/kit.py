@@ -164,7 +164,25 @@ def orb(name, c, r, tile, seg=(10, 6), scale=(1, 1, 1)):
         v.co = Vector((v.co.x * scale[0], v.co.y * scale[1], v.co.z * scale[2])) + Vector(c)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me); bm.free()
-    return _link(name, me, tile, True)
+    obj = _link(name, me, tile, True)
+    # Map the sphere onto the middle of its tile (radial glow tiles have dark corners).
+    u0, v0, u1, v1 = S['tiles'][tile]
+    cv = Vector(c)
+    for poly in obj.data.polygons:
+        for li, vi in zip(poly.loop_indices, poly.vertices):
+            d = obj.data.vertices[vi].co - cv
+            d = Vector((d.x / (r * scale[0]), d.y / (r * scale[1]), d.z / (r * scale[2])))
+            obj.data.uv_layers.active.data[li].uv = (u0 + (0.5 + 0.3 * d.x) * (u1 - u0), v0 + (0.5 + 0.3 * d.z) * (v1 - v0))
+    return obj
+
+
+def rot_z(obj, deg, about=(0, 0, 0)):
+    obj.location = Vector(obj.location) - Vector(about)
+    _apply(obj)
+    obj.rotation_euler = (0, 0, math.radians(deg))
+    obj.location = about
+    _apply(obj)
+    return obj
 
 
 def lathe(name, profile, sides, tile, center=(0, 0, 0), smooth=True, top=None, bottom=None, scale=(1, 1)):
