@@ -23,7 +23,8 @@ def asset(path, label, size=1024):
 
 def dais(R, h=0.45, n=10, glow=True):
     """Low mound of overlapping petals round a glowing seam."""
-    lathe([(R * 0.99, 0.0), (R * 0.96, h * 0.45), (R * 0.72, h * 0.9), (0.05, h)], max(16, n * 2), 'slat')
+    lathe([(R * 0.99, 0.0), (R * 0.96, h * 0.45), (R * 0.72, h * 0.9), (0.05, h)], max(16, n * 2), 'under')
+    lathe([(R * 0.985, h * 0.3), (R * 0.975, h * 0.48), (R * 0.93, h * 0.6)], max(16, n * 2), 'glow')
     lathe([(R, 0.0), (R * 1.0, h * 0.18), (R * 0.93, h * 0.3), (R * 0.9, 0.0)], max(16, n * 2), 'under')
     f = discfn(R * 0.99, h + 0.06, h * 0.25, p=0.6)
     for k in range(n):

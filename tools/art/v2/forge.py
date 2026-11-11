@@ -620,8 +620,8 @@ ZONES = {
         'leaf': dict(kind='leaf', base=(0.07, 0.17, 0.045), base2=(0.16, 0.26, 0.06)),
         'grass': dict(kind='leaf', base=(0.1, 0.2, 0.05), base2=(0.3, 0.34, 0.1)),
         'frond': dict(kind='frond', base=(0.07, 0.04, 0.12), emit=(0.25, 0.9, 0.7), strength=2.2),
-        'gem_pink': dict(kind='gem', base=(0.75, 0.05, 0.3), base2=(1.0, 0.72, 0.86), emit=(1.0, 0.08, 0.3), strength=0.55),
-        'gem_opal': dict(kind='gem', base=(0.08, 0.22, 0.75), base2=(0.85, 0.93, 1.0), emit=(0.08, 0.3, 1.0), strength=0.5, opal=True),
+        'gem_pink': dict(kind='gem', base=(0.42, 0.015, 0.2), base2=(1.0, 0.42, 0.72), emit=(1.0, 0.08, 0.3), strength=0.4),
+        'gem_opal': dict(kind='gem', base=(0.03, 0.1, 0.45), base2=(0.6, 0.85, 1.0), emit=(0.08, 0.3, 1.0), strength=0.4, opal=True),
         'redrock': dict(kind='rock', base=(0.2, 0.07, 0.05), base2=(0.38, 0.16, 0.11), moss=0.0),
         'metalrock': dict(kind='rock', base=(0.12, 0.14, 0.18), base2=(0.3, 0.34, 0.4), moss=0.0, metal=0.6),
     },
@@ -767,8 +767,18 @@ def zone_mat(zone):
             zz = n.sep(n.co)[2]
             band = n.smooth(n.m('FRACT', n.m('ADD', n.m('MULTIPLY', zz, z['strata']), n.m('MULTIPLY', big, 1.5))), 0.0, 0.5)
             col = n.mix(n.m('MULTIPLY', band, 0.35), col, (b[0] * 0.4, b[1] * 0.4, b[2] * 0.4))
-        cr = n.m('SUBTRACT', 1.0, n.smooth(n.voronoi(2.6, 'DISTANCE_TO_EDGE').outputs['Distance'], 0.0, 0.035))
-        col = n.mix(n.m('MULTIPLY', cr, 0.7), col, (b[0] * 0.25, b[1] * 0.25, b[2] * 0.25))
+        warp = n.nt.nodes.new('ShaderNodeVectorMath')
+        warp.operation = 'ADD'
+        n.link(n.co, warp.inputs[0])
+        wn = n.nt.nodes.new('ShaderNodeTexNoise')
+        wn.inputs['Scale'].default_value = 1.3
+        n.link(n.co, wn.inputs['Vector'])
+        n.link(n.vscale(wn.outputs['Color'], (0.5, 0.5, 0.5)), warp.inputs[1])
+        cr = n.m('SUBTRACT', 1.0, n.smooth(n.voronoi(1.7, 'DISTANCE_TO_EDGE', co=n.vscale(warp.outputs[0], (1.0, 1.0, 2.2))).outputs['Distance'], 0.0, 0.016))
+        cr = n.m('MULTIPLY', cr, n.smooth(n.noise(0.9, 2.0), 0.5, 0.62))
+        mott = n.smooth(n.noise(6.0, 6.0), 0.3, 0.75)
+        col = n.mix(n.m('MULTIPLY', mott, 0.35), col, (b[0] * 0.55, b[1] * 0.55, b[2] * 0.55))
+        col = n.mix(n.m('MULTIPLY', cr, 0.75), col, (b[0] * 0.25, b[1] * 0.25, b[2] * 0.25))
         n.edge(0.7, radius=0.06)
         if z.get('moss', 0) > 0:
             m = n.m('MULTIPLY', n.smooth(n.upness(), 0.45, 0.85), n.smooth(n.noise(2.2, 5.0), 0.4, 0.6))
@@ -796,14 +806,15 @@ def zone_mat(zone):
         lw.inputs['Blend'].default_value = 0.5
         fac = lw.outputs[1]
         b, e = z['base'], z['emit']
-        w = n.wave(z.get('bands', 2.6), 5.5, 2.5, 1.3)
-        band = n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', n.m('FRACT', n.m('MULTIPLY', w, 3.0)), 0.5)), 0.12, 0.34)
-        col = n.mix(band, z['base2'], b)
+        zz = n.smooth(n.sep(n.co)[2], 0.1, z.get('height', 2.6))
+        inner = n.smooth(n.noise(2.4, 3.0), 0.35, 0.7)
+        col = n.mix(n.m('ADD', n.m('MULTIPLY', zz, 0.75), n.m('MULTIPLY', inner, 0.25), clamp=True), b, z['base2'])
         if z.get('opal'):
-            col = n.mix(n.smooth(n.noise(1.8, 2.0), 0.5, 0.7), col, (0.45, 0.85, 0.7))
-        col = n.mix(n.m('MULTIPLY', fac, 0.35), col, (1.0, 0.95, 1.0))
-        n.out(col, 0.14, 0.0, e, n.m('MULTIPLY', n.m('ADD', 0.25, n.m('MULTIPLY', band, 0.75)), z['strength']))
-        n.bump(band, 0.25, 0.02, soft=False)
+            col = n.mix(n.m('MULTIPLY', n.smooth(n.noise(1.8, 2.0), 0.5, 0.7), 0.6), col, (0.3, 0.8, 0.7))
+        col = n.mix(n.m('MULTIPLY', fac, 0.3), col, (1.0, 0.95, 1.0))
+        n.out(col, n.m('ADD', 0.1, n.m('MULTIPLY', fine, 0.08)), 0.0, e,
+              n.m('MULTIPLY', n.m('ADD', 0.25, n.m('MULTIPLY', zz, 0.75)), z['strength']))
+        n.edge(0.5, radius=0.04)
     ST['mats'][zone] = mat
     return mat
 

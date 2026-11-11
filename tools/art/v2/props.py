@@ -134,23 +134,40 @@ def tendril():
     return dict(name='Tendril')
 
 
+def crystal(base, h, r, yaw, lean, zone, sides=6):
+    """Faceted shard: a six-sided column with a slanted point, leaning out from its base."""
+    a, l = math.radians(yaw), math.radians(lean)
+    d = (math.cos(a) * math.sin(l), math.sin(a) * math.sin(l), math.cos(l))
+    p0 = (base[0] - d[0] * 0.15, base[1] - d[1] * 0.15, base[2] - d[2] * 0.15)
+    p1 = (base[0] + d[0] * h, base[1] + d[1] * h, base[2] + d[2] * h)
+    o = tube(p0, p1, [(0, r * 0.8), (0.72, r), (0.86, r * 0.6), (1, r * 0.04)], sides, zone, sharp=15)
+    return o
+
+
+def cluster(c, n, h, r, zone, rnd, lean=28):
+    crystal(c, h, r, rnd.uniform(0, 360), rnd.uniform(0, 8), zone)
+    for k in range(n):
+        yaw = 360.0 * k / n + rnd.uniform(-20, 20)
+        a = math.radians(yaw)
+        hh = h * rnd.uniform(0.4, 0.8)
+        rr = r * rnd.uniform(0.5, 0.8)
+        crystal((c[0] + math.cos(a) * r * 0.8, c[1] + math.sin(a) * r * 0.8, c[2]), hh, rr, yaw, lean + rnd.uniform(-10, 14), zone)
+
+
 def deposit(gem, rockzone, seed, big, n_small, spread):
     rnd = random.Random(seed)
-    # Broken ground, the main geode, satellite crystals and shards.
-    for k in range(7):
-        a = math.radians(360.0 * k / 7 + rnd.uniform(-20, 20))
-        d = rnd.uniform(spread * 0.35, spread * 0.8)
-        r = rnd.uniform(0.45, 0.9)
+    # Broken ground, a main spray of crystal columns, satellite sprays and loose shards.
+    for k in range(8):
+        a = math.radians(360.0 * k / 8 + rnd.uniform(-20, 20))
+        d = rnd.uniform(spread * 0.25, spread * 0.8)
+        r = rnd.uniform(0.5, 0.95)
         rock((math.cos(a) * d, math.sin(a) * d, r * 0.3), r, rockzone, sq=(1.1, 0.9, 0.6), seed=seed + k, floor=-0.05)
-    rock((0, 0, big * 0.62), big, gem, sq=(1.05, 1.0, 0.95), seed=seed + 50, sub=3, rough=0.22, cuts=9, floor=-0.02)
+    rock((0, 0, 0.3), big * 0.75, rockzone, sq=(1.1, 1.0, 0.5), seed=seed + 30, floor=-0.05)
+    cluster((0, 0, 0.25), 7, big * 1.9, big * 0.34, gem, rnd)
     for k in range(n_small):
         a = math.radians(360.0 * k / n_small + rnd.uniform(-25, 25))
-        d = rnd.uniform(spread * 0.5, spread)
-        r = rnd.uniform(0.35, 0.75)
-        o = rock((math.cos(a) * d, math.sin(a) * d, r * 0.55), r, gem, sq=(0.8, 0.8, rnd.uniform(1.0, 1.7)), seed=seed + 60 + k,
-                 rough=0.2, cuts=7, floor=-0.02)
-        F.rot(o, 'X', rnd.uniform(-25, 25), about=(math.cos(a) * d, math.sin(a) * d, 0))
-        F.rot(o, 'Y', rnd.uniform(-25, 25), about=(math.cos(a) * d, math.sin(a) * d, 0))
+        d = rnd.uniform(spread * 0.45, spread)
+        cluster((math.cos(a) * d, math.sin(a) * d, 0.0), rnd.randint(2, 4), rnd.uniform(0.7, 1.4), rnd.uniform(0.16, 0.26), gem, rnd, lean=34)
 
 
 @asset('props/deposit_ore.glb', 'Ore site (pink crystal)', size=512)
