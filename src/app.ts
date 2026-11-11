@@ -1335,7 +1335,7 @@ export class App {
    * that for the enemy (standing in for two NPC teams), lined up to fight across the middle.
    * Returns how many units were added.
    */
-  stressSpawnForTest(perSide: number): number {
+  stressSpawnForTest(perSide: number, withEnemies = true): number {
     const world = this.world;
     const ground = (faction: string) =>
       [...world.unitTypes.values()].filter((type) => type.faction === faction && !type.air && type.weapon && !type.workerKind);
@@ -1358,8 +1358,10 @@ export class App {
       }
     };
     place(1, human, perSide, half * 0.12, 1);
-    place(2, alien, perSide, -half * 0.12, -1);
-    place(2, human, perSide, -half * 0.12 - Math.ceil(perSide / 16) * 5, -1);
+    if (withEnemies) {
+      place(2, alien, perSide, -half * 0.12, -1);
+      place(2, human, perSide, -half * 0.12 - Math.ceil(perSide / 16) * 5, -1);
+    }
     return added;
   }
 

@@ -5,6 +5,7 @@ import {
   mapFor,
   type MapDef,
 } from './map';
+import { goalTaken, steer } from './avoidance';
 import { findPath } from './pathfinding';
 import {
   STOP_DISTANCE,
@@ -78,7 +79,10 @@ export function followPath(
 ): void {
   const map = mapFor(world.map, type.movement);
   const goalDistance = Math.hypot(goal.x - unit.x, goal.z - unit.z);
-  if (goalDistance <= STOP_DISTANCE) {
+  if (
+    goalDistance <= STOP_DISTANCE ||
+    ((unit.order.kind === 'move' || unit.order.kind === 'attackMove') && goalTaken(world, unit, goal.x, goal.z, goalDistance))
+  ) {
     unit.path = [];
     unit.speed = 0;
     if (unit.order.kind === 'move' || unit.order.kind === 'attackMove') {
@@ -107,10 +111,10 @@ export function followPath(
     }
   }
 
-  const steer = (visible >= 0 ? unit.path[visible] : unit.path[0]) ?? goal;
+  const aim = (visible >= 0 ? unit.path[visible] : unit.path[0]) ?? goal;
 
-  let remaining = Math.hypot(steer.x - unit.x, steer.z - unit.z);
-  let previous: Point = steer;
+  let remaining = Math.hypot(aim.x - unit.x, aim.z - unit.z);
+  let previous: Point = aim;
   for (let index = visible + 1; index < unit.path.length; index += 1) {
     const point = unit.path[index];
     if (!point) {
@@ -121,13 +125,14 @@ export function followPath(
   }
   remaining += Math.hypot(goal.x - previous.x, goal.z - previous.z);
 
-  const bearing = Math.atan2(steer.z - unit.z, steer.x - unit.x);
+  const steering = steer(world, map, unit, type, Math.atan2(aim.z - unit.z, aim.x - unit.x), goalDistance);
+  const bearing = steering.bearing;
   unit.heading = rotateTowards(unit.heading, bearing, type.turnDegPerSec * DEG_TO_RAD / 20);
   const error = Math.abs(angleDiff(bearing, unit.heading));
 
   const turnSpeed = type.topSpeed * Math.max(TURN_SPEED_FLOOR, 1 - error / Math.PI);
   const braking = Math.sqrt(2 * type.accel * Math.max(0, remaining - STOP_DISTANCE));
-  const targetSpeed = Math.min(turnSpeed, braking);
+  const targetSpeed = Math.min(turnSpeed, braking, steering.speedCap);
   unit.speed = approach(unit.speed, targetSpeed, type.accel / 20);
 
   const step = unit.speed / 20;

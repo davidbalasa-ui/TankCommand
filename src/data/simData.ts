@@ -7,7 +7,7 @@ import { loadMapTable, loadResearchTable, loadStructureTable, loadUnitTable } fr
 import type { MapRow } from './mapSchema';
 import type { StructureRow } from './structureSchema';
 import type { UnitRow } from './unitSchema';
-import { DEFAULT_DISMANTLE_REFUND_PERCENT, DEFAULT_DISMANTLE_SEC } from '../sim/tuning';
+import { DEFAULT_DISMANTLE_REFUND_PERCENT, DEFAULT_DISMANTLE_SEC, UNIT_RADIUS } from '../sim/tuning';
 import type { ResearchNode, SimStructureType, SimUnitType, WorldState } from '../sim/types';
 import { addAi } from '../ai/driver';
 import { buildSkirmishSetup } from '../sim/skirmishSetup';
@@ -21,6 +21,8 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
       id: row.id,
       modelId: row.modelAssetId,
       visualScale: row.visualScale,
+      // Bigger models take more room: footprint follows drawn size, within limits.
+      radius: UNIT_RADIUS * Math.min(1.4, Math.max(0.85, row.visualScale ?? 1)),
       faction: row.faction,
       role: row.role,
       hp: row.hp,

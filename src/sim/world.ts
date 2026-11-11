@@ -6,13 +6,12 @@ import {
   generateMap,
   NO_FEATURES,
   type MapFeatures,
-  mapFor,
-  groundLineClear,
   heightAt,
   isBlockedAt,
   lineOfSightClear,
 } from './map';
-import { unitMap } from './motion';
+import { followPath, unitMap } from './motion';
+import { separateUnits } from './avoidance';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
 import { findPath } from './pathfinding';
 import {
@@ -30,7 +29,6 @@ import {
   TARGET_HEIGHT,
   TURRET_ALIGN_TOLERANCE_DEG,
   UNIT_RADIUS,
-  WAYPOINT_REACHED,
   WRECK_TTL_SEC,
 } from './tuning';
 import {
@@ -120,7 +118,6 @@ import type {
 
 const DT = 1 / SIM_TICK_HZ;
 const DEG_TO_RAD = Math.PI / 180;
-const TURN_SPEED_FLOOR = 0.25;
 
 export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
@@ -665,96 +662,6 @@ function isHoldingFirePosition(
   return distance <= weapon.range && unitLineOfSightAt(world, unit, target.x, target.z);
 }
 
-function followPath(
-  world: WorldState,
-  unit: UnitState,
-  type: SimUnitType,
-  goal: Point,
-): void {
-  const map = mapFor(world.map, type.movement);
-  const goalDistance = Math.hypot(goal.x - unit.x, goal.z - unit.z);
-  if (goalDistance <= STOP_DISTANCE) {
-    unit.path = [];
-    unit.speed = 0;
-    if (unit.order.kind === 'move' || unit.order.kind === 'attackMove') {
-      unit.order = { kind: 'idle' };
-    }
-    return;
-  }
-
-  while (unit.path.length > 1) {
-    const first = unit.path[0];
-    if (!first) {
-      break;
-    }
-    if (Math.hypot(first.x - unit.x, first.z - unit.z) > WAYPOINT_REACHED) {
-      break;
-    }
-    unit.path.shift();
-  }
-
-  let visible = -1;
-  for (let index = unit.path.length - 1; index >= 0; index -= 1) {
-    const point = unit.path[index];
-    if (point && groundLineClear(map, unit.x, unit.z, point.x, point.z)) {
-      visible = index;
-      break;
-    }
-  }
-
-  const steer = (visible >= 0 ? unit.path[visible] : unit.path[0]) ?? goal;
-
-  let remaining = Math.hypot(steer.x - unit.x, steer.z - unit.z);
-  let previous: Point = steer;
-  for (let index = visible + 1; index < unit.path.length; index += 1) {
-    const point = unit.path[index];
-    if (!point) {
-      continue;
-    }
-    remaining += Math.hypot(point.x - previous.x, point.z - previous.z);
-    previous = point;
-  }
-  remaining += Math.hypot(goal.x - previous.x, goal.z - previous.z);
-
-  const bearing = Math.atan2(steer.z - unit.z, steer.x - unit.x);
-  unit.heading = rotateTowards(unit.heading, bearing, type.turnDegPerSec * DEG_TO_RAD * DT);
-  const error = Math.abs(angleDiff(bearing, unit.heading));
-
-  const turnSpeed = type.topSpeed * Math.max(TURN_SPEED_FLOOR, 1 - error / Math.PI);
-  const braking = Math.sqrt(2 * type.accel * Math.max(0, remaining - STOP_DISTANCE));
-  const targetSpeed = Math.min(turnSpeed, braking);
-  unit.speed = approach(unit.speed, targetSpeed, type.accel * DT);
-
-  const step = unit.speed * DT;
-  if (step <= 0) {
-    return;
-  }
-
-  const stepX = Math.cos(unit.heading) * step;
-  const stepZ = Math.sin(unit.heading) * step;
-  let nextX = unit.x + stepX;
-  let nextZ = unit.z + stepZ;
-  if (isBlockedAt(map, nextX, nextZ)) {
-    if (!isBlockedAt(map, unit.x + stepX, unit.z)) {
-      nextX = unit.x + stepX;
-      nextZ = unit.z;
-    } else if (!isBlockedAt(map, unit.x, unit.z + stepZ)) {
-      nextX = unit.x;
-      nextZ = unit.z + stepZ;
-    } else {
-      unit.speed = 0;
-      return;
-    }
-  }
-  const clamped = clampToMap(map, nextX, nextZ, UNIT_RADIUS);
-  if (isBlockedAt(map, clamped.x, clamped.z)) {
-    unit.speed = 0;
-    return;
-  }
-  unit.x = clamped.x;
-  unit.z = clamped.z;
-}
-
 function fireProjectile(
   world: WorldState,
   shooter: { owner: PlayerId; x: number; z: number; id?: number },
@@ -970,62 +877,6 @@ function updateProjectiles(world: WorldState): void {
     remaining.push(projectile);
   }
   world.projectiles = remaining;
-}
-
-function separateUnits(world: WorldState): void {
-  const minimum = UNIT_RADIUS * 2;
-  for (let iteration = 0; iteration < 8; iteration += 1) {
-    let moved = false;
-    for (let i = 0; i < world.units.length; i += 1) {
-      const a = world.units[i];
-      if (!a || a.hp <= 0) {
-        continue;
-      }
-      for (let j = i + 1; j < world.units.length; j += 1) {
-        const b = world.units[j];
-        if (!b || b.hp <= 0 || a.air || b.air) {
-          continue;
-        }
-        let dx = b.x - a.x;
-        let dz = b.z - a.z;
-        let distance = Math.hypot(dx, dz);
-        if (distance >= minimum - 0.001) {
-          continue;
-        }
-        if (distance < 0.0001) {
-          const angle = ((a.id * 13 + b.id * 7) % 360) * DEG_TO_RAD;
-          dx = Math.cos(angle);
-          dz = Math.sin(angle);
-          distance = 1;
-        }
-        const push = (minimum - distance) / 2;
-        const ax = a.x - (dx / distance) * push;
-        const az = a.z - (dz / distance) * push;
-        const bx = b.x + (dx / distance) * push;
-        const bz = b.z + (dz / distance) * push;
-        const aCan = canStand(world, ax, az);
-        const bCan = canStand(world, bx, bz);
-        if (aCan && bCan) {
-          a.x = ax;
-          a.z = az;
-          b.x = bx;
-          b.z = bz;
-          moved = true;
-        } else if (aCan) {
-          a.x = a.x - (dx / distance) * push * 2;
-          a.z = a.z - (dz / distance) * push * 2;
-          moved = true;
-        } else if (bCan) {
-          b.x = b.x + (dx / distance) * push * 2;
-          b.z = b.z + (dz / distance) * push * 2;
-          moved = true;
-        }
-      }
-    }
-    if (!moved) {
-      break;
-    }
-  }
 }
 
 function updateOrderPath(
@@ -1284,7 +1135,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
     }
   }
 
-  separateUnits(world);
+  separateUnits(world, (x, z) => canStand(world, x, z));
   updateStuckUnits(world, startPositions);
 }
 

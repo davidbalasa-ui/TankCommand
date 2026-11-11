@@ -213,8 +213,11 @@ describe('economy', () => {
     world = step(world, [
       { kind: 'mine', unitIds: [minerId], depositId: 1, tick: 1, issuer: 1 },
     ]);
+    // Alerts live a few seconds, so note it whenever it shows rather than only at the end.
+    let reportedEmpty = false;
     for (let i = 0; i < 1200; i += 1) {
       world = step(world, []);
+      reportedEmpty ||= world.alerts.some((alert) => alert.kind === 'depositEmpty');
       const deposit = world.deposits[0];
       const miner = world.units.find((unit) => unit.id === minerId);
       if (deposit && miner?.job?.stage === 'waiting' && deposit.amount === 0 && stats(world)?.ore === 3) {
@@ -227,7 +230,7 @@ describe('economy', () => {
     expect(miner?.job?.stage).toBe('waiting');
     // The last part-filled crate is hauled too (the hauler found the work by itself).
     expect(stats(world)?.ore).toBe(3);
-    expect(world.alerts.some((alert) => alert.kind === 'depositEmpty')).toBe(true);
+    expect(reportedEmpty).toBe(true);
 
     const before = stats(world)?.ore ?? 0;
     for (let i = 0; i < 100; i += 1) {

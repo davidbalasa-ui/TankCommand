@@ -283,7 +283,7 @@ export interface TestHook {
   alertList(): AlertView[];
   setStorageFullForTest(value: boolean): void;
   pressAndroidBack(): void;
-  stressSpawn(perSide: number): number;
+  stressSpawn(perSide: number, withEnemies?: boolean): number;
 }
 
 declare global {

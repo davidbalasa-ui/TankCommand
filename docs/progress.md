@@ -167,3 +167,17 @@ David's cap: 64 player units plus two 64-unit NPC teams on screen. Test hook `st
 - Optional particles (sparks, debris, smoke) thin out past 60 live particles and stop past 200, since each is a draw call.
 - Settings > Show FPS shows fps, slowest frame, unit count, draw calls and triangles, for checking a real phone.
 - CPU profile of the 192-unit battle: the main thread is about 98% idle, so game logic and scene updates are cheap; the GPU is the limit. The cloud browser renders in software, so real fps has to be read on David's phone. Scene is about 330k triangles without shadows (650k with the shadow pass) at 192 units, inside the ~2,500-triangle unit budget.
+
+## C-09 Unit avoidance (2026-11-11)
+
+David: tanks ran into each other; wants better avoidance and interaction. Before, units drove straight at each other and were only shoved apart after overlapping, all with one radius.
+
+`src/sim/avoidance.ts` (deterministic, own side only; enemies are targets and only get contact separation):
+- Look-ahead corridor along the desired bearing; the nearest friend in it is steered round with enough sideways offset to clear it by the time the units draw level.
+- Head-on and in line: both keep right.
+- A friend ahead going the same way: follow at its speed instead of ramming. Friends driving alongside are ignored (formation).
+- A parked friend (idle, no job) in the corridor shuffles sideways out of the way.
+- Arrival: a unit stops when its goal is taken by a parked friend and it is as close as it can get, so a crowd ordered to one spot settles instead of jostling.
+- Footprint radius follows each unit's drawn size (UNIT_RADIUS x visualScale, 0.85-1.4); separation uses it.
+- Spatial grid (8 m cells) for neighbour queries.
+Tests `tests/unit/avoidance.test.ts` (AVD-01..04); AVD-01/02 fail with steering disabled. AI-07 back to 10/10 (it dropped to 7/10 while units also steered round enemies). Before/after clip: /mnt/project-files/movement/avoidance-before-after.mp4.

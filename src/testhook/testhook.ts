@@ -101,7 +101,7 @@ export interface TestHook {
   alertList(): AlertSnapshot[];
   setStorageFullForTest(value: boolean): void;
   pressAndroidBack(): void;
-  stressSpawn(perSide: number): number;
+  stressSpawn(perSide: number, withEnemies?: boolean): number;
 }
 
 export function installTestHook(app: App): void {
@@ -183,7 +183,7 @@ export function installTestHook(app: App): void {
     pressAndroidBack: () => {
       app.pressAndroidBack();
     },
-    stressSpawn: (perSide) => app.stressSpawnForTest(perSide),
+    stressSpawn: (perSide, withEnemies) => app.stressSpawnForTest(perSide, withEnemies),
   };
 
   (window as unknown as { __TC_TEST__?: TestHook }).__TC_TEST__ = hook;

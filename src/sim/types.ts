@@ -92,6 +92,8 @@ export interface SimUnitType {
   modelId?: string;
   // Render-only: drawn length relative to a light tank.
   visualScale?: number;
+  // Ground footprint radius for avoidance and spacing (metres). Defaults to UNIT_RADIUS.
+  radius?: number;
   faction: Faction;
   role: UnitRole;
   hp: number;
