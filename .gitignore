@@ -9,3 +9,4 @@ test-results/
 .env
 .env.local
 .deepseek-runs/
+__pycache__/
