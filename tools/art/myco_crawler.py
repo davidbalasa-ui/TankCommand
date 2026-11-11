@@ -404,7 +404,22 @@ def flat_mat(name, col, alpha=1.0):
 
 dirt = flat_mat('Dirt', (0.075, 0.05, 0.03, 1))
 dirt_lt = flat_mat('DirtLight', (0.075, 0.055, 0.032, 1))
-dust = flat_mat('Dust', (0.3, 0.24, 0.16, 1), 0.3)
+# Dust: a soft-edged translucent puff (opaque only where it faces the camera), fading with age.
+dust = bpy.data.materials.new('Dust'); dust.use_nodes = True
+_dn = dust.node_tree
+_dn.nodes.remove(_dn.nodes['Principled BSDF'])
+_df = _dn.nodes.new('ShaderNodeBsdfDiffuse'); _df.inputs['Color'].default_value = (0.36, 0.28, 0.19, 1)
+_tr = _dn.nodes.new('ShaderNodeBsdfTransparent')
+_mx = _dn.nodes.new('ShaderNodeMixShader')
+_lw = _dn.nodes.new('ShaderNodeLayerWeight'); _lw.inputs['Blend'].default_value = 0.6
+_at = _dn.nodes.new('ShaderNodeAttribute'); _at.attribute_type = 'OBJECT'; _at.attribute_name = 'dens'
+_inv = _dn.nodes.new('ShaderNodeMath'); _inv.operation = 'SUBTRACT'; _inv.inputs[0].default_value = 1.0
+_dn.links.new(_lw.outputs['Facing'], _inv.inputs[1])  # 1 facing the camera, 0 at the rim
+_op = _dn.nodes.new('ShaderNodeMath'); _op.operation = 'MULTIPLY'
+_dn.links.new(_inv.outputs['Value'], _op.inputs[0]); _dn.links.new(_at.outputs['Fac'], _op.inputs[1])
+_dn.links.new(_op.outputs['Value'], _mx.inputs['Fac'])
+_dn.links.new(_tr.outputs['BSDF'], _mx.inputs[1]); _dn.links.new(_df.outputs['BSDF'], _mx.inputs[2])
+_dn.links.new(_mx.outputs['Shader'], _dn.nodes['Material Output'].inputs['Surface'])
 scar = flat_mat('Scar', (0.035, 0.022, 0.013, 1))
 
 scene.render.engine = 'CYCLES'
@@ -490,17 +505,21 @@ for f in range(-60, N):
         if (tz0 < 0 <= tz) or (tz0 >= 0 > tz):
             c = tip_point(i, X0 + v * f, rel, 0)
             events.append((f, c.x, c.y, ROOTS[i][1], 'rip' if tz >= 0 else 'plunge', i))
-scene.cycles.samples = 20
+scene.cycles.samples = 16
 scene.render.resolution_x, scene.render.resolution_y = 960, 540
-aim((3, -30, 9.0), (0, 0, 2.2), 26)
 live = []
+import os
+ONLY = {int(x) for x in os.environ.get('FRAMES', '').split(',') if x}
 for f in range(N):
+    if ONLY and f not in ONLY:
+        continue
     for o in live:
         bpy.data.objects.remove(o, do_unlink=True)
     live = []
     SUB_TIPS.clear()
     F_NOW[0] = f
     bx = X0 + v * f
+    aim((0.5 * bx + 1.5, -25, 8.5), (0.5 * bx, 0, 2.2), 30)  # follows at half speed: the ground visibly slides
     sway = math.sin(2 * math.pi * f / (T / 2))
     root.location = (bx, 0, 0.1 * sway)
     root.rotation_euler = (0.025 * math.sin(2 * math.pi * f / T), 0.02 * sway, 0)
@@ -525,10 +544,5 @@ for f in range(N):
                 if z > 0:
                     live.append(blob('Chunk', (ex + vx * t, ey + vy * t, z), rr.uniform(0.08, 0.25) * (0.6 + 0.6 * sz),
                                      dirt, e * 7 + k, sub=1))
-            if age < 16:
-                for k in range(3):  # dust puff that swells and fades
-                    rad = (0.5 + age * 0.11) * (0.6 + 0.6 * sz)
-                    live.append(blob('Dust', (ex + rr.uniform(-0.6, 0.6), ey + rr.uniform(-0.6, 0.6), 0.3 + age * 0.05),
-                                     rad, dust, e * 3 + k, sub=1))
     scene.render.filepath = f'{anim_dir}/f_{f:04d}.png'
     bpy.ops.render.render(write_still=True)

@@ -301,7 +301,7 @@ if render_dir:
     bpy.ops.mesh.primitive_plane_add(size=80)
     ground = bpy.context.object
     gm = bpy.data.materials.new('Ground'); gm.use_nodes = True
-    gm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.12, 0.13, 0.1, 1)
+    gm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.045, 0.04, 0.05, 1)
     ground.data.materials.append(gm)
     scene.render.engine = 'CYCLES'
     scene.cycles.samples = 96
@@ -321,8 +321,10 @@ if render_dir:
         scene.render.filepath = f'{render_dir}/{name}.png'
         bpy.ops.render.render(write_still=True)
 
-    look('crystal_front', (15, -15, 2.5), target=(0, 0, 8.0), lens_mm=26)
-    look('crystal_rts', (16, -16, 30), target=(0, 0, 4), lens_mm=35)
+    import os
+    if not os.environ.get('FRAMES'):
+        look('crystal_front', (15, -15, 2.5), target=(0, 0, 8.0), lens_mm=26)
+        look('crystal_rts', (16, -16, 30), target=(0, 0, 4), lens_mm=35)
 
     if anim_dir:
         # Looping preview: crystal turns once, ribbons the other way twice, shards orbit twice,
@@ -346,34 +348,194 @@ if render_dir:
             for o in (crystal, core, ribbons, shards):
                 o.location = (0, 0, 0.35 * math.sin(2 * math.pi * t))
                 o.keyframe_insert('location', frame=f)
-        # The beam: core to a point on the ground, on for frames 52-66, with an impact flash.
-        tgt = (9.0, -4.0, 0.0)
-        cz = FLOAT + H * 0.48
+        # The attack, built from pieces that are all cheap on a phone (in game: billboard quads, ground
+        # decals and a few particles): a lock-on ring tightens on the target, the core charges, a
+        # flickering beam (white-hot core plus a soft violet glow) fires, the impact flashes, a
+        # shockwave ring rolls out, sparks fly, and a scorch mark is left glowing and cooling.
         import mathutils
-        a, b = mathutils.Vector((0, 0, cz)), mathutils.Vector(tgt)
-        mid, d = (a + b) / 2, b - a
-        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.22, depth=d.length, location=mid)
-        beam = bpy.context.object
-        beam.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
-        bm_ = bpy.data.materials.new('Beam'); bm_.use_nodes = True
-        bb = bm_.node_tree.nodes['Principled BSDF']
-        bb.inputs['Base Color'].default_value = (0, 0, 0, 1)
-        bb.inputs['Emission Color'].default_value = (0.8, 0.45, 1.0, 1)
-        bb.inputs['Emission Strength'].default_value = 40
-        beam.data.materials.append(bm_)
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.2, location=tgt)
-        flash = bpy.context.object
-        flash.data.materials.append(bm_)
-        for o in (beam, flash):
-            for f, on in ((1, False), (52, True), (67, False)):
+        import random as _r
+        rr = _r.Random(7)
+        V = mathutils.Vector
+        tgt = V((7.5, -1.5, 0.0))
+        cz = FLOAT + H * 0.48
+        src = V((0, 0, cz))
+        F_LOCK, F_FIRE, F_END = 28, 52, 63
+
+        def glow_mat(name, col, soft=True):
+            m = bpy.data.materials.new(name); m.use_nodes = True
+            t = m.node_tree
+            t.nodes.remove(t.nodes['Principled BSDF'])
+            em = t.nodes.new('ShaderNodeEmission'); em.inputs['Color'].default_value = (*col, 1)
+            tr = t.nodes.new('ShaderNodeBsdfTransparent')
+            mx = t.nodes.new('ShaderNodeMixShader')
+            if soft:  # bright through the middle, fading to nothing at the silhouette
+                lw = t.nodes.new('ShaderNodeLayerWeight'); lw.inputs['Blend'].default_value = 0.5
+                pw = t.nodes.new('ShaderNodeMath'); pw.operation = 'POWER'; pw.inputs[1].default_value = 0.5
+                t.links.new(lw.outputs['Facing'], pw.inputs[0]); t.links.new(pw.outputs['Value'], mx.inputs['Fac'])
+            else:
+                mx.inputs['Fac'].default_value = 0.0
+            t.links.new(em.outputs['Emission'], mx.inputs[1]); t.links.new(tr.outputs['BSDF'], mx.inputs[2])
+            t.links.new(mx.outputs['Shader'], t.nodes['Material Output'].inputs['Surface'])
+            m.surface_render_method = 'BLENDED'
+            return m, em.inputs['Strength']
+
+        def key_strength(sock, pts):
+            for f, v in pts:
+                sock.default_value = v
+                sock.keyframe_insert('default_value', frame=f)
+
+        def key_vis(o, on_from, off_from):
+            for f, on in ((1, False), (on_from, True), (off_from, False)):
                 o.hide_render = not on
                 o.keyframe_insert('hide_render', frame=f)
+
+        def aim_obj(o, a, b):
+            o.location = (a + b) / 2
+            o.rotation_euler = (b - a).to_track_quat('Z', 'Y').to_euler()
+
+        # 1. Lock-on ring: shrinks onto the target and blinks faster as the charge builds.
+        bpy.ops.mesh.primitive_torus_add(major_radius=1.0, minor_radius=0.035, major_segments=48, minor_segments=6,
+                                         location=(tgt.x, tgt.y, 0.06))
+        lock = bpy.context.object
+        lm, ls = glow_mat('Lock', (0.7, 0.25, 1.0), soft=False)
+        lock.data.materials.append(lm)
+        key_vis(lock, F_LOCK, F_FIRE + 1)
+        for f in range(F_LOCK, F_FIRE + 1):
+            t = (f - F_LOCK) / (F_FIRE - F_LOCK)
+            s_ = 4.0 - 2.6 * t
+            lock.scale = (s_, s_, 1); lock.keyframe_insert('scale', frame=f)
+            blink = 0.5 + 0.5 * math.cos(f * (0.6 + 1.6 * t))
+            ls.default_value = 2 + 5 * blink; ls.keyframe_insert('default_value', frame=f)
+        # 2. Core charge: a glow ball swelling inside the crystal, then spent while firing.
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=1.0, location=src)
+        charge = bpy.context.object
+        cm, cs = glow_mat('Charge', (0.9, 0.6, 1.0))
+        charge.data.materials.append(cm)
+        key_vis(charge, 36, F_END + 2)
+        for f, s_, e in ((36, 0.1, 2), (50, 1.0, 6), (F_FIRE, 1.2, 7), (F_END, 0.6, 3), (F_END + 2, 0.2, 0)):
+            charge.scale = (s_, s_, s_); charge.keyframe_insert('scale', frame=f)
+            cs.default_value = e; cs.keyframe_insert('default_value', frame=f)
+        # 3+4. Beam: thin white-hot core and a wider soft glow cone that flares at the ground.
+        L = (tgt - src).length
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.08, depth=L)
+        bcore = bpy.context.object; aim_obj(bcore, src, tgt)
+        bcm, bcs = glow_mat('BeamCore', (1.0, 0.8, 1.0), soft=False)
+        bcore.data.materials.append(bcm)
+        bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.4, radius2=0.95, depth=L, end_fill_type='NOTHING')
+        bshell = bpy.context.object; aim_obj(bshell, src, tgt)
+        bsm, bss = glow_mat('BeamGlow', (0.42, 0.04, 1.0))
+        bshell.data.materials.append(bsm)
+        for o in (bcore, bshell):
+            key_vis(o, F_FIRE, F_END + 1)
+        for f in range(F_FIRE, F_END + 1):
+            k = 1.0 if f < F_END - 2 else (F_END + 1 - f) / 3
+            w = rr.uniform(0.7, 1.3) * k
+            bcore.scale = (w, w, 1); bcore.keyframe_insert('scale', frame=f)
+            w2 = rr.uniform(0.8, 1.25) * (1.4 if f == F_FIRE else 1.0) * max(k, 0.3)
+            bshell.scale = (w2, w2, 1); bshell.keyframe_insert('scale', frame=f)
+            bcs.default_value = rr.uniform(6, 9) * k; bcs.keyframe_insert('default_value', frame=f)
+            bss.default_value = rr.uniform(3, 5) * k; bss.keyframe_insert('default_value', frame=f)
+        # 5. Impact flash: a soft glow pooled on the ground plus a short bright splash at the hit point.
+        bpy.ops.mesh.primitive_circle_add(vertices=24, radius=1.0, fill_type='TRIFAN', location=(tgt.x, tgt.y, 0.05))
+        flash = bpy.context.object
+        fl = bpy.data.materials.new('Flash'); fl.use_nodes = True
+        ft = fl.node_tree
+        ft.nodes.remove(ft.nodes['Principled BSDF'])
+        fe = ft.nodes.new('ShaderNodeEmission'); fe.inputs['Color'].default_value = (0.5, 0.1, 1.0, 1)
+        ftr = ft.nodes.new('ShaderNodeBsdfTransparent'); fmx = ft.nodes.new('ShaderNodeMixShader')
+        fg = ft.nodes.new('ShaderNodeTexGradient'); fg.gradient_type = 'QUADRATIC_SPHERE'
+        ftc = ft.nodes.new('ShaderNodeTexCoord')
+        ft.links.new(ftc.outputs['Object'], fg.inputs['Vector'])
+        finv = ft.nodes.new('ShaderNodeMath'); finv.operation = 'SUBTRACT'; finv.inputs[0].default_value = 1.0
+        ft.links.new(fg.outputs['Fac'], finv.inputs[1])
+        ft.links.new(finv.outputs['Value'], fmx.inputs['Fac'])
+        ft.links.new(fe.outputs['Emission'], fmx.inputs[1]); ft.links.new(ftr.outputs['BSDF'], fmx.inputs[2])
+        ft.links.new(fmx.outputs['Shader'], ft.nodes['Material Output'].inputs['Surface'])
+        fl.surface_render_method = 'BLENDED'
+        flash.data.materials.append(fl)
+        fs = fe.inputs['Strength']
+        key_vis(flash, F_FIRE, F_END + 8)
+        for f, s_, e in ((F_FIRE, 1.5, 8), (F_FIRE + 2, 3.2, 7), (F_END, 3.0, 5), (F_END + 8, 3.8, 0)):
+            flash.scale = (s_, s_, 1); flash.keyframe_insert('scale', frame=f)
+            fs.default_value = e; fs.keyframe_insert('default_value', frame=f)
+        # 6. Shockwave: a ring that rolls out across the ground and fades.
+        bpy.ops.mesh.primitive_torus_add(major_radius=1.0, minor_radius=0.09, major_segments=48, minor_segments=8,
+                                         location=(tgt.x, tgt.y, 0.1))
+        shock = bpy.context.object
+        sm, ss = glow_mat('Shock', (0.5, 0.1, 1.0))
+        shock.data.materials.append(sm)
+        key_vis(shock, F_FIRE + 1, F_FIRE + 20)
+        for f in range(F_FIRE + 1, F_FIRE + 20):
+            t = (f - F_FIRE - 1) / 18
+            s_ = 0.8 + 8.0 * (1 - (1 - t) ** 2)
+            shock.scale = (s_, s_, 1 + 2 * (1 - t)); shock.keyframe_insert('scale', frame=f)
+            ss.default_value = 5 * (1 - t) ** 1.5; ss.keyframe_insert('default_value', frame=f)
+        # 7. Scorch: a ragged burnt patch with ember specks that cool down after the hit.
+        bpy.ops.mesh.primitive_circle_add(vertices=24, radius=3.0, fill_type='TRIFAN', location=(tgt.x, tgt.y, 0.03))
+        scorch = bpy.context.object
+        sc = bpy.data.materials.new('Scorch'); sc.use_nodes = True
+        st = sc.node_tree; sb = st.nodes['Principled BSDF']
+        tc = st.nodes.new('ShaderNodeTexCoord')
+        nz = st.nodes.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 1.2; nz.inputs['Detail'].default_value = 6
+        st.links.new(tc.outputs['Object'], nz.inputs['Vector'])
+        dist = st.nodes.new('ShaderNodeVectorMath'); dist.operation = 'LENGTH'
+        st.links.new(tc.outputs['Object'], dist.inputs[0])
+        rag = st.nodes.new('ShaderNodeMath'); rag.operation = 'MULTIPLY_ADD'
+        rag.inputs[1].default_value = 1.6; rag.inputs[2].default_value = -0.8
+        st.links.new(nz.outputs['Fac'], rag.inputs[0])
+        edge = st.nodes.new('ShaderNodeMath'); edge.operation = 'ADD'
+        st.links.new(dist.outputs['Value'], edge.inputs[0]); st.links.new(rag.outputs['Value'], edge.inputs[1])
+        mask = st.nodes.new('ShaderNodeMapRange')
+        mask.inputs['From Min'].default_value = 1.4; mask.inputs['From Max'].default_value = 2.6
+        mask.inputs['To Min'].default_value = 1.0; mask.inputs['To Max'].default_value = 0.0
+        st.links.new(edge.outputs['Value'], mask.inputs['Value'])
+        st.links.new(mask.outputs['Result'], sb.inputs['Alpha'])
+        nz2 = st.nodes.new('ShaderNodeTexNoise'); nz2.inputs['Scale'].default_value = 3.5; nz2.inputs['Detail'].default_value = 2
+        st.links.new(tc.outputs['Object'], nz2.inputs['Vector'])
+        emb = st.nodes.new('ShaderNodeMapRange')
+        emb.inputs['From Min'].default_value = 0.66; emb.inputs['From Max'].default_value = 0.72
+        st.links.new(nz2.outputs['Fac'], emb.inputs['Value'])
+        core_m = st.nodes.new('ShaderNodeMath'); core_m.operation = 'MULTIPLY'
+        st.links.new(emb.outputs['Result'], core_m.inputs[0]); st.links.new(mask.outputs['Result'], core_m.inputs[1])
+        heat = st.nodes.new('ShaderNodeMath'); heat.operation = 'MULTIPLY'
+        st.links.new(core_m.outputs['Value'], heat.inputs[0])
+        st.links.new(heat.outputs['Value'], sb.inputs['Emission Strength'])
+        sb.inputs['Base Color'].default_value = (0.012, 0.009, 0.012, 1); sb.inputs['Roughness'].default_value = 1
+        sb.inputs['Emission Color'].default_value = (1.0, 0.4, 0.8, 1)
+        sc.surface_render_method = 'BLENDED'
+        scorch.data.materials.append(sc)
+        key_vis(scorch, F_FIRE + 1, N + 2)
+        key_strength(heat.inputs[1], ((F_FIRE + 1, 9), (F_END, 7), (F_END + 12, 2.5), (N, 0.3)))
+        # 8. Sparks: short glowing streaks thrown out of the hit, falling under gravity.
+        spm, sps = glow_mat('Spark', (1.0, 0.45, 0.95), soft=False)
+        sps.default_value = 9
+        for k in range(14):
+            bpy.ops.mesh.primitive_cylinder_add(vertices=4, radius=0.04, depth=0.45)
+            sp = bpy.context.object
+            sp.data.materials.append(spm)
+            a = rr.uniform(0, 2 * math.pi)
+            a = rr.uniform(-0.6, 2.4)  # throw away from the camera side
+            vh, vz = rr.uniform(4, 8), rr.uniform(5, 9)
+            f0 = F_FIRE + rr.randint(0, 6)
+            last = f0
+            for f in range(f0, f0 + 14):
+                t = (f - f0) / 24
+                p = tgt + V((vh * t * math.cos(a), vh * t * math.sin(a), 0.3 + vz * t - 9.8 * t * t))
+                if p.z < 0:
+                    break
+                vel = V((vh * math.cos(a), vh * math.sin(a), vz - 19.6 * t))
+                sp.location = p; sp.rotation_euler = vel.to_track_quat('Z', 'Y').to_euler()
+                sp.keyframe_insert('location', frame=f); sp.keyframe_insert('rotation_euler', frame=f)
+                last = f
+            key_vis(sp, f0, last + 1)
+        # 9. Light: the hit lights the ground; the core light swells with the charge.
         hit = bpy.data.objects.new('HitLight', bpy.data.lights.new('HitLight', 'POINT'))
-        hit.data.color = (0.8, 0.45, 1.0); hit.location = (tgt[0], tgt[1], 1.0)
+        hit.data.color = (0.85, 0.5, 1.0); hit.location = (tgt.x, tgt.y, 1.2)
         scene.collection.objects.link(hit)
-        for f, e in ((1, 0), (51, 0), (52, 9000), (66, 9000), (67, 0)):
-            hit.data.energy = e
-            hit.data.keyframe_insert('energy', frame=f)
+        for f, e in ((1, 0), (F_FIRE - 1, 0), (F_FIRE, 9000), (F_END, 6000), (F_END + 8, 800), (N, 100)):
+            hit.data.energy = e; hit.data.keyframe_insert('energy', frame=f)
+        for f, e in ((1, 6000), (36, 6000), (F_FIRE, 11000), (F_END + 2, 6000)):
+            inner.data.energy = e; inner.data.keyframe_insert('energy', frame=f)
         scene.render.resolution_x, scene.render.resolution_y = 800, 500
         scene.cycles.samples = 24
         scene.cycles.use_denoising = True
@@ -382,6 +544,13 @@ if render_dir:
         dd = [t_ - l for t_, l in zip(look_at, cam.location)]
         cam.rotation_euler = (math.atan2(math.hypot(dd[0], dd[1]), -dd[2]), 0, math.atan2(dd[1], dd[0]) - math.pi / 2)
         cam.data.lens = 24
-        scene.render.filepath = f'{anim_dir}/f_'
         scene.render.image_settings.file_format = 'PNG'
-        bpy.ops.render.render(animation=True)
+        import os
+        if os.environ.get('FRAMES'):
+            for f in [int(x) for x in os.environ['FRAMES'].split(',')]:
+                scene.frame_set(f)
+                scene.render.filepath = f'{anim_dir}/f_{f:04d}.png'
+                bpy.ops.render.render(write_still=True)
+        else:
+            scene.render.filepath = f'{anim_dir}/f_'
+            bpy.ops.render.render(animation=True)
