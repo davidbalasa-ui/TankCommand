@@ -1,4 +1,4 @@
-"""Ore deposit samples from David's references, <= 1,500 triangles each, one 512px atlas.
+"""Ore deposit samples from David's references (several crystals per site), <= 1,500 triangles each, one 512px atlas.
 
   pink: a faceted magenta crystal with a swirling glowing core, half-buried in red rock, shards around.
   opal: an iridescent blue / violet / gold opal mass growing out of dark wet rock, with a crystal cluster.
@@ -138,11 +138,19 @@ if variant == 'pink':
     gem_obj = hull('Crystal', pts, 'pink', gem, planar=((0, 0, 0.9), 2.4))
     gem_obj.rotation_euler = (0.25, -0.35, 0.4)
     objs.append(gem_obj)
+    # A field of smaller crystals around the big one, so the site reads as rich (David: more per site).
     for k in range(6):
+        a = 2 * math.pi * k / 6 + rng.uniform(-0.3, 0.3)
+        r = rng.uniform(3.4, 4.6)
+        c = (r * math.cos(a), r * math.sin(a), 0.35)
+        sz = rng.uniform(0.7, 1.2)
+        o = hull(f'Small{k}', blob(c, sz * 1.1, sz * 0.8, sz, 16, 0.3, zmin=-0.2), 'pink', gem, planar=(c, sz))
+        objs.append(o)
+    for k in range(16):
         a = rng.uniform(0, 2 * math.pi)
-        r = rng.uniform(2.2, 3.4)
-        objs.append(shard(f'Shard{k}', (r * math.cos(a), r * math.sin(a), 0.1), rng.uniform(0.6, 1.3),
-                          rng.uniform(0.15, 0.3), rng.uniform(0.3, 0.9), a + math.pi / 2, 'pink'))
+        r = rng.uniform(2.2, 5.4)
+        objs.append(shard(f'Shard{k}', (r * math.cos(a), r * math.sin(a), 0.1), rng.uniform(0.6, 1.6),
+                          rng.uniform(0.15, 0.3), rng.uniform(0.2, 0.9), a + math.pi / 2, 'pink'))
 else:
     # Dark wet rock bed with a few boulders.
     objs.append(hull('Bed', blob((0, 0, -0.1), 3.6, 3.0, 0.7, 30, 0.35, zmin=-0.3), 'wet', stone))
@@ -154,6 +162,19 @@ else:
     objs.append(hull('Opal', blob((-0.2, 0, 1.2), 2.2, 1.6, 1.4, 90, 0.22, zmin=0.0), 'opal', gem, smooth=True,
                      planar=((-0.2, 0, 1.2), 2.2)))
     objs.append(hull('Crust', blob((1.4, 0.2, 1.1), 1.0, 1.3, 1.2, 16, 0.4), 'wet', stone))
+    # Smaller opal masses scattered around the main one (David: more per site).
+    for k in range(4):
+        a = 2 * math.pi * k / 4 + 0.8
+        r = rng.uniform(3.6, 4.6)
+        c = (r * math.cos(a), r * math.sin(a), 0.3)
+        sz = rng.uniform(0.7, 1.1)
+        objs.append(hull(f'SmallOpal{k}', blob(c, sz * 1.2, sz, sz * 0.8, 28, 0.2, zmin=0.0), 'opal', gem,
+                         smooth=True, planar=(c, sz)))
+    # A second crystal cluster on the far side.
+    for k in range(5):
+        yaw = rng.uniform(-0.8, 0.8)
+        objs.append(shard(f'Cluster2_{k}', (-2.6, rng.uniform(-1.5, -0.8), 0.2), rng.uniform(0.7, 1.2),
+                          rng.uniform(0.12, 0.2), rng.uniform(0.4, 1.1), yaw + math.pi / 2, 'opal'))
     # A cluster of iridescent crystals bursting from the crust.
     for k in range(6):
         yaw = rng.uniform(-0.8, 0.8)
@@ -188,7 +209,7 @@ if render_dir:
     sb.inputs['Emission Strength'].default_value = 12
     for _ in range(40):
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=rng.uniform(0.02, 0.05),
-                                              location=(rng.uniform(-3, 3), rng.uniform(-3, 3), rng.uniform(0.1, 3.2)))
+                                              location=(rng.uniform(-5, 5), rng.uniform(-5, 5), rng.uniform(0.1, 3.2)))
         bpy.context.object.data.materials.append(sm)
     world = bpy.data.worlds.new('W'); scene.world = world
     world.use_nodes = True
@@ -204,7 +225,7 @@ if render_dir:
     glow.data.color = (1.0, 0.3, 0.8) if variant == 'pink' else (0.4, 0.5, 1.0)
     glow.location = (0, -1.5, 2.5)
     scene.collection.objects.link(glow)
-    bpy.ops.mesh.primitive_plane_add(size=60)
+    bpy.ops.mesh.primitive_plane_add(size=80)
     ground = bpy.context.object
     gm = bpy.data.materials.new('Ground'); gm.use_nodes = True
     gcol = (0.18, 0.07, 0.06, 1) if variant == 'pink' else (0.04, 0.04, 0.05, 1)
@@ -226,5 +247,5 @@ if render_dir:
         scene.render.filepath = f'{render_dir}/{name}.png'
         bpy.ops.render.render(write_still=True)
 
-    look(f'ore_{variant}_front34', (8, -8, 4.5), (0, 0, 1.0), 40)
-    look(f'ore_{variant}_rts', (9, -9, 16), (0, 0, 0.5), 40)
+    look(f'ore_{variant}_front34', (10, -10, 6.0), (0, 0, 0.8), 35)
+    look(f'ore_{variant}_rts', (11, -11, 20), (0, 0, 0.5), 38)

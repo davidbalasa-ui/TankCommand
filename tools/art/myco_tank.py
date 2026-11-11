@@ -1,13 +1,14 @@
 """Third faction (mushroom tanks, working name Myco) sample tank, phone budget <= 2,500 triangles.
 
-Style target: David's reference (tracked hull carved from pale fungus wood, gold spoked wheels,
-a big red white-spotted cap on a thick stalk, a trumpet-shaped gill cannon firing golden spore
-clouds, small mushrooms sprouting on the hull, a red banner with a mushroom crest).
+Style target: David's reference, made completely organic at his request (no wheels, tracks or
+banner): a lumpy fungal bulb that crawls on thick mycelium root legs, a big red white-spotted cap
+on a stalk, a chanterelle-like gill funnel blowing golden spore clouds, glowing spore sacs, small
+mushrooms sprouting all over, and a crest of purple bracket fungus instead of a banner.
 The spore cloud is a cheap particle effect in game; the render adds one only as a preview.
 
 Run with Blender's Python (pip bpy):
   python myco_tank.py <atlas_dir> <out.glb> [render_dir]
-Nodes: Hull (body), TurretPivot (empty at the stalk base) > Turret (stalk, cap, cannon).
+Nodes: Hull (body, roots), TurretPivot (empty at the stalk base) > Turret (stalk, cap, funnel).
 """
 import math
 import random
@@ -24,12 +25,12 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 
 TILES = {  # u0, v0, u1, v1 in UV space (v up), from tools/art/atlas_myco.py
-    'wood': (0.0, 0.5, 0.5, 1.0),
+    'flesh': (0.0, 0.5, 0.5, 1.0),
     'cap': (0.5, 0.5, 1.0, 1.0),
     'gill': (0.0, 0.25, 0.5, 0.5),
-    'track': (0.5, 0.25, 1.0, 0.5),
-    'wheel': (0.0, 0.0, 0.25, 0.25),
-    'banner': (0.25, 0.0, 0.5, 0.25),
+    'myc': (0.5, 0.25, 1.0, 0.5),
+    'bulb': (0.0, 0.0, 0.25, 0.25),
+    'ruffle': (0.25, 0.0, 0.5, 0.25),
     'moss': (0.5, 0.0, 0.75, 0.25),
     'spore': (0.75, 0.0, 1.0, 0.25),
 }
@@ -108,7 +109,7 @@ def box(name, c, s, tile):
                  cy - sy, cy + sy, tile)
 
 
-def lathe(name, profile, sides, tile, center=(0, 0, 0), axis='z', smooth=True, close=True):
+def lathe(name, profile, sides, tile, center=(0, 0, 0), axis='z', smooth=True, close=True, uvs=None):
     """Revolve a profile of (radius, height) around an axis. Radius 0 points become poles."""
     cx, cy, cz = center
     verts, faces, rows = [], [], []
@@ -139,7 +140,7 @@ def lathe(name, profile, sides, tile, center=(0, 0, 0), axis='z', smooth=True, c
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
     bm.to_mesh(me)
     bm.free()
-    return link(name, me, tile, smooth)
+    return link(name, me, tile, smooth, uvs)
 
 
 def wheel(name, x, y, z, r, w, sides=12):
@@ -156,59 +157,123 @@ def wheel(name, x, y, z, r, w, sides=12):
 
 
 def mini_mushroom(name, x, y, z, s, tile='cap'):
-    stem = lathe(f'{name}Stem', [(0.12 * s, 0), (0.09 * s, 0.45 * s)], 6, 'wood', (x, y, z), smooth=False)
+    stem = lathe(f'{name}Stem', [(0.12 * s, 0), (0.09 * s, 0.45 * s)], 6, 'flesh', (x, y, z), smooth=False)
     cap = lathe(f'{name}Cap', [(0.0, 0.38 * s), (0.36 * s, 0.4 * s), (0.28 * s, 0.6 * s), (0.0, 0.72 * s)],
                 8, tile, (x, y, z))
     return [stem, cap]
 
 
 rng = random.Random(9)
-parts = []
-# --- Hull: carved fungus-wood body, chunky and rounded at the corners.
-hull_profile = [(-2.9, 0.55), (2.5, 0.55), (3.1, 0.95), (2.6, 1.5), (-2.5, 1.55), (-3.0, 1.2)]
-parts.append(prism('HullCore', hull_profile, -1.2, 1.2, 'wood'))
-for side, y in (('L', 1.55), ('R', -1.55)):
-    pod = [(-3.2, 0.1), (2.9, 0.1), (3.35, 0.55), (2.9, 1.0), (-3.15, 1.0), (-3.45, 0.55)]
-    parts.append(prism(f'Track{side}', pod, y - 0.4, y + 0.4, 'track'))
-    sign = 1 if y > 0 else -1
-    for i, x in enumerate((-2.4, -1.2, 0.0, 1.2, 2.4)):
-        parts.append(wheel(f'Wheel{side}{i}', x, y + sign * 0.43, 0.55, 0.48, 0.1))
-    # Moss and vines along the upper hull edge.
-    parts.append(box(f'Moss{side}', (-0.2, sign * 1.15, 1.5), (2.3, 0.08, 0.06), 'moss'))
-# Little mushrooms sprouting on the deck.
-for i, (x, y, s) in enumerate(((2.0, 0.8, 1.1), (2.3, -0.7, 0.9), (-2.2, 0.85, 1.0), (-2.0, -0.9, 1.3),
-                               (1.4, 1.0, 0.7), (-1.5, -1.05, 0.8), (2.6, 0.2, 0.6), (-2.6, 0.1, 0.75),
-                               (0.9, -1.05, 0.6), (-0.9, 1.05, 0.65))):
-    parts += mini_mushroom(f'Mini{i}', x, y, 1.52, s, 'cap' if i % 2 == 0 else 'gill')
 
-# --- Turret: thick stalk, big spotted cap with glowing gills, trumpet gill cannon.
-tz = 1.55
-turret = []
-turret.append(lathe('Stalk', [(1.15, 0.0), (0.95, 0.4), (0.75, 1.2), (0.7, 1.9), (0.85, 2.15)], 10, 'wood',
-                    (-0.3, 0, tz), smooth=True))
-cap_z = tz + 2.0
-turret.append(lathe('Cap', [(2.15, 0.0), (2.75, 0.15), (2.7, 0.55), (2.25, 1.05), (1.4, 1.45), (0.0, 1.6)],
-                    16, 'cap', (-0.3, 0, cap_z)))
-turret.append(lathe('Gills', [(2.6, 0.12), (0.8, 0.02)], 16, 'gill', (-0.3, 0, cap_z), close=False))
-# Round gold window set in each side of the stalk (as in the reference).
+
+def tube(name, pts, r0, r1, sides, tile):
+    """A tapered organic tube along a polyline (root legs, tendrils)."""
+    import mathutils
+    P = [mathutils.Vector(p) for p in pts]
+    verts, faces = [], []
+    n = len(P)
+    for i, p in enumerate(P):
+        t = i / (n - 1)
+        fwd = (P[min(n - 1, i + 1)] - P[max(0, i - 1)]).normalized()
+        side = fwd.cross(mathutils.Vector((0, 0, 1)))
+        if side.length < 1e-3:
+            side = mathutils.Vector((1, 0, 0))
+        side.normalize()
+        up = side.cross(fwd)
+        r = r0 + (r1 - r0) * t
+        for k in range(sides):
+            a = 2 * math.pi * k / sides
+            verts.append(tuple(p + (side * math.cos(a) + up * math.sin(a)) * r))
+    for i in range(n - 1):
+        for k in range(sides):
+            j = (k + 1) % sides
+            faces.append([i * sides + k, i * sides + j, (i + 1) * sides + j, (i + 1) * sides + k])
+    faces.append(list(range(sides))[::-1])
+    tip = len(verts)
+    verts.append(tuple(P[-1] + (P[-1] - P[-2]).normalized() * r1))
+    for k in range(sides):
+        j = (k + 1) % sides
+        faces.append([(n - 1) * sides + k, (n - 1) * sides + j, tip])
+    return mesh_from(name, verts, faces, tile, smooth=True)
+
+
+def orb(name, c, r, tile, squash=1.0):
+    return lathe(name, [(0, -r * squash), (r * 0.7, -r * 0.7 * squash), (r, 0), (r * 0.7, r * 0.7 * squash),
+                        (0, r * squash)], 8, tile, c)
+
+
+parts = []
+# --- Body: a soft, lumpy volva (the bulb a mushroom grows from), longer than wide. No wheels or tracks.
+body = lathe('Body', [(0.0, 0.55), (1.6, 0.6), (2.1, 0.95), (2.15, 1.35), (1.85, 1.7), (1.2, 1.95), (0.0, 2.0)],
+             14, 'flesh')
+for v in body.data.vertices:  # stretch along X and add lumps, so it reads as grown, not turned
+    a = math.atan2(v.co.y, v.co.x)
+    bump = 1 + 0.07 * math.sin(5 * a) + 0.05 * math.sin(3 * a + v.co.z * 2)
+    v.co.x *= 1.45 * bump
+    v.co.y *= 1.0 * bump
+parts.append(body)
+# Root legs: thick mycelium roots splay out and grip the ground; the tank crawls on them.
 for side in (1, -1):
-    turret.append(wheel(f'Window{side}', -0.3, side * 0.86, tz + 0.95, 0.36, 0.08, sides=10))
-# Puffball sprouts on the cap (morel-like knobs), on short stems.
+    for i, x in enumerate((-2.4, -1.2, 0.0, 1.2, 2.4)):
+        lean = 0.35 * x / 2.4
+        pts = [(x * 0.9, side * 1.3, 1.1),
+               (x * 0.95 + lean * 0.3, side * 1.95, 0.95),
+               (x + lean * 0.6, side * 2.45, 0.55),
+               (x + lean, side * 2.7, 0.18),
+               (x + lean * 1.3, side * 2.85, 0.02)]
+        parts.append(tube(f'Root{side}{i}', pts, 0.32, 0.08, 6, 'myc'))
+# Mycelium mat spreading on the ground under the body.
+mat_pts = []
+for k in range(16):
+    a = 2 * math.pi * k / 16
+    r = rng.uniform(2.6, 3.4)
+    mat_pts.append((1.25 * r * math.cos(a), r * math.sin(a) * 0.95, 0.03))
+parts.append(mesh_from('Mat', mat_pts, [list(range(16))], 'myc'))
+# Glowing spore sacs along the flanks, and small mushrooms sprouting all over the back.
+for side in (1, -1):
+    for x in (-1.6, 0.2, 1.8):
+        parts.append(orb(f'Sac{side}{x}', (x, side * 1.95, 1.25), 0.24, 'bulb', squash=0.8))
+for i, (x, y, z, s_) in enumerate(((2.2, 0.8, 1.55, 1.1), (2.5, -0.6, 1.45, 0.9), (-2.3, 0.8, 1.6, 1.0),
+                                   (-2.1, -0.9, 1.6, 1.3), (1.5, 1.2, 1.6, 0.7), (-1.4, -1.2, 1.7, 0.8),
+                                   (2.8, 0.1, 1.3, 0.6), (-2.8, 0.1, 1.4, 0.75), (0.9, -1.3, 1.65, 0.6),
+                                   (-0.9, 1.3, 1.7, 0.65))):
+    parts += mini_mushroom(f'Mini{i}', x, y, z, s_, 'cap' if i % 3 else 'ruffle')
+
+# --- Turret: stalk, spotted cap with glowing gills, a chanterelle-like funnel that blows spores.
+tz = 1.85
+turret = []
+turret.append(lathe('Stalk', [(1.05, 0.0), (0.85, 0.4), (0.72, 1.1), (0.7, 1.7), (0.85, 1.95)], 10, 'flesh',
+                    (-0.3, 0, tz), smooth=True))
+cap_z = tz + 1.85
+turret.append(lathe('Cap', [(2.15, 0.0), (2.75, 0.15), (2.7, 0.55), (2.25, 1.05), (1.4, 1.45), (0.0, 1.6)],
+                    16, 'cap', (-0.3, 0, cap_z), uvs=lambda co: ((co.x + 0.3) / 5.6 + 0.5, co.y / 5.6 + 0.5)))
+turret.append(lathe('Gills', [(2.6, 0.12), (0.8, 0.02)], 16, 'gill', (-0.3, 0, cap_z), close=False))
 for i, (dx, dy) in enumerate(((0.6, 0.9), (-0.9, -0.6), (-0.4, 1.0))):
-    turret.append(lathe(f'PuffStem{i}', [(0.12, 0), (0.1, 0.5)], 6, 'wood', (-0.3 + dx, dy, cap_z + 1.2), smooth=False))
-    turret.append(lathe(f'Puff{i}', [(0, 0.35), (0.3, 0.45), (0.36, 0.7), (0.28, 0.95), (0, 1.05)], 8, 'wood',
+    turret.append(lathe(f'PuffStem{i}', [(0.12, 0), (0.1, 0.5)], 6, 'flesh', (-0.3 + dx, dy, cap_z + 1.2), smooth=False))
+    turret.append(lathe(f'Puff{i}', [(0, 0.35), (0.3, 0.45), (0.36, 0.7), (0.28, 0.95), (0, 1.05)], 8, 'flesh',
                         (-0.3 + dx, dy, cap_z + 1.2)))
-# Trumpet cannon: a flared bell along +X, gills inside the mouth.
-turret.append(lathe('Trumpet', [(0.4, 0.0), (0.3, 1.2), (0.33, 2.2), (0.52, 2.85), (0.85, 3.2), (1.05, 3.35)],
-                    12, 'wood', (0.2, 0, tz + 1.15), axis='x', close=False))
-turret.append(lathe('TrumpetGills', [(0.99, 3.33), (0.78, 3.15), (0.47, 2.85), (0.25, 2.45), (0.0, 2.35)], 12,
-                    'gill', (0.2, 0, tz + 1.15), axis='x', close=False))
-# Banner pole with a mushroom-crest flag at the back of the cap.
-turret.append(box('Pole', (-2.0, -0.9, cap_z + 1.6), (0.05, 0.05, 1.7), 'wood'))
-flag = [(-2.0, cap_z + 1.9), (-0.9, cap_z + 1.9), (-0.9, cap_z + 3.2), (-2.0, cap_z + 3.2)]
-fx0, fz0 = flag[0]
-turret.append(mesh_from('Flag', [(x, -0.9, z) for x, z in flag], [[0, 1, 2, 3]], 'banner',
-                        uvs=lambda co: ((co.x - fx0) / 1.1, (co.z - fz0) / 1.3)))
+# Funnel: grows out of the stalk, flesh outside, glowing gills inside, wavy ruffled lip.
+funnel = lathe('Funnel', [(0.36, 0.0), (0.3, 1.0), (0.34, 1.9), (0.55, 2.6), (0.9, 3.0), (1.15, 3.15)],
+               12, 'flesh', (0.2, 0, tz + 1.0), axis='x', close=False)
+funnel_in = lathe('FunnelGills', [(1.1, 3.13), (0.85, 2.95), (0.5, 2.6), (0.25, 2.2), (0.0, 2.1)], 12, 'gill',
+                  (0.2, 0, tz + 1.0), axis='x', close=False)
+for o in (funnel, funnel_in):  # ruffle the lip
+    for v in o.data.vertices:
+        if v.co.x > 0.2 + 2.7:
+            dy, dz = v.co.y, v.co.z - (tz + 1.0)
+            a = math.atan2(dz, dy)
+            k = 1 + 0.12 * math.sin(6 * a)
+            v.co.y, v.co.z = dy * k, (tz + 1.0) + dz * k
+            v.co.x += 0.12 * math.sin(6 * a)
+turret += [funnel, funnel_in]
+# A crest of purple bracket fungus shelves up the back of the stalk (the faction's living banner).
+for k, (z, r) in enumerate(((0.5, 0.75), (1.0, 0.65), (1.45, 0.55))):
+    shelf = lathe(f'Shelf{k}', [(0.0, 0.08), (r * 0.6, 0.06), (r, 0.0), (r * 0.6, -0.05), (0.0, -0.06)], 8,
+                  'ruffle', (-0.3 - 0.75, 0, tz + z))
+    for v in shelf.data.vertices:  # keep only the half that sticks out backwards
+        if v.co.x > -0.3 - 0.75:
+            v.co.x = -0.3 - 0.75 + (v.co.x - (-0.3 - 0.75)) * 0.15
+    turret.append(shelf)
 
 
 def join(objs, name):

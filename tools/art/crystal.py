@@ -41,10 +41,15 @@ def make_mat(name, glass=False, emit_strength=1.0, alpha=None):
     t.links.new(base.outputs['Color'], b.inputs['Base Color'])
     t.links.new(emi.outputs['Color'], b.inputs['Emission Color'])
     b.inputs['Emission Strength'].default_value = emit_strength
-    b.inputs['Roughness'].default_value = 0.08 if glass else 0.8
+    b.inputs['Roughness'].default_value = 0.0 if glass else 0.8
     if glass:
-        b.inputs['Transmission Weight'].default_value = 0.3
-        b.inputs['IOR'].default_value = 1.6
+        # Strong refraction: nearly clear gem glass with a high index and colour fringing.
+        # In game this is faked cheaply (environment reflection, fresnel rim, inner facet texture).
+        b.inputs['Transmission Weight'].default_value = 0.92
+        b.inputs['IOR'].default_value = 2.1
+        if 'Dispersion' in b.inputs:
+            b.inputs['Dispersion'].default_value = 0.6
+        b.inputs['Coat Weight'].default_value = 0.6
     if alpha is not None:
         # Pure glow: dark base, emission does the work, brightness drives the alpha.
         b.inputs['Base Color'].default_value = (0, 0, 0, 1)
@@ -57,7 +62,7 @@ def make_mat(name, glass=False, emit_strength=1.0, alpha=None):
     return m
 
 
-glass = make_mat('CrystalGlass', glass=True, emit_strength=0.5)
+glass = make_mat('CrystalGlass', glass=True, emit_strength=0.12)
 glow = make_mat('CrystalGlow', emit_strength=10.0, alpha=True)
 core_mat = make_mat('CrystalCore', emit_strength=30.0)
 stone = make_mat('CrystalStone', emit_strength=2.0)
@@ -103,7 +108,7 @@ rng = random.Random(3)
 FLOAT = 3.0   # gap between plinth and crystal tip
 H = 14.0      # crystal height
 R = 1.9       # widest radius
-SIDES = 8
+SIDES = 10
 
 # --- Crystal: stacked rings, every other ring turned half a step, so the facets are triangles.
 rings = [0.0, 0.1, 0.24, 0.4, 0.55, 0.7, 0.84, 1.0]
@@ -264,8 +269,26 @@ bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', export_apply=Tr
 if render_dir:
     world = bpy.data.worlds.new('W'); scene.world = world
     world.use_nodes = True
-    world.node_tree.nodes['Background'].inputs['Color'].default_value = (0.025, 0.015, 0.05, 1)
-    world.node_tree.nodes['Background'].inputs['Strength'].default_value = 1.0
+    # A gradient night sky so the refraction has something to bend.
+    wn = world.node_tree
+    bgn = wn.nodes['Background']
+    grad = wn.nodes.new('ShaderNodeTexGradient')
+    geo = wn.nodes.new('ShaderNodeTexCoord')
+    sep = wn.nodes.new('ShaderNodeSeparateXYZ')
+    ramp = wn.nodes.new('ShaderNodeValToRGB')
+    wn.links.new(geo.outputs['Generated'], sep.inputs['Vector'])
+    wn.links.new(sep.outputs['Z'], ramp.inputs['Fac'])
+    ramp.color_ramp.elements[0].color = (0.02, 0.01, 0.04, 1)
+    ramp.color_ramp.elements[1].color = (0.25, 0.08, 0.35, 1)
+    wn.links.new(ramp.outputs['Color'], bgn.inputs['Color'])
+    bgn.inputs['Strength'].default_value = 1.0
+    for k, (col, loc) in enumerate((((1.0, 0.3, 0.6), (-8, 6, 10)), ((0.3, 0.6, 1.0), (8, 8, 14)),
+                                    ((0.9, 0.5, 1.0), (-6, -8, 16)))):
+        al = bpy.data.objects.new(f'Rim{k}', bpy.data.lights.new(f'Rim{k}', 'AREA'))
+        al.data.energy = 1500; al.data.size = 3; al.data.color = col; al.location = loc
+        d = [-c for c in loc]
+        al.rotation_euler = (math.atan2(math.hypot(d[0], d[1]), -d[2]), 0, math.atan2(d[1], d[0]) - math.pi / 2)
+        scene.collection.objects.link(al)
     sun = bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN'))
     sun.data.energy = 2.5
     sun.rotation_euler = (math.radians(50), math.radians(15), math.radians(35))
@@ -280,7 +303,9 @@ if render_dir:
     gm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.12, 0.13, 0.1, 1)
     ground.data.materials.append(gm)
     scene.render.engine = 'CYCLES'
-    scene.cycles.samples = 64
+    scene.cycles.samples = 96
+    scene.cycles.transmission_bounces = 16
+    scene.cycles.max_bounces = 16
     scene.cycles.device = 'CPU'
     scene.render.resolution_x, scene.render.resolution_y = 1200, 750
     cam = bpy.data.objects.new('Cam', bpy.data.cameras.new('Cam'))

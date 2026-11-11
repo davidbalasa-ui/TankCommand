@@ -1,7 +1,7 @@
-"""Kesh scout ("Darter"; David picked the first Stinger sample as the scout look), phone budget: <= 2,500 triangles, one shared 512px atlas.
+"""Kesh scout ("Darter"; David picked this first sample as the scout look, without obsidian), phone budget: <= 2,500 triangles, one shared 512px atlas.
 
 Style target: David's alien reference (hovering lens-shaped silver-bronze hull with etched
-pattern, layered side petals with gold slots, dark purple obsidian chips and insets that catch light, swept crescent fin, long gold-slotted barrel,
+pattern, layered side petals with gold slots, swept crescent fin, long gold-slotted barrel,
 glowing core orb). Lightning is NOT geometry: in game it is a cheap animated sprite; the
 render adds a few emissive strands after export only to preview the look.
 
@@ -32,7 +32,6 @@ TILES = {  # u0, v0, u1, v1 in UV space (v up), from tools/art/atlas_kesh.py
     'glow': (0.0, 0.0, 0.25, 0.25),
     'core': (0.25, 0.0, 0.5, 0.25),
     'dark': (0.5, 0.0, 0.75, 0.25),
-    'obsidian': (0.75, 0.0, 1.0, 0.25),
 }
 
 mat = bpy.data.materials.new('KeshAtlas')
@@ -48,15 +47,6 @@ nt.links.new(emi.outputs['Color'], bsdf.inputs['Emission Color'])
 bsdf.inputs['Emission Strength'].default_value = 2.5
 bsdf.inputs['Metallic'].default_value = 0.85
 bsdf.inputs['Roughness'].default_value = 0.32
-
-# Obsidian: same atlas, but glossy glass-like so the facets catch light (second material).
-obs = mat.copy()
-obs.name = 'KeshObsidian'
-ob = obs.node_tree.nodes['Principled BSDF']
-ob.inputs['Metallic'].default_value = 0.2
-ob.inputs['Roughness'].default_value = 0.04
-ob.inputs['Specular IOR Level'].default_value = 1.0
-ob.inputs['Coat Weight'].default_value = 1.0
 
 
 def fit_uv(obj, tile, margin=0.01):
@@ -162,31 +152,6 @@ def orb(name, c, r, tile):
     return obj
 
 
-def shard(name, c, size, rng, elong=2.2, sides=5):
-    """A faceted obsidian chip: a squat bipyramid, randomly turned, flat shaded."""
-    import mathutils
-    verts = [(0, 0, size * elong), (0, 0, -size * 0.4)]
-    for k in range(sides):
-        a = 2 * math.pi * k / sides + rng.uniform(-0.2, 0.2)
-        r = size * rng.uniform(0.8, 1.15)
-        verts.append((r * math.cos(a), r * math.sin(a), size * rng.uniform(0.1, 0.5)))
-    faces = []
-    for k in range(sides):
-        j = (k + 1) % sides
-        faces.append([0, 2 + k, 2 + j])
-        faces.append([1, 2 + j, 2 + k])
-    rot = mathutils.Euler((rng.uniform(-0.9, 0.9), rng.uniform(-0.9, 0.9), rng.uniform(0, 6.3))).to_matrix()
-    verts = [tuple(rot @ mathutils.Vector(v) + mathutils.Vector(c)) for v in verts]
-    me = bpy.data.meshes.new(name)
-    me.from_pydata(verts, [], faces)
-    me.update()
-    obj = bpy.data.objects.new(name, me)
-    scene.collection.objects.link(obj)
-    obj.data.materials.append(obs)
-    fit_uv(obj, 'obsidian')
-    return obj
-
-
 def lens(x0, x1, w, zt, zb, zm, n=9, nose=0.55):
     """Sections for a pointed lens: widest a bit forward of centre, sharper nose."""
     out = []
@@ -199,7 +164,6 @@ def lens(x0, x1, w, zt, zb, zm, n=9, nose=0.55):
 
 
 HOVER = 0.75  # hull floats; the ground shadow sells it
-rng_obs = random.Random(5)
 parts = []
 # --- Hull: a wide pointed lens, flatter underneath.
 parts.append(loft('HullCore', lens(-3.4, 3.6, 1.55, HOVER + 1.05, HOVER + 0.05, HOVER + 0.45), 12, 'shell'))
@@ -223,23 +187,6 @@ for side in (1, -1):
         parts.append(prism(f'Slot{side}{i}', slot, min(yy, yy + side * 0.05), max(yy, yy + side * 0.05), 'glow'))
     # Glowing core orb on each flank, between the petals (as in the reference).
     parts.append(orb(f'Core{side}', (0.6, side * 1.6, HOVER + 0.5), 0.36, 'core'))
-    # Obsidian inset along each petal's outer face, and chips clustered round the core orb.
-    for i, (x0, x1, y, zm) in enumerate(((-2.6, 0.1, 1.62, HOVER + 0.6), (-0.2, 2.7, 1.72, HOVER + 0.55))):
-        o = loft(f'Inset{side}{i}', lens(x0, x1, 0.12, zm + 0.3, zm - 0.16, zm, n=6, nose=1.0), 6, 'obsidian',
-                 smooth=False, cy=side * y)
-        o.data.materials.clear(); o.data.materials.append(obs)
-        parts.append(o)
-    for k in range(5):
-        a = 2 * math.pi * k / 5
-        parts.append(shard(f'CoreChip{side}{k}', (0.6 + 0.5 * math.cos(a), side * 1.55, HOVER + 0.5 + 0.45 * math.sin(a)),
-                           0.16, rng_obs, elong=1.6))
-# Dorsal spine of obsidian shards along the hull top, behind and ahead of the turret.
-for k, x in enumerate((-3.0, -2.6, -2.2, 2.2, 2.65, 3.05)):
-    parts.append(shard(f'Spine{k}', (x, 0, HOVER + 1.0 - 0.12 * abs(x - 0.1) / 3), 0.22, rng_obs, elong=2.6))
-# Two small rear tail fins.
-for side in (1, -1):
-    tail = [(-3.3, HOVER + 0.6), (-2.4, HOVER + 0.8), (-3.0, HOVER + 1.6), (-3.6, HOVER + 1.9)]
-    parts.append(prism(f'Tail{side}', tail, side * 0.55 - 0.05, side * 0.55 + 0.05, 'fin'))
 
 # --- Turret: an elongated swept pod, a rising crescent fin, one long gold-slotted barrel.
 tz = HOVER + 1.0
@@ -264,13 +211,6 @@ turret.append(cylinder_x('Barrel', 4.3, 7.1, 0, tz + 0.3, 0.1, 8, 'shell'))
 turret.append(cylinder_x('BarrelGlow', 4.7, 6.6, 0, tz + 0.3, 0.105, 8, 'barrel'))
 turret.append(cylinder_x('Muzzle', 6.9, 7.3, 0, tz + 0.3, 0.14, 8, 'fin'))
 turret.append(orb('MuzzleCore', (7.35, 0, tz + 0.3), 0.1, 'glow'))
-# Obsidian chips set into the turret crown and along the crescent fin.
-for k, (x, y, z) in enumerate(((-0.6, 0.35, tz + 0.72), (-0.1, -0.3, tz + 0.74), (0.5, 0.2, tz + 0.66),
-                               (-1.1, -0.1, tz + 0.66))):
-    turret.append(shard(f'Crown{k}', (x, y, z), 0.19, rng_obs, elong=1.8))
-for i in (2, 4, 6):
-    x, z = outer[i]
-    turret.append(shard(f'FinChip{i}', (x, 0, z), 0.17, rng_obs, elong=1.4))
 
 
 def join(objs, name):
