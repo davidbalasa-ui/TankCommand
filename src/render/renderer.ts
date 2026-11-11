@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { UnitInstances, isInstancedPart, markInstanced } from './unitInstances';
 import { Effects } from './effects';
 import { AssetLoader } from '../assets/loader';
+import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
@@ -24,6 +25,9 @@ import {
 } from './quality';
 
 const TANK_ASSET_ID = 'unit.human.poc_tank';
+const TERRAIN_DETAIL_ID = 'texture.terrain.detail';
+/** Metres covered by one repeat of the ground detail texture. */
+const DETAIL_TILE = 7;
 const TURRET_NODES = [
   'Turret',
   'Mantlet',
@@ -52,8 +56,6 @@ const ORDER_LINE_COLOR = 0x8fd3ff;
 const ORDER_LINE_Y = 0.18;
 const FRIENDLY_STRUCTURE_COLOR = 0x6b8f3a;
 const ENEMY_STRUCTURE_COLOR = 0x8a3a3a;
-const ORE_DEPOSIT_COLOR = 0xd4a540;
-const METAL_DEPOSIT_COLOR = 0x9aa4b0;
 const DROP_BEAM_COLOR = 0x9adfff;
 const PLACEMENT_VALID_COLOR = 0x6cf58a;
 const PLACEMENT_INVALID_COLOR = 0xff5c5c;
@@ -373,7 +375,8 @@ export class RenderView {
   private readonly healthBars = new Map<number, HealthBar>();
   private readonly unitRoots = new Map<number, UnitVisual>();
   private readonly structureVisuals = new Map<number, StructureVisual>();
-  private readonly depositMeshes = new Map<number, THREE.Mesh>();
+  private landscape: Landscape | null = null;
+  private terrainDetail: { value: THREE.Texture | null } = { value: null };
   private readonly beamPool: THREE.Mesh[] = [];
   private readonly selectionRings = new Map<number, THREE.Mesh>();
   private readonly flashes: Flash[] = [];
@@ -797,7 +800,7 @@ export class RenderView {
     this.updateLight();
     this.syncUnits(alpha);
     this.syncStructures(world);
-    this.syncDeposits(world);
+    this.landscape?.sync(world);
     this.syncDropBeams(world);
     this.syncPadTraffic(world, alpha);
     this.syncWorkerCargo(world, alpha);
@@ -945,6 +948,8 @@ export class RenderView {
     }
     this.disposed = true;
     this.effects.dispose();
+    this.landscape?.dispose();
+    this.terrainDetail.value?.dispose();
     this.unitInstances.clear();
     this.wreckInstances.clear();
     for (const group of this.markerMeshes) {
@@ -1016,6 +1021,7 @@ export class RenderView {
       }
     }
 
+    this.landscape?.setShadows(view.shadows);
     if (shadowsChanged) {
       this.renderer.shadowMap.needsUpdate = true;
       this.scene.traverse((object) => {
@@ -1081,6 +1087,7 @@ export class RenderView {
 
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
+    this.landscape = new Landscape(this.scene, this.world.map, this.fogUniforms);
     const waterLevel = this.world.map.waterLevel;
     if (waterLevel !== null) {
       const water = new THREE.Mesh(
@@ -1214,6 +1221,8 @@ export class RenderView {
     const vertexCount = stride * (map.rows + 1);
     const positions = new Float32Array(vertexCount * 3);
     const colors = new Float32Array(vertexCount * 3);
+    // Ground kind per vertex (grass, dirt, rock weights): picks which detail channel the shader uses.
+    const surface = new Float32Array(vertexCount * 3);
     const half = map.size / 2;
 
     let minHeight = Number.POSITIVE_INFINITY;
@@ -1254,6 +1263,11 @@ export class RenderView {
         if (slope > MAX_SLOPE) {
           color.lerp(blockedRock, 0.82);
         }
+        const rockWeight = slope > MAX_SLOPE ? 1 : clamp(Math.max((heightNorm - 0.45) / 0.4, (slopeNorm - 0.55) / 0.45), 0, 1);
+        const dirtWeight = clamp(slopeNorm * 1.4 - 0.1, 0, 1) * (1 - rockWeight);
+        surface[index * 3] = 1 - rockWeight - dirtWeight;
+        surface[index * 3 + 1] = dirtWeight;
+        surface[index * 3 + 2] = rockWeight;
         colors[index * 3] = color.r;
         colors[index * 3 + 1] = color.g;
         colors[index * 3 + 2] = color.b;
@@ -1274,6 +1288,7 @@ export class RenderView {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('surface', new THREE.BufferAttribute(surface, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
@@ -1281,27 +1296,41 @@ export class RenderView {
       vertexColors: true,
       roughness: 1,
       metalness: 0,
-      flatShading: true,
     });
     const uniforms = this.fogUniforms;
+    const detail = this.terrainDetail;
     uniforms.uFogSize.value = map.size;
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uFog = uniforms.uFog;
       shader.uniforms.uFogOn = uniforms.uFogOn;
       shader.uniforms.uFogSize = uniforms.uFogSize;
+      shader.uniforms.uDetail = detail;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;');
+        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;\nattribute vec3 surface;\nvarying vec3 vSurface;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;\nvSurface = surface;');
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;',
+          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;\nvarying vec3 vSurface;' +
+            (detail.value ? '\nuniform sampler2D uDetail;' : ''),
         )
         .replace(
           '#include <color_fragment>',
-          '#include <color_fragment>\nif (uFogOn > 0.5) { float fogLevel = texture2D(uFog, vFogXZ / uFogSize + 0.5).r; diffuseColor.rgb *= fogLevel; }',
+          '#include <color_fragment>\n' +
+            // Ground detail: fine grass, pebbles or cracks by ground kind, plus broad patches so a
+            // field is not one flat colour. Off until the texture has loaded.
+            (detail.value
+              ? `vec3 dFine = texture2D(uDetail, vFogXZ / ${DETAIL_TILE.toFixed(1)}).rgb - 0.5;
+vec3 dBroad = texture2D(uDetail, vFogXZ / ${(DETAIL_TILE * 6.3).toFixed(1)} + 0.37).rgb - 0.5;
+vec3 w = vSurface / max(0.001, vSurface.x + vSurface.y + vSurface.z);
+diffuseColor.rgb *= 1.0 + dot(dFine, w) * 1.3 + dBroad.r * 0.55;
+diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.82), clamp(dBroad.g * 2.0, 0.0, 1.0) * w.x);
+`
+              : '') +
+            'if (uFogOn > 0.5) { float fogLevel = texture2D(uFog, vFogXZ / uFogSize + 0.5).r; diffuseColor.rgb *= fogLevel; }',
         );
     };
+    material.customProgramCacheKey = () => (detail.value ? 'terrainDetail' : 'terrain');
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     return mesh;
@@ -1397,7 +1426,48 @@ export class RenderView {
       return;
     }
     this.rebuildUnitVisuals();
-    await this.loadUnitModels();
+    await Promise.all([this.loadUnitModels(), this.loadLandscape()]);
+  }
+
+  // Ground detail texture, ore and metal site models and the scattered props. Any that fail to load
+  // leave the plain terrain, the placeholder deposit discs, or no props.
+  private async loadLandscape(): Promise<void> {
+    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS].filter((id) =>
+      this.registry.has(id),
+    );
+    const results = await Promise.allSettled(ids.map((id) => this.loader.load(id)));
+    if (this.disposed) {
+      return;
+    }
+    ids.forEach((id, index) => {
+      const result = results[index];
+      if (result?.status !== 'fulfilled') {
+        return;
+      }
+      const asset = result.value;
+      if (id === TERRAIN_DETAIL_ID && asset instanceof THREE.Texture) {
+        asset.wrapS = THREE.RepeatWrapping;
+        asset.wrapT = THREE.RepeatWrapping;
+        asset.anisotropy = 4;
+        asset.needsUpdate = true;
+        this.terrainDetail.value = asset;
+        // Recompile the terrain shader with the detail lookup switched on.
+        const terrainMaterial = this.terrain?.material;
+        if (terrainMaterial instanceof THREE.Material) {
+          terrainMaterial.needsUpdate = true;
+        }
+        this.loadedModels.push(id);
+      } else if (asset instanceof THREE.Object3D && this.landscape) {
+        if (id === DEPOSIT_MODEL_IDS.ore) {
+          this.landscape.addDepositModel('ore', asset);
+        } else if (id === DEPOSIT_MODEL_IDS.metal) {
+          this.landscape.addDepositModel('metal', asset);
+        } else {
+          this.landscape.addPropModel(id, asset);
+        }
+        this.loadedModels.push(id);
+      }
+    });
   }
 
   // Load every distinct unit and structure model the world's types name (besides the shared fallback tank).
@@ -1758,44 +1828,6 @@ export class RenderView {
       if (item && mesh) {
         mesh.scale.set(item.radius, 1, item.radius);
         mesh.position.set(item.x, heightAt(world.map, item.x, item.z) + 0.2, item.z);
-      }
-    }
-  }
-
-  private syncDeposits(world: WorldState): void {
-    const alive = new Set<number>();
-    for (const deposit of world.deposits) {
-      if (deposit.amount <= 0) {
-        continue;
-      }
-      alive.add(deposit.id);
-      if (this.depositMeshes.has(deposit.id)) {
-        continue;
-      }
-      const geometry = new THREE.CylinderGeometry(1.2, 1.2, 0.4, 10);
-      const material = new THREE.MeshStandardMaterial({
-        color: deposit.kind === 'ore' ? ORE_DEPOSIT_COLOR : METAL_DEPOSIT_COLOR,
-        roughness: 0.6,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(
-        deposit.x,
-        heightAt(world.map, deposit.x, deposit.z) + 0.2,
-        deposit.z,
-      );
-      mesh.receiveShadow = true;
-      this.scene.add(mesh);
-      this.depositMeshes.set(deposit.id, mesh);
-    }
-    for (const [id, mesh] of this.depositMeshes) {
-      if (!alive.has(id)) {
-        this.scene.remove(mesh);
-        mesh.geometry.dispose();
-        const material = mesh.material;
-        if (material instanceof THREE.Material) {
-          material.dispose();
-        }
-        this.depositMeshes.delete(id);
       }
     }
   }

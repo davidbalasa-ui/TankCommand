@@ -181,3 +181,13 @@ David: tanks ran into each other; wants better avoidance and interaction. Before
 - Footprint radius follows each unit's drawn size (UNIT_RADIUS x visualScale, 0.85-1.4); separation uses it.
 - Spatial grid (8 m cells) for neighbour queries.
 Tests `tests/unit/avoidance.test.ts` (AVD-01..04); AVD-01/02 fail with steering disabled. AI-07 back to 10/10 (it dropped to 7/10 while units also steered round enemies). Before/after clip: /mnt/project-files/movement/avoidance-before-after.mp4.
+
+## C-10 Landscape art and landing pad rebuild (2026-11-11)
+
+David: the approved ore/metal art was not in the game, there were no rocks, the landing pad was "still garbage"; approved tentative art for everything landscape.
+
+- Ore and metal sites use the approved models (pink crystal = ore, blue opal = metal; `prop.deposit.*`), drawn about 4.5 m across. The crystals shrink to 35% as a site is mined out.
+- Scenery: 8 props from `tools/art/landscape.py` (boulder, rock cluster, slab, cliff crag, bush, grass, dead tree, alien fronds; 54-320 triangles, one 256 texture set each, hero bake). `src/render/landscape.ts` scatters them from the map seed (render only, no sim effect): crags and boulders only on ground too steep to drive, low clutter on open ground, nothing in water, cleared round deposits and structures. One InstancedMesh per prop kind; props darken under fog, glow included.
+- Ground texture: `tools/art/terrain_detail.py` makes one tileable 512 image (grass / dirt / rock detail in R / G / B); the terrain shader picks the channel per vertex by slope and height and adds broad colour patches. Terrain is now smooth-shaded.
+- Landing pads rebuilt with the hero bake (`tools/art/pads_hero.py`): Terran pad 161 parts, 3,884 triangles (stepped deck, buttresses, hazard ring, vents, ramp treads, lift well with crane, control tower, fuel tanks, flood masts, crates); Kesh nest 62 parts, 4,920 triangles (layered etched bowl, floating leaf petals, hovering halo and crown, raised cargo cradle). Layout unchanged (exit +X, lift on -Y). The old versions were 43 and 20 parts.
+- Test `tests/unit/landscape.test.ts` (LND-01).

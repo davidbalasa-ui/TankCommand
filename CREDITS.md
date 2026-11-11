@@ -4,6 +4,16 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 
 | Asset | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
+| prop.deposit.metal | TankCommand project (scripted Blender) | ORIGINAL | - | Metal deposits |
+| prop.deposit.ore | TankCommand project (scripted Blender) | ORIGINAL | - | Ore deposits |
+| prop.nature.boulder | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.cliff | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.dead_tree | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.grass | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.rock_cluster | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.shrub | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.slab | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.tendril | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
 | structure.alien.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Hive Roost (structure) |
 | structure.alien.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Gene Vault (structure) |
 | structure.alien.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Nest (structure) |
@@ -18,6 +28,7 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | structure.human.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spire Missile Battery (structure) |
 | structure.human.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Radar Tower (structure) |
 | structure.human.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion Gun (structure) |
+| texture.terrain.detail | TankCommand project (scripted numpy) | ORIGINAL | - | Terrain surface |
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
 | unit.alien.disc | TankCommand project (scripted Blender) | ORIGINAL | - | Disc (saucer) |
