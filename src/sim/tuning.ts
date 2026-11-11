@@ -62,11 +62,11 @@ export const SKIRMISH_ORE = 500; // placeholder until Stage 0
 export const SKIRMISH_METAL = 100; // placeholder until Stage 0
 
 export const SKIRMISH_TANK_OFFSETS: ReadonlyArray<{ x: number; z: number }> = [
-  { x: 0, z: 5 },
-  { x: 0, z: 8 },
+  { x: 4, z: -10 },
+  { x: -4, z: -10 },
 ]; // placeholder until Stage 0
-export const SKIRMISH_MINER_OFFSET = { x: -6, z: 0 }; // placeholder until Stage 0
-export const SKIRMISH_TUG_OFFSET = { x: 6, z: 0 }; // placeholder until Stage 0
+export const SKIRMISH_MINER_OFFSET = { x: -10, z: 0 }; // placeholder until Stage 0
+export const SKIRMISH_TUG_OFFSET = { x: -10, z: -6 }; // placeholder until Stage 0
 export const SKIRMISH_TANK_HEADING = Math.PI / 4; // placeholder until Stage 0
 export const DEFAULT_DISMANTLE_SEC = 4; // placeholder until Stage 0
 export const DEFAULT_DISMANTLE_REFUND_PERCENT = 70; // placeholder until Stage 0

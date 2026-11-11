@@ -12,8 +12,8 @@
     "hp": 1200,
     "armor": 8,
     "footprint": {
-      "cellsX": 3,
-      "cellsZ": 3
+      "cellsX": 6,
+      "cellsZ": 6
     },
     "sightRange": 18,
     "modelId": "structure.human.landing_pad",
@@ -57,8 +57,8 @@
     "hp": 1200,
     "armor": 8,
     "footprint": {
-      "cellsX": 3,
-      "cellsZ": 3
+      "cellsX": 6,
+      "cellsZ": 6
     },
     "sightRange": 18,
     "modelId": "structure.alien.landing_pad",

@@ -14,6 +14,10 @@ import {
   scoutType,
   tugType,
 } from './simHelpers';
+import { PAD_LAND_SEC } from '../../src/sim/pad';
+
+// Test pads deliver in 0.2 s, then the delivery spends PAD_LAND_SEC coming down onto the pad.
+const DELIVERY_TICKS = Math.ceil((0.2 + PAD_LAND_SEC) * 20) + 4;
 
 function types(): {
   units: ReadonlyMap<string, SimUnitType>;
@@ -142,7 +146,7 @@ describe('drops', () => {
     let delivered = step(base, [
       { kind: 'buy', itemId: 'unit.test.scout', padId, tick: 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < DELIVERY_TICKS; i += 1) {
       delivered = step(delivered, []);
     }
     expect(delivered.dropQueue).toHaveLength(0);
@@ -165,7 +169,7 @@ describe('drops', () => {
     let delivered = step(base, [
       { kind: 'buy', itemId: 'unit.test.scout', padId, tick: 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < DELIVERY_TICKS; i += 1) {
       delivered = step(delivered, []);
     }
     const unit = delivered.units.find((item) => item.typeId === 'unit.test.scout');
@@ -200,7 +204,7 @@ describe('drops', () => {
     let buying = step(base, [
       { kind: 'buy', itemId: 'structure.test.pad', padId, tick: 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < DELIVERY_TICKS; i += 1) {
       buying = step(buying, []);
     }
     expect(buying.pendingKits).toHaveLength(1);
@@ -224,7 +228,7 @@ describe('drops', () => {
     let stationWorld = step(valid, [
       { kind: 'buy', itemId: 'structure.test.metal_station', padId, tick: valid.tick + 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < DELIVERY_TICKS; i += 1) {
       stationWorld = step(stationWorld, []);
     }
     const stationKit = stationWorld.pendingKits[0]?.id ?? 0;
@@ -250,9 +254,11 @@ describe('drops', () => {
     let first = step(base, [
       { kind: 'buy', itemId: 'unit.test.scout', padId, tick: 1, issuer: 1 },
     ]);
-    for (let i = 0; i < 3; i += 1) {
+    // Save mid-descent: the order is already coming down onto the pad.
+    for (let i = 0; i < 20; i += 1) {
       first = step(first, []);
     }
+    expect(first.dropQueue[0]?.landingSec).toBeGreaterThan(0);
     const text = encodeSave(first, {
       gameVersion: 'test',
       savedAtIso: '2026-11-17T00:00:00.000Z',
@@ -264,7 +270,7 @@ describe('drops', () => {
     }
     let resumed = decoded.world;
     let uninterrupted = first;
-    for (let i = 0; i < 30; i += 1) {
+    for (let i = 0; i < DELIVERY_TICKS; i += 1) {
       resumed = step(resumed, []);
       uninterrupted = step(uninterrupted, []);
     }

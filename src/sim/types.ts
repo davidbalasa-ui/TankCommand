@@ -27,6 +27,7 @@ export type WorkerStage =
   | 'toPad'
   | 'toStation'
   | 'loading'
+  | 'unloading'
   | 'waiting';
 
 export interface WorkerJob {
@@ -36,6 +37,11 @@ export interface WorkerJob {
   load: number;
   progress: number;
   reportedEmpty: boolean;
+  // Delivery line at a landing pad: which pad, when this worker joined its line (tick),
+  // and the unload time left once it is at the dock.
+  dockPadId?: number | null;
+  queuedAt?: number;
+  unloadLeft?: number;
 }
 
 export interface UnitState {
@@ -169,6 +175,10 @@ export interface StructureState {
   // Pack or dismantle in progress; the structure can't fire while it runs.
   work: { kind: 'pack' | 'dismantle'; left: number } | null;
   research: { nodeId: string; left: number } | null;
+  // Landing pads only: the unit that just came down and is still driving off, and how long
+  // the pad keeps waiting for it before the next delivery may land anyway.
+  padUnitId?: number | null;
+  padClearLeft?: number;
 }
 
 export interface ProjectileState {
@@ -225,6 +235,10 @@ export interface DropBeamState {
   x: number;
   z: number;
   ttl: number;
+  // Render-only flavour: 'arrive' (default) is the touchdown flash; 'ore' / 'metal' is a cargo
+  // pod lifting off a pad's dock. `total` is the starting ttl.
+  kind?: 'arrive' | 'ore' | 'metal';
+  total?: number;
 }
 
 export interface SideStats {
@@ -265,6 +279,8 @@ export interface DropOrder {
   totalSec: number;
   costOre: number;
   costMetal: number;
+  // Set once the delivery is coming down onto the pad: seconds into the descent.
+  landingSec?: number;
 }
 
 export type AlertKind =

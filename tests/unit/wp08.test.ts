@@ -189,17 +189,25 @@ describe('[AIR-01] bases and buying', () => {
     expect(next.resources.find((r) => r.player === 1)?.ore).toBe(2000);
   });
 
-  it('[AIR-01] with a base the aircraft is delivered parked at the base', () => {
+  it('[AIR-01] with a base the aircraft comes down on the pad, flies to the base and parks there', () => {
     const w = airWorld();
     const pad = w.structures.find((s) => s.typeId === 'structure.test.pad' && s.owner === 1);
-    const next = run(
+    let landed = run(
       w,
       [{ kind: 'buy', issuer: 1, itemId: 'unit.test.bomber', padId: pad?.id ?? 0 }],
-      3 * SEC,
+      1,
     );
+    expect(landed.dropQueue).toHaveLength(1);
+    for (let i = 0; i < 60 * SEC && !landed.units.some((u) => u.typeId === 'unit.test.bomber'); i += 1) {
+      landed = run(landed, [], 1);
+    }
+    const fresh = unitOf(landed, 'unit.test.bomber');
+    expect(fresh.air?.mode).toBe('returning');
+    expect(fresh.air?.homeId).not.toBeNull();
+    expect(Math.hypot(fresh.x - (pad?.x ?? 0), fresh.z - (pad?.z ?? 0))).toBeLessThan(20);
+    const next = run(landed, [], 30 * SEC);
     const bought = unitOf(next, 'unit.test.bomber');
     expect(bought.air?.mode).toBe('parked');
-    expect(bought.air?.homeId).not.toBeNull();
     const base = next.structures.find((s) => s.typeId === 'structure.test.air_base');
     expect(Math.hypot(bought.x - (base?.x ?? 0), bought.z - (base?.z ?? 0))).toBeLessThan(0.1);
   });

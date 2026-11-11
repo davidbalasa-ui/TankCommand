@@ -1,6 +1,7 @@
-import { assignHome, hasFreeAirSlot } from './air';
+import { flyNewAircraftHome, hasFreeAirSlot } from './air';
+import { PAD_CLEAR_TIMEOUT_SEC, PAD_LAND_SEC, padLayout, padOccupied } from './pad';
 import { SIM_TICK_HZ } from './constants';
-import { findNearestFreeSpot, addStructure, addUnit, placementValidity, unitCount } from './spawn';
+import { addStructure, addUnit, placementValidity, unitCount } from './spawn';
 import { addAlert, ensureSideStats } from './economy';
 import { isItemUnlocked } from './research';
 import {
@@ -13,6 +14,7 @@ import type {
   DropOrder,
   PendingKit,
   PlayerId,
+  StructureState,
   SimStructureType,
   SimUnitType,
   WorldState,
@@ -196,6 +198,10 @@ export function applyCancelCommand(
     setOutcome(world, command.tick, 'cancel', false, 'unknownOrder');
     return;
   }
+  if (order.landingSec !== undefined) {
+    setOutcome(world, command.tick, 'cancel', false, 'landing');
+    return;
+  }
   const stats = ensureSideStats(world, command.issuer);
   stats.ore += order.costOre;
   stats.metal += order.costMetal;
@@ -269,6 +275,57 @@ export function addBeam(world: WorldState, owner: PlayerId, x: number, z: number
   world.dropBeams.push({ owner, x, z, ttl: DROP_BEAM_TTL_SEC });
 }
 
+// The descent is over: the delivery is on the pad.
+function touchDown(
+  world: WorldState,
+  player: PlayerId,
+  pad: StructureState,
+  item: ResolvedItem,
+): boolean {
+  if (item.kind === 'unit') {
+    if (unitCount(world, player) >= UNIT_CAP) {
+      return false;
+    }
+    const layout = padLayout(world, pad);
+    const spawned = addUnit(world, {
+      owner: player,
+      typeId: item.unit.id,
+      x: pad.x,
+      z: pad.z,
+      heading: layout.facing,
+    });
+    if (!spawned) {
+      return false;
+    }
+    if (spawned.air) {
+      flyNewAircraftHome(world, spawned);
+    } else {
+      spawned.order = { kind: 'move', x: layout.rallyX, z: layout.rallyZ, queue: false };
+    }
+    pad.padUnitId = spawned.id;
+    pad.padClearLeft = PAD_CLEAR_TIMEOUT_SEC;
+    const stats = ensureSideStats(world, player);
+    stats.unitsBuilt += 1;
+    addBeam(world, player, pad.x, pad.z);
+    addAlert(world, 'dropArrived', player, pad.x, pad.z);
+    return true;
+  }
+  const kit: PendingKit = {
+    id: world.nextId,
+    owner: player,
+    structureTypeId: item.structure.id,
+  };
+  world.nextId += 1;
+  world.pendingKits.push(kit);
+  addBeam(world, player, pad.x, pad.z);
+  addAlert(world, 'dropArrived', player, pad.x, pad.z);
+  return true;
+}
+
+// Deliveries come down one at a time per side, in the order they were bought. When an order's
+// timer runs out it waits for its pad to be clear, then descends onto the pad's landing circle
+// (PAD_LAND_SEC). A unit then drives off the exit edge to the rally point; the pad stays busy
+// until it has left, so arrivals never stack up on top of each other.
 export function updateDropQueues(world: WorldState): void {
   const players = [...world.players].sort((a, b) => a - b);
   for (const player of players) {
@@ -279,63 +336,55 @@ export function updateDropQueues(world: WorldState): void {
     if (!first) {
       continue;
     }
-    const pad = world.structures.find(
+    let pad = world.structures.find(
       (structure) => structure.id === first.padId && structure.owner === player && structure.hp > 0,
     );
-    const replacement = pad ? null : firstOwnPad(world, player);
-    if (!pad && replacement === null) {
-      continue;
-    }
-    if (!pad && replacement !== null) {
+    if (!pad) {
+      const replacement = firstOwnPad(world, player);
+      if (replacement === null) {
+        first.landingSec = undefined;
+        continue;
+      }
       first.padId = replacement;
+      first.landingSec = undefined;
+      pad = world.structures.find((structure) => structure.id === replacement);
+      if (!pad) {
+        continue;
+      }
     }
-    first.remainingSec = Math.max(0, first.remainingSec - DT);
-    if (first.remainingSec > 0) {
+
+    if (first.landingSec === undefined) {
+      first.remainingSec = Math.max(0, first.remainingSec - DT);
+      if (first.remainingSec > 0) {
+        continue;
+      }
+      const ready = resolveItem(world, player, first.itemId).item;
+      if (!ready) {
+        world.dropQueue = world.dropQueue.filter((order) => order.id !== first.id);
+        continue;
+      }
+      if (padOccupied(world, pad)) {
+        continue;
+      }
+      if (ready.kind === 'unit' && unitCount(world, player) >= UNIT_CAP) {
+        continue;
+      }
+      first.landingSec = 0;
       continue;
     }
 
+    first.landingSec = Math.min(PAD_LAND_SEC, first.landingSec + DT);
+    if (first.landingSec < PAD_LAND_SEC) {
+      continue;
+    }
     const item = resolveItem(world, player, first.itemId).item;
     if (!item) {
       world.dropQueue = world.dropQueue.filter((order) => order.id !== first.id);
       continue;
     }
-    const padStructure = world.structures.find((structure) => structure.id === first.padId);
-    if (!padStructure) {
+    if (!touchDown(world, player, pad, item)) {
       continue;
     }
-    if (item.kind === 'unit') {
-      if (unitCount(world, player) >= UNIT_CAP) {
-        continue;
-      }
-      const spot = findNearestFreeSpot(world, padStructure.x, padStructure.z);
-      const spawned = addUnit(world, {
-        owner: player,
-        typeId: item.unit.id,
-        x: spot.x,
-        z: spot.z,
-        heading: 0,
-      });
-      if (!spawned) {
-        continue;
-      }
-      assignHome(world, spawned);
-      const stats = ensureSideStats(world, player);
-      stats.unitsBuilt += 1;
-      addBeam(world, player, spot.x, spot.z);
-      addAlert(world, 'dropArrived', player, spot.x, spot.z);
-      world.dropQueue = world.dropQueue.filter((order) => order.id !== first.id);
-      continue;
-    }
-
-    const kit: PendingKit = {
-      id: world.nextId,
-      owner: player,
-      structureTypeId: item.structure.id,
-    };
-    world.nextId += 1;
-    world.pendingKits.push(kit);
-    addBeam(world, player, padStructure.x, padStructure.z);
-    addAlert(world, 'dropArrived', player, padStructure.x, padStructure.z);
     world.dropQueue = world.dropQueue.filter((order) => order.id !== first.id);
   }
 }

@@ -80,6 +80,23 @@ export function assignHome(world: WorldState, unit: UnitState): void {
   unit.air.mode = 'parked';
 }
 
+/**
+ * Call when an aircraft has just come down on a landing pad: it takes off at once and flies to
+ * the nearest base with room, where it lands and parks.
+ */
+export function flyNewAircraftHome(world: WorldState, unit: UnitState): void {
+  if (!unit.air) {
+    return;
+  }
+  const base = nearestBase(world, unit, true);
+  unit.air.homeId = base ? base.id : null;
+  if (!base) {
+    unit.air.mode = 'parked';
+    return;
+  }
+  sendHome(world, unit);
+}
+
 export function applyAirCommand(
   world: WorldState,
   command: Extract<Command, { kind: 'air' }>,

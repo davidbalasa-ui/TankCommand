@@ -1,7 +1,6 @@
 import { SIM_TICK_HZ } from './constants';
 import {
   DEPOSIT_REACH,
-  PAD_REACH,
   STATION_REACH,
 } from './tuning';
 import { approach, computePath, followPath } from './motion';
@@ -15,7 +14,16 @@ import {
   nearestPad,
   structureTypeOf,
 } from './economy';
-import type { SimUnitType, StructureState, UnitState, WorldState } from './types';
+import {
+  PAD_CARGO_LIFT_SEC,
+  PAD_DOCK_REACH,
+  PAD_QUEUE_JOIN_DISTANCE,
+  PAD_UNLOAD_SEC,
+  padLayout,
+  padLine,
+  padQueueSpot,
+} from './pad';
+import type { SimUnitType, StructureState, UnitState, WorkerJob, WorldState } from './types';
 
 const DT = 1 / SIM_TICK_HZ;
 
@@ -35,6 +43,10 @@ function moveWorkerTo(
   if (Math.hypot(unit.x - x, unit.z - z) <= reach) {
     stopMoving(unit, type);
     return true;
+  }
+  const last = unit.path[unit.path.length - 1];
+  if (last && Math.hypot(last.x - x, last.z - z) > Math.max(reach, world.map.cellSize * 1.5)) {
+    unit.path = []; // the destination moved (e.g. a place in the pad's delivery line)
   }
   if (unit.path.length === 0) {
     const path = computePath(world, unit, x, z);
@@ -57,6 +69,87 @@ function reportEmpty(world: WorldState, unit: UnitState, depositId: number): voi
   const z = deposit?.z ?? unit.z;
   addAlert(world, 'depositEmpty', unit.owner, x, z);
   job.reportedEmpty = true;
+}
+
+function ownPadById(world: WorldState, owner: number, id: number | null | undefined): StructureState | null {
+  if (id === undefined || id === null) {
+    return null;
+  }
+  const pad = world.structures.find((item) => item.id === id && item.owner === owner && item.hp > 0);
+  return pad && structureTypeOf(world, pad)?.kind === 'pad' ? pad : null;
+}
+
+function leaveLine(job: WorkerJob): void {
+  job.dockPadId = null;
+  job.queuedAt = undefined;
+  job.unloadLeft = undefined;
+}
+
+/**
+ * Bring a loaded worker to a landing pad's dock and unload it. Workers line up behind the dock in
+ * the order they arrived and unload one at a time; the cargo then lifts off the pad. Returns true
+ * on the tick the load is handed over, which is when the caller credits it.
+ */
+function deliverAtPad(
+  world: WorldState,
+  unit: UnitState,
+  type: SimUnitType,
+  job: WorkerJob,
+  cargo: 'ore' | 'metal',
+): boolean {
+  let pad = ownPadById(world, unit.owner, job.dockPadId);
+  if (!pad) {
+    pad = nearestPad(world, unit.owner, unit.x, unit.z);
+    leaveLine(job);
+    job.stage = 'toPad';
+    if (!pad) {
+      stopMoving(unit, type);
+      return false;
+    }
+    job.dockPadId = pad.id;
+  }
+  const layout = padLayout(world, pad);
+
+  if (job.stage === 'unloading') {
+    stopMoving(unit, type);
+    job.unloadLeft = Math.max(0, (job.unloadLeft ?? PAD_UNLOAD_SEC) - DT);
+    if (job.unloadLeft > 0) {
+      return false;
+    }
+    world.dropBeams.push({
+      owner: unit.owner,
+      x: layout.liftX,
+      z: layout.liftZ,
+      ttl: PAD_CARGO_LIFT_SEC,
+      total: PAD_CARGO_LIFT_SEC,
+      kind: cargo,
+    });
+    leaveLine(job);
+    return true;
+  }
+
+  if (job.queuedAt === undefined) {
+    if (Math.hypot(unit.x - layout.dockX, unit.z - layout.dockZ) > PAD_QUEUE_JOIN_DISTANCE) {
+      moveWorkerTo(world, unit, type, layout.dockX, layout.dockZ, PAD_DOCK_REACH);
+      return false;
+    }
+    job.queuedAt = world.tick;
+  }
+  const line = padLine(world, pad).filter(
+    (item) => item.job?.stage === 'unloading' || item.job?.queuedAt !== undefined,
+  );
+  const place = line.indexOf(unit);
+  if (place <= 0) {
+    if (moveWorkerTo(world, unit, type, layout.dockX, layout.dockZ, PAD_DOCK_REACH)) {
+      job.stage = 'unloading';
+      job.unloadLeft = PAD_UNLOAD_SEC;
+      stopMoving(unit, type);
+    }
+    return false;
+  }
+  const spot = padQueueSpot(world, layout, place - 1);
+  moveWorkerTo(world, unit, type, spot.x, spot.z, PAD_DOCK_REACH);
+  return false;
 }
 
 export function updateWorkers(world: WorldState): void {
@@ -121,14 +214,8 @@ function updateMiner(world: WorldState, unit: UnitState, type: SimUnitType): voi
     return;
   }
 
-  if (job.stage === 'toPad') {
-    const pad = nearestPad(world, unit.owner, unit.x, unit.z);
-    if (!pad) {
-      stopMoving(unit, type);
-      return;
-    }
-    const arrived = moveWorkerTo(world, unit, type, pad.x, pad.z, PAD_REACH);
-    if (!arrived) {
+  if (job.stage === 'toPad' || job.stage === 'unloading') {
+    if (!deliverAtPad(world, unit, type, job, 'ore')) {
       return;
     }
     creditOre(world, unit.owner, job.load);
@@ -231,14 +318,8 @@ function updateTug(world: WorldState, unit: UnitState, type: SimUnitType): void 
     return;
   }
 
-  if (job.stage === 'toPad') {
-    const pad = nearestPad(world, unit.owner, unit.x, unit.z);
-    if (!pad) {
-      stopMoving(unit, type);
-      return;
-    }
-    const arrived = moveWorkerTo(world, unit, type, pad.x, pad.z, PAD_REACH);
-    if (!arrived) {
+  if (job.stage === 'toPad' || job.stage === 'unloading') {
+    if (!deliverAtPad(world, unit, type, job, 'metal')) {
       return;
     }
     creditMetal(world, unit.owner, job.load);

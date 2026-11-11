@@ -78,6 +78,7 @@ import {
   updateTurrets,
 } from './structures';
 import { updateWorkers } from './workers';
+import { updatePadClearing } from './pad';
 import { addStructure, addUnit } from './spawn';
 import type {
   CommandOutcome,
@@ -1406,6 +1407,7 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
   updateRepair(next);
   updateResearch(next);
   updateWorkers(next);
+  updatePadClearing(next, DT);
   updateMetalStations(next);
   updateDropQueues(next);
   updateProjectiles(next);
@@ -1442,7 +1444,11 @@ export function canonicalJson(value: unknown): string {
   }
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    const keys = Object.keys(record).sort();
+    // Keys holding `undefined` are skipped, the same as JSON does, so a save/load round trip
+    // (which drops them) keeps the hash.
+    const keys = Object.keys(record)
+      .filter((key) => record[key] !== undefined)
+      .sort();
     return `{${keys
       .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
       .join(',')}}`;
