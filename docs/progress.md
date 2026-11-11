@@ -122,3 +122,12 @@ WP-10 (pause, speed, five save slots, settings, generated audio, alerts, offline
 - **AI.** Builds a missile battery for every other defence once enemy aircraft have been seen; desperation counts only metal it can still reach.
 - **Sim fix.** A tug at a dry station moves itself to a station that still has metal.
 - **Tests.** DATA-01/03 updated for the new roster; AI-02 waits until an enemy is genuinely hidden; MSN-03's scripted player finishes off stray units; the two placeholder combat missions start with 300 metal.
+
+## C-04 Art: faction sets (2026-11-11)
+
+- **Approved looks.** David approved the Terran Lancer and Kesh Darter samples ("we should be able to make assets for the 2 factions now"). Every model is scripted Blender (`tools/art/`), one 512px atlas per faction, phone budgets (2,500 triangles, 5,000 for big units).
+- **Kit.** `tools/art/kit.py` holds the shared modelling helpers (prisms with chamfer and taper, lofts, lathes, orbs mapped onto the glow tiles, assemble with TurretPivot, previews framed to size).
+- **Units.** `terran_set.py` (13 new units: Outrider, Prospector, Hauler, Mender, Watchman, Skimmer, Bulwark, Javelin, Longbow, Falcon, Condor, packed Bastion and Spire) and `kesh_set.py` (13 new units, including a new Stinger light tank with a scorpion-tail weapon, since the old Stinger look became the Darter scout). All 28 unit types now point at their own model.
+- **Structures.** `structures_set.py` builds the 7 structures per faction sized to their footprints; the renderer draws the model in place of the box (the box stays invisible for picking) and turns its TurretPivot.
+- **Loading.** Models now load in parallel (sequential loading took about 30 seconds on a busy machine).
+- **Open.** The renderer still scales every unit to one tank length; a per-type visual size is next. The third faction (mushroom crawler, `myco_crawler.py`) and the crystal superweapon are samples only.
