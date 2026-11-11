@@ -212,8 +212,8 @@ test('[screens] wp04-4-placing-structure-kit', async ({ page }, testInfo) => {
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))
     .toBe(true);
-  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -42, targetZ: -42, distance: 60, yaw: 0 }));
-  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-42, -42) ?? null);
+  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -35, targetZ: -46, distance: 60, yaw: 0 }));
+  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-35, -46) ?? null);
   expect(screen).not.toBeNull();
   if (!screen) {
     return;
