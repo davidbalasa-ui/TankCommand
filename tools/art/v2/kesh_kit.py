@@ -5,25 +5,27 @@ import forge as F
 from forge import body, box, crescent, cyl, lensfn, orb, shell, sweep, tube
 
 
-def layered_hull(fn, top=True, sides=True, under=True, rear=True, glow='slat', extra=False, nose=True):
-    """Glowing ribbed inner body wrapped in overlapping leaf-shaped shell plates."""
+def layered_hull(fn, top=True, sides=True, under=True, rear=True, glow='slat', extra=False, nose=True, tone=None):
+    """Glowing ribbed inner body wrapped in overlapping leaf-shaped shell plates.
+    tone='worker' gives the bronze-and-copper livery of the non-combat units."""
+    hi, lo = ('bronze', 'copper') if tone == 'worker' else ('shell', 'bronze')
     body(fn, glow, off=-0.06, nu=16, nv=14)
     if top:
         if nose:
-            shell(fn, 0.0, 0.42, 90, 104, 'shell', nu=10, nv=6, off=0.05, lift=0.05, shape=0.6)
+            shell(fn, 0.0, 0.42, 90, 104, hi, nu=10, nv=6, off=0.05, lift=0.05, shape=0.6)
             for vc in (34, 146):
-                shell(fn, 0.04, 0.5, vc, 52, 'bronze', nu=9, nv=4, off=0.02, lift=0.06, shape=0.6, skew=(90 - vc) * 0.3)
+                shell(fn, 0.04, 0.5, vc, 52, lo, nu=9, nv=4, off=0.02, lift=0.06, shape=0.6, skew=(90 - vc) * 0.3)
         for vc in (56, 124):
-            shell(fn, 0.3, 0.76, vc, 56, 'shell', nu=10, nv=5, off=0.09, lift=0.1, skew=(90 - vc) * 0.25)
-        shell(fn, 0.28, 0.72, 90, 30, 'bronze', nu=9, nv=3, off=0.17, lift=0.08, shape=0.7)
+            shell(fn, 0.3, 0.76, vc, 56, hi, nu=10, nv=5, off=0.09, lift=0.1, skew=(90 - vc) * 0.25)
+        shell(fn, 0.28, 0.72, 90, 30, lo, nu=9, nv=3, off=0.17, lift=0.08, shape=0.7)
         if rear:
-            shell(fn, 0.55, 1.0, 90, 96, 'bronze', nu=10, nv=6, off=0.13, lift=0.12, shape=0.6)
+            shell(fn, 0.55, 1.0, 90, 96, lo, nu=10, nv=6, off=0.13, lift=0.12, shape=0.6)
         if extra:
             for vc in (38, 142):
-                shell(fn, 0.5, 0.97, vc, 50, 'shell', nu=8, nv=4, off=0.16, lift=0.16, skew=(90 - vc) * 0.2)
+                shell(fn, 0.5, 0.97, vc, 50, hi, nu=8, nv=4, off=0.16, lift=0.16, skew=(90 - vc) * 0.2)
     if sides:
         for vc in (4, 176):
-            shell(fn, 0.1, 0.96, vc, 32, 'bronze', nu=12, nv=4, off=0.14, lift=0.14, shape=0.7)
+            shell(fn, 0.1, 0.96, vc, 32, lo, nu=12, nv=4, off=0.14, lift=0.14, shape=0.7)
     if under:
         for vc in (232, 308):
             shell(fn, 0.04, 0.96, vc, 74, 'under', nu=10, nv=4, off=0.03, lift=0.02, shape=0.5)

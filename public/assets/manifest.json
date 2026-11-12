@@ -229,7 +229,7 @@
       "id": "unit.alien.gorger",
       "kind": "model",
       "path": "assets/models/alien/gorger.glb",
-      "bytes": 382872,
+      "bytes": 379548,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -242,7 +242,7 @@
       "id": "unit.alien.ferrier",
       "kind": "model",
       "path": "assets/models/alien/ferrier.glb",
-      "bytes": 331772,
+      "bytes": 315780,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -255,7 +255,7 @@
       "id": "unit.alien.weaver",
       "kind": "model",
       "path": "assets/models/alien/weaver.glb",
-      "bytes": 359316,
+      "bytes": 339076,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -268,7 +268,7 @@
       "id": "unit.alien.thornmound_packed",
       "kind": "model",
       "path": "assets/models/alien/thornmound_packed.glb",
-      "bytes": 483868,
+      "bytes": 469588,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -281,7 +281,7 @@
       "id": "unit.alien.seer",
       "kind": "model",
       "path": "assets/models/alien/seer.glb",
-      "bytes": 343788,
+      "bytes": 316048,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -320,7 +320,7 @@
       "id": "unit.alien.carapace",
       "kind": "model",
       "path": "assets/models/alien/carapace.glb",
-      "bytes": 881304,
+      "bytes": 876072,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -333,7 +333,7 @@
       "id": "unit.alien.spitter",
       "kind": "model",
       "path": "assets/models/alien/spitter.glb",
-      "bytes": 363452,
+      "bytes": 360692,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -359,7 +359,7 @@
       "id": "unit.alien.spore_tower_packed",
       "kind": "model",
       "path": "assets/models/alien/spore_tower_packed.glb",
-      "bytes": 461836,
+      "bytes": 453232,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -489,7 +489,7 @@
       "id": "structure.alien.turret",
       "kind": "model",
       "path": "assets/models/structures/kesh_thornmound.glb",
-      "bytes": 923928,
+      "bytes": 900380,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -567,7 +567,7 @@
       "id": "unit.alien.dragonfly",
       "kind": "model",
       "path": "assets/models/alien/dragonfly.glb",
-      "bytes": 463424,
+      "bytes": 451464,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -979,7 +979,7 @@
       "id": "unit.alien.gorger.lod",
       "kind": "model",
       "path": "assets/models/alien/gorger_lod.glb",
-      "bytes": 106672,
+      "bytes": 107056,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -995,7 +995,7 @@
       "id": "unit.alien.ferrier.lod",
       "kind": "model",
       "path": "assets/models/alien/ferrier_lod.glb",
-      "bytes": 99732,
+      "bytes": 100208,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1011,7 +1011,7 @@
       "id": "unit.alien.weaver.lod",
       "kind": "model",
       "path": "assets/models/alien/weaver_lod.glb",
-      "bytes": 103816,
+      "bytes": 103280,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1027,7 +1027,7 @@
       "id": "unit.alien.thornmound_packed.lod",
       "kind": "model",
       "path": "assets/models/alien/thornmound_packed_lod.glb",
-      "bytes": 111964,
+      "bytes": 111124,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1043,7 +1043,7 @@
       "id": "unit.alien.seer.lod",
       "kind": "model",
       "path": "assets/models/alien/seer_lod.glb",
-      "bytes": 102452,
+      "bytes": 100264,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1091,7 +1091,7 @@
       "id": "unit.alien.carapace.lod",
       "kind": "model",
       "path": "assets/models/alien/carapace_lod.glb",
-      "bytes": 199632,
+      "bytes": 198756,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1107,7 +1107,7 @@
       "id": "unit.alien.spitter.lod",
       "kind": "model",
       "path": "assets/models/alien/spitter_lod.glb",
-      "bytes": 106384,
+      "bytes": 108008,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1139,7 +1139,7 @@
       "id": "unit.alien.spore_tower_packed.lod",
       "kind": "model",
       "path": "assets/models/alien/spore_tower_packed_lod.glb",
-      "bytes": 113020,
+      "bytes": 115640,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1171,7 +1171,7 @@
       "id": "unit.alien.dragonfly.lod",
       "kind": "model",
       "path": "assets/models/alien/dragonfly_lod.glb",
-      "bytes": 112240,
+      "bytes": 115164,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",

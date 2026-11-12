@@ -96,15 +96,16 @@ def glider():
 
 @asset('alien/carapace.glb', 'Kesh Carapace (heavy tank)', size=1024)
 def carapace():
-    fn = lensfn(-4.2, 4.2, 2.4, 2.15, 0.5, 1.15, nose=0.75)
+    fn = lensfn(-4.2, 4.2, 3.1, 2.15, 0.5, 1.15, nose=0.9)
     K.layered_hull(fn, extra=True)
+    for s in (1, -1):   # great forward horns
+        K.blade((2.3, s * 0.9, 1.25), 2.7, s * -25, s * 92, 0.55, 0.14, sq=(1.25, 0.85), zone='shell')
     K.lifters([(2.2, 0, 0.5), (-2.0, 1.1, 0.52), (-2.0, -1.1, 0.52), (0.2, 0, 0.45)], 0.42)
     for s in (1, -1):
         K.fin((-3.0, s * 1.0, 1.7), 2.0, 222, 60, 0.6, 0.08, lean=-s * 10)
         K.fin((-2.2, s * 1.7, 1.35), 1.35, 215, 70, 0.42, 0.06, lean=-s * 26)
         K.core((1.9, s * 1.05, 1.52), 0.24)
-    K.flanks(8.3, 2.45, 1.35)
-    K.flanks(6.5, 2.7, 1.0, x=0.8, width=0.16)
+    K.flanks(8.3, 3.15, 1.35)
     tz = 2.05
     with F.group('Turret'):
         turret(tz, L=3.9, w=1.25, h=0.85, x0=-2.2, gun=(7.2, 0.22))
@@ -121,24 +122,25 @@ def spitter():
     fn = lensfn(-3.1, 3.2, 1.75, 1.7, 0.5, 1.02, nose=0.72)
     K.layered_hull(fn)
     K.lifters([(1.5, 0, 0.5), (-1.3, 0.8, 0.52), (-1.3, -0.8, 0.52)], 0.34)
-    K.flanks(6.60, 2.01, 1.15, x=0.1)
+    for s in (1, -1):   # twin tail spikes
+        sweep([(-1.6, s * 1.0, 1.05), (-3.4, s * 1.25, 1.2), (-5.2, s * 1.2, 1.55)], [(0.3, 0.16), (0.22, 0.12), (0.03, 0.03)], 'bronze', sides=6)
     tz = 1.65
     with F.group('Turret'):
         tube((-0.3, 0, tz - 0.05), (-0.3, 0, tz + 0.3), [(0, 0.8), (0.5, 0.7), (1, 0.45)], 12, 'bronze')
         # Arched spine rack holding six seeker pods, three a side.
         for s in (1, -1):
             m = F.mark()
-            K.fin((-0.3, 0, tz + 0.25), 1.35, 15, 165, 0.42, 0.07, zone='shell', plane='yz', sq=(1.0, 0.9))
+            K.fin((-0.3, 0, tz + 0.25), 1.7, 15, 165, 0.5, 0.08, zone='shell', plane='yz', sq=(1.0, 0.95))
             F.rot_all(m, 'Z', 0)
             F.move_all(m, (s * 0.75, 0, 0))
         for i, a in enumerate((38, 90, 142)):
             for dx in (-0.75, 0.75):
-                y, z = 1.2 * math.cos(math.radians(a)), tz + 0.25 + 1.08 * math.sin(math.radians(a))
+                y, z = 1.52 * math.cos(math.radians(a)), tz + 0.25 + 1.45 * math.sin(math.radians(a))
                 m = F.mark()
                 tube((dx - 0.2, y, z), (dx + 0.9, y, z), [(0, 0.1), (0.15, 0.2), (0.6, 0.2), (0.85, 0.13), (1, 0.02)], 10, 'barrel')
                 cyl((dx + 0.05, y, z), (dx + 0.3, y, z), 0.215, 10, 'slat')
                 F.rot_all(m, 'Y', -22, about=(dx, y, z))
-        K.core((-0.3, 0, tz + 0.65), 0.3)
+        K.core((-0.3, 0, tz + 0.75), 0.36)
     return dict(pivot=('Turret', (-0.3, 0, tz)))
 
 
@@ -166,8 +168,8 @@ def mortar_beast():
 
 @asset('alien/gorger.glb', 'Kesh Gorger (ore miner)')
 def gorger():
-    fn = lensfn(-3.2, 3.0, 1.8, 1.5, 0.5, 1.0, nose=0.8)
-    K.layered_hull(fn, rear=False)
+    fn = lensfn(-3.1, 2.9, 2.3, 1.5, 0.5, 1.0, nose=1.0)
+    K.layered_hull(fn, rear=False, tone='worker')
     K.lifters([(1.4, 0, 0.5), (-1.5, 0.8, 0.52), (-1.5, -0.8, 0.52)], 0.34)
     # Ore crop: an open cup of petals behind the middle, where the mined ore shows.
     c = (-1.35, 0, 1.25)
@@ -191,8 +193,8 @@ def gorger():
 
 @asset('alien/ferrier.glb', 'Kesh Ferrier (cargo tug)')
 def ferrier():
-    fn = lensfn(-3.3, 3.1, 1.75, 1.3, 0.5, 0.95, nose=0.8)
-    K.layered_hull(fn, rear=False)
+    fn = lensfn(-3.1, 3.0, 2.35, 1.3, 0.5, 0.95, nose=1.0)
+    K.layered_hull(fn, rear=False, tone='worker')
     K.lifters([(1.5, 0, 0.5), (-1.5, 0.8, 0.52), (-1.5, -0.8, 0.52)], 0.34)
     # Cargo cradle: a shallow dish gripped by four tall claws.
     c = (-1.0, 0, 1.2)
@@ -204,17 +206,15 @@ def ferrier():
         F.move_all(m, (0.5, 0, 0))
         F.rot_all(m, 'Z', 45 + 90 * k)
         F.move_all(m, c)
-    K.flanks(6.81, 2.01, 1.10, x=0.2)
     K.core((1.9, 0, 1.3), 0.26)
     return {}
 
 
 @asset('alien/weaver.glb', 'Kesh Weaver (repair)')
 def weaver():
-    fn = lensfn(-3.0, 3.0, 1.7, 1.6, 0.5, 1.0, nose=0.75)
-    K.layered_hull(fn)
+    fn = lensfn(-2.8, 2.8, 2.15, 1.6, 0.5, 1.0, nose=1.0)
+    K.layered_hull(fn, tone='worker')
     K.lifters([(1.5, 0, 0.5), (-1.3, 0.8, 0.52), (-1.3, -0.8, 0.52)], 0.34)
-    K.flanks(6.38, 1.94, 1.15, x=0.1)
     tz = 1.55
     tube((-0.2, 0, tz - 0.05), (-0.2, 0, tz + 0.35), [(0, 0.8), (0.5, 0.7), (1, 0.4)], 12, 'bronze')
     with F.group('Halo'):
@@ -239,17 +239,15 @@ def weaver():
 
 @asset('alien/seer.glb', 'Kesh Seer (mobile sensor)')
 def seer():
-    fn = lensfn(-2.8, 2.8, 1.6, 1.5, 0.5, 1.0, nose=0.75)
-    K.layered_hull(fn)
+    fn = lensfn(-2.6, 2.6, 2.0, 1.5, 0.5, 1.0, nose=1.0)
+    K.layered_hull(fn, tone='worker')
     K.lifters([(1.4, 0, 0.5), (-1.2, 0.75, 0.52), (-1.2, -0.75, 0.52)], 0.32)
-    K.flanks(5.96, 1.80, 1.15, x=0.1)
     tz = 1.45
     tube((-0.3, 0, tz - 0.05), (-0.3, 0, tz + 0.3), [(0, 0.75), (0.5, 0.65), (1, 0.4)], 12, 'bronze')
     with F.group('Eye'):
         # The eye: a large orb cradled by two tall horns, with two tilted orbit rings.
         c = (-0.3, 0, tz + 2.0)
         orb(c, 0.62, 'core', seg=(18, 12))
-        orb((c[0] + 0.5, c[1], c[2]), 0.22, 'under', seg=(10, 8), sq=(0.6, 1, 1))
         for s in (1, -1):
             K.fin((-0.3, 0, tz + 1.55), 1.5, 270 - s * 80, 270 + s * 38 - s * 180, 0.36, 0.07, zone='shell', plane='yz')
         K.ring(c, 0.95, 0.045, 'bronze', sides=24, tilt=(24, 0))
@@ -259,10 +257,9 @@ def seer():
 
 
 def carrier():
-    fn = lensfn(-3.0, 3.0, 1.7, 1.25, 0.5, 0.95, nose=0.8)
-    K.layered_hull(fn, rear=False)
+    fn = lensfn(-2.9, 2.9, 2.15, 1.25, 0.5, 0.95, nose=1.0)
+    K.layered_hull(fn, rear=False, tone='worker')
     K.lifters([(1.5, 0, 0.5), (-1.3, 0.8, 0.52), (-1.3, -0.8, 0.52)], 0.34)
-    K.flanks(6.38, 1.94, 1.10, x=0.1)
     K.core((2.0, 0, 1.22), 0.2)
 
 
@@ -353,35 +350,38 @@ def dragonfly():
         # Twin lances under the chin.
         tube((1.2, s * 0.26, Z - 0.3), (3.3, s * 0.26, Z - 0.3), [(0, 0.11), (0.15, 0.13), (0.2, 0.065), (0.92, 0.05), (0.94, 0.085), (1, 0.085)], 8, 'barrel')
         cyl((3.29, s * 0.26, Z - 0.3), (3.31, s * 0.26, Z - 0.3), 0.06, 8, 'glow')
-    K.core((0.2, 0, Z + 0.78), 0.24)
-    # Long segmented tail, tapering and lifting towards the tip.
+    K.core((0.55, 0, Z + 0.74), 0.22)
+    # Long straight segmented tail.
     n = 7
     x, r = -0.8, 0.5
+    zc = Z + 0.05
+    x_start, r_start = x, r
     for k in range(n):
         ln = 0.82 - k * 0.03
         r1 = r * 0.86
-        z0 = Z + 0.05 + 0.035 * k * k * 0.5
-        z1 = Z + 0.05 + 0.035 * (k + 1) * (k + 1) * 0.5
-        tube((x, 0, z0), (x - ln, 0, z1), [(0, r * 0.72), (0.18, r), (0.7, r * 0.92), (1, r1 * 0.7)], 10,
+        tube((x, 0, zc), (x - ln, 0, zc), [(0, r * 0.72), (0.18, r), (0.7, r * 0.92), (1, r1 * 0.7)], 10,
              'shell' if k % 2 == 0 else 'bronze')
-        K.ring((x - ln, 0, z1), r1 * 0.78, 0.035, 'glow', sides=10, tilt=(0, 90))
-        if k in (1, 3):
-            K.fin((x - ln * 0.5, 0, (z0 + z1) / 2 + r * 0.7), 0.62 - k * 0.06, 200, 75, 0.26, 0.05)
+        K.ring((x - ln, 0, zc), r1 * 0.78, 0.035, 'glow', sides=10, tilt=(0, 90))
         x, r = x - ln, r1
-    zt = Z + 0.05 + 0.035 * n * n * 0.5
     for s in (1, -1):   # tail claspers
-        b = K.blade((x - 0.05, s * 0.75, zt), 0.75, s * -80, s * -190, 0.3, 0.06)
-    # Four long blade wings in two pairs, swept and raised at the tips, each with a glowing vein.
+        K.blade((x - 0.05, s * 0.75, zc), 0.75, s * -80, s * -190, 0.3, 0.06)
+    # Straight lines down the back: a glowing spine flanked by two bronze rails, nose to tail tip.
+    sweep([(1.1, 0, Z + 0.66), (-0.9, 0, Z + 0.62), (x + 0.2, 0, zc + r + 0.06)], [(0.035, 0.03), (0.035, 0.03), (0.02, 0.02)], 'glow', sides=4)
     for s in (1, -1):
-        for (x0, span, sweep_, rise, chord) in ((0.75, 4.4, -0.5, 0.75, 0.58), (-0.25, 3.7, -1.5, 0.45, 0.5)):
-            pts = [(x0, s * 0.35, Z + 0.5), (x0 + sweep_ * 0.25, s * (0.35 + span * 0.35), Z + 0.5 + rise * 0.2),
-                   (x0 + sweep_ * 0.6, s * (0.35 + span * 0.7), Z + 0.5 + rise * 0.55), (x0 + sweep_, s * (0.35 + span), Z + 0.5 + rise)]
-            sweep(pts, [(chord * 0.45, 0.07), (chord, 0.06), (chord * 0.85, 0.045), (chord * 0.12, 0.02)], 'shell', sides=6, power=0.7)
-            spar = [(p[0] + chord * 0.55, p[1], p[2] + 0.03) for p in pts[:3]] + [(pts[3][0] + 0.05, pts[3][1], pts[3][2] + 0.02)]
-            sweep(spar, [(0.11, 0.07), (0.1, 0.06), (0.07, 0.05), (0.02, 0.02)], 'bronze', sides=6)
-            vein = [(p[0] - chord * 0.05, p[1], p[2] + 0.045) for p in pts[:3]]
-            sweep(vein, [(0.03, 0.02), (0.035, 0.02), (0.02, 0.015)], 'glow', sides=4)
-        # Wing root shoulder.
-        orb((0.3, s * 0.42, Z + 0.48), 0.3, 'bronze', seg=(10, 8), sq=(1.9, 0.8, 0.6))
+        sweep([(0.9, s * 0.2, Z + 0.6), (-0.9, s * 0.2, Z + 0.56), (x + 0.2, s * 0.07, zc + r + 0.04)],
+              [(0.05, 0.05), (0.05, 0.05), (0.025, 0.03)], 'bronze', sides=4, power=1.6)
+    # Four long see-through wings in two pairs, each with straight veins and a bronze leading spar.
+    for s in (1, -1):
+        for (x0, span, sweep_, rise, chord) in ((0.75, 6.2, -0.4, 0.9, 0.62), (-0.3, 5.2, -1.9, 0.55, 0.54)):
+            root = (x0, s * 0.35, Z + 0.5)
+            tip = (x0 + sweep_, s * (0.35 + span), Z + 0.5 + rise)
+            def at(t, dx=0.0, dz=0.0):
+                return (root[0] + (tip[0] - root[0]) * t + dx, root[1] + (tip[1] - root[1]) * t, root[2] + (tip[2] - root[2]) * t + dz)
+            sweep([at(0), at(0.3), at(0.7), at(1)], [(chord * 0.5, 0.03), (chord, 0.025), (chord * 0.9, 0.02), (chord * 0.2, 0.012)], 'wing', sides=6, power=0.7)
+            sweep([at(0, chord * 0.5, 0.02), at(0.3, chord, 0.02), at(0.7, chord * 0.9, 0.02), at(1, chord * 0.2, 0.01)],
+                  [(0.09, 0.07), (0.08, 0.06), (0.06, 0.05), (0.02, 0.02)], 'bronze', sides=6)
+            for off in (-0.45, 0.0, 0.42):   # straight veins
+                sweep([at(0.04, chord * off * 0.5, 0.03), at(0.95, chord * off * 0.25, 0.02)], [(0.018, 0.012), (0.01, 0.01)], 'glow', sides=4)
+        orb((0.25, s * 0.42, Z + 0.48), 0.3, 'bronze', seg=(10, 8), sq=(1.9, 0.8, 0.6))
     K.lifters([(0.6, 0, Z - 0.5)], 0.3)
-    return dict(name='KeshDragonfly', single=True)
+    return dict(name='KeshDragonfly', single=True, clear='wing')
