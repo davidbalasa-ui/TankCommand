@@ -3,13 +3,14 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { UnitInstances, isInstancedPart, markInstanced } from './unitInstances';
 import { Effects } from './effects';
+import { WreckField } from './wrecks';
 import { applyUnfold, readUnfold, type UnfoldData, type UnfoldStart } from './unfold';
 import { AssetLoader } from '../assets/loader';
 import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
-import { CAMERA_FOV_DEG, MAX_SLOPE, ORE_CRATE_SIZE, ORE_MAX_CRATES, TANK_LENGTH } from '../sim/tuning';
+import { CAMERA_FOV_DEG, MAX_SLOPE, ORE_CRATE_SIZE, ORE_MAX_CRATES, TANK_LENGTH, WRECK_TTL_SEC } from '../sim/tuning';
 import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
 import { crateOre } from '../sim/economy';
@@ -84,6 +85,9 @@ export interface RenderStats {
   units: number;
   /** Units drawn with their low-detail model last frame. */
   lodUnits?: number;
+  /** Burning wrecks on the field, and live effect particles. */
+  wrecks?: number;
+  effects?: number;
 }
 
 export interface ScreenBounds {
@@ -220,6 +224,13 @@ interface UnitVisual {
   batchKey: string;
   /** Low-detail geometry per instanced part (same order), when the model has a _lod file. */
   lod: THREE.BufferGeometry[] | null;
+  typeId: string;
+  /** Arcadian: gold weapons and the idle gold crackle. */
+  alien: boolean;
+  /** 1 right after firing, easing back to 0: the turret kicks back and the hull rocks. */
+  recoil: number;
+  /** The turret pivot's rest position, for the recoil kick. */
+  pivotRest: THREE.Vector3 | null;
 }
 
 interface PositionSnapshot {
@@ -396,8 +407,20 @@ function cloneMaterials(root: THREE.Object3D, enemy: boolean, colourBlind: boole
   remapMeshMaterials(root, (material) => cloneWithTint(material, tint, false));
 }
 
+/** Chars a wreck: soot-black, lights out, dull. */
 function darkenMaterials(root: THREE.Object3D): void {
-  remapMeshMaterials(root, (material) => cloneWithTint(material, null, true));
+  remapMeshMaterials(root, (material) => {
+    const clone = cloneWithTint(material, null, true);
+    if (clone instanceof THREE.MeshStandardMaterial) {
+      clone.color.setRGB(0.07, 0.062, 0.055);
+      clone.envMapIntensity = 0.25;
+      clone.emissive.setRGB(0, 0, 0);
+      clone.emissiveMap = null;
+      clone.roughness = 1;
+      clone.metalness = Math.min(clone.metalness, 0.3);
+    }
+    return clone;
+  });
 }
 
 function createFallbackTank(): THREE.Group {
@@ -506,6 +529,7 @@ export class RenderView {
       startZ: number;
       shooterId: number | undefined;
       aim: number;
+      alien: boolean;
       /** Shard lance: where it started, and the seed and time of its last kink re-roll. */
       from?: THREE.Vector3;
       seed?: number;
@@ -516,7 +540,10 @@ export class RenderView {
   private readonly wreckInstances = new UnitInstances(this.scene);
   private readonly effects = new Effects(this.scene);
   private readonly wrecksGroup = new THREE.Group();
-  private readonly wreckMeshes: THREE.Object3D[] = [];
+  private readonly wreckField = new WreckField(this.wrecksGroup, this.wreckInstances, this.effects, darkenMaterials);
+  private lastFrameAt = 0;
+  /** Which side's look each structure had, for its death blast after it has left the world. */
+  private readonly structureAlien = new Map<number, boolean>();
   private readonly selection: number[] = [];
   private readonly previousSnapshots = new Map<number, PositionSnapshot>();
   private readonly currentSnapshots = new Map<number, PositionSnapshot>();
@@ -1155,6 +1182,8 @@ export class RenderView {
       frame: this.frame,
       units: this.unitRoots.size,
       lodUnits: this.lodUnits,
+      wrecks: this.wreckField.count,
+      effects: this.effects.count,
     };
   }
 
@@ -1223,6 +1252,7 @@ export class RenderView {
   private applyQuality(): void {
     const level = this.effectiveQualityLevel();
     const view = qualityViewFor(level, this.basePixelRatio);
+    this.effects.setDetail(1 - level * 0.13);
     const step = qualityStep(level);
 
     this.renderer.setPixelRatio(view.pixelRatio);
@@ -1609,6 +1639,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   private updateSnapshots(world: WorldState): void {
     if (world.tick === this.lastTick) {
       return;
+    }
+    if (world.tick < this.lastTick) {
+      // A new match or a loaded save: the old battlefield's wrecks go.
+      this.wreckField.clear();
     }
     this.previousSnapshots.clear();
     for (const [id, snapshot] of this.currentSnapshots) {
@@ -2020,6 +2054,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       reach: Math.max(0.6, (this.world.unitTypes.get(unit.typeId)?.radius ?? 1.6) * 0.75),
       batchKey: `${template ? unit.typeId : 'fallback'}|${enemy ? 'enemy' : 'own'}`,
       lod,
+      typeId: unit.typeId,
+      alien: this.world.factions.find((item) => item.player === unit.owner)?.faction === 'alien',
+      recoil: 0,
+      pivotRest: root.getObjectByName('TurretPivot')?.position.clone() ?? null,
     };
   }
 
@@ -2027,6 +2065,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const alive = new Set(this.world.units.map((unit) => unit.id));
     for (const [id, visual] of this.unitRoots) {
       if (!alive.has(id)) {
+        this.unitDied(visual);
         this.scene.remove(visual.root);
         this.unitRoots.delete(id);
       }
@@ -2035,6 +2074,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const allLod = this.effectiveQualityLevel() >= LOD_QUALITY_LEVEL;
     const eye = this.camera.position;
     this.lodUnits = 0;
+    let arcBudget = 3;
 
     for (const unit of this.world.units) {
       let visual = this.unitRoots.get(unit.id);
@@ -2085,7 +2125,25 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       visual.root.position.set(x, ground + visual.lift, z);
       visual.root.rotation.set(visual.roll, -heading, visual.pitch, 'YZX');
       if (visual.turretPivot) {
-        visual.turretPivot.rotation.y = heading - turretHeading;
+        const rel = heading - turretHeading;
+        visual.turretPivot.rotation.y = rel;
+        if (visual.pivotRest) {
+          // Recoil: the turret jumps back along its barrel and the hull rocks nose-up.
+          const kick = visual.recoil * 0.28;
+          visual.turretPivot.position.set(
+            visual.pivotRest.x - Math.cos(rel) * kick,
+            visual.pivotRest.y,
+            visual.pivotRest.z + Math.sin(rel) * kick,
+          );
+        }
+      }
+      if (visual.recoil > 0.001) {
+        visual.root.rotation.z += visual.recoil * 0.07 * Math.cos(heading - turretHeading);
+        visual.recoil *= 0.82;
+      }
+      if (visual.alien && visual.root.visible && arcBudget > 0 && Math.random() < 0.025) {
+        arcBudget -= 1;
+        this.effects.arcAround(x, ground + visual.lift + 0.9 * visual.root.scale.y, z, 1.1 * visual.root.scale.y);
       }
       if (visual.root.visible) {
         visual.root.updateMatrixWorld(true);
@@ -2112,6 +2170,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         continue;
       }
       alive.add(structure.id);
+      this.structureAlien.set(structure.id, type.faction === 'alien');
       let visual = this.structureVisuals.get(structure.id);
       if (!visual) {
         const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize;
@@ -2276,6 +2335,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     this.syncRubble(world);
     for (const [id, visual] of this.structureVisuals) {
       if (!alive.has(id)) {
+        this.structureDied(world, id, visual);
         this.disposeStructureVisual(visual);
         this.structureVisuals.delete(id);
         this.structureFolding.delete(id);
@@ -2903,7 +2963,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       if (!ids.has(id)) {
         const at = visual.object.position;
         const ground = heightAt(this.world.map, at.x, at.z);
-        this.effects.impact(visual.kind, at.x, at.y, at.z, ground, visual.splash);
+        this.effects.impact(visual.kind, at.x, at.y, at.z, ground, visual.splash, visual.alien);
         if (visual.kind === 'shard' && visual.from) {
           // A fading violet afterimage of the lance's path.
           this.effects.shardLance(visual.from, at, 0.35, 0.3, visual.seed ?? 0);
@@ -2934,9 +2994,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           startZ: projectile.z,
           shooterId: projectile.shooterId,
           aim: projectile.aimDistance ?? 0,
+          alien: !human,
         };
         this.projectileVisuals.set(projectile.id, visual);
-        this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind);
+        this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz);
+        if (shooter && !airborne) {
+          shooter.recoil = 1;
+        }
       }
       const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
       const progress = visual.aim > 0.01 ? Math.min(1, travelled / visual.aim) : 1;
@@ -2994,37 +3058,45 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   }
 
   private syncWrecks(): void {
-    this.wreckInstances.begin();
-    while (this.wreckMeshes.length < this.world.wrecks.length) {
-      const source = this.templateRoot ?? this.prepareFallback();
-      const root = source.clone(true);
-      darkenMaterials(root);
-      markInstanced(root);
-      root.scale.y = 0.55;
-      this.wrecksGroup.add(root);
-      this.wreckMeshes.push(root);
+    const now = performance.now();
+    const dt = this.lastFrameAt === 0 ? 1 / 60 : Math.min(0.1, (now - this.lastFrameAt) / 1000);
+    this.lastFrameAt = now;
+    this.wreckField.update(dt, this.shadowsEnabled);
+  }
+
+  /** A unit just left the world: if the sim left a fresh wreck where it was, it was destroyed. */
+  private unitDied(visual: UnitVisual): void {
+    const at = visual.root.position;
+    const wreck = this.world.wrecks.find(
+      (item) => item.ttl > WRECK_TTL_SEC - 4 && Math.hypot(item.x - at.x, item.z - at.z) < 4,
+    );
+    if (!wreck || !visual.root.visible) {
+      return;
     }
-    while (this.wreckMeshes.length > this.world.wrecks.length) {
-      const mesh = this.wreckMeshes.pop();
-      if (mesh) {
-        this.wrecksGroup.remove(mesh);
-      }
+    const size = visual.root.scale.y;
+    const gy = this.unitGroundAt(wreck.x, wreck.z);
+    const air = visual.lift > 0.5;
+    this.effects.unitDeath(at.x, at.y, at.z, gy, size, visual.alien, air);
+    if (this.templateFor(visual.typeId)) {
+      visual.root.position.set(wreck.x, at.y, wreck.z);
+      visual.root.updateMatrixWorld(true);
+      this.wreckField.add(visual.root, visual.typeId, gy, size, air);
     }
-    for (let i = 0; i < this.world.wrecks.length; i += 1) {
-      const wreck = this.world.wrecks[i];
-      const mesh = this.wreckMeshes[i];
-      if (!wreck || !mesh) {
-        continue;
-      }
-      mesh.position.set(
-        wreck.x,
-        heightAt(this.world.map, wreck.x, wreck.z) - 0.25,
-        wreck.z,
-      );
-      mesh.updateMatrixWorld(true);
-      this.wreckInstances.add('wreck', mesh);
+  }
+
+  /** A structure just left the world: destroyed ones (they leave rubble) go up in a big blast. */
+  private structureDied(world: WorldState, id: number, visual: StructureVisual): void {
+    const alien = this.structureAlien.get(id) ?? false;
+    this.structureAlien.delete(id);
+    const at = visual.mesh.position;
+    const rubble = world.rubble.find((item) => Math.hypot(item.x - at.x, item.z - at.z) < 1);
+    if (!rubble) {
+      return;
     }
-    this.wreckInstances.end(this.shadowsEnabled);
+    const gy = heightAt(world.map, rubble.x, rubble.z);
+    const width = Math.max(2, rubble.radius * 1.4);
+    this.effects.structureDeath(rubble.x, gy, rubble.z, width, alien);
+    this.effects.addBurner(rubble.x, gy + 0.6, rubble.z, Math.min(2.5, width * 0.4), 8, 22);
   }
 
   private updateFlashes(): void {
