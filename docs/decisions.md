@@ -113,3 +113,11 @@ David: two resources for everything is too complicated and can leave a player un
 ## 2026-11-12 Solid buildings and smoother driving
 
 David reported clipping and rough vehicle movement. Buildings (except landing pads, which units land on) are now solid: pathfinding, steering and the step check use a per-tick map view with building footprints inflated by half a hull (src/sim/obstacles.ts). Ore and metal sites are solid for fighting units; workers still drive in to mine. Units caught inside a new building slide out. Solid scenery (rocks, cliffs, dead trees, fronds) is only placed where its whole footprint is undrivable. Tracked vehicles pivot in place for turns sharper than 75° off their route; rendered headings blend the short way round; hulls tilt with the ground. Path planning labels connected areas once per map view and caches terrain cells, so the sim is faster than before despite the obstacle checks.
+
+## Towers fold out part by part (2026-11-12)
+Tower models from the art pass carry a packed pose on Base, Carrier and TurretPivot. When a packed
+tower deploys, the renderer (src/render/unfold.ts) shrinks and turns the whole model from the
+packed vehicle's size and facing to the structure's, then folds each part out over 1.5 s; the
+Carrier (folded hull) hides at the end. Packing up plays it backwards over the pack time. Turret
+and missile battery footprints went from 1x1 to 2x2 cells so the deployed tower is about as big as
+the vehicle it came from (at 1x1 it shrank to half size). Deploying no longer raises "Unit lost".

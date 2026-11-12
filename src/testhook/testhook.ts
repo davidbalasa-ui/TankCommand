@@ -102,6 +102,8 @@ export interface TestHook {
   setStorageFullForTest(value: boolean): void;
   pressAndroidBack(): void;
   stressSpawn(perSide: number, withEnemies?: boolean): number;
+  /** Adds one unit (test scenes only); returns its id, or null when it could not be placed. */
+  spawnUnit(typeId: string, owner: number, x: number, z: number, heading?: number): number | null;
 }
 
 export function installTestHook(app: App): void {
@@ -184,6 +186,7 @@ export function installTestHook(app: App): void {
       app.pressAndroidBack();
     },
     stressSpawn: (perSide, withEnemies) => app.stressSpawnForTest(perSide, withEnemies),
+    spawnUnit: (typeId, owner, x, z, heading) => app.spawnUnitForTest(typeId, owner, x, z, heading),
   };
 
   (window as unknown as { __TC_TEST__?: TestHook }).__TC_TEST__ = hook;

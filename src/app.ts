@@ -1382,6 +1382,10 @@ export class App {
     return added;
   }
 
+  spawnUnitForTest(typeId: string, owner: number, x: number, z: number, heading = 0): number | null {
+    return addUnit(this.world, { owner, typeId, x, z, heading })?.id ?? null;
+  }
+
   raiseAlertForTest(kind: AlertKind, x: number, z: number): void {
     this.services?.raiseAlert(kind, x, z);
   }

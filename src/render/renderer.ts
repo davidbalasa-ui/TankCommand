@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { UnitInstances, isInstancedPart, markInstanced } from './unitInstances';
 import { Effects } from './effects';
+import { applyUnfold, readUnfold, type UnfoldData, type UnfoldStart } from './unfold';
 import { AssetLoader } from '../assets/loader';
 import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
@@ -28,6 +29,8 @@ const TANK_ASSET_ID = 'unit.human.poc_tank';
 const TERRAIN_DETAIL_ID = 'texture.terrain.detail';
 /** How long a newly deployed structure takes to unfold. */
 const UNFOLD_MS = 1200;
+/** How long a packed tower takes to fold out into its structure. */
+const TOWER_UNFOLD_MS = 1500;
 /** Metres covered by one repeat of the ground detail texture. */
 const DETAIL_TILE = 7;
 const TURRET_NODES = [
@@ -502,6 +505,10 @@ export class RenderView {
   // for the unfold animation. Kept outside the visuals, which are rebuilt when models load.
   private readonly structureSeen = new Set<number>();
   private readonly structureBorn = new Map<number, number>();
+  /** Towers folding out part by part (models with packed poses), keyed by structure id. */
+  private readonly structureFolding = new Map<number, { born: number; start: UnfoldStart }>();
+  /** Where units that are packing up into a structure stand and face, for the fold-out to start from. */
+  private readonly deployingUnits = new Map<number, { x: number; z: number; heading: number }>();
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
@@ -1742,15 +1749,20 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   }
 
   // Structure models are normalised to a 1 x 1 footprint, centred, standing on y = 0.
+  // Fold-out towers normalise on their deployed pose without the Carrier (the folded hull).
   private prepareStructureTemplate(model: THREE.Object3D): THREE.Group {
     model.updateMatrixWorld(true);
-    const bounds = new THREE.Box3().setFromObject(model);
+    const unfold = readUnfold(model);
+    const bounds = unfold ? unfold.bounds : new THREE.Box3().setFromObject(model);
+    let normScale = 1;
     if (!bounds.isEmpty()) {
       const size = new THREE.Vector3();
       bounds.getSize(size);
-      model.scale.multiplyScalar(1 / Math.max(size.x, size.z, 0.0001));
+      normScale = 1 / Math.max(size.x, size.z, 0.0001);
+      model.scale.multiplyScalar(normScale);
       model.updateMatrixWorld(true);
-      const scaled = new THREE.Box3().setFromObject(model);
+      // Fold-out bounds come from readUnfold (no Carrier); scaling about the origin scales them too.
+      const scaled = unfold ? bounds.clone().applyMatrix4(new THREE.Matrix4().makeScale(normScale, normScale, normScale)) : new THREE.Box3().setFromObject(model);
       const centre = new THREE.Vector3();
       scaled.getCenter(centre);
       model.position.x -= centre.x;
@@ -1758,6 +1770,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       model.position.y -= scaled.min.y;
     }
     const root = new THREE.Group();
+    if (unfold) {
+      const data: UnfoldData = { ...unfold.data, normScale };
+      root.userData.unfold = data;
+    }
     root.add(model);
     root.updateMatrixWorld(true);
     return root;
@@ -1850,6 +1866,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         turretHeading: unit.turretHeading,
       };
       const previous = this.previousSnapshots.get(unit.id) ?? current;
+      if (unit.transform) {
+        this.deployingUnits.set(unit.id, { x: unit.x, z: unit.z, heading: unit.heading });
+      }
       const x = lerp(previous.x, current.x, alpha);
       const z = lerp(previous.z, current.z, alpha);
       const heading = lerpAngle(previous.heading, current.heading, alpha);
@@ -1976,8 +1995,14 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       if (!this.structureSeen.has(structure.id)) {
         this.structureSeen.add(structure.id);
         // Anything already there on the first frame was placed with the map, not deployed.
+        const start = this.frame > 1 ? this.foldStart(structure, type, visual) : null;
+        if (start) {
+          this.structureFolding.set(structure.id, { born: performance.now(), start });
+        }
         if (this.frame > 1) {
-          this.structureBorn.set(structure.id, performance.now());
+          if (!start) {
+            this.structureBorn.set(structure.id, performance.now());
+          }
           const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize;
           this.effects.deploy(
             structure.x,
@@ -1988,7 +2013,25 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           );
         }
       }
-      this.animateUnfold(structure.id, visual);
+      const folding = this.structureFolding.get(structure.id);
+      const unfoldData = visual.model?.userData.unfold as UnfoldData | undefined;
+      const inner = visual.model?.children[0];
+      const packWork = structure.work?.kind === 'pack' ? structure.work : null;
+      if (packWork && unfoldData && inner && type.packSec > 0) {
+        // Packing up plays the fold-out backwards, ending on the packed unit (which faces east).
+        const start = this.foldStart(structure, type, visual);
+        if (start) {
+          applyUnfold(inner, unfoldData, packWork.left / type.packSec, { ...start, yaw: 0 }, -structure.turretHeading);
+          this.structureFolding.set(structure.id, { born: Number.NEGATIVE_INFINITY, start });
+        }
+      } else if (folding && unfoldData && inner) {
+        const t = (performance.now() - folding.born) / TOWER_UNFOLD_MS;
+        if (applyUnfold(inner, unfoldData, t, folding.start, -structure.turretHeading)) {
+          this.structureFolding.delete(structure.id);
+        }
+      } else {
+        this.animateUnfold(structure.id, visual);
+      }
       visual.mesh.position.set(
         structure.x,
         heightAt(world.map, structure.x, structure.z) + visual.height / 2,
@@ -2004,7 +2047,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       for (const entry of visual.modelColors) {
         entry.material.color.copy(entry.base).multiplyScalar(shade);
       }
-      if (visual.modelPivot) {
+      if (visual.modelPivot && !this.structureFolding.has(structure.id)) {
         // Model weapons point along +X, like the units: same heading convention as unit turrets.
         visual.modelPivot.rotation.y = -structure.turretHeading;
       }
@@ -2013,15 +2056,51 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         pivot.rotation.y = structure.turretHeading;
       }
       const packing = structure.work?.kind === 'pack' || structure.work?.kind === 'dismantle';
-      visual.mesh.scale.y = packing ? 0.7 : 1;
+      visual.mesh.scale.y = packing && !unfoldData ? 0.7 : 1;
     }
     this.syncRubble(world);
     for (const [id, visual] of this.structureVisuals) {
       if (!alive.has(id)) {
         this.disposeStructureVisual(visual);
         this.structureVisuals.delete(id);
+        this.structureFolding.delete(id);
       }
     }
+    for (const id of this.deployingUnits.keys()) {
+      if (!world.units.some((unit) => unit.id === id && unit.transform)) {
+        this.deployingUnits.delete(id);
+      }
+    }
+  }
+
+  /**
+   * Where a fold-out tower starts: the size and facing of the packed unit it came from. Null when
+   * the model has no fold data or the packed unit's model is not loaded (the plain rise plays).
+   */
+  private foldStart(
+    structure: { x: number; z: number },
+    type: SimStructureType,
+    visual: StructureVisual,
+  ): UnfoldStart | null {
+    if (!visual.model?.userData.unfold || !type.packedUnitId) {
+      return null;
+    }
+    const unitType = this.world.unitTypes.get(type.packedUnitId);
+    const unitModel = unitType?.modelId ? this.templates.get(unitType.modelId)?.children[0] : undefined;
+    if (!unitType || !unitModel || visual.modelScale <= 0) {
+      return null;
+    }
+    let heading = 0;
+    for (const entry of this.deployingUnits.values()) {
+      if (Math.abs(entry.x - structure.x) < 0.05 && Math.abs(entry.z - structure.z) < 0.05) {
+        heading = entry.heading;
+        break;
+      }
+    }
+    return {
+      packedScale: (unitModel.scale.x * (unitType.visualScale ?? 1)) / visual.modelScale,
+      yaw: -heading,
+    };
   }
 
   private readonly rubbleMeshes: THREE.Mesh[] = [];

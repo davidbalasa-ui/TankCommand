@@ -42,6 +42,7 @@ interface PreviousUnit {
   hp: number;
   x: number;
   z: number;
+  deploying?: boolean;
 }
 
 interface PreviousStructure extends PreviousUnit {
@@ -129,7 +130,7 @@ export class AlertCenter {
     const current = new Map<number, PreviousUnit>();
     for (const unit of world.units) {
       if (unit.owner === 1) {
-        current.set(unit.id, { hp: unit.hp, x: unit.x, z: unit.z });
+        current.set(unit.id, { hp: unit.hp, x: unit.x, z: unit.z, deploying: unit.transform !== null });
       }
     }
 
@@ -144,7 +145,8 @@ export class AlertCenter {
         }
       }
       for (const [id, previous] of this.previous) {
-        if (!current.has(id)) {
+        // A unit that was unfolding into a tower became that tower; it was not lost.
+        if (!current.has(id) && !previous.deploying) {
           this.raiseAlert('unitLost', previous.x, previous.z);
         }
       }
@@ -285,7 +287,7 @@ export class AlertCenter {
     this.previous.clear();
     for (const unit of world.units) {
       if (unit.owner === 1) {
-        this.previous.set(unit.id, { hp: unit.hp, x: unit.x, z: unit.z });
+        this.previous.set(unit.id, { hp: unit.hp, x: unit.x, z: unit.z, deploying: unit.transform !== null });
       }
     }
   }

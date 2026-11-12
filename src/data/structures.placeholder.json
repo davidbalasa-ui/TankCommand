@@ -104,8 +104,8 @@
     "deliverySec": 10,
     "hp": 400,
     "footprint": {
-      "cellsX": 1,
-      "cellsZ": 1
+      "cellsX": 2,
+      "cellsZ": 2
     },
     "sightRange": 14,
     "modelId": "structure.human.turret",
@@ -193,8 +193,8 @@
     "deliverySec": 10,
     "hp": 400,
     "footprint": {
-      "cellsX": 1,
-      "cellsZ": 1
+      "cellsX": 2,
+      "cellsZ": 2
     },
     "sightRange": 14,
     "modelId": "structure.alien.turret",
@@ -330,8 +330,8 @@
     "deliverySec": 12,
     "hp": 350,
     "footprint": {
-      "cellsX": 1,
-      "cellsZ": 1
+      "cellsX": 2,
+      "cellsZ": 2
     },
     "sightRange": 14,
     "modelId": "structure.human.missile_battery",
@@ -373,8 +373,8 @@
     "deliverySec": 12,
     "hp": 350,
     "footprint": {
-      "cellsX": 1,
-      "cellsZ": 1
+      "cellsX": 2,
+      "cellsZ": 2
     },
     "sightRange": 14,
     "modelId": "structure.alien.missile_battery",
