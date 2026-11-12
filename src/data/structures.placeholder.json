@@ -26,8 +26,8 @@
     "faction": "human",
     "kind": "metalStation",
     "cost": {
-      "ore": 200,
-      "metal": 50
+      "ore": 250,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 600,
@@ -71,8 +71,8 @@
     "faction": "alien",
     "kind": "metalStation",
     "cost": {
-      "ore": 200,
-      "metal": 50
+      "ore": 250,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 600,
@@ -98,8 +98,8 @@
     "name": "Bastion Gun",
     "kind": "turret",
     "cost": {
-      "ore": 150,
-      "metal": 40
+      "ore": 190,
+      "metal": 0
     },
     "deliverySec": 10,
     "hp": 400,
@@ -140,8 +140,8 @@
     "name": "Radar Tower",
     "kind": "radar",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 160,
+      "metal": 0
     },
     "deliverySec": 8,
     "hp": 250,
@@ -164,8 +164,8 @@
     "name": "Research Lab",
     "kind": "lab",
     "cost": {
-      "ore": 250,
-      "metal": 50
+      "ore": 300,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 500,
@@ -187,8 +187,8 @@
     "name": "Thornmound",
     "kind": "turret",
     "cost": {
-      "ore": 150,
-      "metal": 40
+      "ore": 190,
+      "metal": 0
     },
     "deliverySec": 10,
     "hp": 400,
@@ -229,8 +229,8 @@
     "name": "Seer Spire",
     "kind": "radar",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 160,
+      "metal": 0
     },
     "deliverySec": 8,
     "hp": 250,
@@ -253,8 +253,8 @@
     "name": "Gene Vault",
     "kind": "lab",
     "cost": {
-      "ore": 250,
-      "metal": 50
+      "ore": 300,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 500,
@@ -276,8 +276,8 @@
     "name": "Airfield",
     "kind": "airBase",
     "cost": {
-      "ore": 250,
-      "metal": 60
+      "ore": 310,
+      "metal": 0
     },
     "deliverySec": 14,
     "hp": 500,
@@ -300,8 +300,8 @@
     "name": "Hive Roost",
     "kind": "airBase",
     "cost": {
-      "ore": 250,
-      "metal": 60
+      "ore": 310,
+      "metal": 0
     },
     "deliverySec": 14,
     "hp": 500,
@@ -324,8 +324,8 @@
     "name": "Spire Missile Battery",
     "kind": "turret",
     "cost": {
-      "ore": 180,
-      "metal": 70
+      "ore": 250,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 350,
@@ -367,8 +367,8 @@
     "name": "Spore Tower",
     "kind": "turret",
     "cost": {
-      "ore": 180,
-      "metal": 70
+      "ore": 250,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 350,

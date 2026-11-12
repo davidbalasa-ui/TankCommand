@@ -1,9 +1,9 @@
 // Map dressing: the ore and metal site models, and scattered rocks, cliff chunks and plants.
 //
-// Everything here is decoration drawn from the map seed; none of it touches the sim. Big rocks and
-// cliff chunks sit only on ground too steep to drive, so they show where tanks cannot go. Open
-// ground gets low clutter (grass, bushes, small stones, dead trees, alien fronds) that units simply
-// drive over. Props are hidden round deposits and under structures, and the set is rebuilt when
+// Everything here is decoration drawn from the map seed; none of it touches the sim. Anything solid
+// (rocks, cliff chunks, slabs, dead trees, alien fronds) sits only on ground too steep to drive, and
+// only where the whole prop stays on that ground, so a tank never drives through one. Drivable
+// ground gets only soft, low clutter (grass, small bushes) that units can roll over. Props are hidden round deposits and under structures, and the set is rebuilt when
 // structures appear or go.
 //
 // Each prop model is one mesh with one material, so each prop kind is a single InstancedMesh.
@@ -86,6 +86,20 @@ export function addFogHook(material: THREE.Material, fog: FogUniforms, instanced
   material.customProgramCacheKey = () => (instanced ? 'tcFogInst' : 'tcFog');
 }
 
+/** Rough radius of a solid prop at scale 1, in metres. */
+const PROP_FOOTPRINT = 1.6;
+
+/** True when the ground all round (x, z) out to radius r is too steep to drive. */
+function footprintUndrivable(map: MapDef, x: number, z: number, r: number): boolean {
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (i / 8) * Math.PI * 2;
+    if (slopeAt(map, x + Math.cos(angle) * r, z + Math.sin(angle) * r) <= MAX_SLOPE) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Where the props go: fixed for a map, so a replay or reload looks the same. */
 export function scatterProps(map: MapDef): Placement[] {
   const out: Placement[] = [];
@@ -115,43 +129,47 @@ export function scatterProps(map: MapDef): Placement[] {
       const size = hash(cx, cz, map.seed, 5);
       const slope = slopeAt(map, x, z);
       if (slope > MAX_SLOPE) {
-        // Steep ground: crags and boulders, dense enough to read as a rocky face.
+        // Steep ground: crags and boulders, dense enough to read as a rocky face, plus the odd
+        // dead tree or frond. Only where the prop's whole footprint is undrivable.
+        let prop: PropId | null = null;
+        let scale = 1;
+        let sink = 0;
         if (r < 0.26) {
-          place('prop.nature.cliff', x, z, 0.55 + size * 0.5, yaw, 0.35);
+          prop = 'prop.nature.cliff';
+          scale = 0.55 + size * 0.5;
+          sink = 0.35;
         } else if (r < 0.46) {
-          place('prop.nature.boulder', x, z, 0.7 + size * 0.7, yaw, 0.25);
+          prop = 'prop.nature.boulder';
+          scale = 0.7 + size * 0.7;
+          sink = 0.25;
         } else if (r < 0.58) {
-          place('prop.nature.rock_cluster', x, z, 0.6 + size * 0.5, yaw, 0.15);
+          prop = 'prop.nature.rock_cluster';
+          scale = 0.6 + size * 0.5;
+          sink = 0.15;
+        } else if (r < 0.63) {
+          prop = 'prop.nature.slab';
+          scale = 0.4 + size * 0.3;
+          sink = 0.15;
+        } else if (r < 0.66) {
+          prop = 'prop.nature.dead_tree';
+          scale = 0.7 + size * 0.5;
+        } else if (r < 0.69) {
+          prop = 'prop.nature.tendril';
+          scale = 0.7 + size * 0.5;
+        }
+        if (prop && footprintUndrivable(map, x, z, PROP_FOOTPRINT * scale)) {
+          place(prop, x, z, scale, yaw, sink);
         }
         continue;
       }
-      if (slope > MAX_SLOPE * 0.6) {
-        // Hillside: loose stones and the odd boulder at the foot of steep ground.
-        if (r < 0.05) {
-          place('prop.nature.rock_cluster', x, z, 0.4 + size * 0.4, yaw, 0.1);
-        } else if (r < 0.08) {
-          place('prop.nature.slab', x, z, 0.4 + size * 0.3, yaw, 0.15);
-        } else if (r < 0.11) {
-          place('prop.nature.grass', x, z, 0.9 + size * 0.6, yaw, 0);
-        }
-        continue;
-      }
-      // Open ground: sparse low clutter, a little thicker in patches.
+      // Drivable ground (open and hillside): only soft clutter units can roll over.
       const patch = hash(cx >> 3, cz >> 3, map.seed, 6);
-      const density = 0.4 + patch * 1.2;
+      const density = (0.4 + patch * 1.2) * (slope > MAX_SLOPE * 0.6 ? 0.5 : 1);
       const t = r / density;
-      if (t < 0.045) {
+      if (t < 0.05) {
         place('prop.nature.grass', x, z, 0.9 + size * 0.8, yaw, 0);
-      } else if (t < 0.058) {
-        place('prop.nature.shrub', x, z, 0.6 + size * 0.6, yaw, 0.05);
       } else if (t < 0.064) {
-        place('prop.nature.slab', x, z, 0.3 + size * 0.3, yaw, 0.15);
-      } else if (t < 0.069) {
-        place('prop.nature.rock_cluster', x, z, 0.3 + size * 0.3, yaw, 0.1);
-      } else if (t < 0.072) {
-        place('prop.nature.dead_tree', x, z, 0.7 + size * 0.5, yaw, 0);
-      } else if (t < 0.075) {
-        place('prop.nature.tendril', x, z, 0.7 + size * 0.5, yaw, 0);
+        place('prop.nature.shrub', x, z, 0.5 + size * 0.4, yaw, 0.05);
       }
     }
   }

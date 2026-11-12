@@ -42,6 +42,35 @@ export interface MapDef {
   waterLevel: number | null;
   // Which kind of unit this view of the map is for. Tracked when absent.
   movement?: MovementClass;
+  // Buildings (and sites) as solid shapes; only on per-tick views made by obstacles.ts, never on
+  // the world's own map.
+  obstacles?: MapObstacles;
+}
+
+/** An axis-aligned box (half sizes hx, hz) or, when round, a circle of radius hx. */
+export interface ObstacleShape {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+  round: boolean;
+}
+
+export interface MapObstacles {
+  shapes: ObstacleShape[];
+  /** 1 where a cell centre is inside a shape, row-major (cz * cols + cx). */
+  cells: Uint8Array;
+}
+
+function inObstacle(obstacles: MapObstacles, x: number, z: number): boolean {
+  for (const shape of obstacles.shapes) {
+    const dx = x - shape.x;
+    const dz = z - shape.z;
+    if (shape.round ? dx * dx + dz * dz < shape.hx * shape.hx : Math.abs(dx) < shape.hx && Math.abs(dz) < shape.hz) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // The same terrain seen by a unit of another movement class.
@@ -282,10 +311,31 @@ export function isBlockedAt(map: MapDef, x: number, z: number): boolean {
   if (movement === 'air') {
     return false;
   }
+  if (map.obstacles && inObstacle(map.obstacles, x, z)) {
+    return true;
+  }
   if (movement === 'tracked' && isWaterAt(map, x, z)) {
     return true;
   }
   return slopeAt(map, x, z) > MAX_SLOPE;
+}
+
+// Terrain never changes during a match, so each map's blocked cells are worked out once per
+// movement class (0 = unknown, 1 = open, 2 = blocked) and kept with its height array.
+const terrainCellCache = new WeakMap<Float32Array, Map<MovementClass, Uint8Array>>();
+
+function terrainCells(map: MapDef, movement: MovementClass): Uint8Array {
+  let byMovement = terrainCellCache.get(map.heights);
+  if (!byMovement) {
+    byMovement = new Map();
+    terrainCellCache.set(map.heights, byMovement);
+  }
+  let cells = byMovement.get(movement);
+  if (!cells || cells.length !== map.cols * map.rows) {
+    cells = new Uint8Array(map.cols * map.rows);
+    byMovement.set(movement, cells);
+  }
+  return cells;
 }
 
 export function isBlockedCell(map: MapDef, cx: number, cz: number): boolean {
@@ -296,6 +346,21 @@ export function isBlockedCell(map: MapDef, cx: number, cz: number): boolean {
   if (movement === 'air') {
     return false;
   }
+  const index = cz * map.cols + cx;
+  if (map.obstacles && map.obstacles.cells[index] === 1) {
+    return true;
+  }
+  const cache = terrainCells(map, movement);
+  const known = cache[index];
+  if (known !== undefined && known !== 0) {
+    return known === 2;
+  }
+  const blocked = terrainCellBlocked(map, movement, cx, cz);
+  cache[index] = blocked ? 2 : 1;
+  return blocked;
+}
+
+function terrainCellBlocked(map: MapDef, movement: MovementClass, cx: number, cz: number): boolean {
   const h00 = heightAtVertex(map, cx, cz);
   const h10 = heightAtVertex(map, cx + 1, cz);
   const h01 = heightAtVertex(map, cx, cz + 1);

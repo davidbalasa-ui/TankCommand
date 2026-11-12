@@ -63,7 +63,9 @@ export const PLACEMENT_CLEARANCE = 0.25; // placeholder until Stage 0
 export const PLACEMENT_SAMPLE_STEPS = 3; // placeholder until Stage 0
 export const ALERT_TTL_SEC = 6; // placeholder until Stage 0
 export const DROP_BEAM_TTL_SEC = 1; // placeholder until Stage 0
-export const SKIRMISH_ORE = 500; // placeholder until Stage 0
+// Units and buildings cost ore only (metal pays for research), so the start gets the old
+// metal's worth in ore on top: 500 + 100.
+export const SKIRMISH_ORE = 600; // placeholder until Stage 0
 export const SKIRMISH_METAL = 100; // placeholder until Stage 0
 
 export const SKIRMISH_TANK_OFFSETS: ReadonlyArray<{ x: number; z: number }> = [

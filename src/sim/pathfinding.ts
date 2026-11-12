@@ -153,26 +153,64 @@ function nearestOpenCell(map: MapDef, start: Cell): Cell | null {
   return null;
 }
 
+// Connected areas of open cells, labelled once per map view. Obstacle views are rebuilt each
+// tick (obstacles.ts), so every path planned in the same tick shares one labelling instead of
+// flood-filling the whole map per path. Diagonal steps follow the same corner rule as A*, so two
+// cells share a label exactly when a path between them exists.
+const componentCache = new WeakMap<MapDef, Int32Array>();
+
+function componentLabels(map: MapDef): Int32Array {
+  const cached = componentCache.get(map);
+  if (cached) {
+    return cached;
+  }
+  const total = map.cols * map.rows;
+  const labels = new Int32Array(total);
+  const queue = new Int32Array(total);
+  let next = 0;
+  for (let seed = 0; seed < total; seed += 1) {
+    if (labels[seed] !== 0) {
+      continue;
+    }
+    const seedCell = cellOfKey(map, seed);
+    if (isBlockedCell(map, seedCell.cx, seedCell.cz)) {
+      labels[seed] = -1;
+      continue;
+    }
+    next += 1;
+    labels[seed] = next;
+    let head = 0;
+    let tail = 0;
+    queue[tail] = seed;
+    tail += 1;
+    while (head < tail) {
+      const key = queue[head] ?? 0;
+      head += 1;
+      for (const item of neighbors(map, cellOfKey(map, key))) {
+        const neighbourKey = keyOf(map, item.cell.cx, item.cell.cz);
+        if (labels[neighbourKey] !== 0) {
+          continue;
+        }
+        labels[neighbourKey] = next;
+        queue[tail] = neighbourKey;
+        tail += 1;
+      }
+    }
+  }
+  componentCache.set(map, labels);
+  return labels;
+}
+
 function reachableFrom(map: MapDef, start: Cell): Uint8Array {
   const reachable = new Uint8Array(map.cols * map.rows);
-  const startKey = keyOf(map, start.cx, start.cz);
   if (isBlockedCell(map, start.cx, start.cz)) {
     return reachable;
   }
-  const queue: Cell[] = [start];
-  reachable[startKey] = 1;
-  for (let index = 0; index < queue.length; index += 1) {
-    const current = queue[index];
-    if (!current) {
-      continue;
-    }
-    for (const item of neighbors(map, current)) {
-      const key = keyOf(map, item.cell.cx, item.cell.cz);
-      if (reachable[key] === 1) {
-        continue;
-      }
+  const labels = componentLabels(map);
+  const label = labels[keyOf(map, start.cx, start.cz)];
+  for (let key = 0; key < labels.length; key += 1) {
+    if (labels[key] === label) {
       reachable[key] = 1;
-      queue.push(item.cell);
     }
   }
   return reachable;
@@ -207,11 +245,20 @@ function nearestReachableCell(
     if (depth >= maxRadius) {
       continue;
     }
-    for (const neighbour of neighbors(map, cell)) {
-      const key = keyOf(map, neighbour.cell.cx, neighbour.cell.cz);
-      if (!seen.has(key)) {
-        seen.add(key);
-        queue.push({ cell: neighbour.cell, depth: depth + 1 });
+    // Spread over every cell, blocked or not: the target itself is often inside a building or
+    // a cliff, and the nearest open cell can be several blocked cells away.
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const cx = cell.cx + dx;
+        const cz = cell.cz + dz;
+        if ((dx === 0 && dz === 0) || cx < 0 || cz < 0 || cx >= map.cols || cz >= map.rows) {
+          continue;
+        }
+        const key = keyOf(map, cx, cz);
+        if (!seen.has(key)) {
+          seen.add(key);
+          queue.push({ cell: { cx, cz }, depth: depth + 1 });
+        }
       }
     }
   }

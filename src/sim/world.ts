@@ -12,6 +12,7 @@ import {
 } from './map';
 import { followPath, unitMap } from './motion';
 import { separateUnits } from './avoidance';
+import { obstacleMap, pushOutOfObstacles } from './obstacles';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
 import { findPath } from './pathfinding';
 import {
@@ -561,7 +562,8 @@ function canStand(world: WorldState, x: number, z: number): boolean {
   if (z < -half + UNIT_RADIUS || z > half - UNIT_RADIUS) {
     return false;
   }
-  return !isBlockedAt(world.map, x, z);
+  // Separation never shoves a unit into a building.
+  return !isBlockedAt(obstacleMap(world, 'tracked', false), x, z);
 }
 
 function unitLineOfSightAt(world: WorldState, unit: UnitState, x: number, z: number): boolean {
@@ -1136,6 +1138,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
   }
 
   separateUnits(world, (x, z) => canStand(world, x, z));
+  pushOutOfObstacles(world);
   updateStuckUnits(world, startPositions);
 }
 

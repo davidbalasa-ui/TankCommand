@@ -10,14 +10,14 @@
       "player": 1,
       "faction": "human",
       "controller": "human",
-      "ore": 600,
+      "ore": 900,
       "metal": 300
     },
     {
       "player": 2,
       "faction": "alien",
       "controller": "ai",
-      "ore": 300,
+      "ore": 200,
       "metal": 50,
       "difficulty": "easy"
     }

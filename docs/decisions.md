@@ -105,3 +105,11 @@ David: buttons that can't be used right now should not be on screen; Build shoul
 ## 2026-11-12 Landscape lock
 
 David asked to lock the phone sideways. Browser: on a touch phone a match requests full screen plus `screen.orientation.lock('landscape')` (only allowed in full screen); the in-game "turn sideways" overlay keeps a manual button. Android app: set `android:screenOrientation="sensorLandscape"` on the main activity when the Capacitor Android project is created.
+
+## 2026-11-12 Ore buys, metal researches
+
+David: two resources for everything is too complicated and can leave a player unable to buy anything. Units and structures now cost ore only (each item's old metal price was added to its ore price). Metal stays as a second material that pays only for research and upgrades. Skirmish start ore is 600 (old 500 plus the 100 metal's worth); mission start ore likewise includes the old metal value (enemy side kept small).
+
+## 2026-11-12 Solid buildings and smoother driving
+
+David reported clipping and rough vehicle movement. Buildings (except landing pads, which units land on) are now solid: pathfinding, steering and the step check use a per-tick map view with building footprints inflated by half a hull (src/sim/obstacles.ts). Ore and metal sites are solid for fighting units; workers still drive in to mine. Units caught inside a new building slide out. Solid scenery (rocks, cliffs, dead trees, fronds) is only placed where its whole footprint is undrivable. Tracked vehicles pivot in place for turns sharper than 75° off their route; rendered headings blend the short way round; hulls tilt with the ground. Path planning labels connected areas once per map view and caches terrain cells, so the sim is faster than before despite the obstacle checks.

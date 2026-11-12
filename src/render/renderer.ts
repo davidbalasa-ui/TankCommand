@@ -202,6 +202,11 @@ interface UnitVisual {
   turretPivot: THREE.Object3D | null;
   owner: number;
   lift: number;
+  /** Smoothed nose-up pitch and side roll from the ground under the unit (radians). */
+  pitch: number;
+  roll: number;
+  /** Half the hull length, used to sample the ground in front of and behind the unit. */
+  reach: number;
   /** Instancing batch: model and look shared by every unit drawn in the same InstancedMesh. */
   batchKey: string;
 }
@@ -253,6 +258,18 @@ function structureHeight(kind: string): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Shortest-way blend between two angles, so a heading crossing ±π never spins a full turn. */
+function lerpAngle(a: number, b: number, t: number): number {
+  let diff = b - a;
+  while (diff > Math.PI) {
+    diff -= Math.PI * 2;
+  }
+  while (diff < -Math.PI) {
+    diff += Math.PI * 2;
+  }
+  return a + diff * t;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -1803,6 +1820,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       turretPivot: root.getObjectByName('TurretPivot') ?? null,
       owner: unit.owner,
       lift: 0,
+      pitch: 0,
+      roll: 0,
+      reach: Math.max(0.6, (this.world.unitTypes.get(unit.typeId)?.radius ?? 1.6) * 0.75),
       batchKey: `${template ? unit.typeId : 'fallback'}|${enemy ? 'enemy' : 'own'}`,
     };
   }
@@ -1832,16 +1852,37 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       const previous = this.previousSnapshots.get(unit.id) ?? current;
       const x = lerp(previous.x, current.x, alpha);
       const z = lerp(previous.z, current.z, alpha);
-      const heading = lerp(previous.heading, current.heading, alpha);
-      const turretHeading = lerp(previous.turretHeading, current.turretHeading, alpha);
+      const heading = lerpAngle(previous.heading, current.heading, alpha);
+      const turretHeading = lerpAngle(previous.turretHeading, current.turretHeading, alpha);
       const airType = unit.air ? this.world.unitTypes.get(unit.typeId)?.air : null;
       const wantLift =
         unit.air && (unit.air.mode === 'flying' || unit.air.mode === 'returning')
           ? (airType?.cruiseHeight ?? 6)
           : 0;
       visual.lift += (wantLift - visual.lift) * 0.08;
-      visual.root.position.set(x, heightAt(this.world.map, x, z) + visual.lift, z);
-      visual.root.rotation.y = -heading;
+      const map = this.world.map;
+      const ground = heightAt(map, x, z);
+      // Sit the hull on the slope: pitch from the ground ahead and behind, roll from either side.
+      let wantPitch = 0;
+      let wantRoll = 0;
+      if (visual.lift < 0.3) {
+        const r = visual.reach;
+        const fx = Math.cos(heading) * r;
+        const fz = Math.sin(heading) * r;
+        const front = heightAt(map, x + fx, z + fz);
+        const back = heightAt(map, x - fx, z - fz);
+        // Local +Z of the model is world (-sin h, cos h).
+        const side = heightAt(map, x - fz, z + fx);
+        const otherSide = heightAt(map, x + fz, z - fx);
+        wantPitch = Math.atan2(front - back, 2 * r);
+        wantRoll = -Math.atan2(side - otherSide, 2 * r);
+      }
+      visual.pitch += (wantPitch - visual.pitch) * 0.25;
+      visual.roll += (wantRoll - visual.roll) * 0.25;
+      // The middle of the hull follows the average of the four samples' plane, which the centre
+      // height already approximates; lift keeps aircraft above it.
+      visual.root.position.set(x, ground + visual.lift, z);
+      visual.root.rotation.set(visual.roll, -heading, visual.pitch, 'YZX');
       if (visual.turretPivot) {
         visual.turretPivot.rotation.y = heading - turretHeading;
       }

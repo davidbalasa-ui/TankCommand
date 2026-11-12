@@ -6,8 +6,8 @@
     "role": "tank",
     "techLevel": 1,
     "cost": {
-      "ore": 100,
-      "metal": 50
+      "ore": 150,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 220,
@@ -179,8 +179,8 @@
     "role": "tank",
     "techLevel": 1,
     "cost": {
-      "ore": 100,
-      "metal": 50
+      "ore": 150,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 220,
@@ -352,8 +352,8 @@
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 160,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 120,
@@ -431,8 +431,8 @@
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 160,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 120,
@@ -510,8 +510,8 @@
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 60
+      "ore": 180,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 100,
@@ -546,8 +546,8 @@
     "role": "support",
     "techLevel": 2,
     "cost": {
-      "ore": 120,
-      "metal": 60
+      "ore": 180,
+      "metal": 0
     },
     "deliverySec": 12,
     "hp": 100,
@@ -582,8 +582,8 @@
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 140,
-      "metal": 60
+      "ore": 200,
+      "metal": 0
     },
     "deliverySec": 13,
     "hp": 180,
@@ -632,8 +632,8 @@
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 180,
-      "metal": 100
+      "ore": 280,
+      "metal": 0
     },
     "deliverySec": 15,
     "hp": 90,
@@ -688,8 +688,8 @@
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 220,
-      "metal": 120
+      "ore": 340,
+      "metal": 0
     },
     "deliverySec": 18,
     "hp": 130,
@@ -744,8 +744,8 @@
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 140,
-      "metal": 60
+      "ore": 200,
+      "metal": 0
     },
     "deliverySec": 13,
     "hp": 180,
@@ -794,8 +794,8 @@
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 320,
-      "metal": 200
+      "ore": 520,
+      "metal": 0
     },
     "deliverySec": 24,
     "hp": 260,
@@ -850,8 +850,8 @@
     "role": "air",
     "techLevel": 2,
     "cost": {
-      "ore": 180,
-      "metal": 100
+      "ore": 280,
+      "metal": 0
     },
     "deliverySec": 15,
     "hp": 90,
@@ -906,8 +906,8 @@
     "role": "tank",
     "techLevel": 3,
     "cost": {
-      "ore": 220,
-      "metal": 120
+      "ore": 340,
+      "metal": 0
     },
     "deliverySec": 20,
     "hp": 520,
@@ -955,8 +955,8 @@
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 140,
-      "metal": 80
+      "ore": 220,
+      "metal": 0
     },
     "deliverySec": 14,
     "hp": 150,
@@ -1005,8 +1005,8 @@
     "role": "artillery",
     "techLevel": 3,
     "cost": {
-      "ore": 260,
-      "metal": 160
+      "ore": 420,
+      "metal": 0
     },
     "deliverySec": 22,
     "hp": 140,
@@ -1093,8 +1093,8 @@
     "role": "tank",
     "techLevel": 3,
     "cost": {
-      "ore": 220,
-      "metal": 120
+      "ore": 340,
+      "metal": 0
     },
     "deliverySec": 20,
     "hp": 520,
@@ -1142,8 +1142,8 @@
     "role": "tank",
     "techLevel": 2,
     "cost": {
-      "ore": 140,
-      "metal": 80
+      "ore": 220,
+      "metal": 0
     },
     "deliverySec": 14,
     "hp": 150,
@@ -1192,8 +1192,8 @@
     "role": "artillery",
     "techLevel": 3,
     "cost": {
-      "ore": 260,
-      "metal": 160
+      "ore": 420,
+      "metal": 0
     },
     "deliverySec": 22,
     "hp": 140,

@@ -296,6 +296,15 @@ describe('placeholder missions', () => {
       const tankId = row.sides[0]?.faction === 'human' ? 'unit.human.light_tank' : 'unit.alien.light_tank';
       const pad = w.structures.find((s) => s.owner === 1);
       const limit = (row.timeLimitSec ?? 1500) * SEC;
+      // Put the miner to work, as a player would: with units costing ore only, the enemy AI is
+      // no longer held back by metal, so the attack needs the ore income to keep up.
+      const miner = w.units.find((u) => u.owner === 1 && u.typeId.endsWith('ore_miner'));
+      const near = (d: { x: number; z: number }): number =>
+        Math.hypot(d.x - (miner?.x ?? 0), d.z - (miner?.z ?? 0));
+      const ore = w.deposits.filter((d) => d.kind === 'ore').sort((a, b) => near(a) - near(b))[0];
+      if (miner && ore) {
+        w = stepWithAi(w, [{ kind: 'mine', issuer: 1, tick: w.tick + 1, unitIds: [miner.id], depositId: ore.id }]);
+      }
       while (!w.result && w.tick < limit) {
         const commands: Command[] = [];
         if (w.tick % 100 === 1) {
@@ -312,7 +321,10 @@ describe('placeholder missions', () => {
             commands.push({ kind: 'attackMove', issuer: 1, tick: w.tick + 1, unitIds: army, x: -45, z: -45 });
           }
           const stats = w.resources.find((r) => r.player === 1);
-          if (pad && stats && stats.ore >= 100 && stats.metal >= 50) {
+          const tankType = w.unitTypes.get(tankId);
+          const ore = tankType?.oreCost ?? 100;
+          const metal = tankType?.metalCost ?? 50;
+          if (pad && stats && stats.ore >= ore && stats.metal >= metal) {
             commands.push({ kind: 'buy', issuer: 1, tick: w.tick + 1, itemId: tankId, padId: pad.id });
           }
         }

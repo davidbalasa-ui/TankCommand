@@ -112,6 +112,7 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
   expect(state.players).toBe(3);
   expect(state.fog).toBe(false);
   expect(state.faction).toBe('alien');
-  expect(state.ore).toBe(1000);
+  // High resources doubles the 600 starting ore (units cost ore only; see docs/decisions.md).
+  expect(state.ore).toBe(1200);
   expect(state.units).toBe(0);
 });

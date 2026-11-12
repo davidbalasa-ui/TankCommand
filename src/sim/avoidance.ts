@@ -17,7 +17,7 @@ const CELL = 8;
 const MAX_RADIUS = UNIT_RADIUS * 1.5;
 const LOOK_BASE = 2;
 const LOOK_SECONDS = 0.8;
-const CLEAR_MARGIN = 0.4;
+const CLEAR_MARGIN = 0.6;
 const YIELD_SPEED = 3; // m/s a parked unit shuffles sideways
 const TICK = 1 / 20;
 

@@ -17,7 +17,8 @@ function setUp(): WorldState {
     world.research.push({ player: 1, done: [...AVIATION] });
   }
   for (const stats of world.resources) {
-    stats.ore = 3000;
+    // Units and buildings cost ore only now; the old 1500 metal's worth moves into ore.
+    stats.ore = 4500;
     stats.metal = 1500;
   }
   const pad = world.structures.find((s) => s.owner === 1);
