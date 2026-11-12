@@ -28,6 +28,8 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | structure.human.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spire Missile Battery (structure) |
 | structure.human.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Radar Tower (structure) |
 | structure.human.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion Gun (structure) |
+| structure.shard.core | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Core (structure) |
+| structure.shard.spire | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Spire (structure) |
 | texture.terrain.detail | TankCommand project (scripted numpy) | ORIGINAL | - | Terrain surface |
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
 | unit.alien.carapace.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |

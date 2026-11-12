@@ -541,7 +541,7 @@
       "id": "structure.alien.missile_battery",
       "kind": "model",
       "path": "assets/models/structures/kesh_spore_tower.glb",
-      "bytes": 907096,
+      "bytes": 876488,
       "faction": "alien",
       "credit": {
         "license": "ORIGINAL",
@@ -1182,6 +1182,32 @@
       "tags": [
         "lod"
       ]
+    },
+    {
+      "id": "structure.shard.core",
+      "kind": "model",
+      "path": "assets/models/structures/shard_core.glb",
+      "bytes": 563484,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Shard Core",
+        "usedFor": "Shard Core (structure)"
+      }
+    },
+    {
+      "id": "structure.shard.spire",
+      "kind": "model",
+      "path": "assets/models/structures/shard_spire.glb",
+      "bytes": 205580,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Shard Spire",
+        "usedFor": "Shard Spire (structure)"
+      }
     }
   ]
 }

@@ -27,7 +27,7 @@ def asset(path, label, size=1024):
 def heart(c, h, r, sides=6):
     """Double-pointed crystal hanging in the air, long point down."""
     return tube((c[0], c[1], c[2] - h * 0.6), (c[0], c[1], c[2] + h * 0.4),
-                [(0, r * 0.03), (0.42, r * 0.8), (0.62, r), (0.8, r * 0.7), (1, r * 0.04)], sides, GEM, sharp=15)
+                [(0, r * 0.03), (0.42, r * 0.8), (0.62, r), (0.8, r * 0.7), (1, r * 0.04)], sides, 'gem_heart', sharp=15)
 
 
 def splinters(c, n, ring_r, h, r, rnd, spin=0.0):
@@ -84,10 +84,10 @@ def shard_spire():
     for k, (h, r, lean) in enumerate(((4.4, 0.42, 9), (3.0, 0.36, 21), (2.3, 0.32, 27))):
         yaw = 120.0 * k + rnd.uniform(-12, 12)
         a = math.radians(yaw)
-        crystal((math.cos(a) * 0.5, math.sin(a) * 0.5, 0.2), h, r, yaw, lean, GEM)
+        crystal((math.cos(a) * 0.5, math.sin(a) * 0.5, 0.2), h, r, yaw, lean, 'gem_shard_s')
     for k in range(3):
         a = math.radians(120.0 * k + 60)
-        cluster((math.cos(a) * 1.35, math.sin(a) * 1.35, 0.05), 2, rnd.uniform(0.6, 0.9), 0.16, GEM, rnd, lean=36)
+        cluster((math.cos(a) * 1.35, math.sin(a) * 1.35, 0.05), 2, rnd.uniform(0.6, 0.9), 0.16, 'gem_shard_s', rnd, lean=36)
     tz = 4.9
     with F.group('Core'):
         heart((0.15, 0, tz), 1.5, 0.4)
