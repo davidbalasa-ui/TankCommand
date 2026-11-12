@@ -132,7 +132,12 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
     return;
   }
   const oreBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
-  await tapUnit(page, tug.id);
+  // The tug drives between the pad and the miner, and software rendering is slow, so a tap can
+  // land just behind it: tap again (at its new position) until it is selected.
+  await expect(async () => {
+    await tapUnit(page, tug.id);
+    expect(await page.evaluate((id) => window.__TC_TEST__?.selection().includes(id) ?? false, tug.id)).toBe(true);
+  }).toPass({ timeout: 20_000 });
   // The salvage button is enabled for *any* selected worker, so a tap that
   // missed the tug would leave the earlier miner selected and still satisfy the
   // enabled check. Verify the tug actually became the selection before
@@ -323,7 +328,7 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
     return;
   }
 
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  // The Place tile sits in the queue strip at the top of the screen.
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))
@@ -366,7 +371,7 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.dropState().kits.length ?? 0))
     .toBe(1);
 
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  // The Place tile sits in the queue strip at the top of the screen.
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
   await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -24, targetZ: -64, distance: 60, yaw: 0 }));
   const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-24, -64) ?? null);

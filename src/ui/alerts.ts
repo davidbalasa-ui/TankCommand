@@ -1,7 +1,6 @@
 import type { CommandOutcome, WorldState } from '../sim/types';
 import { SIM_TICK_HZ } from '../sim/constants';
 import {
-  ALERT_MAX_TOASTS,
   ALERT_RATE_LIMIT_MS,
   ALERT_TOAST_TTL_MS,
   ALERT_TTL_SEC,
@@ -32,6 +31,8 @@ export interface AlertSnapshot {
 export interface AlertCenterOptions {
   host: HTMLElement;
   onJump: (x: number, z: number) => void;
+  /** Where a map point is on screen (null when it is not), for the red edge flash. */
+  locate?: (x: number, z: number) => { x: number; y: number } | null;
   onAlert?: (alert: AlertSnapshot) => void;
   now?: () => number;
   rateLimitMs?: number;
@@ -50,7 +51,26 @@ interface PreviousStructure extends PreviousUnit {
 }
 
 /** Sim alert kinds (src/sim/economy.ts addAlert) that the toast layer shows as-is. */
-const SIM_ALERT_KINDS: ReadonlySet<string> = new Set(['depositEmpty', 'dropArrived']);
+// Drop arrived is not shown any more: the order's tile leaving the queue strip says it.
+const SIM_ALERT_KINDS: ReadonlySet<string> = new Set(['depositEmpty']);
+
+/** How long the alert line's text stays before only its icon is left. */
+export const ALERT_TEXT_MS = 4000;
+/** Alerts of one kind this close together merge into one counted line. */
+export const ALERT_MERGE_MS = 8000;
+
+/** "3 units under attack" for a merged line; null keeps "<message> ×3". */
+function pluralMessage(message: string, count: number): string {
+  const plurals: Record<string, string> = {
+    'Unit under attack': 'units under attack',
+    'Unit lost': 'units lost',
+    'Structure lost': 'structures lost',
+    'Base under attack': 'hits on your base',
+    'Deposit empty': 'deposits empty',
+  };
+  const plural = plurals[message];
+  return plural ? `${count} ${plural}` : `${message} ×${count}`;
+}
 
 function defaultMessage(kind: AlertKind): string {
   switch (kind) {
@@ -88,7 +108,13 @@ export class AlertCenter {
   private lastOutcome: CommandOutcome | null = null;
   private readonly lastRaised = new Map<AlertKind, number>();
   private readonly history: AlertSnapshot[] = [];
-  private readonly visible = new Map<number, { element: HTMLButtonElement; timer: number }>();
+  private readonly line: HTMLButtonElement;
+  private readonly lineText: HTMLSpanElement;
+  private readonly flash: HTMLDivElement;
+  private readonly locate: ((x: number, z: number) => { x: number; y: number } | null) | null;
+  private current: { alert: AlertSnapshot; key: string; count: number; at: number } | null = null;
+  private textTimer: number | null = null;
+  private flashTimer: number | null = null;
   private initialized = false;
   private nextId = 1;
   private enabled = false;
@@ -99,10 +125,33 @@ export class AlertCenter {
     this.now = options.now ?? (() => performance.now());
     this.rateLimitMs = options.rateLimitMs ?? ALERT_RATE_LIMIT_MS;
     this.ttlMs = options.ttlMs ?? ALERT_TOAST_TTL_MS;
+    this.locate = options.locate ?? null;
+    // One line under the resource bar: the newest alert, merged with repeats of its kind. The
+    // text fades after a few seconds; the icon stays, and a tap jumps to the newest alert.
     this.root = document.createElement('div');
     this.root.className = 'alert-toasts';
     this.root.dataset.alertToasts = 'true';
-    options.host.append(this.root);
+    this.line = document.createElement('button');
+    this.line.type = 'button';
+    this.line.className = 'alert-toast';
+    this.line.hidden = true;
+    const glyph = document.createElement('span');
+    glyph.className = 'alert-icon';
+    glyph.textContent = '!';
+    this.lineText = document.createElement('span');
+    this.lineText.className = 'alert-text';
+    this.line.append(glyph, this.lineText);
+    this.line.addEventListener('click', () => {
+      const alert = this.current?.alert;
+      if (alert) {
+        this.onJump(alert.x, alert.z);
+      }
+    });
+    this.root.append(this.line);
+    this.flash = document.createElement('div');
+    this.flash.className = 'alert-edge-flash';
+    this.flash.hidden = true;
+    options.host.append(this.root, this.flash);
     this.setEnabled(false);
   }
 
@@ -117,9 +166,7 @@ export class AlertCenter {
     this.seenSimAlerts.clear();
     this.lastOutcome = world?.lastCommandOutcome ?? null;
     this.initialized = false;
-    for (const id of [...this.visible.keys()]) {
-      this.dismiss(id);
-    }
+    this.clearLine();
     if (world) {
       this.capture(world);
       this.initialized = true;
@@ -245,6 +292,13 @@ export class AlertCenter {
     const at = this.now();
     const last = this.lastRaised.get(kind) ?? Number.NEGATIVE_INFINITY;
     if (at - last < this.rateLimitMs) {
+      // Too soon for a new alert, but the line still counts it.
+      const key = message ?? defaultMessage(kind);
+      if (this.current && this.current.key === key) {
+        this.current.count += 1;
+        this.current.at = at;
+        this.renderLine();
+      }
       return null;
     }
     this.lastRaised.set(kind, at);
@@ -277,10 +331,9 @@ export class AlertCenter {
   }
 
   dispose(): void {
-    for (const id of [...this.visible.keys()]) {
-      this.dismiss(id);
-    }
+    this.clearLine();
     this.root.remove();
+    this.flash.remove();
   }
 
   private capture(world: WorldState): void {
@@ -293,37 +346,90 @@ export class AlertCenter {
   }
 
   private show(alert: AlertSnapshot): void {
-    if (this.visible.size >= ALERT_MAX_TOASTS) {
-      const oldest = [...this.visible.keys()][0];
-      if (oldest !== undefined) {
-        this.dismiss(oldest);
-      }
+    const key = alert.message;
+    if (this.current && this.current.key === key && alert.at - this.current.at < ALERT_MERGE_MS) {
+      this.current.count += 1;
+      this.current.alert = alert;
+      this.current.at = alert.at;
+    } else {
+      this.current = { alert, key, count: 1, at: alert.at };
     }
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'alert-toast';
-    button.dataset.alertId = String(alert.id);
-    button.dataset.alertKind = alert.kind;
-    button.textContent = alert.message;
-    button.addEventListener('click', () => {
-      this.onJump(alert.x, alert.z);
-      this.dismiss(alert.id);
-    });
-    this.root.append(button);
-    const timer = window.setTimeout(() => {
-      this.dismiss(alert.id);
-    }, this.ttlMs);
-    this.visible.set(alert.id, { element: button, timer });
+    this.renderLine();
+    this.edgeFlash(alert);
   }
 
-  private dismiss(id: number): void {
-    const entry = this.visible.get(id);
-    if (!entry) {
+  private renderLine(): void {
+    const current = this.current;
+    if (!current) {
       return;
     }
-    window.clearTimeout(entry.timer);
-    entry.element.remove();
-    this.visible.delete(id);
+    const text = current.count > 1 ? pluralMessage(current.key, current.count) : current.key;
+    this.lineText.textContent = text;
+    this.line.dataset.alertId = String(current.alert.id);
+    this.line.dataset.alertKind = current.alert.kind;
+    this.line.dataset.count = String(current.count);
+    this.line.setAttribute('aria-label', `${text}. Tap to look.`);
+    this.line.hidden = false;
+    this.line.classList.remove('faded');
+    if (this.textTimer !== null) {
+      window.clearTimeout(this.textTimer);
+    }
+    this.textTimer = window.setTimeout(() => {
+      this.textTimer = null;
+      this.line.classList.add('faded');
+    }, Math.min(ALERT_TEXT_MS, this.ttlMs));
+  }
+
+  /** A red glow on the screen edge the trouble is past, when it is off screen. */
+  private edgeFlash(alert: AlertSnapshot): void {
+    if (alert.kind === 'notEnoughResources' || alert.kind === 'researchDone') {
+      return;
+    }
+    const point = this.locate?.(alert.x, alert.z) ?? null;
+    if (!point) {
+      return;
+    }
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    let side: 'left' | 'right' | 'top' | 'bottom' | null = null;
+    if (point.x < 0) {
+      side = 'left';
+    } else if (point.x > width) {
+      side = 'right';
+    } else if (point.y < 0) {
+      side = 'top';
+    } else if (point.y > height) {
+      side = 'bottom';
+    }
+    if (!side) {
+      return;
+    }
+    this.flash.dataset.side = side;
+    this.flash.hidden = false;
+    this.flash.classList.remove('on');
+    void this.flash.offsetWidth;
+    this.flash.classList.add('on');
+    if (this.flashTimer !== null) {
+      window.clearTimeout(this.flashTimer);
+    }
+    this.flashTimer = window.setTimeout(() => {
+      this.flashTimer = null;
+      this.flash.hidden = true;
+      this.flash.classList.remove('on');
+    }, 1200);
+  }
+
+  private clearLine(): void {
+    if (this.textTimer !== null) {
+      window.clearTimeout(this.textTimer);
+      this.textTimer = null;
+    }
+    if (this.flashTimer !== null) {
+      window.clearTimeout(this.flashTimer);
+      this.flashTimer = null;
+    }
+    this.current = null;
+    this.line.hidden = true;
+    this.flash.hidden = true;
   }
 }

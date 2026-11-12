@@ -779,11 +779,14 @@ test('[PLAY-02] drag-select then right-click a visible ground point moves every 
   await page.mouse.move(maxX + 18, maxY + 18, { steps: 8 });
   await page.mouse.up();
 
+  // A box that catches tanks leaves the miner and hauler out (overhaul step 3).
+  const tanks = own.filter((unit) => !unit.workerKind).map((unit) => unit.id).sort((a, b) => a - b);
+  expect(tanks.length).toBeGreaterThan(0);
   await expect
-    .poll(async () => (await page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).length)
-    .toBe(4);
+    .poll(async () => (await page.evaluate(() => window.__TC_TEST__?.selection() ?? [])).slice().sort((a, b) => a - b))
+    .toEqual(tanks);
   const selected = await page.evaluate(() => window.__TC_TEST__?.selection() ?? []);
-  expect(selected).toHaveLength(4);
+  expect(selected).toHaveLength(tanks.length);
 
   const candidates = await findOrderCandidates(page, own);
   expect(candidates.length, 'a visible ground point clear of the tanks').toBeGreaterThan(0);

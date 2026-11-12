@@ -2497,3 +2497,549 @@ button.corner-action {
 .game-loading.done {
   opacity: 0;
 }
+
+/* ---------- Match screen layout (overhaul step 3) ----------
+ * Every panel has one fixed home on an edge, and nothing covers another panel's home:
+ *   top-left: resources, and under them the alert line;   top-centre: build queue, and under it
+ *   the objective line;   top-right: pause;   left edge: select mode;   bottom-left: minimap and
+ *   selection;   bottom, right of the selection: group tiles;   right edge: commands.
+ * The drop menu is a bottom strip about a third of the screen tall. */
+
+/* Alert line: one line under the resource bar. */
+.alert-toasts {
+  top: 58px;
+  left: max(8px, env(safe-area-inset-left));
+  right: auto;
+  max-width: 280px;
+}
+
+:root[data-hand='left'] .alert-toasts {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+.alert-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  max-width: 280px;
+  padding: 0 12px 0 6px;
+  border: 1px solid #d98080;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: max-width 0.4s ease, padding 0.4s ease;
+}
+
+.alert-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--red, #e05555);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 30px;
+  text-align: center;
+}
+
+.alert-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.4s ease;
+}
+
+/* After a few seconds only the icon is left; it still jumps to the newest alert. */
+.alert-toast.faded {
+  max-width: 44px;
+  padding: 0 6px;
+}
+
+.alert-toast.faded .alert-text {
+  opacity: 0;
+  width: 0;
+}
+
+.alert-edge-flash {
+  position: fixed;
+  z-index: 29;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.alert-edge-flash[data-side='left'] {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  background: linear-gradient(90deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='right'] {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  background: linear-gradient(270deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='top'] {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background: linear-gradient(180deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='bottom'] {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: linear-gradient(0deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash.on {
+  animation: edge-flash 1.2s ease-out;
+}
+
+@keyframes edge-flash {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Build queue strip, top centre. */
+.hud-queue {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 640px);
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-queue-tiles {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.hud-shell button.hud-queue-tile {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.hud-shell button.hud-queue-tile.place {
+  border-color: var(--orange);
+  box-shadow: inset 0 0 0 1px var(--orange);
+}
+
+.hud-queue-thumb {
+  position: absolute;
+  inset: 0 0 17px;
+  background: center / cover no-repeat;
+}
+
+.hud-queue-track {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.hud-queue-progress {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--orange);
+}
+
+.hud-queue-cost {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 12px;
+}
+
+.hud-shell button.hud-queue-undo {
+  flex: none;
+  height: 44px;
+  padding: 0 12px;
+  font-weight: 700;
+  color: #1b0e02;
+  background: var(--orange);
+  border: 0;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+/* Objective line, under the queue. */
+.hud-shell button.hud-objective {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 600px);
+  min-width: 160px;
+  height: 44px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--soft);
+  background: rgba(9, 13, 22, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-objective .ico {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--orange);
+}
+
+.hud-objective-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-shell button.hud-objective.message {
+  color: #fff;
+  border-color: #3d5f8f;
+  background: rgba(9, 13, 22, 0.9);
+}
+
+/* The objective line's mission message replaces the old floating toast. */
+.hud-objective .hud-toast {
+  position: static;
+  transform: none;
+  max-width: none;
+  padding: 0;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+}
+
+/* Select mode toggle, left edge. */
+.hud-shell button.hud-select-mode {
+  position: absolute;
+  left: max(8px, env(safe-area-inset-left));
+  top: 110px;
+  width: 60px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-select-mode.active {
+  border-color: var(--cyan-hi, #6fe3ff);
+  box-shadow: inset 0 0 0 1px var(--cyan-hi, #6fe3ff), 0 0 12px rgba(111, 227, 255, 0.35);
+}
+
+.hud-shell.select-mode {
+  box-shadow: inset 0 0 0 2px rgba(111, 227, 255, 0.45);
+}
+
+/* Group tiles along the bottom, right of the selection panel and left of the commands. */
+.hud-groups {
+  left: auto;
+  top: auto;
+  right: 142px;
+  bottom: 8px;
+  flex-direction: row;
+}
+
+.hud-shell button.hud-group-button {
+  width: 56px;
+  height: 52px;
+}
+
+.hud-shell .hud-group-button.all {
+  border-color: rgba(255, 154, 46, 0.6);
+}
+
+.hud-shell .hud-group-button.empty {
+  opacity: 0.45;
+  border-style: dashed;
+  background: transparent;
+}
+
+.hud-shell .hud-group-button.empty .group-caption {
+  font-size: 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1;
+}
+
+.hud-groups .hud-group-button[data-group='5'] {
+  display: none;
+}
+
+/* Commands down the right edge, from the bottom. */
+.hud-commandbar {
+  bottom: 8px;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+/* Selection panel between the minimap and the group tiles. */
+.hud-selection {
+  left: 156px;
+  max-width: calc(100% - 156px - 142px - 316px - 8px);
+}
+
+.hud-selection.single .hud-selection-body {
+  width: auto;
+  max-width: 260px;
+}
+
+/* Drop menu: a strip along the bottom, about a third of the screen tall. */
+.hud-shell .hud-build-panel {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: clamp(146px, 36vh, 210px);
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  padding: 0 max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
+}
+
+.hud-build-panel .drawer-tabs {
+  align-items: center;
+  padding: 2px 0 0;
+}
+
+.hud-build-panel .drawer-tabs .drawer-header {
+  margin-left: auto;
+  padding: 0;
+}
+
+.hud-shell .hud-build-panel button.drawer-tab {
+  flex: none;
+  min-width: 96px;
+  padding: 0 14px;
+}
+
+.hud-build-panel .drawer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.hud-shell .hud-build-panel .drawer-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  gap: 7px;
+  padding: 6px 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  align-items: stretch;
+}
+
+.hud-shell .hud-build-panel button.build-card {
+  flex: none;
+  width: 116px;
+  height: auto;
+  min-height: 92px;
+}
+
+.hud-build-panel .build-card .card-thumb {
+  inset: 0 0 46px;
+}
+
+.hud-build-panel .card-role {
+  padding: 0 7px;
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 14px;
+}
+
+.hud-build-panel .card-cost {
+  padding-bottom: 4px;
+}
+
+/* Short of ore: dim the card and turn the price red; it never moves. */
+.hud-build-panel .build-card.short .card-thumb,
+.hud-build-panel .build-card.short .card-name,
+.hud-build-panel .build-card.short .card-role {
+  opacity: 0.5;
+}
+
+.hud-build-panel .build-card.short .card-cost {
+  color: #ff7b7b;
+  opacity: 1;
+}
+
+.hud-build-panel .research-card {
+  flex: none;
+  width: 140px;
+}
+
+.hud-shell .hud-build-panel button.research-more {
+  flex: none;
+  width: 110px;
+  height: auto;
+}
+
+.hud-build-panel .research-note {
+  flex: none;
+  width: 120px;
+  align-self: center;
+}
+
+/* While the drop menu is open it covers the minimap, selection, groups, commands and select
+ * mode; the battlefield above stays live. */
+.hud-shell.build-open .hud-minimap,
+.hud-shell.build-open .hud-select-mode,
+.hud-shell.placing .hud-select-mode,
+.hud-shell.base-open .hud-select-mode {
+  display: none;
+}
+
+/* Left-handed: the whole layout mirrors. */
+.hud-shell.left-handed .hud-resbar {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-corner {
+  right: auto;
+  left: 8px;
+}
+
+.hud-shell.left-handed .hud-select-mode {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+.hud-shell.left-handed .hud-groups {
+  right: auto;
+  left: 142px;
+}
+
+.hud-shell.left-handed .hud-selection {
+  left: auto;
+  right: 156px;
+}
+
+.hud-shell.left-handed .hud-build-panel {
+  border-right: 0;
+}
+
+@media (min-width: 1100px) and (min-height: 700px) {
+  .hud-selection {
+    left: 196px;
+    max-width: calc(100% - 196px - 142px - 316px - 8px);
+  }
+  .hud-shell.left-handed .hud-selection {
+    right: 196px;
+  }
+}
+
+.alert-toast[hidden],
+.alert-edge-flash[hidden] {
+  display: none;
+}
+
+/* Several units: smaller portraits so more fit beside the group tiles. */
+.hud-shell .hud-selection:not(.single) button.selection-icon {
+  width: 46px;
+  height: 58px;
+}
+
+.hud-shell button.hud-hint {
+  position: absolute;
+  left: 76px;
+  top: 110px;
+  max-width: 230px;
+  min-height: 56px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--text);
+  background: rgba(9, 13, 22, 0.92);
+  border: 1px solid var(--cyan-hi, #6fe3ff);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-shell.left-handed button.hud-hint {
+  left: auto;
+  right: 76px;
+}
+
+.hud-shell.build-open button.hud-hint,
+.hud-shell.placing button.hud-hint {
+  display: none;
+}
+
+/* A mission message may run to two lines so it is not cut short. */
+.hud-shell button.hud-objective.message {
+  height: auto;
+  min-height: 44px;
+  padding: 4px 12px;
+}
+
+.hud-objective.message .hud-objective-text {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+}

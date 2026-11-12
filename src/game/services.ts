@@ -37,6 +37,8 @@ export interface GameServicesHost {
   currentScreen(): string;
   inMatch(): boolean;
   setCameraTarget(x: number, z: number): void;
+  /** Screen point of a map point, or null with no 3D view (used for the alert edge flash). */
+  worldToScreen?(x: number, z: number): { x: number; y: number } | null;
   setSimSpeed(multiplier: number): void;
   getSimSpeed(): number;
   freezeReport(): WatchdogReport | null;
@@ -118,6 +120,7 @@ export class GameServices implements GameApi {
       onJump: (x, z) => {
         this.host.setCameraTarget(x, z);
       },
+      locate: (x, z) => this.host.worldToScreen?.(x, z) ?? null,
       onAlert: (alert) => {
         this.audioEngine.play({ type: 'alert', kind: alert.kind });
         void this.haptics.alert();

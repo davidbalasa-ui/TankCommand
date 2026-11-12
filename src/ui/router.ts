@@ -137,6 +137,8 @@ export interface ResultView {
 export interface HudSnapshot {
   leftHanded: boolean;
   groupsOpen: boolean;
+  /** Select mode is on (a drag draws a box, a tap adds or removes a unit). */
+  selectMode: boolean;
   queueMode: boolean;
   attackMoveArmed: boolean;
   selectedCount: number;
@@ -202,6 +204,11 @@ export interface ScreenContext {
   thumbnail?: (kind: 'unit' | 'structure', typeId: string) => string | null;
   /** Friendly name of a unit or structure type. */
   itemName?: (typeId: string) => string;
+  /** Plain-terms role of a unit or structure type ("Light tank"), if it has one. */
+  itemRole?: (typeId: string) => string | undefined;
+  /** Select mode: one-finger drag draws a box and a tap adds or removes a unit. */
+  isSelectMode?: () => boolean;
+  setSelectMode?: (value: boolean) => void;
   getOwnPads?: () => Array<{ id: number; x: number; z: number }>;
   getSelectedPadId?: () => number | null;
   setSelectedPad?: (id: number) => void;
