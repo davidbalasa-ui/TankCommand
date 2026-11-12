@@ -644,6 +644,20 @@ function selectTarget(
       bestDistance = distance;
     }
   }
+  if (best || (type.weapon && !weaponCanHit(type.weapon, 'ground'))) {
+    return best;
+  }
+  // No enemy unit in reach: hostile structures are fair game (see decisions.md, structure targets).
+  for (const structure of world.structures) {
+    if (structure.hp <= 0 || !isHostile(world, unit.owner, structure.owner)) {
+      continue;
+    }
+    const distance = Math.hypot(structure.x - unit.x, structure.z - unit.z);
+    if (distance <= range && distance < bestDistance) {
+      best = { id: structure.id, x: structure.x, z: structure.z, kind: 'structure' };
+      bestDistance = distance;
+    }
+  }
   return best;
 }
 
@@ -813,6 +827,10 @@ function updateProjectiles(world: WorldState): void {
     let hitT = Number.POSITIVE_INFINITY;
     for (const unit of world.units) {
       if (unit.hp <= 0 || isAllied(world, projectile.owner, unit.owner)) {
+        continue;
+      }
+      // A shot at a building flies under aircraft passing overhead.
+      if (projectile.targetStructureId !== undefined && isAirborne(unit)) {
         continue;
       }
       const unitY = heightAt(world.map, unit.x, unit.z) + TARGET_HEIGHT;

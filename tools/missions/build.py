@@ -1,0 +1,537 @@
+"""Builds the campaign maps and missions from the approved outline.
+
+Writes src/data/maps.campaign.json, src/data/missions/campaign/*.json and the import list
+src/data/missions/campaign.ts. Edit this file, not the generated JSON.
+
+    python3 tools/missions/build.py
+
+Pacing (David, 2026-11-12): mission 1 is easy and short; every later mission adds at most one new
+idea and a little more enemy pressure. Speakers and briefings are original text.
+"""
+import json, os, math
+
+ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
+SEC = 20  # sim ticks per second
+
+# ---------------------------------------------------------------- factions and roles
+
+ROLE = {
+    'human': {
+        'light': 'unit.human.light_tank', 'scout': 'unit.human.scout', 'miner': 'unit.human.ore_miner',
+        'tug': 'unit.human.tug', 'repair': 'unit.human.repair', 'radar': 'unit.human.radar',
+        'hover': 'unit.human.hover_tank', 'heavy': 'unit.human.heavy_tank', 'missile': 'unit.human.missile_tank',
+        'artillery': 'unit.human.artillery', 'fighter': 'unit.human.fighter', 'bomber': 'unit.human.bomber',
+        'pad': 'structure.human.landing_pad', 'station': 'structure.human.metal_station',
+        'turret': 'structure.human.turret', 'tower_radar': 'structure.human.radar', 'lab': 'structure.human.lab',
+        'air_base': 'structure.human.air_base', 'battery': 'structure.human.missile_battery',
+    },
+    'alien': {
+        'light': 'unit.alien.light_tank', 'scout': 'unit.alien.light_skimmer', 'miner': 'unit.alien.ore_miner',
+        'tug': 'unit.alien.tug', 'repair': 'unit.alien.repair', 'radar': 'unit.alien.radar',
+        'hover': 'unit.alien.glider', 'heavy': 'unit.alien.heavy_tank', 'missile': 'unit.alien.missile_tank',
+        'artillery': 'unit.alien.artillery', 'fighter': 'unit.alien.fighter', 'saucer': 'unit.alien.saucer',
+        'pad': 'structure.alien.landing_pad', 'station': 'structure.alien.metal_station',
+        'turret': 'structure.alien.turret', 'tower_radar': 'structure.alien.radar', 'lab': 'structure.alien.lab',
+        'air_base': 'structure.alien.air_base', 'battery': 'structure.alien.missile_battery',
+    },
+}
+OTHER = {'human': 'alien', 'alien': 'human'}
+SPEAKER = {'human': 'Command', 'alien': 'Brood-mind'}
+
+# Research each step of the campaign hands the player for free, so new items arrive by mission,
+# not by a lab the player cannot build yet.
+RESEARCH = {
+    'towers': ['armor_plating', 'fortifications'],
+    'sensors': ['fire_control', 'sensors'],
+    'heavy': ['armor_plating', 'fortifications', 'heavy_armor'],
+}
+
+
+def research(faction, *groups):
+    names = []
+    for group in groups:
+        for name in RESEARCH[group]:
+            if name not in names:
+                names.append(name)
+    return [f'research.{faction}.{name}' for name in names]
+
+
+def avail(faction, *roles):
+    return [ROLE[faction][role] for role in roles]
+
+
+def heading_to(x0, z0, x1, z1):
+    return round(math.atan2(z1 - z0, x1 - x0), 3)
+
+
+# ---------------------------------------------------------------- maps
+
+MAPS = []
+
+
+def add_map(map_id, name, size, starts, deposits, terrain, water=None):
+    features = {'waterLevel': None, 'lakes': [], 'rivers': [], 'terrain': terrain}
+    if water:
+        features.update(water)
+    MAPS.append({
+        'id': map_id, 'name': name, 'size': size, 'cellSize': 2,
+        'starts': [{'player': i + 1, 'x': x, 'z': z} for i, (x, z) in enumerate(starts)],
+        'deposits': [{'kind': k, 'x': x, 'z': z, 'amount': a} for k, x, z, a in deposits],
+        'features': features, 'placeholder': False, 'campaignOnly': True,
+    })
+
+
+# Halden Outpost: landing field south-west, the colony outpost north-east, two ridges making a
+# central lane. Missions 1-4 of both campaigns.
+LAND = (-52, 48)
+OUTPOST = (45, -45)
+add_map('map.c_halden', 'Halden Outpost', 160, [LAND, OUTPOST], [
+    ('ore', -68, 36, 600), ('ore', -40, 64, 600), ('ore', -68, 60, 500), ('metal', -36, 34, 250),
+    ('ore', 60, -30, 500), ('ore', 30, -60, 500), ('metal', 62, -58, 250), ('ore', 6, 8, 400),
+], {
+    'seed': 101, 'roughness': 0.8, 'centreRidge': False, 'symmetric': False,
+    'ridges': [
+        {'x0': -32, 'z0': -76, 'x1': -12, 'z1': -18, 'height': 8, 'width': 7},
+        {'x0': 8, 'z0': 18, 'x1': 72, 'z1': 36, 'height': 8, 'width': 7},
+    ],
+    'hills': [{'x': 2, 'z': -50, 'radius': 18, 'height': 4}, {'x': -48, 'z': -8, 'radius': 15, 'height': 3.5},
+              {'x': 32, 'z': 58, 'radius': 16, 'height': 4}],
+    'flats': [{'x': LAND[0], 'z': LAND[1], 'radius': 14}, {'x': OUTPOST[0], 'z': OUTPOST[1], 'radius': 14},
+              {'x': 2, 'z': 6, 'radius': 9}],
+})
+
+# Blind Ridge: tall hills hide three small posts; the player has to scout to find them.
+RIDGE_START = (-66, 62)
+RIDGE_POSTS = [(-58, -58), (62, -50), (58, 52)]
+add_map('map.c_blind_ridge', 'Blind Ridge', 180, [RIDGE_START, (60, -50)], [
+    ('ore', -78, 50, 600), ('ore', -52, 78, 600), ('metal', -76, 76, 250), ('ore', 0, 0, 500),
+    ('ore', -70, -40, 400), ('ore', 70, -70, 400), ('ore', 76, 40, 400),
+], {
+    'seed': 202, 'roughness': 0.9, 'centreRidge': False, 'symmetric': False,
+    'hills': [
+        {'x': -38, 'z': -30, 'radius': 24, 'height': 12}, {'x': 30, 'z': -28, 'radius': 22, 'height': 12},
+        {'x': 30, 'z': 32, 'radius': 22, 'height': 12}, {'x': -20, 'z': 40, 'radius': 14, 'height': 7},
+    ],
+    'flats': [{'x': RIDGE_START[0], 'z': RIDGE_START[1], 'radius': 14}, {'x': 0, 'z': 0, 'radius': 10}]
+             + [{'x': x, 'z': z, 'radius': 9} for x, z in RIDGE_POSTS],
+})
+
+# Relay Road: a long road between broken ridges to the relay station in the far corner.
+ROAD_START = (-76, 72)
+RELAY = (72, -72)
+add_map('map.c_relay_road', 'Relay Road', 200, [ROAD_START, RELAY], [
+    ('ore', -86, 58, 500), ('ore', -62, 86, 500), ('ore', 84, -56, 400), ('metal', 58, -86, 250),
+], {
+    'seed': 303, 'roughness': 0.7, 'centreRidge': False, 'symmetric': False,
+    'ridges': [
+        {'x0': -58, 'z0': 92, 'x1': -12, 'z1': 46, 'height': 9, 'width': 7},
+        {'x0': 8, 'z0': 26, 'x1': 92, 'z1': -58, 'height': 9, 'width': 7},
+        {'x0': -92, 'z0': 56, 'x1': -46, 'z1': 10, 'height': 9, 'width': 7},
+        {'x0': -26, 'z0': -10, 'x1': 56, 'z1': -92, 'height': 9, 'width': 7},
+    ],
+    'flats': [{'x': ROAD_START[0], 'z': ROAD_START[1], 'radius': 12}, {'x': RELAY[0], 'z': RELAY[1], 'radius': 12},
+              {'x': -2, 'z': 0, 'radius': 10}],
+})
+
+# Kessra Valley: the enemy base sits in a valley ringed by ridges with two ways in.
+VALLEY_HOME = (-62, 62)
+VALLEY_ENEMY = (56, -56)
+add_map('map.c_kessra_valley', 'Kessra Valley', 200, [VALLEY_HOME, VALLEY_ENEMY], [
+    ('ore', -80, 48, 600), ('ore', -48, 80, 600), ('ore', -82, 80, 500), ('metal', -44, 46, 250),
+    ('ore', 72, -40, 600), ('ore', 40, -74, 600), ('metal', 76, -76, 250),
+    ('ore', -6, 6, 500), ('ore', 30, 40, 400), ('ore', -40, -30, 400),
+], {
+    'seed': 404, 'roughness': 0.9, 'centreRidge': False, 'symmetric': False,
+    'ridges': [
+        {'x0': 10, 'z0': -96, 'x1': 14, 'z1': -40, 'height': 9, 'width': 8},
+        {'x0': 14, 'z0': -22, 'x1': 30, 'z1': -14, 'height': 9, 'width': 8},
+        {'x0': 48, 'z0': -10, 'x1': 96, 'z1': -14, 'height': 9, 'width': 8},
+    ],
+    'hills': [{'x': -20, 'z': 30, 'radius': 18, 'height': 4}, {'x': 10, 'z': 60, 'radius': 16, 'height': 5}],
+    'flats': [{'x': VALLEY_HOME[0], 'z': VALLEY_HOME[1], 'radius': 15},
+              {'x': VALLEY_ENEMY[0], 'z': VALLEY_ENEMY[1], 'radius': 15}],
+})
+
+# ---------------------------------------------------------------- mission helpers
+
+MISSIONS = []
+
+
+def T(id_, when, *do, repeat=False):
+    t = {'id': id_, 'when': when, 'do': list(do)}
+    if repeat:
+        t['repeat'] = True
+    return t
+
+
+def at(sec):
+    return {'t': 'time', 'tick': int(sec * SEC)}
+
+
+def area(side, x, z, r, **kw):
+    return {'t': 'areaEntered', 'side': side, 'x': x, 'z': z, 'radius': r, **kw}
+
+
+def msg(text, faction):
+    return {'t': 'message', 'speaker': SPEAKER[faction], 'text': text}
+
+
+def done(id_):
+    return {'t': 'setObjective', 'id': id_, 'status': 'done'}
+
+
+def failed(id_):
+    return {'t': 'setObjective', 'id': id_, 'status': 'failed'}
+
+
+def spawn(side, unit, count, x, z, tag=None, drop=False):
+    a = {'t': 'spawn', 'side': side, 'unitType': unit, 'count': count, 'x': x, 'z': z}
+    if tag:
+        a['tag'] = tag
+    if drop:
+        a['drop'] = True
+    return a
+
+
+def attack(tag, x, z):
+    return {'t': 'aiOrder', 'tag': tag, 'mode': 'attack', 'x': x, 'z': z}
+
+
+def U(side, unit, x, z, heading=0.0, tag=None):
+    u = {'side': side, 'unitType': unit, 'x': x, 'z': z, 'heading': heading}
+    if tag:
+        u['tag'] = tag
+    return u
+
+
+def S(side, structure, x, z):
+    return {'side': side, 'structureType': structure, 'x': x, 'z': z}
+
+
+def player_side(faction, ore, metal=0, available=None, research_done=None):
+    s = {'player': 1, 'faction': faction, 'controller': 'human', 'ore': ore, 'metal': metal}
+    if available is not None:
+        s['available'] = available
+    if research_done:
+        s['researchDone'] = research_done
+    return s
+
+
+def enemy_side(faction, controller='none', ore=0, metal=0, difficulty=None, player=2):
+    s = {'player': player, 'faction': faction, 'controller': controller, 'ore': ore, 'metal': metal}
+    if difficulty:
+        s['difficulty'] = difficulty
+    return s
+
+
+def mission(faction, order, slug, title, briefing, map_id, sides, units, structures, objectives, triggers,
+            time_limit=None):
+    campaign = 'human' if faction == 'human' else 'alien'
+    m = {
+        'id': f'mission.{campaign}.{order:02d}_{slug}', 'campaign': campaign, 'order': order, 'title': title,
+        'briefing': briefing, 'mapId': map_id, 'sides': sides, 'units': units, 'structures': structures,
+        'objectives': [{'id': i, 'text': t, 'kind': k} for i, t, k in objectives], 'triggers': triggers,
+        'placeholder': False,
+    }
+    if time_limit:
+        m['timeLimitSec'] = time_limit
+    # Sides without an AI default to neutral; every enemy side here fights the player from the start.
+    m['relations'] = [r for side in sides if side['controller'] != 'human' and not side.get('team')
+                      for r in ({'a': 1, 'b': side['player'], 'relation': 'hostile'},
+                                {'a': side['player'], 'b': 1, 'relation': 'hostile'})]
+    MISSIONS.append(m)
+
+
+def spread(cx, cz, n, gap=4.0):
+    """n positions in a small block around a centre."""
+    cols = max(1, math.ceil(math.sqrt(n)))
+    out = []
+    for i in range(n):
+        out.append((round(cx + (i % cols - (cols - 1) / 2) * gap, 1), round(cz + (i // cols - (cols - 1) / 2) * gap, 1)))
+    return out
+
+
+# ---------------------------------------------------------------- act 1 (both sides)
+
+def act1(f):
+    e = OTHER[f]
+    R, E = ROLE[f], ROLE[e]
+    terran = f == 'human'
+    lx, lz = LAND
+    ox, oz = OUTPOST
+    face = heading_to(lx, lz, ox, oz)
+
+    # 1: one objective, a handful of weak enemies, nothing to build. About five minutes.
+    mission(f, 1, 'signal_lost' if terran else 'first_seed',
+            'Signal Lost' if terran else 'First Seed',
+            ('The Halden outpost stopped answering an hour ago. Take four Lancers to the outpost and '
+             'clear out whatever is there.') if terran else
+            ('A Terran outpost stands where our seed fell. Take four Stingers across the field and silence '
+             'its three guards.'),
+            'map.c_halden',
+            [player_side(f, 0, available=[]), enemy_side(e)],
+            [U(1, R['light'], x, z, face) for x, z in spread(lx, lz, 4)]
+            + [U(2, E['scout'], x, z, -face) for x, z in [(ox - 6, oz + 4), (ox + 4, oz - 6), (ox + 2, oz + 6)]],
+            [],
+            [('reach', 'Reach the outpost', 'primary'), ('clear', 'Destroy the three guards', 'primary')],
+            [
+                T('intro', at(0), msg('Head north-east to the outpost. Drag to select, tap the ground to move.'
+                                      if terran else 'Cross the field to the outpost. Drag to select, tap to move.', f)),
+                T('reach', area(1, ox, oz, 16), done('reach'),
+                  msg('Enemy scouts at the outpost. Tap one to attack it.' if terran else
+                      'The guards are here. Tap one to attack it.', f)),
+                T('clear', {'t': 'allDestroyed', 'side': 2}, done('clear')),
+            ],
+            time_limit=15 * 60)
+
+    # 2: the economy, with a small raid half way through.
+    mission(f, 2, 'ore_line' if terran else 'feeding_ground',
+            'Ore Line' if terran else 'Feeding Ground',
+            ('The outpost needs ore to call down reinforcements. Put the Prospector to work and bank 400 ore. '
+             'Expect a small raid.') if terran else
+            ('The brood is hungry. Set the Gorger on the ore field and gather 400 ore. Terran scouts may '
+             'come sniffing.'),
+            'map.c_halden',
+            [player_side(f, 100, available=avail(f, 'light', 'scout', 'miner', 'tug')), enemy_side(e)],
+            [U(1, R['light'], lx + 6, lz - 4, face), U(1, R['light'], lx + 2, lz - 8, face),
+             U(1, R['miner'], lx - 6, lz - 2, face), U(1, R['tug'], lx - 4, lz + 4, face)],
+            [S(1, R['pad'], lx, lz)],
+            [('ore', 'Bank 400 ore', 'primary'), ('pad', 'Keep your landing pad', 'primary')],
+            [
+                T('intro', at(0), msg('Select the miner, then tap an ore field to start mining. The hauler '
+                                      'carries the crates home by itself.', f)),
+                T('raid', at(150), msg('Raiders coming from the north-east!', f),
+                  spawn(2, E['scout'], 2, ox - 10, oz + 10, tag='raid'), attack('raid', lx, lz)),
+                T('ore', {'t': 'resourceReached', 'side': 1, 'ore': 400}, done('ore')),
+                T('padLost', {'t': 'allDestroyed', 'side': 1, 'unitType': R['pad']}, failed('pad'),
+                  {'t': 'lose', 'reason': 'padLost'}),
+                T('padKept', {'t': 'objectiveDone', 'id': 'ore'}, done('pad')),
+            ],
+            time_limit=15 * 60)
+
+    # 3: hold out, with the first defence tower.
+    tower = 'Bastion gun' if terran else 'Thornmound'
+    mission(f, 3, 'dig_in' if terran else 'thorns',
+            'Dig In' if terran else 'Thorns',
+            (f'Raiders are probing the outpost. Hold it for six minutes. A {tower} kit is now on the Build list: '
+             'place it where the raids come in.') if terran else
+            (f'Terran patrols want our nest back. Hold it for six minutes. Grow a {tower} where they attack.'),
+            'map.c_halden',
+            [player_side(f, 450, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret'),
+                         research_done=research(f, 'towers')), enemy_side(e)],
+            [U(1, R['light'], ox - 8, oz + 8, -face), U(1, R['light'], ox - 2, oz + 10, -face),
+             U(1, R['light'], ox - 10, oz + 2, -face), U(1, R['miner'], ox + 8, oz + 4), U(1, R['tug'], ox + 6, oz + 8)],
+            [S(1, R['pad'], ox, oz)],
+            [('hold', 'Hold the outpost for 6 minutes', 'primary')],
+            [
+                T('intro', at(0), msg(f'First raid in one minute. Buy a {tower} and place it facing south-west.', f)),
+                T('w1', at(60), spawn(2, E['scout'], 2, lx, lz, tag='w1'), attack('w1', ox, oz)),
+                T('w2', at(140), spawn(2, E['scout'], 2, -70, -40, tag='w2'), spawn(2, E['light'], 1, -66, -44, tag='w2'),
+                  attack('w2', ox, oz)),
+                T('w3', at(220), msg('A bigger group is coming.', f),
+                  spawn(2, E['light'], 4, lx + 6, lz - 6, tag='w3'), attack('w3', ox, oz)),
+                T('w4', at(300), spawn(2, E['light'], 3, 20, 70, tag='w4'), spawn(2, E['scout'], 2, 26, 66, tag='w4'),
+                  attack('w4', ox, oz)),
+                T('padLost', {'t': 'allDestroyed', 'side': 1, 'unitType': R['pad']}, failed('hold'),
+                  {'t': 'lose', 'reason': 'padLost'}),
+                T('held', at(360), done('hold')),
+            ])
+
+    # 4: the first enemy base (Terran) / a fleeing convoy (Arcadian).
+    if terran:
+        mission(f, 4, 'first_strike', 'First Strike',
+                ('An enemy camp has dug in across the field. Protect the supply hauler, hold off the reinforcement '
+                 'wave and destroy the camp. Optional: build a metal station.'),
+                'map.c_halden',
+                [player_side(f, 900, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'station'),
+                             research_done=research(f, 'towers')),
+                 enemy_side(e, 'ai', ore=200, metal=50, difficulty='easy')],
+                [U(1, R['light'], lx + 4, lz - 2, face), U(1, R['light'], lx + 2, lz - 6, face),
+                 U(1, R['light'], lx + 8, lz - 6, face), U(1, R['tug'], lx - 4, lz + 2, face, tag='vip'),
+                 U(1, R['miner'], lx - 2, lz + 6, face),
+                 U(2, E['light'], ox - 4, oz + 2, -face), U(2, E['light'], ox - 2, oz + 4, -face)],
+                [S(1, R['pad'], lx, lz), S(2, E['pad'], ox, oz)],
+                [('base', 'Destroy the enemy camp', 'primary'), ('vip', 'Keep the supply hauler alive', 'primary'),
+                 ('station', 'Build a metal station', 'optional')],
+                [
+                    T('intro', at(0), msg('The camp is north-east. Keep the hauler away from the fighting.', f)),
+                    T('wave', at(180), msg('Enemy reinforcements are landing.', f),
+                      spawn(2, E['light'], 3, ox, oz, tag='wave', drop=True), attack('wave', lx, lz)),
+                    T('vipLost', {'t': 'unitDestroyed', 'tag': 'vip'}, failed('vip'), {'t': 'lose', 'reason': 'vipLost'}),
+                    T('station', {'t': 'structureBuilt', 'side': 1, 'structureType': R['station']}, done('station')),
+                    T('baseDown', {'t': 'allDestroyed', 'side': 2}, done('base'), done('vip')),
+                ],
+                time_limit=25 * 60)
+    else:
+        # Haulers drive from the outpost to the far road; destroy them before they get there.
+        convoy_from, convoy_to = (OUTPOST[0], OUTPOST[1]), (-70, -66)
+        mission(f, 4, 'prey', 'Prey',
+                ('A Terran supply convoy is running from the outpost. Catch it and destroy its three haulers '
+                 'before they reach the north-west road.'),
+                'map.c_halden',
+                [player_side(f, 300, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret'),
+                             research_done=research(f, 'towers')), enemy_side(e)],
+                [U(1, R['scout'], x, z, face) for x, z in spread(lx + 4, lz - 4, 4)]
+                + [U(1, R['light'], x, z, face) for x, z in spread(lx - 4, lz + 2, 2)]
+                + [U(1, R['miner'], lx - 8, lz + 6), U(1, R['tug'], lx - 10, lz + 2)]
+                + [U(2, E['tug'], x, z, 3.0, tag='convoy') for x, z in spread(convoy_from[0], convoy_from[1], 3, 5)]
+                + [U(2, E['light'], x, z, 3.0, tag='escort') for x, z in [(convoy_from[0] - 8, convoy_from[1]),
+                                                                            (convoy_from[0], convoy_from[1] - 8)]],
+                [S(1, R['pad'], lx, lz)],
+                [('convoy', 'Destroy the three haulers', 'primary'), ('escape', 'Let none of them escape', 'primary')],
+                [
+                    T('intro', at(0), msg('Darters are fast. Send them ahead to cut the convoy off.', f)),
+                    # The convoy moves in legs and stops to regroup, so a player has about four minutes.
+                    T('leg1', at(40), msg('The convoy is moving. It stops to regroup on the way.', f),
+                      attack('convoy', 20, -60), attack('escort', 20, -60)),
+                    T('leg2', at(120), attack('convoy', -15, -45), attack('escort', -15, -45)),
+                    T('leg3', at(200), msg('They are on the move again. Catch them before the road!', f),
+                      attack('convoy', -45, -65), attack('escort', -45, -65)),
+                    T('leg4', at(270), attack('convoy', convoy_to[0], convoy_to[1]), attack('escort', convoy_to[0], convoy_to[1])),
+                    T('escaped', {'t': 'unitEscorted', 'tag': 'convoy', 'x': convoy_to[0], 'z': convoy_to[1], 'radius': 10},
+                      failed('escape'), {'t': 'lose', 'reason': 'convoyEscaped'}),
+                    T('caught', {'t': 'unitDestroyed', 'tag': 'convoy'}, done('convoy'), done('escape')),
+                ],
+                time_limit=12 * 60)
+
+    # 5: scouting with radar to find hidden posts.
+    sx, sz = RIDGE_START
+    post = E['tower_radar']
+    mission(f, 5, 'blind_ridge' if terran else 'eyes_of_the_brood',
+            'Blind Ridge' if terran else 'Eyes of the Brood',
+            ('Three Arcadian posts are hidden among the hills, each with a guard. A Watchman radar can see them from '
+             'far off. Find and destroy all three.') if terran else
+            ('Three Terran listening posts hide in these hills, each with a guard. A Seer can see them from far off. '
+             'Find and destroy all three.'),
+            'map.c_blind_ridge',
+            [player_side(f, 600, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar'),
+                         research_done=research(f, 'towers', 'sensors')), enemy_side(e)],
+            [U(1, R['light'], x, z, -0.7) for x, z in spread(sx + 8, sz - 8, 4)]
+            + [U(1, R['radar'], sx + 2, sz - 2, -0.7), U(1, R['miner'], sx - 6, sz + 2), U(1, R['tug'], sx - 2, sz + 6)]
+            + [U(2, E['light'], px + 5, pz + 5) for px, pz in RIDGE_POSTS]
+            + [U(2, E['scout'], px - 5, pz + 5) for px, pz in RIDGE_POSTS[1:]],
+            [S(1, R['pad'], sx, sz)] + [S(2, post, px, pz) for px, pz in RIDGE_POSTS],
+            [('posts', 'Destroy the three hidden posts', 'primary')],
+            [
+                T('intro', at(0), msg('Move the radar unit ahead of your tanks. It spots enemies far beyond your guns.', f)),
+                T('patrol', at(240), spawn(2, E['light'], 2, 0, 0, tag='patrol'), attack('patrol', sx, sz)),
+                T('posts', {'t': 'allDestroyed', 'side': 2, 'unitType': post}, done('posts')),
+            ],
+            time_limit=25 * 60)
+
+    # 6: heavy tanks, an escort or a breakthrough.
+    rx, rz = ROAD_START
+    vx, vz = RELAY
+    if terran:
+        mission(f, 6, 'heavy_metal', 'Heavy Metal',
+                ('Two Bulwark heavy tanks must reach the relay station at the end of the road. Ambushes wait in '
+                 'the gaps between the ridges. Get both Bulwarks there.'),
+                'map.c_relay_road',
+                [player_side(f, 700, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'heavy'),
+                             research_done=research(f, 'heavy', 'sensors')), enemy_side(e)],
+                [U(1, R['heavy'], rx + 6, rz - 6, -0.785, tag='convoy'), U(1, R['heavy'], rx + 2, rz - 10, -0.785, tag='convoy')]
+                + [U(1, R['light'], x, z, -0.785) for x, z in spread(rx + 10, rz - 2, 3)]
+                + [U(1, R['miner'], rx - 6, rz + 2), U(1, R['tug'], rx - 2, rz + 6)],
+                [S(1, R['pad'], rx, rz)],
+                [('relay', 'Bring both Bulwarks to the relay station', 'primary'),
+                 ('convoy', 'Keep both Bulwarks alive', 'primary')],
+                [
+                    T('intro', at(0), msg('Send the Lancers ahead to spring the ambushes before the Bulwarks arrive.', f)),
+                    T('amb1', area(1, -30, 30, 18), msg('Ambush in the first gap!', f),
+                      spawn(2, E['light'], 2, -14, 2, tag='amb1'), spawn(2, E['scout'], 2, -40, 12, tag='amb1'),
+                      attack('amb1', -30, 30)),
+                    T('amb2', area(1, 10, -10, 18), msg('More of them at the second gap.', f),
+                      spawn(2, E['light'], 3, 30, 4, tag='amb2'), spawn(2, E['missile'], 1, 0, -26, tag='amb2'),
+                      attack('amb2', 10, -10)),
+                    T('amb3', area(1, 50, -50, 18), spawn(2, E['heavy'], 1, 78, -48, tag='amb3'),
+                      spawn(2, E['light'], 2, 50, -80, tag='amb3'), attack('amb3', 50, -50)),
+                    T('lost', {'t': 'unitsAlive', 'tag': 'convoy', 'op': '<=', 'count': 1}, failed('convoy'),
+                      {'t': 'lose', 'reason': 'convoyLost'}),
+                    T('arrived', {'t': 'unitEscorted', 'tag': 'convoy', 'x': vx, 'z': vz, 'radius': 12},
+                      done('relay'), done('convoy')),
+                ],
+                time_limit=20 * 60)
+    else:
+        guard = [(vx - 18, vz + 2), (vx - 2, vz + 18)]
+        mission(f, 6, 'shell_and_spine', 'Shell and Spine',
+                ('The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring '
+                 'your new Carapaces up the road and break it.'),
+                'map.c_relay_road',
+                [player_side(f, 700, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'heavy'),
+                             research_done=research(f, 'heavy', 'sensors')), enemy_side(e)],
+                [U(1, R['heavy'], x, z, -0.785) for x, z in spread(rx + 6, rz - 8, 2)]
+                + [U(1, R['light'], x, z, -0.785) for x, z in spread(rx + 10, rz - 2, 3)]
+                + [U(1, R['miner'], rx - 6, rz + 2), U(1, R['tug'], rx - 2, rz + 6)]
+                + [U(2, E['light'], vx - 10, vz + 10), U(2, E['light'], vx - 14, vz + 6), U(2, E['missile'], vx - 6, vz + 14)],
+                [S(1, R['pad'], rx, rz), S(2, E['turret'], *guard[0]), S(2, E['turret'], *guard[1]),
+                 S(2, E['tower_radar'], vx, vz)],
+                [('guns', 'Destroy both Bastion guns', 'primary'), ('radar', 'Destroy the radar tower', 'primary')],
+                [
+                    T('intro', at(0), msg('Carapaces shrug off gunfire. Lead with them; keep the Stingers behind.', f)),
+                    T('amb1', area(1, -30, 30, 18), spawn(2, E['light'], 2, -14, 2, tag='amb1'),
+                      attack('amb1', -30, 30)),
+                    T('amb2', area(1, 10, -10, 18), spawn(2, E['light'], 2, 30, 4, tag='amb2'),
+                      spawn(2, E['scout'], 2, 0, -26, tag='amb2'), attack('amb2', 10, -10)),
+                    T('guns', {'t': 'allDestroyed', 'side': 2, 'unitType': E['turret']}, done('guns')),
+                    T('radar', {'t': 'allDestroyed', 'side': 2, 'unitType': E['tower_radar']}, done('radar')),
+                ],
+                time_limit=20 * 60)
+
+    # 7: act 1 finale, a full match against an easy enemy.
+    hx, hz = VALLEY_HOME
+    ex, ez = VALLEY_ENEMY
+    mission(f, 7, 'landfall_broken' if terran else 'root_and_ruin',
+            'Landfall Broken' if terran else 'Root and Ruin',
+            ('The Arcadian landing nest sits in Kessra Valley, guarded by ridges with two ways in. Build up, '
+             'then destroy the nest and everything defending it.') if terran else
+            ('The colony lands its supplies in Kessra Valley. Grow the brood, then tear down their landing pad.'),
+            'map.c_kessra_valley',
+            [player_side(f, 800, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar',
+                                                 'heavy', 'station'),
+                         research_done=research(f, 'heavy', 'sensors')),
+             enemy_side(e, 'ai', ore=500, metal=0, difficulty='easy')],
+            [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 8, hz - 8, 4)]
+            + [U(1, R['miner'], hx - 8, hz + 2), U(1, R['tug'], hx - 4, hz + 8), U(1, R['radar'], hx + 2, hz - 4)]
+            + [U(2, E['light'], x, z, 2.356) for x, z in spread(ex - 8, ez + 8, 3)]
+            + [U(2, E['miner'], ex + 6, ez - 4), U(2, E['tug'], ex + 2, ez - 8)],
+            [S(1, R['pad'], hx, hz), S(2, E['pad'], ex, ez), S(2, E['turret'], ex - 22, ez + 4)],
+            [('pad', 'Destroy the enemy landing pad' if terran else 'Destroy the Terran landing pad', 'primary')]
+            + ([('all', 'Destroy every enemy unit and building', 'primary')] if terran else []),
+            [
+                T('intro', at(0), msg('Mine, build up, then strike. The valley has two ways in.', f)),
+                T('pad', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('pad')),
+            ] + ([T('all', {'t': 'allDestroyed', 'side': 2}, done('all'))] if terran else []),
+            time_limit=40 * 60)
+
+
+act1('human')
+act1('alien')
+
+# ---------------------------------------------------------------- write
+
+def write():
+    with open(os.path.join(ROOT, 'src/data/maps.campaign.json'), 'w') as f:
+        json.dump(MAPS, f, indent=2)
+        f.write('\n')
+    out_dir = os.path.join(ROOT, 'src/data/missions/campaign')
+    os.makedirs(out_dir, exist_ok=True)
+    for name in os.listdir(out_dir):
+        if name.endswith('.json'):
+            os.remove(os.path.join(out_dir, name))
+    lines = ['// Generated by tools/missions/build.py. Do not edit by hand.']
+    names = []
+    for i, m in enumerate(MISSIONS):
+        file = m['id'].split('.', 1)[1].replace('.', '_') + '.json'
+        with open(os.path.join(out_dir, file), 'w') as f:
+            json.dump(m, f, indent=2)
+            f.write('\n')
+        lines.append(f"import m{i} from './campaign/{file}';")
+        names.append(f'm{i}')
+    lines.append('')
+    lines.append(f"export const CAMPAIGN_MISSIONS: readonly unknown[] = [{', '.join(names)}];")
+    with open(os.path.join(ROOT, 'src/data/missions/campaign.ts'), 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f'{len(MAPS)} maps, {len(MISSIONS)} missions')
+
+
+write()

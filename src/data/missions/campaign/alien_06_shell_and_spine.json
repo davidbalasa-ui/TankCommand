@@ -1,0 +1,275 @@
+{
+  "id": "mission.alien.06_shell_and_spine",
+  "campaign": "alien",
+  "order": 6,
+  "title": "Shell and Spine",
+  "briefing": "The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring your new Carapaces up the road and break it.",
+  "mapId": "map.c_relay_road",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 700,
+      "metal": 0,
+      "available": [
+        "unit.alien.light_tank",
+        "unit.alien.light_skimmer",
+        "unit.alien.ore_miner",
+        "unit.alien.tug",
+        "structure.alien.turret",
+        "unit.alien.radar",
+        "unit.alien.heavy_tank"
+      ],
+      "researchDone": [
+        "research.alien.armor_plating",
+        "research.alien.fortifications",
+        "research.alien.heavy_armor",
+        "research.alien.fire_control",
+        "research.alien.sensors"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": -72.0,
+      "z": 62.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": -68.0,
+      "z": 62.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -68.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -64.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -68.0,
+      "z": 72.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.ore_miner",
+      "x": -82,
+      "z": 74,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.tug",
+      "x": -78,
+      "z": 78,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 62,
+      "z": -62,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 58,
+      "z": -66,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.missile_tank",
+      "x": 66,
+      "z": -58,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.alien.landing_pad",
+      "x": -76,
+      "z": 72
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.turret",
+      "x": 54,
+      "z": -70
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.turret",
+      "x": 70,
+      "z": -54
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.radar",
+      "x": 72,
+      "z": -72
+    }
+  ],
+  "objectives": [
+    {
+      "id": "guns",
+      "text": "Destroy both Bastion guns",
+      "kind": "primary"
+    },
+    {
+      "id": "radar",
+      "text": "Destroy the radar tower",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "Carapaces shrug off gunfire. Lead with them; keep the Stingers behind."
+        }
+      ]
+    },
+    {
+      "id": "amb1",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": -30,
+        "z": 30,
+        "radius": 18
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": -14,
+          "z": 2,
+          "tag": "amb1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "amb1",
+          "mode": "attack",
+          "x": -30,
+          "z": 30
+        }
+      ]
+    },
+    {
+      "id": "amb2",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 10,
+        "z": -10,
+        "radius": 18
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": 30,
+          "z": 4,
+          "tag": "amb2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.scout",
+          "count": 2,
+          "x": 0,
+          "z": -26,
+          "tag": "amb2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "amb2",
+          "mode": "attack",
+          "x": 10,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "guns",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.human.turret"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "guns",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "radar",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.human.radar"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "radar",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1200,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

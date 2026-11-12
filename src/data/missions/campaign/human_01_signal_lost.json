@@ -1,0 +1,155 @@
+{
+  "id": "mission.human.01_signal_lost",
+  "campaign": "human",
+  "order": 1,
+  "title": "Signal Lost",
+  "briefing": "The Halden outpost stopped answering an hour ago. Take four Lancers to the outpost and clear out whatever is there.",
+  "mapId": "map.c_halden",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 0,
+      "metal": 0,
+      "available": []
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -54.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -54.0,
+      "z": 50.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 50.0,
+      "heading": -0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 39,
+      "z": -41,
+      "heading": 0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 49,
+      "z": -51,
+      "heading": 0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 47,
+      "z": -39,
+      "heading": 0.764
+    }
+  ],
+  "structures": [],
+  "objectives": [
+    {
+      "id": "reach",
+      "text": "Reach the outpost",
+      "kind": "primary"
+    },
+    {
+      "id": "clear",
+      "text": "Destroy the three guards",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Head north-east to the outpost. Drag to select, tap the ground to move."
+        }
+      ]
+    },
+    {
+      "id": "reach",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 45,
+        "z": -45,
+        "radius": 16
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "reach",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Enemy scouts at the outpost. Tap one to attack it."
+        }
+      ]
+    },
+    {
+      "id": "clear",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "clear",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 900,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

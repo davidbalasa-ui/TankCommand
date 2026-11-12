@@ -1,0 +1,188 @@
+{
+  "id": "mission.human.02_ore_line",
+  "campaign": "human",
+  "order": 2,
+  "title": "Ore Line",
+  "briefing": "The outpost needs ore to call down reinforcements. Put the Prospector to work and bank 400 ore. Expect a small raid.",
+  "mapId": "map.c_halden",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 100,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46,
+      "z": 44,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50,
+      "z": 40,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -58,
+      "z": 46,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -56,
+      "z": 52,
+      "heading": -0.764
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -52,
+      "z": 48
+    }
+  ],
+  "objectives": [
+    {
+      "id": "ore",
+      "text": "Bank 400 ore",
+      "kind": "primary"
+    },
+    {
+      "id": "pad",
+      "text": "Keep your landing pad",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Select the miner, then tap an ore field to start mining. The hauler carries the crates home by itself."
+        }
+      ]
+    },
+    {
+      "id": "raid",
+      "when": {
+        "t": "time",
+        "tick": 3000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Raiders coming from the north-east!"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": 35,
+          "z": -35,
+          "tag": "raid"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "raid",
+          "mode": "attack",
+          "x": -52,
+          "z": 48
+        }
+      ]
+    },
+    {
+      "id": "ore",
+      "when": {
+        "t": "resourceReached",
+        "side": 1,
+        "ore": 400
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "ore",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "pad",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    },
+    {
+      "id": "padKept",
+      "when": {
+        "t": "objectiveDone",
+        "id": "ore"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "pad",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 900,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

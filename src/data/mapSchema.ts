@@ -78,6 +78,8 @@ export const mapRowSchema = z.object({
   deposits: z.array(depositSchema),
   features: featuresSchema.optional(),
   placeholder: z.boolean(),
+  /** Campaign-only maps are not offered in skirmish setup. */
+  campaignOnly: z.boolean().optional(),
 });
 
 export type MapRow = z.infer<typeof mapRowSchema>;

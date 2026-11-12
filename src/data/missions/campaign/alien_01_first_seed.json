@@ -1,0 +1,155 @@
+{
+  "id": "mission.alien.01_first_seed",
+  "campaign": "alien",
+  "order": 1,
+  "title": "First Seed",
+  "briefing": "A Terran outpost stands where our seed fell. Take four Stingers across the field and silence its three guards.",
+  "mapId": "map.c_halden",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 0,
+      "metal": 0,
+      "available": []
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -54.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -54.0,
+      "z": 50.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -50.0,
+      "z": 50.0,
+      "heading": -0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.scout",
+      "x": 39,
+      "z": -41,
+      "heading": 0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.scout",
+      "x": 49,
+      "z": -51,
+      "heading": 0.764
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.scout",
+      "x": 47,
+      "z": -39,
+      "heading": 0.764
+    }
+  ],
+  "structures": [],
+  "objectives": [
+    {
+      "id": "reach",
+      "text": "Reach the outpost",
+      "kind": "primary"
+    },
+    {
+      "id": "clear",
+      "text": "Destroy the three guards",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "Cross the field to the outpost. Drag to select, tap to move."
+        }
+      ]
+    },
+    {
+      "id": "reach",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 45,
+        "z": -45,
+        "radius": 16
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "reach",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The guards are here. Tap one to attack it."
+        }
+      ]
+    },
+    {
+      "id": "clear",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "clear",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 900,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

@@ -1,21 +1,33 @@
 {
-  "id": "mission.alien.1_first_strike",
-  "campaign": "alien",
-  "order": 1,
+  "id": "mission.human.04_first_strike",
+  "campaign": "human",
+  "order": 4,
   "title": "First Strike",
-  "briefing": "Enemy forces have dug in across the basin. Protect the supply tug, hold off the reinforcement wave and destroy the enemy base. Optional: build a metal station.",
-  "mapId": "map.wp02_skirmish",
+  "briefing": "An enemy camp has dug in across the field. Protect the supply hauler, hold off the reinforcement wave and destroy the camp. Optional: build a metal station.",
+  "mapId": "map.c_halden",
   "sides": [
     {
       "player": 1,
-      "faction": "alien",
+      "faction": "human",
       "controller": "human",
       "ore": 900,
-      "metal": 300
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "structure.human.metal_station"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications"
+      ]
     },
     {
       "player": 2,
-      "faction": "human",
+      "faction": "alien",
       "controller": "ai",
       "ore": 200,
       "metal": 50,
@@ -25,78 +37,78 @@
   "units": [
     {
       "side": 1,
-      "unitType": "unit.alien.light_tank",
-      "x": -46,
-      "z": -48,
-      "heading": 0.785
-    },
-    {
-      "side": 1,
-      "unitType": "unit.alien.light_tank",
+      "unitType": "unit.human.light_tank",
       "x": -48,
-      "z": -46,
-      "heading": 0.785
+      "z": 46,
+      "heading": -0.764
     },
     {
       "side": 1,
-      "unitType": "unit.alien.light_tank",
+      "unitType": "unit.human.light_tank",
+      "x": -50,
+      "z": 42,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
       "x": -44,
-      "z": -44,
-      "heading": 0.785
+      "z": 42,
+      "heading": -0.764
     },
     {
       "side": 1,
-      "unitType": "unit.alien.tug",
-      "x": -54,
-      "z": -48,
-      "heading": 0.785,
+      "unitType": "unit.human.tug",
+      "x": -56,
+      "z": 50,
+      "heading": -0.764,
       "tag": "vip"
     },
     {
       "side": 1,
-      "unitType": "unit.alien.ore_miner",
-      "x": -52,
-      "z": -44,
-      "heading": 0.785
+      "unitType": "unit.human.ore_miner",
+      "x": -54,
+      "z": 54,
+      "heading": -0.764
     },
     {
       "side": 2,
-      "unitType": "unit.human.light_tank",
-      "x": 46,
-      "z": 48,
-      "heading": 0.785
+      "unitType": "unit.alien.light_tank",
+      "x": 41,
+      "z": -43,
+      "heading": 0.764
     },
     {
       "side": 2,
-      "unitType": "unit.human.light_tank",
-      "x": 48,
-      "z": 46,
-      "heading": 0.785
+      "unitType": "unit.alien.light_tank",
+      "x": 43,
+      "z": -41,
+      "heading": 0.764
     }
   ],
   "structures": [
     {
       "side": 1,
-      "structureType": "structure.alien.landing_pad",
-      "x": -50,
-      "z": -50
+      "structureType": "structure.human.landing_pad",
+      "x": -52,
+      "z": 48
     },
     {
       "side": 2,
-      "structureType": "structure.human.landing_pad",
-      "x": 50,
-      "z": 50
+      "structureType": "structure.alien.landing_pad",
+      "x": 45,
+      "z": -45
     }
   ],
   "objectives": [
     {
       "id": "base",
-      "text": "Destroy the enemy base",
+      "text": "Destroy the enemy camp",
       "kind": "primary"
     },
     {
       "id": "vip",
-      "text": "Keep the supply tug alive",
+      "text": "Keep the supply hauler alive",
       "kind": "primary"
     },
     {
@@ -116,7 +128,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Keep the tug safe and take their base apart."
+          "text": "The camp is north-east. Keep the hauler away from the fighting."
         }
       ]
     },
@@ -129,16 +141,16 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Scout",
-          "text": "Reinforcements inbound from the north-east!"
+          "speaker": "Command",
+          "text": "Enemy reinforcements are landing."
         },
         {
           "t": "spawn",
           "side": 2,
-          "unitType": "unit.human.light_tank",
-          "count": 2,
-          "x": 30,
-          "z": 40,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 45,
+          "z": -45,
           "tag": "wave",
           "drop": true
         },
@@ -146,8 +158,8 @@
           "t": "aiOrder",
           "tag": "wave",
           "mode": "attack",
-          "x": -45,
-          "z": -45
+          "x": -52,
+          "z": 48
         }
       ]
     },
@@ -165,7 +177,7 @@
         },
         {
           "t": "lose",
-          "reason": "The supply tug was destroyed"
+          "reason": "vipLost"
         }
       ]
     },
@@ -174,7 +186,7 @@
       "when": {
         "t": "structureBuilt",
         "side": 1,
-        "structureType": "structure.alien.metal_station"
+        "structureType": "structure.human.metal_station"
       },
       "do": [
         {
@@ -204,6 +216,18 @@
       ]
     }
   ],
+  "placeholder": false,
   "timeLimitSec": 1500,
-  "placeholder": true
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
 }

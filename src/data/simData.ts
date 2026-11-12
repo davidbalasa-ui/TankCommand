@@ -1,6 +1,7 @@
 import units from './units.placeholder.json';
 import structures from './structures.placeholder.json';
 import maps from './maps.placeholder.json';
+import campaignMaps from './maps.campaign.json';
 import research from './research.placeholder.json';
 import type { AssetRegistry } from '../assets/registry';
 import { loadMapTable, loadResearchTable, loadStructureTable, loadUnitTable } from './dataRegistry';
@@ -113,7 +114,7 @@ export interface SimData {
 export function loadSimData(registry: AssetRegistry): SimData {
   const table = loadUnitTable(units, registry);
   const structureTable = loadStructureTable(structures);
-  const mapRows = loadMapTable(maps);
+  const mapRows = loadMapTable([...maps, ...campaignMaps]);
   const mapData = mapRows[0];
   if (!mapData) {
     throw new Error('No map data available');

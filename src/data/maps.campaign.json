@@ -1,0 +1,519 @@
+[
+  {
+    "id": "map.c_halden",
+    "name": "Halden Outpost",
+    "size": 160,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -52,
+        "z": 48
+      },
+      {
+        "player": 2,
+        "x": 45,
+        "z": -45
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -68,
+        "z": 36,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": 64,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -68,
+        "z": 60,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -36,
+        "z": 34,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": -30,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 30,
+        "z": -60,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 62,
+        "z": -58,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 6,
+        "z": 8,
+        "amount": 400
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 101,
+        "roughness": 0.8,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": -32,
+            "z0": -76,
+            "x1": -12,
+            "z1": -18,
+            "height": 8,
+            "width": 7
+          },
+          {
+            "x0": 8,
+            "z0": 18,
+            "x1": 72,
+            "z1": 36,
+            "height": 8,
+            "width": 7
+          }
+        ],
+        "hills": [
+          {
+            "x": 2,
+            "z": -50,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": -48,
+            "z": -8,
+            "radius": 15,
+            "height": 3.5
+          },
+          {
+            "x": 32,
+            "z": 58,
+            "radius": 16,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -52,
+            "z": 48,
+            "radius": 14
+          },
+          {
+            "x": 45,
+            "z": -45,
+            "radius": 14
+          },
+          {
+            "x": 2,
+            "z": 6,
+            "radius": 9
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_blind_ridge",
+    "name": "Blind Ridge",
+    "size": 180,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -66,
+        "z": 62
+      },
+      {
+        "player": 2,
+        "x": 60,
+        "z": -50
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -78,
+        "z": 50,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -52,
+        "z": 78,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -76,
+        "z": 76,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 0,
+        "z": 0,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -70,
+        "z": -40,
+        "amount": 400
+      },
+      {
+        "kind": "ore",
+        "x": 70,
+        "z": -70,
+        "amount": 400
+      },
+      {
+        "kind": "ore",
+        "x": 76,
+        "z": 40,
+        "amount": 400
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 202,
+        "roughness": 0.9,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": -38,
+            "z": -30,
+            "radius": 24,
+            "height": 12
+          },
+          {
+            "x": 30,
+            "z": -28,
+            "radius": 22,
+            "height": 12
+          },
+          {
+            "x": 30,
+            "z": 32,
+            "radius": 22,
+            "height": 12
+          },
+          {
+            "x": -20,
+            "z": 40,
+            "radius": 14,
+            "height": 7
+          }
+        ],
+        "flats": [
+          {
+            "x": -66,
+            "z": 62,
+            "radius": 14
+          },
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 10
+          },
+          {
+            "x": -58,
+            "z": -58,
+            "radius": 9
+          },
+          {
+            "x": 62,
+            "z": -50,
+            "radius": 9
+          },
+          {
+            "x": 58,
+            "z": 52,
+            "radius": 9
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_relay_road",
+    "name": "Relay Road",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -76,
+        "z": 72
+      },
+      {
+        "player": 2,
+        "x": 72,
+        "z": -72
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -86,
+        "z": 58,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -62,
+        "z": 86,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 84,
+        "z": -56,
+        "amount": 400
+      },
+      {
+        "kind": "metal",
+        "x": 58,
+        "z": -86,
+        "amount": 250
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 303,
+        "roughness": 0.7,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": -58,
+            "z0": 92,
+            "x1": -12,
+            "z1": 46,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": 8,
+            "z0": 26,
+            "x1": 92,
+            "z1": -58,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": -92,
+            "z0": 56,
+            "x1": -46,
+            "z1": 10,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": -26,
+            "z0": -10,
+            "x1": 56,
+            "z1": -92,
+            "height": 9,
+            "width": 7
+          }
+        ],
+        "flats": [
+          {
+            "x": -76,
+            "z": 72,
+            "radius": 12
+          },
+          {
+            "x": 72,
+            "z": -72,
+            "radius": 12
+          },
+          {
+            "x": -2,
+            "z": 0,
+            "radius": 10
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_kessra_valley",
+    "name": "Kessra Valley",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -62,
+        "z": 62
+      },
+      {
+        "player": 2,
+        "x": 56,
+        "z": -56
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -80,
+        "z": 48,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -48,
+        "z": 80,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -82,
+        "z": 80,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -44,
+        "z": 46,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 72,
+        "z": -40,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 40,
+        "z": -74,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 76,
+        "z": -76,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -6,
+        "z": 6,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 30,
+        "z": 40,
+        "amount": 400
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": -30,
+        "amount": 400
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 404,
+        "roughness": 0.9,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": 10,
+            "z0": -96,
+            "x1": 14,
+            "z1": -40,
+            "height": 9,
+            "width": 8
+          },
+          {
+            "x0": 14,
+            "z0": -22,
+            "x1": 30,
+            "z1": -14,
+            "height": 9,
+            "width": 8
+          },
+          {
+            "x0": 48,
+            "z0": -10,
+            "x1": 96,
+            "z1": -14,
+            "height": 9,
+            "width": 8
+          }
+        ],
+        "hills": [
+          {
+            "x": -20,
+            "z": 30,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": 10,
+            "z": 60,
+            "radius": 16,
+            "height": 5
+          }
+        ],
+        "flats": [
+          {
+            "x": -62,
+            "z": 62,
+            "radius": 15
+          },
+          {
+            "x": 56,
+            "z": -56,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  }
+]

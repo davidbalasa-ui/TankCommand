@@ -7,8 +7,7 @@ import type { SimData } from './simData';
 import type { WorldState } from '../sim/types';
 import training1 from './missions/training_1_drops.json';
 import training2 from './missions/training_2_mining.json';
-import human1 from './missions/human_1_first_strike.json';
-import alien1 from './missions/alien_1_first_strike.json';
+import { CAMPAIGN_MISSIONS } from './missions/campaign';
 
 export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
   const rows = json.map((entry) => parseMission(entry));
@@ -22,7 +21,7 @@ export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
   return rows.sort((a, b) => a.campaign.localeCompare(b.campaign) || a.order - b.order);
 }
 
-export const MISSIONS: MissionRow[] = loadMissionTable([training1, training2, human1, alien1]);
+export const MISSIONS: MissionRow[] = loadMissionTable([training1, training2, ...CAMPAIGN_MISSIONS]);
 
 export function missionsOf(campaign: MissionRow['campaign']): MissionRow[] {
   return MISSIONS.filter((mission) => mission.campaign === campaign);

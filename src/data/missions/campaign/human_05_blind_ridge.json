@@ -1,0 +1,228 @@
+{
+  "id": "mission.human.05_blind_ridge",
+  "campaign": "human",
+  "order": 5,
+  "title": "Blind Ridge",
+  "briefing": "Three Arcadian posts are hidden among the hills, each with a guard. A Watchman radar can see them from far off. Find and destroy all three.",
+  "mapId": "map.c_blind_ridge",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 600,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -60.0,
+      "z": 52.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -56.0,
+      "z": 52.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -60.0,
+      "z": 56.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -56.0,
+      "z": 56.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.radar",
+      "x": -64,
+      "z": 60,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -72,
+      "z": 64,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -68,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": -53,
+      "z": -53,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 67,
+      "z": -45,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 63,
+      "z": 57,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 57,
+      "z": -45,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 53,
+      "z": 57,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -66,
+      "z": 62
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": -58,
+      "z": -58
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 62,
+      "z": -50
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 58,
+      "z": 52
+    }
+  ],
+  "objectives": [
+    {
+      "id": "posts",
+      "text": "Destroy the three hidden posts",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Move the radar unit ahead of your tanks. It spots enemies far beyond your guns."
+        }
+      ]
+    },
+    {
+      "id": "patrol",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 0,
+          "z": 0,
+          "tag": "patrol"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "patrol",
+          "mode": "attack",
+          "x": -66,
+          "z": 62
+        }
+      ]
+    },
+    {
+      "id": "posts",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.radar"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "posts",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

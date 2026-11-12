@@ -1,0 +1,272 @@
+{
+  "id": "mission.human.03_dig_in",
+  "campaign": "human",
+  "order": 3,
+  "title": "Dig In",
+  "briefing": "Raiders are probing the outpost. Hold it for six minutes. A Bastion gun kit is now on the Build list: place it where the raids come in.",
+  "mapId": "map.c_halden",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 450,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": 37,
+      "z": -37,
+      "heading": 0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": 43,
+      "z": -35,
+      "heading": 0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": 35,
+      "z": -43,
+      "heading": 0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": 53,
+      "z": -41,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": 51,
+      "z": -37,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": 45,
+      "z": -45
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold",
+      "text": "Hold the outpost for 6 minutes",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "First raid in one minute. Buy a Bastion gun and place it facing south-west."
+        }
+      ]
+    },
+    {
+      "id": "w1",
+      "when": {
+        "t": "time",
+        "tick": 1200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": -52,
+          "z": 48,
+          "tag": "w1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w1",
+          "mode": "attack",
+          "x": 45,
+          "z": -45
+        }
+      ]
+    },
+    {
+      "id": "w2",
+      "when": {
+        "t": "time",
+        "tick": 2800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": -70,
+          "z": -40,
+          "tag": "w2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 1,
+          "x": -66,
+          "z": -44,
+          "tag": "w2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w2",
+          "mode": "attack",
+          "x": 45,
+          "z": -45
+        }
+      ]
+    },
+    {
+      "id": "w3",
+      "when": {
+        "t": "time",
+        "tick": 4400
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "A bigger group is coming."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 4,
+          "x": -46,
+          "z": 42,
+          "tag": "w3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w3",
+          "mode": "attack",
+          "x": 45,
+          "z": -45
+        }
+      ]
+    },
+    {
+      "id": "w4",
+      "when": {
+        "t": "time",
+        "tick": 6000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 20,
+          "z": 70,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": 26,
+          "z": 66,
+          "tag": "w4"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w4",
+          "mode": "attack",
+          "x": 45,
+          "z": -45
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "when": {
+        "t": "time",
+        "tick": 7200
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

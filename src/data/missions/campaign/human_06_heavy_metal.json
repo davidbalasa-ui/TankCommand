@@ -1,0 +1,306 @@
+{
+  "id": "mission.human.06_heavy_metal",
+  "campaign": "human",
+  "order": 6,
+  "title": "Heavy Metal",
+  "briefing": "Two Bulwark heavy tanks must reach the relay station at the end of the road. Ambushes wait in the gaps between the ridges. Get both Bulwarks there.",
+  "mapId": "map.c_relay_road",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 700,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "unit.human.heavy_tank"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.heavy_armor",
+        "research.human.fire_control",
+        "research.human.sensors"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -70,
+      "z": 66,
+      "heading": -0.785,
+      "tag": "convoy"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -74,
+      "z": 62,
+      "heading": -0.785,
+      "tag": "convoy"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -64.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 72.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -82,
+      "z": 74,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -78,
+      "z": 78,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -76,
+      "z": 72
+    }
+  ],
+  "objectives": [
+    {
+      "id": "relay",
+      "text": "Bring both Bulwarks to the relay station",
+      "kind": "primary"
+    },
+    {
+      "id": "convoy",
+      "text": "Keep both Bulwarks alive",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Send the Lancers ahead to spring the ambushes before the Bulwarks arrive."
+        }
+      ]
+    },
+    {
+      "id": "amb1",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": -30,
+        "z": 30,
+        "radius": 18
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Ambush in the first gap!"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": -14,
+          "z": 2,
+          "tag": "amb1"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": -40,
+          "z": 12,
+          "tag": "amb1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "amb1",
+          "mode": "attack",
+          "x": -30,
+          "z": 30
+        }
+      ]
+    },
+    {
+      "id": "amb2",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 10,
+        "z": -10,
+        "radius": 18
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "More of them at the second gap."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 30,
+          "z": 4,
+          "tag": "amb2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 1,
+          "x": 0,
+          "z": -26,
+          "tag": "amb2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "amb2",
+          "mode": "attack",
+          "x": 10,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "amb3",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 50,
+        "z": -50,
+        "radius": 18
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": 78,
+          "z": -48,
+          "tag": "amb3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 50,
+          "z": -80,
+          "tag": "amb3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "amb3",
+          "mode": "attack",
+          "x": 50,
+          "z": -50
+        }
+      ]
+    },
+    {
+      "id": "lost",
+      "when": {
+        "t": "unitsAlive",
+        "tag": "convoy",
+        "op": "<=",
+        "count": 1
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "convoy",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "convoyLost"
+        }
+      ]
+    },
+    {
+      "id": "arrived",
+      "when": {
+        "t": "unitEscorted",
+        "tag": "convoy",
+        "x": 72,
+        "z": -72,
+        "radius": 12
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "relay",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "convoy",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1200,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

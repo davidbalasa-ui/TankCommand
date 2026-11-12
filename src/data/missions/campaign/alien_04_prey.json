@@ -1,0 +1,325 @@
+{
+  "id": "mission.alien.04_prey",
+  "campaign": "alien",
+  "order": 4,
+  "title": "Prey",
+  "briefing": "A Terran supply convoy is running from the outpost. Catch it and destroy its three haulers before they reach the north-west road.",
+  "mapId": "map.c_halden",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 300,
+      "metal": 0,
+      "available": [
+        "unit.alien.light_tank",
+        "unit.alien.light_skimmer",
+        "unit.alien.ore_miner",
+        "unit.alien.tug",
+        "structure.alien.turret"
+      ],
+      "researchDone": [
+        "research.alien.armor_plating",
+        "research.alien.fortifications"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_skimmer",
+      "x": -50.0,
+      "z": 42.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_skimmer",
+      "x": -46.0,
+      "z": 42.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_skimmer",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_skimmer",
+      "x": -46.0,
+      "z": 46.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -58.0,
+      "z": 48.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -54.0,
+      "z": 48.0,
+      "heading": -0.764
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.ore_miner",
+      "x": -60,
+      "z": 54,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.tug",
+      "x": -62,
+      "z": 50,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.tug",
+      "x": 42.5,
+      "z": -47.5,
+      "heading": 3.0,
+      "tag": "convoy"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.tug",
+      "x": 47.5,
+      "z": -47.5,
+      "heading": 3.0,
+      "tag": "convoy"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.tug",
+      "x": 42.5,
+      "z": -42.5,
+      "heading": 3.0,
+      "tag": "convoy"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 37,
+      "z": -45,
+      "heading": 3.0,
+      "tag": "escort"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 45,
+      "z": -53,
+      "heading": 3.0,
+      "tag": "escort"
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.alien.landing_pad",
+      "x": -52,
+      "z": 48
+    }
+  ],
+  "objectives": [
+    {
+      "id": "convoy",
+      "text": "Destroy the three haulers",
+      "kind": "primary"
+    },
+    {
+      "id": "escape",
+      "text": "Let none of them escape",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "Darters are fast. Send them ahead to cut the convoy off."
+        }
+      ]
+    },
+    {
+      "id": "leg1",
+      "when": {
+        "t": "time",
+        "tick": 800
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The convoy is moving. It stops to regroup on the way."
+        },
+        {
+          "t": "aiOrder",
+          "tag": "convoy",
+          "mode": "attack",
+          "x": 20,
+          "z": -60
+        },
+        {
+          "t": "aiOrder",
+          "tag": "escort",
+          "mode": "attack",
+          "x": 20,
+          "z": -60
+        }
+      ]
+    },
+    {
+      "id": "leg2",
+      "when": {
+        "t": "time",
+        "tick": 2400
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "convoy",
+          "mode": "attack",
+          "x": -15,
+          "z": -45
+        },
+        {
+          "t": "aiOrder",
+          "tag": "escort",
+          "mode": "attack",
+          "x": -15,
+          "z": -45
+        }
+      ]
+    },
+    {
+      "id": "leg3",
+      "when": {
+        "t": "time",
+        "tick": 4000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "They are on the move again. Catch them before the road!"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "convoy",
+          "mode": "attack",
+          "x": -45,
+          "z": -65
+        },
+        {
+          "t": "aiOrder",
+          "tag": "escort",
+          "mode": "attack",
+          "x": -45,
+          "z": -65
+        }
+      ]
+    },
+    {
+      "id": "leg4",
+      "when": {
+        "t": "time",
+        "tick": 5400
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "convoy",
+          "mode": "attack",
+          "x": -70,
+          "z": -66
+        },
+        {
+          "t": "aiOrder",
+          "tag": "escort",
+          "mode": "attack",
+          "x": -70,
+          "z": -66
+        }
+      ]
+    },
+    {
+      "id": "escaped",
+      "when": {
+        "t": "unitEscorted",
+        "tag": "convoy",
+        "x": -70,
+        "z": -66,
+        "radius": 10
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "escape",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "convoyEscaped"
+        }
+      ]
+    },
+    {
+      "id": "caught",
+      "when": {
+        "t": "unitDestroyed",
+        "tag": "convoy"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "convoy",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "escape",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 720,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import { createWorld, hashWorld, step } from '../../src/sim/world';
 import type { Command } from '../../src/sim/commands';
 import type { StartUnit, WorldState } from '../../src/sim/types';
 import { padType, tankType } from './simHelpers';
+import { playMission } from './campaignBot';
 
 const SEC = 20;
 
@@ -287,49 +288,13 @@ describe('placeholder missions', () => {
   }, 120_000);
 
   it('[MSN-03] the combat missions can be won by a scripted attack', () => {
-    for (const id of ['mission.human.1_first_strike', 'mission.alien.1_first_strike']) {
+    // The scripted player lives in campaignBot.ts; CMP-01 runs it on every campaign mission.
+    for (const id of ['mission.human.04_first_strike', 'mission.alien.07_root_and_ruin']) {
       const row = MISSIONS.find((m) => m.id === id);
       if (!row) {
         throw new Error(id);
       }
-      let w = buildMissionWorld(data, row, 2);
-      const tankId = row.sides[0]?.faction === 'human' ? 'unit.human.light_tank' : 'unit.alien.light_tank';
-      const pad = w.structures.find((s) => s.owner === 1);
-      const limit = (row.timeLimitSec ?? 1500) * SEC;
-      // Put the miner to work, as a player would: with units costing ore only, the enemy AI is
-      // no longer held back by metal, so the attack needs the ore income to keep up.
-      const miner = w.units.find((u) => u.owner === 1 && u.typeId.endsWith('ore_miner'));
-      const near = (d: { x: number; z: number }): number =>
-        Math.hypot(d.x - (miner?.x ?? 0), d.z - (miner?.z ?? 0));
-      const ore = w.deposits.filter((d) => d.kind === 'ore').sort((a, b) => near(a) - near(b))[0];
-      if (miner && ore) {
-        w = stepWithAi(w, [{ kind: 'mine', issuer: 1, tick: w.tick + 1, unitIds: [miner.id], depositId: ore.id }]);
-      }
-      while (!w.result && w.tick < limit) {
-        const commands: Command[] = [];
-        if (w.tick % 100 === 1) {
-          const army = w.units
-            .filter((u) => u.owner === 1 && u.typeId === tankId && u.hp > 0)
-            .map((u) => u.id);
-          // Structures first, then hunt down whatever enemy units are left (scouts wander far).
-          const foe =
-            w.structures.find((st) => st.owner === 2 && st.hp > 0) ??
-            w.units.find((u) => u.owner === 2 && u.hp > 0);
-          if (army.length > 0 && w.tick >= 4800 && foe) {
-            commands.push({ kind: 'attack', issuer: 1, tick: w.tick + 1, unitIds: army, targetId: foe.id });
-          } else if (army.length > 0) {
-            commands.push({ kind: 'attackMove', issuer: 1, tick: w.tick + 1, unitIds: army, x: -45, z: -45 });
-          }
-          const stats = w.resources.find((r) => r.player === 1);
-          const tankType = w.unitTypes.get(tankId);
-          const ore = tankType?.oreCost ?? 100;
-          const metal = tankType?.metalCost ?? 50;
-          if (pad && stats && stats.ore >= ore && stats.metal >= metal) {
-            commands.push({ kind: 'buy', issuer: 1, tick: w.tick + 1, itemId: tankId, padId: pad.id });
-          }
-        }
-        w = stepWithAi(w, commands);
-      }
+      const w = playMission(buildMissionWorld(data, row, 2), (row.timeLimitSec ?? 1500) * SEC);
       expect(w.result, `${id} ${w.mission?.failReason} t=${w.tick}`).toEqual({ winner: 1 });
     }
   }, 300_000);
@@ -344,7 +309,7 @@ describe('placeholder missions', () => {
 
 describe('[DET-07] mission state is saved and deterministic', () => {
   it('[DET-07] save/load mid-mission keeps the hash and the future', () => {
-    const row = MISSIONS.find((m) => m.id === 'mission.human.1_first_strike');
+    const row = MISSIONS.find((m) => m.id === 'mission.human.04_first_strike');
     if (!row) {
       throw new Error('missing');
     }

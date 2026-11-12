@@ -352,7 +352,7 @@ export class App {
         this.skirmishConfig = config;
       },
       getSkirmishMaps: () =>
-        this.mapRows.map((row) => ({
+        this.mapRows.filter((row) => !row.campaignOnly).map((row) => ({
           id: row.id,
           name: row.name,
           preview: {
