@@ -42,6 +42,8 @@ async function tapWorldPoint(page: Page, x: number, z: number): Promise<void> {
 
 test('[HUD-05] build menu, live resources, queue and cancel work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  // The open Build drawer over the detailed models renders slowly in software.
+  test.setTimeout(60_000);
   await enterGame(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? -1))

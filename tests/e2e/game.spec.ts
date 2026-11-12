@@ -114,7 +114,9 @@ test('[WD-04] a frozen sim records a freeze report and only the 5 s recover mark
   page,
 }) => {
   await enterGame(page);
-  await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+  // Freeze well past the 5 s recover mark: with slow software-rendered frames a 6 s freeze could
+  // end before the watchdog looked again.
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(8000));
 
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.lastFreezeReport() !== null), {
