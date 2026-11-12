@@ -121,3 +121,4 @@ packed vehicle's size and facing to the structure's, then folds each part out ov
 Carrier (folded hull) hides at the end. Packing up plays it backwards over the pack time. Turret
 and missile battery footprints went from 1x1 to 2x2 cells so the deployed tower is about as big as
 the vehicle it came from (at 1x1 it shrank to half size). Deploying no longer raises "Unit lost".
+| 2026-11-12 | Alien faction name | David: the aliens are the **Arcadians** (was working name Kesh); humans stay Terran for now. Player-facing text renamed; code ids (`alien`, asset names like kesh_*.glb) unchanged. | David's call. | David |

@@ -87,7 +87,7 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
   await page.getByRole('radio', { name: 'Opponents: 2 AI' }).click();
   await expect(page.getByRole('radio', { name: 'Opponents: 2 AI' })).toHaveAttribute('aria-checked', 'true');
-  await page.getByRole('radio', { name: 'Your side: Kesh' }).click();
+  await page.getByRole('radio', { name: 'Your side: Arcadians' }).click();
   await page.getByRole('radio', { name: 'Resources: High' }).click();
   await page.getByRole('radio', { name: 'Start with: Pad only' }).click();
   await page.getByRole('radio', { name: 'Fog of war: Off' }).click();

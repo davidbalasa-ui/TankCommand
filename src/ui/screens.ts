@@ -32,7 +32,7 @@ async function lockLandscape(): Promise<void> {
 }
 
 // Working faction names (C-03). Final public names need David's approval.
-export const FACTION_NAMES = { human: 'Terran Coalition', alien: 'Kesh' } as const;
+export const FACTION_NAMES = { human: 'Terran Coalition', alien: 'Arcadians' } as const;
 
 const MAX_AI_OPPONENTS = 2;
 

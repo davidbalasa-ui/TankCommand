@@ -24,10 +24,58 @@ export interface RiverFeature {
   fords: Array<{ from: number; to: number }>;
 }
 
+/** A raised wall of ground from one point to another (a ridge line); leave gaps by splitting it. */
+export interface RidgeFeature {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  /** Height at the crest, metres (negative digs a trench). */
+  height: number;
+  /** Half-width of the ridge at its base, metres. */
+  width: number;
+}
+
+/** A round hill (positive height) or basin (negative). */
+export interface HillFeature {
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+}
+
+/** Level ground for a base or landing site. */
+export interface FlatFeature {
+  x: number;
+  z: number;
+  radius: number;
+  height?: number;
+}
+
+/**
+ * Hand-shaped terrain for campaign maps. Absent = the classic skirmish terrain (seeded noise,
+ * the diagonal centre ridge, rotational symmetry, four flat corners).
+ */
+export interface TerrainFeature {
+  /** Noise seed for this map's hills; the world seed when absent. */
+  seed?: number;
+  /** Multiplier on the rolling noise (default 1). */
+  roughness?: number;
+  /** The skirmish maps' diagonal ridge (default true). */
+  centreRidge?: boolean;
+  /** Mirror the map so both sides start equal (default true). */
+  symmetric?: boolean;
+  ridges?: RidgeFeature[];
+  hills?: HillFeature[];
+  /** Replace the four default flat corners when given. */
+  flats?: FlatFeature[];
+}
+
 export interface MapFeatures {
   waterLevel: number | null;
   lakes: LakeFeature[];
   rivers: RiverFeature[];
+  terrain?: TerrainFeature;
 }
 
 export const NO_FEATURES: MapFeatures = { waterLevel: null, lakes: [], rivers: [] };
@@ -164,20 +212,41 @@ export function generateMap(
   };
 
   const half = map.size / 2;
+  const terrain = features.terrain;
+  const noiseSeed = terrain?.seed ?? seed;
+  const roughness = terrain?.roughness ?? 1;
 
   for (let iz = 0; iz <= rows; iz += 1) {
     const z = -half + iz * cellSize;
     for (let ix = 0; ix <= cols; ix += 1) {
       const x = -half + ix * cellSize;
-      const octave1 = valueNoise(x * 0.035, z * 0.035, seed) * 2.4;
-      const octave2 = valueNoise(x * 0.09, z * 0.09, seed + 17) * 1.1;
-      const octave3 = valueNoise(x * 0.19, z * 0.19, seed + 43) * 0.45;
-      let h = octave1 + octave2 + octave3;
+      const octave1 = valueNoise(x * 0.035, z * 0.035, noiseSeed) * 2.4;
+      const octave2 = valueNoise(x * 0.09, z * 0.09, noiseSeed + 17) * 1.1;
+      const octave3 = valueNoise(x * 0.19, z * 0.19, noiseSeed + 43) * 0.45;
+      let h = (octave1 + octave2 + octave3) * roughness;
 
-      const ridgeDistance = Math.abs(x + z);
-      const ridgeAlong = Math.abs(x - z);
-      if (ridgeAlong < 70) {
-        h += Math.max(0, 1 - ridgeDistance / 6) * 9;
+      if (terrain?.centreRidge ?? true) {
+        const ridgeDistance = Math.abs(x + z);
+        const ridgeAlong = Math.abs(x - z);
+        if (ridgeAlong < 70) {
+          h += Math.max(0, 1 - ridgeDistance / 6) * 9;
+        }
+      }
+      for (const ridge of terrain?.ridges ?? []) {
+        const dx = ridge.x1 - ridge.x0;
+        const dz = ridge.z1 - ridge.z0;
+        const lengthSq = dx * dx + dz * dz;
+        const t = lengthSq === 0 ? 0 : clamp(((x - ridge.x0) * dx + (z - ridge.z0) * dz) / lengthSq, 0, 1);
+        const d = Math.hypot(x - (ridge.x0 + dx * t), z - (ridge.z0 + dz * t));
+        if (d < ridge.width) {
+          h += smooth(1 - d / ridge.width) * ridge.height;
+        }
+      }
+      for (const hill of terrain?.hills ?? []) {
+        const d = Math.hypot(x - hill.x, z - hill.z);
+        if (d < hill.radius) {
+          h += smooth(1 - d / hill.radius) * hill.height;
+        }
       }
 
       const edgeDistance = Math.min(ix, iz, cols - ix, rows - iz) * cellSize;
@@ -190,7 +259,7 @@ export function generateMap(
   }
 
   // Rotationally symmetric terrain so both start positions are equally good.
-  for (let iz = 0; iz <= rows; iz += 1) {
+  for (let iz = 0; iz <= rows && (terrain?.symmetric ?? true); iz += 1) {
     for (let ix = 0; ix <= cols; ix += 1) {
       const mirrorIx = cols - ix;
       const mirrorIz = rows - iz;
@@ -203,11 +272,17 @@ export function generateMap(
     }
   }
 
-  flattenCircle(map, -50, -50, 14, 24, 0);
-  flattenCircle(map, 50, 50, 14, 24, 0);
-  flattenCircle(map, 50, -50, 14, 24, 0);
-  flattenCircle(map, -50, 50, 14, 24, 0);
-  flattenCircle(map, 20, -20, 6, 10, 0);
+  if (terrain?.flats) {
+    for (const flat of terrain.flats) {
+      flattenCircle(map, flat.x, flat.z, flat.radius, flat.radius * 1.7, flat.height ?? 0);
+    }
+  } else {
+    flattenCircle(map, -50, -50, 14, 24, 0);
+    flattenCircle(map, 50, 50, 14, 24, 0);
+    flattenCircle(map, 50, -50, 14, 24, 0);
+    flattenCircle(map, -50, 50, 14, 24, 0);
+    flattenCircle(map, 20, -20, 6, 10, 0);
+  }
 
   carveWater(map, features);
 

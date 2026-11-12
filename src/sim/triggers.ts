@@ -31,7 +31,13 @@ export interface RevealState {
 
 // `def` never changes during play; everything else is saved and hashed.
 export interface MissionState {
-  def: { id: string; triggers: Trigger[]; timeLimitTicks: number | null };
+  def: {
+    id: string;
+    triggers: Trigger[];
+    timeLimitTicks: number | null;
+    /** Per side (player number as a string): the only items it may buy in this mission. */
+    available?: Record<string, string[]>;
+  };
   humanSide: PlayerId;
   fired: string[];
   objectives: ObjectiveState[];
@@ -47,6 +53,12 @@ export interface TriggerDeps {
 }
 
 const MAX_MESSAGES = 12;
+
+/** False when the mission limits what this side may buy and the item is not on its list. */
+export function missionAllows(world: WorldState, player: PlayerId, itemId: string): boolean {
+  const list = world.mission?.def.available?.[String(player)];
+  return !list || list.includes(itemId);
+}
 
 export function cloneMission(mission: MissionState): MissionState {
   return {

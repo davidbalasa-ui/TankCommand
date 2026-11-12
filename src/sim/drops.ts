@@ -1,4 +1,5 @@
 import { flyNewAircraftHome, hasFreeAirSlot } from './air';
+import { missionAllows } from './triggers';
 import { PAD_CLEAR_TIMEOUT_SEC, PAD_LAND_SEC, padLayout, padOccupied, padRallySpot } from './pad';
 import { SIM_TICK_HZ } from './constants';
 import { addStructure, addUnit, placementValidity, unitCount } from './spawn';
@@ -33,6 +34,7 @@ type BuyReason =
   | 'padGone'
   | 'unaffordable'
   | 'locked'
+  | 'notInMission'
   | 'cap'
   | 'noAirBase';
 
@@ -72,6 +74,9 @@ function resolveItem(
   }
   if (unit && unit.deploysTo !== null) {
     return { item: null, reason: 'notInRoster' };
+  }
+  if (!missionAllows(world, player, itemId)) {
+    return { item: null, reason: 'notInMission' };
   }
   if (!isItemUnlocked(world, player, itemId)) {
     return { item: null, reason: 'locked' };

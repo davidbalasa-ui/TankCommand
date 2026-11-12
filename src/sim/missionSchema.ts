@@ -130,6 +130,8 @@ const missionSide = z.object({
   ore: z.number().int().nonnegative(),
   metal: z.number().int().nonnegative(),
   researchDone: z.array(z.string()).optional(),
+  /** Only these items can be bought by this side in the mission (all when absent). */
+  available: z.array(z.string().min(1)).optional(),
 });
 
 export const missionSchema = z.object({

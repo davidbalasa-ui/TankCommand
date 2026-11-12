@@ -34,6 +34,39 @@ const featuresSchema = z.object({
       fords: z.array(z.object({ from: z.number().min(0).max(1), to: z.number().min(0).max(1) })),
     }),
   ),
+  terrain: z
+    .object({
+      seed: z.number().int().optional(),
+      roughness: z.number().nonnegative().optional(),
+      centreRidge: z.boolean().optional(),
+      symmetric: z.boolean().optional(),
+      ridges: z
+        .array(
+          z.object({
+            x0: z.number().finite(),
+            z0: z.number().finite(),
+            x1: z.number().finite(),
+            z1: z.number().finite(),
+            height: z.number().finite(),
+            width: z.number().positive(),
+          }),
+        )
+        .optional(),
+      hills: z
+        .array(z.object({ x: z.number().finite(), z: z.number().finite(), radius: z.number().positive(), height: z.number().finite() }))
+        .optional(),
+      flats: z
+        .array(
+          z.object({
+            x: z.number().finite(),
+            z: z.number().finite(),
+            radius: z.number().positive(),
+            height: z.number().finite().optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
 });
 
 export const mapRowSchema = z.object({

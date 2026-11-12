@@ -119,7 +119,7 @@ export class Effects {
   }
 
   /**
-   * A jagged arc from a to b (Kesh lightning). Lives one frame unless ttl is given, so calling it
+   * A jagged arc from a to b (Arcadian lightning). Lives one frame unless ttl is given, so calling it
    * every frame makes it crackle.
    */
   lightning(a: THREE.Vector3, b: THREE.Vector3, color = 0xffe7a0, ttl = 0.05, segments = 9, jitter = 0.5): void {
@@ -216,7 +216,7 @@ export class Effects {
 
   /**
    * A packed tower unfolding into its structure: a dust ring and a puff of smoke for Terran
-   * builds, a gold glow ring and sparks for Kesh ones. `size` is the structure's width.
+   * builds, a gold glow ring and sparks for Arcadian ones. `size` is the structure's width.
    */
   deploy(x: number, gy: number, z: number, size: number, alien: boolean): void {
     if (alien) {

@@ -78,6 +78,7 @@ import { GameServices } from './game/services';
 import { FpsMeter } from './ui/fpsMeter';
 import { addUnit, placementValidity, structureAtPoint } from './sim/spawn';
 import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
+import { missionAllows } from './sim/triggers';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
 import { perceivedUnits } from './sim/vision';
@@ -738,7 +739,7 @@ export class App {
     };
     const items: BuildItemView[] = [];
     for (const row of this.unitRows) {
-      if (row.faction !== faction || this.world.unitTypes.get(row.id)?.deploysTo) {
+      if (row.faction !== faction || this.world.unitTypes.get(row.id)?.deploysTo || !missionAllows(this.world, 1, row.id)) {
         continue;
       }
       items.push({
@@ -752,7 +753,8 @@ export class App {
       });
     }
     for (const row of this.structureRows) {
-      if (row.faction !== faction) {
+      // Missions can hold items back so each one adds a single new idea; those are not listed.
+      if (row.faction !== faction || !missionAllows(this.world, 1, row.id)) {
         continue;
       }
       items.push({

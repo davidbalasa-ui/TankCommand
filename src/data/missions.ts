@@ -61,6 +61,13 @@ export function buildMissionWorld(
       id: mission.id,
       triggers: mission.triggers,
       timeLimitTicks: mission.timeLimitSec ? Math.round(mission.timeLimitSec * SIM_TICK_HZ) : null,
+      ...(mission.sides.some((side) => side.available)
+        ? {
+            available: Object.fromEntries(
+              mission.sides.filter((side) => side.available).map((side) => [String(side.player), side.available ?? []]),
+            ),
+          }
+        : {}),
     },
     humanSide: human.player,
     fired: [],
