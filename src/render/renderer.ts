@@ -542,6 +542,8 @@ export class RenderView {
   private readonly wrecksGroup = new THREE.Group();
   private readonly wreckField = new WreckField(this.wrecksGroup, this.wreckInstances, this.effects, darkenMaterials);
   private lastFrameAt = 0;
+  /** Real seconds since the last frame (capped), so effects keep their timing at any frame rate. */
+  private frameDt = 1 / 60;
   /** Which side's look each structure had, for its death blast after it has left the world. */
   private readonly structureAlien = new Map<number, boolean>();
   private readonly selection: number[] = [];
@@ -1054,7 +1056,7 @@ export class RenderView {
     this.syncWorkerLabels();
     this.updateMarker();
     this.updateFlashes();
-    this.effects.update(1 / 60);
+    this.effects.update(this.frameDt);
     this.frame += 1;
     this.thumbnailBudget = 1;
     this.renderer.render(this.scene, this.camera);
@@ -3061,6 +3063,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const now = performance.now();
     const dt = this.lastFrameAt === 0 ? 1 / 60 : Math.min(0.1, (now - this.lastFrameAt) / 1000);
     this.lastFrameAt = now;
+    this.frameDt = Math.min(0.05, dt);
     this.wreckField.update(dt, this.shadowsEnabled);
   }
 

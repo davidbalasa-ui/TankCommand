@@ -387,7 +387,8 @@ export async function winSkirmish(page: Page): Promise<void> {
     if (!hook) {
       return;
     }
-    for (let i = 0; i < 10; i += 1) {
+    // 600 starting ore buys eight 75-ore scouts.
+    for (let i = 0; i < 8; i += 1) {
       hook.sendCommand({
         kind: 'buy',
         itemId: 'unit.human.scout',
@@ -408,11 +409,11 @@ export async function winSkirmish(page: Page): Promise<void> {
           }
           return hook.units().filter((unit) => unit.owner === 1 && unit.typeId === 'unit.human.scout').length;
         }),
-      // Deliveries land one at a time (2.5 s each on the pad), so ten take a while; longer still
+      // Deliveries land one at a time (2.5 s each on the pad), so eight take a while; longer still
       // when software rendering of the detailed models slows the frame loop.
       { timeout: 90_000 },
     )
-    .toBeGreaterThanOrEqual(10);
+    .toBeGreaterThanOrEqual(8);
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const hasResult = await page.evaluate(() => window.__TC_TEST__?.snapshot().result !== null);

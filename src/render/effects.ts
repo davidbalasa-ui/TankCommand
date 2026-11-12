@@ -76,6 +76,8 @@ interface Particle {
   rot: number;
   spin: number;
   seed: number;
+  /** Drawn at least once: even a very short particle shows for one frame at any frame rate. */
+  drawn: boolean;
 }
 
 interface Ribbon {
@@ -90,6 +92,7 @@ interface Ribbon {
   width: number;
   age: number;
   life: number;
+  drawn: boolean;
 }
 
 interface Chunk {
@@ -292,6 +295,7 @@ export class Effects {
       width,
       age: 0,
       life: 0.025,
+      drawn: false,
     });
   }
 
@@ -334,7 +338,7 @@ export class Effects {
         nz += sz * k;
         ny += (Math.random() * 2 - 1) * amount * 0.7;
       }
-      this.ribbonList.push({ ax: px, ay: py, az: pz, bx: nx, by: ny, bz: nz, c: color, alpha: 1, width, age: 0, life: ttl });
+      this.ribbonList.push({ ax: px, ay: py, az: pz, bx: nx, by: ny, bz: nz, c: color, alpha: 1, width, age: 0, life: ttl, drawn: false });
       px = nx;
       py = ny;
       pz = nz;
@@ -391,7 +395,7 @@ export class Effects {
         ny += kink * 0.25;
       }
       const color: Rgb = strength >= 1 ? [0.75, 0.6, 1] : VIOLET;
-      this.ribbonList.push({ ax: px, ay: py, az: pz, bx: nx, by: ny, bz: nz, c: color, alpha: Math.min(1, strength), width: strength >= 1 ? 0.2 : 0.14, age: 0, life: ttl });
+      this.ribbonList.push({ ax: px, ay: py, az: pz, bx: nx, by: ny, bz: nz, c: color, alpha: Math.min(1, strength), width: strength >= 1 ? 0.2 : 0.14, age: 0, life: ttl, drawn: false });
       px = nx;
       py = ny;
       pz = nz;
@@ -401,8 +405,8 @@ export class Effects {
   /** A straight beam from a to b (the Disc's ground beam) with a white core and a gold sheath. */
   beam(a: THREE.Vector3, b: THREE.Vector3, width: number, ttl = 0.05): void {
     const flicker = 0.85 + Math.random() * 0.3;
-    this.ribbonList.push({ ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, c: GOLD, alpha: 0.8, width: width * flicker, age: 0, life: ttl });
-    this.ribbonList.push({ ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, c: GOLD_HOT, alpha: 1, width: width * 0.4 * flicker, age: 0, life: ttl });
+    this.ribbonList.push({ ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, c: GOLD, alpha: 0.8, width: width * flicker, age: 0, life: ttl, drawn: false });
+    this.ribbonList.push({ ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z, c: GOLD_HOT, alpha: 1, width: width * 0.4 * flicker, age: 0, life: ttl, drawn: false });
     if (Math.random() < 0.5) {
       this.arc(a.x, a.y, a.z, b.x, b.y, b.z, GOLD_HOT, 0.05, 6, width * 1.2, 0.08);
     }
@@ -479,6 +483,7 @@ export class Effects {
           width: 0.08,
           age: 0,
           life: 0.16,
+          drawn: false,
         });
       }
       return;
@@ -758,6 +763,7 @@ export class Effects {
     p.rot = Math.random() * Math.PI * 2;
     p.spin = layer === 1 ? rand(-0.6, 0.6) : rand(-2, 2);
     p.seed = Math.random() * 9;
+    p.drawn = false;
     this.particles.push(p);
   }
 
@@ -852,11 +858,12 @@ export class Effects {
         continue;
       }
       p.age += dt;
-      const t = p.age / p.life;
-      if (t >= 1) {
+      if (p.age >= p.life && p.drawn) {
         this.spare.push(p);
         continue;
       }
+      const t = Math.min(0.999, p.age / p.life);
+      p.drawn = true;
       this.particles[write] = p;
       write += 1;
       const damp = Math.max(0, 1 - p.drag * dt);
@@ -892,13 +899,14 @@ export class Effects {
       if (!q) {
         continue;
       }
-      q.age += dt;
-      if (q.age > q.life) {
+      if (q.drawn && q.age > q.life) {
         continue;
       }
       this.ribbonList[keep] = q;
       keep += 1;
-      const fade = Math.max(0, 1 - Math.max(0, q.age - 1 / 60) / q.life);
+      const fade = Math.max(0.15, 1 - q.age / q.life);
+      q.age += dt;
+      q.drawn = true;
       this.ribbons.push(q.ax, q.ay, q.az, q.bx, q.by, q.bz, q.c[0], q.c[1], q.c[2], q.alpha * fade, q.width);
     }
     this.ribbonList.length = keep;

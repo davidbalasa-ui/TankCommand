@@ -60,7 +60,7 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(550);
+    .toBe(525);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0))
     .toBe(1);
@@ -69,7 +69,7 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(500);
+    .toBe(450);
   const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.at(-1)?.id ?? null);
   expect(orderId).not.toBeNull();
   if (orderId === null) {
@@ -78,7 +78,7 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await page.locator(`[data-control-id="build.cancel.${orderId}"]`).tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(550);
+    .toBe(525);
   await expect
     .poll(async () =>
       page.evaluate((id) => window.__TC_TEST__?.hud()?.queue.some((order) => order.id === id) ?? true, orderId),
