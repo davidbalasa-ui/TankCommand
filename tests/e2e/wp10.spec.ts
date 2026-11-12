@@ -306,11 +306,23 @@ test('[AUD-01] selection and orders play audio acknowledgements', async ({ page 
       ...hook.structures().map((item) => ({ x: item.x, z: item.z })),
       ...hook.deposits().map((item) => ({ x: item.x, z: item.z })),
     ];
-    for (const [dx, dz] of [[8, 0], [-8, 0], [0, 8], [0, -8], [8, 8], [-8, -8], [8, -8], [-8, 8], [12, 0], [-12, 0]]) {
-      const x = cam.targetX + (dx ?? 0);
-      const z = cam.targetZ + (dz ?? 0);
+    const offsets: Array<[number, number]> = [];
+    for (const radius of [8, 12, 16]) {
+      for (let step = 0; step < 12; step += 1) {
+        const angle = (step / 12) * Math.PI * 2;
+        offsets.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+      }
+    }
+    for (const [dx, dz] of offsets) {
+      const x = cam.targetX + dx;
+      const z = cam.targetZ + dz;
       if (things.every((item) => Math.hypot(item.x - x, item.z - z) > 6)) {
-        return hook.worldToScreen(x, z);
+        const point = hook.worldToScreen(x, z);
+        // Skip points covered by the HUD (group tiles, command grid, panels).
+        const hit = document.elementFromPoint(point.x, point.y);
+        if (hit instanceof HTMLCanvasElement && hit.classList.contains('game-canvas')) {
+          return point;
+        }
       }
     }
     return null;
