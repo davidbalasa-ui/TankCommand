@@ -30,34 +30,62 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | structure.human.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion Gun (structure) |
 | texture.terrain.detail | TankCommand project (scripted numpy) | ORIGINAL | - | Terrain surface |
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
+| unit.alien.carapace.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
+| unit.alien.darter.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.disc | TankCommand project (scripted Blender) | ORIGINAL | - | Disc (saucer) |
+| unit.alien.disc.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.ferrier | TankCommand project (scripted Blender) | ORIGINAL | - | Ferrier (tug) |
+| unit.alien.ferrier.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.glider | TankCommand project (scripted Blender) | ORIGINAL | - | Glider (glider) |
+| unit.alien.glider.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.gorger | TankCommand project (scripted Blender) | ORIGINAL | - | Gorger (ore miner) |
+| unit.alien.gorger.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.halo | TankCommand project (scripted Blender) | ORIGINAL | - | Halo (fighter) |
+| unit.alien.halo.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.mortar_beast | TankCommand project (scripted Blender) | ORIGINAL | - | Mortar Beast (artillery) |
+| unit.alien.mortar_beast.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.seer | TankCommand project (scripted Blender) | ORIGINAL | - | Seer (radar) |
+| unit.alien.seer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.spitter | TankCommand project (scripted Blender) | ORIGINAL | - | Spitter (missile tank) |
+| unit.alien.spitter.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.spore_tower_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Spore Tower (packed) (missile battery packed) |
+| unit.alien.spore_tower_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.stinger | TankCommand project (scripted Blender) | ORIGINAL | - | Stinger (light tank) |
+| unit.alien.stinger.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.thornmound_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Thornmound (packed) (turret packed) |
+| unit.alien.thornmound_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.weaver | TankCommand project (scripted Blender) | ORIGINAL | - | Weaver (repair) |
+| unit.alien.weaver.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.bastion_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion (packed) (turret packed) |
+| unit.human.bastion_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.bulwark | TankCommand project (scripted Blender) | ORIGINAL | - | Bulwark (heavy tank) |
+| unit.human.bulwark.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.condor | TankCommand project (scripted Blender) | ORIGINAL | - | Condor (bomber) |
+| unit.human.condor.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.falcon | TankCommand project (scripted Blender) | ORIGINAL | - | Falcon (fighter) |
+| unit.human.falcon.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.hauler | TankCommand project (scripted Blender) | ORIGINAL | - | Hauler (tug) |
+| unit.human.hauler.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.javelin | TankCommand project (scripted Blender) | ORIGINAL | - | Javelin (missile tank) |
+| unit.human.javelin.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.lancer | TankCommand project (scripted Blender) | ORIGINAL | - | Lancer (light tank) |
+| unit.human.lancer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.longbow | TankCommand project (scripted Blender) | ORIGINAL | - | Longbow (artillery) |
+| unit.human.longbow.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.mender | TankCommand project (scripted Blender) | ORIGINAL | - | Mender (repair) |
+| unit.human.mender.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.outrider | TankCommand project (scripted Blender) | ORIGINAL | - | Outrider (scout) |
+| unit.human.outrider.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.poc_tank | TankCommand project (scripted Blender) | ORIGINAL | - | Placeholder human tank |
 | unit.human.prospector | TankCommand project (scripted Blender) | ORIGINAL | - | Prospector (ore miner) |
+| unit.human.prospector.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.skimmer | TankCommand project (scripted Blender) | ORIGINAL | - | Skimmer (hover tank) |
+| unit.human.skimmer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.spire_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Spire (packed) (missile battery packed) |
+| unit.human.spire_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.watchman | TankCommand project (scripted Blender) | ORIGINAL | - | Watchman (radar) |
+| unit.human.watchman.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 
 ## Fonts
 
