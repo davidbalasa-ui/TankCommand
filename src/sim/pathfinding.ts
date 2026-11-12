@@ -265,7 +265,16 @@ function nearestReachableCell(
   return null;
 }
 
-function astar(map: MapDef, start: Cell, goal: Cell): Cell[] | null {
+/** Path-grid key of the cell holding (x, z); the key findPath's `avoid` set uses. */
+export function cellKeyAt(map: MapDef, x: number, z: number): number {
+  const cell = worldToCell(map, x, z);
+  return keyOf(map, cell.cx, cell.cz);
+}
+
+/** Extra cost of driving through a cell another unit is parked in (in cells of plain driving). */
+export const AVOID_CELL_COST = 6;
+
+function astar(map: MapDef, start: Cell, goal: Cell, avoid?: ReadonlySet<number>): Cell[] | null {
   const startKey = keyOf(map, start.cx, start.cz);
   const goalKey = keyOf(map, goal.cx, goal.cz);
   if (startKey === goalKey) {
@@ -309,7 +318,7 @@ function astar(map: MapDef, start: Cell, goal: Cell): Cell[] | null {
       if (closed[nKey] === 1) {
         continue;
       }
-      const tentative = currentG + neighbour.cost;
+      const tentative = currentG + neighbour.cost + (avoid?.has(nKey) ? AVOID_CELL_COST : 0);
       if (tentative < (gScore[nKey] ?? Number.POSITIVE_INFINITY)) {
         gScore[nKey] = tentative;
         cameFrom[nKey] = current.key;
@@ -320,7 +329,7 @@ function astar(map: MapDef, start: Cell, goal: Cell): Cell[] | null {
   return null;
 }
 
-function lineClear(map: MapDef, a: Cell, b: Cell): boolean {
+function lineClear(map: MapDef, a: Cell, b: Cell, avoid?: ReadonlySet<number>): boolean {
   const start = cellCenter(map, a.cx, a.cz);
   const end = cellCenter(map, b.cx, b.cz);
   const distance = Math.hypot(end.x - start.x, end.z - start.z);
@@ -332,11 +341,17 @@ function lineClear(map: MapDef, a: Cell, b: Cell): boolean {
     if (isBlockedAt(map, x, z)) {
       return false;
     }
+    if (avoid && avoid.size > 0) {
+      const cell = worldToCell(map, x, z);
+      if (avoid.has(keyOf(map, cell.cx, cell.cz))) {
+        return false;
+      }
+    }
   }
   return true;
 }
 
-function smoothCells(map: MapDef, cells: Cell[]): Cell[] {
+function smoothCells(map: MapDef, cells: Cell[], avoid?: ReadonlySet<number>): Cell[] {
   if (cells.length <= 2) {
     return cells;
   }
@@ -352,7 +367,7 @@ function smoothCells(map: MapDef, cells: Cell[]): Cell[] {
     for (; next > index + 1; next -= 1) {
       const a = cells[index];
       const b = cells[next];
-      if (a && b && lineClear(map, a, b)) {
+      if (a && b && lineClear(map, a, b, avoid)) {
         break;
       }
     }
@@ -372,6 +387,7 @@ export function findPath(
   startZ: number,
   goalX: number,
   goalZ: number,
+  avoid?: ReadonlySet<number>,
 ): Point[] | null {
   if (map.movement === 'air') {
     const half = map.size / 2;
@@ -405,11 +421,17 @@ export function findPath(
     return null;
   }
 
-  const cells = astar(map, start, goal);
+  const cells = astar(map, start, goal, avoid);
   if (!cells) {
     return null;
   }
-  const smoothed = smoothCells(map, cells);
+  // Shortcuts may cross a cell a parked unit stands in only where the route itself goes through it.
+  let routeAvoid: Set<number> | undefined;
+  if (avoid && avoid.size > 0) {
+    const onRoute = new Set(cells.map((c) => keyOf(map, c.cx, c.cz)));
+    routeAvoid = new Set([...avoid].filter((key) => !onRoute.has(key)));
+  }
+  const smoothed = smoothCells(map, cells, routeAvoid);
   const points = smoothed.map((cell) => cellCenter(map, cell.cx, cell.cz));
   const last = points[points.length - 1];
   if (goalOpen && (!last || Math.hypot(last.x - goalX, last.z - goalZ) > 0.000001)) {

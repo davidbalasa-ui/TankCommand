@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, step } from '../../src/sim/world';
-import { PAD_LAND_SEC, padLayout } from '../../src/sim/pad';
+import { PAD_LAND_SEC, padLayout, padQueueSpot } from '../../src/sim/pad';
+import { placementValidity } from '../../src/sim/spawn';
 import type { SimStructureType, SimUnitType, StartUnit, WorldState } from '../../src/sim/types';
 import { metalStationType, minerType, padType, scoutType, tugType } from './simHelpers';
 
@@ -228,5 +229,16 @@ describe('[PAD] landing pad traffic', () => {
     }
     const unit = world.units.find((item) => item.id === scout.id)!;
     expect(Math.hypot(unit.x - (pad.x + 14), unit.z - (pad.z + 2))).toBeLessThan(3);
+  });
+
+  it('[PAD-07] nothing can be built on any delivery spot or the start of its line', () => {
+    const world = padWorld({});
+    const pad = myPad(world);
+    const layout = padLayout(world, pad);
+    const small = padType({ id: 'structure.test.small', footprint: { cellsX: 1, cellsZ: 1 } });
+    layout.docks.forEach((_, side) => {
+      const spot = padQueueSpot(world, layout, 0, side);
+      expect(placementValidity(world, 1, small, spot.x, spot.z).reason, `dock ${side}`).toBe('padLane');
+    });
   });
 });

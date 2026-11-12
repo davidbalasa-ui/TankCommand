@@ -66,6 +66,8 @@ export interface UnitState {
   pathGoal?: { x: number; z: number; endX: number; endZ: number };
   reloadLeft: number;
   stuckTicks: number;
+  /** Ticks spent waiting for an oncoming friend at a narrow spot (0 when not waiting). */
+  yieldTicks?: number;
   speed: number;
   replans: number;
   attackRepathTick: number;

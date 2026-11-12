@@ -5,8 +5,8 @@ import {
   mapFor,
   type MapDef,
 } from './map';
-import { goalTaken, steer } from './avoidance';
-import { findPath } from './pathfinding';
+import { goalTaken, nearbyUnits, steer, unitRadius } from './avoidance';
+import { cellKeyAt, findPath } from './pathfinding';
 import { avoidsDeposits, insideObstacle, obstacleMap } from './obstacles';
 import {
   STOP_DISTANCE,
@@ -63,13 +63,94 @@ export function canStand(world: WorldState, x: number, z: number): boolean {
   return !isBlockedAt(world.map, x, z);
 }
 
+/** A ground unit that is staying put: other units plan their routes round it. */
+export function isParked(unit: UnitState): boolean {
+  // A unit that has been stuck for half a second counts too: it is in the way, not passing through.
+  // Units holding still to fight are left out: they move on again as soon as the fight shifts.
+  if (unit.hp <= 0 || unit.air || unit.speed >= 0.3) {
+    return false;
+  }
+  return unit.stuckTicks >= 10 || (unit.path.length === 0 && unit.order.kind === 'idle');
+}
+
+/** Room left round a parked unit's hull when routing past it. */
+const PARKED_MARGIN = 0.6;
+/** Parked units this close to the start or the goal are ignored (the unit is leaving, or arriving there). */
+const PARKED_IGNORE_NEAR_GOAL = 4;
+
+/**
+ * Path-grid cells that other parked ground units sit in, for routing round them. Only units near
+ * the straight line from start to goal count, which keeps the set (and the cost) small.
+ */
+export function parkedCells(world: WorldState, map: MapDef, unit: UnitState, goalX: number, goalZ: number): Set<number> {
+  const cells = new Set<number>();
+  if (unit.air || unit.job) {
+    return cells;
+  }
+  const r = unitRadius(world, unit);
+  const midX = (unit.x + goalX) / 2;
+  const midZ = (unit.z + goalZ) / 2;
+  const reach = Math.hypot(goalX - unit.x, goalZ - unit.z) / 2 + 20;
+  for (const other of nearbyUnits(world, midX, midZ, reach)) {
+    if (other === unit || !isParked(other)) {
+      continue;
+    }
+    if (
+      Math.hypot(other.x - goalX, other.z - goalZ) < PARKED_IGNORE_NEAR_GOAL ||
+      Math.hypot(other.x - unit.x, other.z - unit.z) < r + unitRadius(world, other) + 0.5
+    ) {
+      continue;
+    }
+    const extent = r + unitRadius(world, other) + PARKED_MARGIN;
+    const step = map.cellSize;
+    for (let dx = -extent; dx <= extent + 1e-6; dx += step / 2) {
+      for (let dz = -extent; dz <= extent + 1e-6; dz += step / 2) {
+        if (dx * dx + dz * dz <= extent * extent) {
+          cells.add(cellKeyAt(map, other.x + dx, other.z + dz));
+        }
+      }
+    }
+  }
+  // Never penalise the cells the unit starts in or is heading for.
+  cells.delete(cellKeyAt(map, unit.x, unit.z));
+  cells.delete(cellKeyAt(map, goalX, goalZ));
+  return cells;
+}
+
+/** True when driving straight from a to b would pass through a parked ground unit (other than self). */
+export function segmentHitsParked(world: WorldState, unit: UnitState, ax: number, az: number, bx: number, bz: number): boolean {
+  const r = unitRadius(world, unit);
+  const dx = bx - ax;
+  const dz = bz - az;
+  const length2 = dx * dx + dz * dz;
+  if (length2 < 1e-6) {
+    return false;
+  }
+  const midX = (ax + bx) / 2;
+  const midZ = (az + bz) / 2;
+  for (const other of nearbyUnits(world, midX, midZ, Math.sqrt(length2) / 2 + 4)) {
+    if (other === unit || other.owner !== unit.owner || !isParked(other)) {
+      continue;
+    }
+    const t = Math.max(0, Math.min(1, ((other.x - ax) * dx + (other.z - az) * dz) / length2));
+    const px = ax + dx * t;
+    const pz = az + dz * t;
+    const clear = r + unitRadius(world, other);
+    if (Math.hypot(other.x - px, other.z - pz) < clear && Math.hypot(other.x - bx, other.z - bz) > clear) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function computePath(
   world: WorldState,
   unit: UnitState,
   goalX: number,
   goalZ: number,
 ): Point[] | null {
-  const path = findPath(unitMap(world, unit), unit.x, unit.z, goalX, goalZ);
+  const map = unitMap(world, unit);
+  const path = findPath(map, unit.x, unit.z, goalX, goalZ, parkedCells(world, map, unit, goalX, goalZ));
   if (!path || path.length === 0) {
     return null;
   }
@@ -127,13 +208,42 @@ export function followPath(
     unit.path.shift();
   }
 
+  // Aim for the furthest waypoint in clear line of sight, preferring one whose straight line does
+  // not run through a parked friend. Waypoints before it are behind us now and are dropped, so a
+  // unit never turns back to a point it has already passed.
+  // Workers queue at pads and sites by their own rules; only units on a plain move weave round parked ones.
+  // Units on the attack take the direct line and leave contact to local steering.
+  const avoidParked = unit.job === null && unit.order.kind === 'move' && goalDistance > PARKED_IGNORE_NEAR_GOAL;
   let visible = -1;
   for (let index = unit.path.length - 1; index >= 0; index -= 1) {
     const point = unit.path[index];
-    if (point && groundLineClear(map, unit.x, unit.z, point.x, point.z)) {
+    if (!point || !groundLineClear(map, unit.x, unit.z, point.x, point.z)) {
+      continue;
+    }
+    if (index === 0 || !avoidParked || !segmentHitsParked(world, unit, unit.x, unit.z, point.x, point.z)) {
       visible = index;
       break;
     }
+  }
+  if (visible < 0 && unit.path.length > 0) {
+    // No waypoint is in sight any more (the unit was pushed or slid off its line): plan again
+    // from here rather than driving into whatever is in the way.
+    const path = computePath(world, unit, goal.x, goal.z);
+    if (path) {
+      unit.path = path;
+      const end = path[path.length - 1]!;
+      if (unit.pathGoal) {
+        unit.pathGoal = { x: unit.pathGoal.x, z: unit.pathGoal.z, endX: end.x, endZ: end.z };
+      }
+      const first = path[0]!;
+      visible = groundLineClear(map, unit.x, unit.z, first.x, first.z) ? 0 : -1;
+    }
+  }
+  // A queued order's path holds the player's waypoints, so it is kept whole.
+  const queued = (unit.order.kind === 'move' || unit.order.kind === 'attackMove') && unit.order.queue;
+  if (visible > 0 && !queued) {
+    unit.path.splice(0, visible);
+    visible = 0;
   }
 
   const aim = (visible >= 0 ? unit.path[visible] : unit.path[0]) ?? goal;

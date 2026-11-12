@@ -198,7 +198,7 @@ describe('drops', () => {
       ore: 1000,
       metal: 500,
       oreDeposit: { x: -42, z: -48, amount: 100 },
-      metalDeposit: { x: -58, z: -52, amount: 100 },
+      metalDeposit: { x: -66, z: -60, amount: 100 },
     });
     const padId = initialPad(base);
     let buying = step(base, [
@@ -242,7 +242,7 @@ describe('drops', () => {
     ]);
     expect(wrongGround.lastCommandOutcome?.reason).toBe('needsMetalDeposit');
     const onDeposit = step(stationWorld, [
-      { kind: 'placeKit', kitId: stationKit, x: -58, z: -52, tick: stationWorld.tick + 1, issuer: 1 },
+      { kind: 'placeKit', kitId: stationKit, x: -66, z: -60, tick: stationWorld.tick + 1, issuer: 1 },
     ]);
     expect(onDeposit.lastCommandOutcome?.ok).toBe(true);
     expect(onDeposit.structures.some((structure) => structure.typeId === 'structure.test.metal_station')).toBe(true);

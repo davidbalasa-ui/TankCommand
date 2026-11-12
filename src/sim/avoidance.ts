@@ -20,6 +20,9 @@ const LOOK_SECONDS = 0.8;
 const CLEAR_MARGIN = 0.6;
 const YIELD_SPEED = 3; // m/s a parked unit shuffles sideways
 const TICK = 1 / 20;
+/** Longest wait for an oncoming friend at a narrow spot (3 s), then 2 s of pushing on. */
+const YIELD_WAIT = 60;
+const YIELD_CYCLE = 100;
 
 export function unitRadius(world: WorldState, unit: UnitState): number {
   return world.unitTypes.get(unit.typeId)?.radius ?? UNIT_RADIUS;
@@ -102,6 +105,19 @@ function isParkedFriend(unit: UnitState, other: UnitState): boolean {
   );
 }
 
+/** Blocked ground within a couple of metres on both sides of the way ahead: a one-lane spot. */
+const NARROW_PROBE = 2.2;
+
+function isNarrow(map: MapDef, x: number, z: number, bearing: number, r: number): boolean {
+  const reach = r + NARROW_PROBE;
+  const lx = -Math.sin(bearing);
+  const lz = Math.cos(bearing);
+  const ahead = r + 2;
+  const cx = x + Math.cos(bearing) * ahead;
+  const cz = z + Math.sin(bearing) * ahead;
+  return isBlockedAt(map, cx + lx * reach, cz + lz * reach) && isBlockedAt(map, cx - lx * reach, cz - lz * reach);
+}
+
 export interface Steering {
   bearing: number;
   /** Top speed allowed this tick (Infinity when nothing is in the way). */
@@ -161,6 +177,7 @@ export function steer(
     }
   }
   if (!best) {
+    unit.yieldTicks = 0;
     return { bearing, speedCap: Infinity };
   }
 
@@ -186,6 +203,29 @@ export function steer(
       best.x = nx;
       best.z = nz;
     }
+  }
+
+  // A narrow spot (blocked ground close on both sides) has no room to pass: take turns. The unit
+  // with the lower id goes first; the other stops and backs off a little to clear the way. Only
+  // against a friend that is driving towards us, and never for long: after YIELD_WAIT it pushes on
+  // for a while (local steering and separation sort it out) before it would wait again.
+  const towardUs = Math.cos(best.heading - Math.atan2(unit.z - best.z, unit.x - best.x)) > 0.5;
+  const headOn = moving && towardUs && facing < -0.5 && Math.abs(bestLateral) < clearance;
+  if (headOn && unit.id > best.id && isNarrow(map, unit.x, unit.z, bearing, r)) {
+    const waited = (unit.yieldTicks ?? 0) + 1;
+    unit.yieldTicks = waited;
+    if (waited % YIELD_CYCLE <= YIELD_WAIT) {
+      const back = YIELD_SPEED * TICK;
+      const bx = unit.x - fx * back;
+      const bz = unit.z - fz * back;
+      if (gap < r && canParkAt(world, map, bx, bz, r)) {
+        unit.x = bx;
+        unit.z = bz;
+      }
+      return { bearing, speedCap: 0 };
+    }
+  } else {
+    unit.yieldTicks = 0;
   }
 
   // Head-on and roughly in line: both keep right. Otherwise pass on the side away from the obstacle.
