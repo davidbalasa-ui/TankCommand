@@ -81,9 +81,9 @@ def glider():
     K.lifters([(1.2, 0, 0.6), (-1.2, 0, 0.6)], 0.3)
     for s in (1, -1):
         # Scythe wings: a long swept blade and a shorter one behind it, raked up at the tips.
-        b1 = K.blade((1.3, s * 0.4, 1.0), 3.6, s * 95, s * 172, 0.95, 0.09, sq=(1.0, 1.0), zone='shell')
+        b1 = K.blade((0.4, s * 2.5, 1.02), 2.2, s * -60, s * -172, 0.95, 0.09, zone='shell')
         F.rot(b1, 'X', s * 7, about=(0, 0, 1.0))
-        b2 = K.blade((0.2, s * 0.4, 1.12), 2.9, s * 100, s * 168, 0.6, 0.07, sq=(1.0, 1.0))
+        b2 = K.blade((-0.7, s * 2.0, 1.14), 1.6, s * -60, s * -170, 0.6, 0.07)
         F.rot(b2, 'X', s * 12, about=(0, 0, 1.1))
         K.fin((-1.9, s * 0.5, 1.3), 1.0, 215, 80, 0.3, 0.05, lean=-s * 18)
         # Fixed twin lances under the nose.
@@ -325,7 +325,7 @@ def disc():
     # Mandibles and lance: the direction of travel.
     for s in (1, -1):
         K.blade((2.6, s * 0.1, Z - 0.1), 1.5, s * -30, s * 105, 0.55, 0.11, sq=(1.25, 0.82), zone='shell')
-    tube((2.6, 0, Z - 0.1), (4.3, 0, Z - 0.1), [(0, 0.2), (0.3, 0.14), (1, 0.02)], 8, 'glow')
+    tube((2.6, 0, Z - 0.1), (3.7, 0, Z - 0.1), [(0, 0.2), (0.3, 0.14), (1, 0.04)], 8, 'barrel')
     with F.group('TurretPod'):
         lathe([(0.75, Z - 0.75), (0.62, Z - 0.98), (0.3, Z - 1.1), (0.02, Z - 1.12)], 14, 'bronze')
         cyl((0, 0, Z - 1.13), (0, 0, Z - 1.08), 0.28, 12, 'glow')

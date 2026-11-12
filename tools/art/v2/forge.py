@@ -769,10 +769,10 @@ def zone_mat(zone):
     elif kind == 'ribs':
         # Dark bronze inner body with thin glowing seams across it.
         x = n.sep(n.co)[0]
-        f = n.m('FRACT', n.m('MULTIPLY', x, z['freq']))
-        on = n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.13, 0.05)
+        f = n.m('FRACT', n.m('MULTIPLY', x, z['freq'] * 1.5))
+        on = n.m('MULTIPLY', n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.07, 0.02), 0.55)
         e = z['emit']
-        n.out(n.mix(on, (0.05, 0.032, 0.018), (e[0] * 0.6, e[1] * 0.6, e[2] * 0.6)),
+        n.out(n.mix(on, (0.09, 0.055, 0.03), (e[0] * 0.5, e[1] * 0.5, e[2] * 0.5)),
               n.m('ADD', 0.38, n.m('MULTIPLY', fine, 0.15)), 0.8, e, n.m('MULTIPLY', on, z['strength']))
         n.bump(n.m('SUBTRACT', 1.0, on), 0.7, 0.03)
     elif kind == 'orb':
