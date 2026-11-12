@@ -273,6 +273,9 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
 
 test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  // Drop, two placements and the build-out run close to the default 30 s under
+  // software rendering (it timed out at the last step before the HUD change too).
+  test.setTimeout(60_000);
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
   const padId = await page.evaluate(() => {
