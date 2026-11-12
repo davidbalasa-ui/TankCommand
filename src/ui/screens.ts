@@ -701,6 +701,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         root.prepend(errorEl);
       };
 
+      // Covers the battlefield until its models are in, so placeholder boxes never show.
+      const veil = document.createElement('div');
+      veil.className = 'game-loading';
+      veil.setAttribute('role', 'status');
+      veil.textContent = 'Loading battlefield…';
+      root.append(veil);
+
       void ctx
         .attachRenderer(canvas)
         .then((resolved) => {
@@ -710,11 +717,20 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           }
           handle = resolved;
           if (resolved.error) {
+            veil.remove();
             showError(resolved.error);
+            return;
           }
+          void (resolved.ready ?? Promise.resolve()).then(() => {
+            veil.classList.add('done');
+            window.setTimeout(() => {
+              veil.remove();
+            }, 500);
+          });
         })
         .catch(() => {
           if (!disposed) {
+            veil.remove();
             showError('3D rendering is unavailable on this device.');
           }
         });

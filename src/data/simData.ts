@@ -21,7 +21,7 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
     result.set(row.id, {
       id: row.id,
       modelId: row.modelAssetId,
-      visualScale: row.visualScale,
+      visualScale: row.modelScale ?? row.visualScale,
       // Bigger models take more room: footprint follows drawn size, within limits.
       radius: UNIT_RADIUS * Math.min(1.4, Math.max(0.85, row.visualScale ?? 1)),
       faction: row.faction,

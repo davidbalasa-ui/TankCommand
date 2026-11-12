@@ -421,8 +421,9 @@
       "cellsZ": 4
     },
     "sightRange": 30,
-    "modelId": "prop.deposit.ore",
+    "modelId": "structure.shard.core",
     "weapon": {
+      "kind": "shard",
       "damage": 70,
       "range": 26,
       "reloadSec": 3,
@@ -457,8 +458,9 @@
       "cellsZ": 2
     },
     "sightRange": 22,
-    "modelId": "prop.deposit.ore",
+    "modelId": "structure.shard.spire",
     "weapon": {
+      "kind": "shard",
       "damage": 30,
       "range": 18,
       "reloadSec": 2,

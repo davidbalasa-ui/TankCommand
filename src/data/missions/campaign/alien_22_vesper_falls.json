@@ -49,9 +49,9 @@
       "player": 2,
       "faction": "human",
       "controller": "ai",
-      "ore": 1000,
+      "ore": 800,
       "metal": 200,
-      "difficulty": "hard"
+      "difficulty": "easy"
     },
     {
       "player": 3,
@@ -329,6 +329,29 @@
           "t": "setObjective",
           "id": "shard",
           "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The Shard is broken. The brood reserves are landing at your nest."
+        },
+        {
+          "t": "spawn",
+          "side": 1,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 4,
+          "x": -82,
+          "z": 92,
+          "drop": true
+        },
+        {
+          "t": "spawn",
+          "side": 1,
+          "unitType": "unit.alien.light_tank",
+          "count": 4,
+          "x": -92,
+          "z": 82,
+          "drop": true
         }
       ]
     },

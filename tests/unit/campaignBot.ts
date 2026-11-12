@@ -79,7 +79,9 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   // Economy.
   for (const u of own) {
     const type = w.unitTypes.get(u.typeId);
-    if (type?.workerKind === 'oreMiner' && !u.job && u.order.kind === 'idle') {
+    // A miner whose site ran dry waits for orders (the 'mine empty' alert); send it to the next one.
+    const dry = u.job?.kind === 'oreMiner' && u.job.reportedEmpty === true;
+    if (type?.workerKind === 'oreMiner' && (!u.job || dry) && u.order.kind === 'idle') {
       const ore = w.deposits
         .filter((d) => d.kind === 'ore' && d.amount > 0)
         .sort((a, b) => Math.hypot(a.x - u.x, a.z - u.z) - Math.hypot(b.x - u.x, b.z - u.z))[0];
@@ -265,7 +267,12 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   // Wait for a bigger group against more than one base; a dwindling attack falls back to regroup.
   const enemyPads = enemyStructures.filter((st) => w.structureTypes.get(st.typeId)?.kind === 'pad').length;
   const wantSize = plan.armySize ?? (enemyPads > 1 ? 12 : 7);
-  const ready = !enemyPad || (marching && army.length >= 4) || army.length >= wantSize;
+  // Late on, with no miners left and no ore to buy more, waiting only loses: go with what there is.
+  const broke =
+    w.tick > 600 * 20 &&
+    (w.resources.find((r) => r.player === me)?.ore ?? 0) < 100 &&
+    !own.some((u) => w.unitTypes.get(u.typeId)?.workerKind === 'oreMiner');
+  const ready = !enemyPad || (marching && army.length >= 4) || army.length >= wantSize || (broke && army.length >= 4);
   if (ids.length > 0) {
     if (threat) {
       out.push({ kind: 'attackMove', unitIds: ids, x: threat.x, z: threat.z });

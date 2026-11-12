@@ -8,17 +8,21 @@
 //                every frame so it crackles, gold sparks on impact.
 //   ground_beam  Kesh saucer: a thick gold beam from the saucer to the ground that tears it open:
 //                a big gold-white blast, shock ring, rock chunks thrown up and a deep scorch.
+//   shard        The Shard (neutral crystal): a thin white lance with a violet fringe from its heart,
+//                3-4 dead-straight segments with sharp kinks, a six-point prism flash on impact and
+//                a fading violet afterimage of the path.
 //   spore        Third faction (sample): a slow pulsing pod that bursts into a lingering spore cloud.
 //   (anything else) tank shells: a short hot tracer and a small fiery flash.
 import * as THREE from 'three';
 
-type Palette = 'fire' | 'gold' | 'cyan' | 'spore';
+type Palette = 'fire' | 'gold' | 'cyan' | 'spore' | 'violet';
 
 const PALETTES: Record<Palette, { core: number; outer: number; ring: number }> = {
   fire: { core: 0xfff1c0, outer: 0xff6a1a, ring: 0xffb050 },
   gold: { core: 0xfffbe8, outer: 0xffb52a, ring: 0xffd27a },
   cyan: { core: 0xeaffff, outer: 0x36d6ff, ring: 0x8ff0ff },
   spore: { core: 0xf3ffb0, outer: 0xb6c94a, ring: 0xd8e57a },
+  violet: { core: 0xf6f0ff, outer: 0x9a5cff, ring: 0xc9a8ff },
 };
 
 interface Particle {
@@ -90,6 +94,11 @@ export class Effects {
       band.scale.set(0.12, 0.12, 0.12);
       band.position.z = -0.5;
       group.add(bomb, band);
+    } else if (kind === 'shard') {
+      // The lance is drawn from the Shard's heart each frame; this is its small white tip.
+      const head = new THREE.Mesh(this.sphere, additive(0xf4ecff, 1));
+      head.scale.setScalar(0.18);
+      group.add(head);
     } else if (kind === 'lightning' || kind === 'ground_beam') {
       // The arc or beam itself is drawn from the shooter each frame; this is the bright head.
       const head = new THREE.Mesh(this.sphere, additive(kind === 'lightning' ? 0xfff2c0 : 0xfffbe8, 1));
@@ -157,6 +166,49 @@ export class Effects {
     }
   }
 
+  /**
+   * The Shard's lance: a few straight segments with sharp angular kinks (crystalline, never curvy).
+   * `seed` fixes the kinks so they hold still between re-rolls; `strength` scales the brightness.
+   */
+  shardLance(a: THREE.Vector3, b: THREE.Vector3, strength: number, ttl: number, seed: number): void {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const length = dir.length();
+    if (length < 0.01) {
+      return;
+    }
+    const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+    const segments = length > 12 ? 4 : 3;
+    const points: THREE.Vector3[] = [a.clone()];
+    for (let i = 1; i < segments; i += 1) {
+      const p = new THREE.Vector3().lerpVectors(a, b, i / segments);
+      const r = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
+      const kink = (r - Math.floor(r)) * 2 - 1;
+      p.addScaledVector(side, kink * Math.min(1.1, length * 0.06));
+      p.y += kink * 0.25;
+      points.push(p);
+    }
+    points.push(b.clone());
+    const forward = new THREE.Vector3(0, 0, 1);
+    for (let i = 0; i < segments; i += 1) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      if (!p0 || !p1) {
+        continue;
+      }
+      const span = p0.distanceTo(p1);
+      const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+      const look = new THREE.Quaternion().setFromUnitVectors(forward, new THREE.Vector3().subVectors(p1, p0).normalize());
+      const layers = strength >= 1 ? ([[0.045, 1, 0xffffff], [0.13, 0.55, 0xa66bff]] as const) : ([[0.09, strength, 0x9a5cff]] as const);
+      for (const [width, opacity, tint] of layers) {
+        const mesh = new THREE.Mesh(this.bolt, additive(tint, opacity));
+        mesh.position.copy(mid);
+        mesh.quaternion.copy(look);
+        mesh.scale.set(width, width, span + width);
+        this.add(mesh, ttl, { fade: opacity, kind: 'ball' });
+      }
+    }
+  }
+
   /** A straight beam from a to b (the saucer's ground beam) with a white core and a gold sheath. */
   beam(a: THREE.Vector3, b: THREE.Vector3, width: number, ttl = 0.05): void {
     const length = a.distanceTo(b);
@@ -181,6 +233,19 @@ export class Effects {
     if (kind === 'laser') {
       this.burst(x, y, z, 0.7, 'cyan', 0.22);
       this.sparks(x, y, z, 5, 0x9ff4ff, 5);
+    } else if (kind === 'shard') {
+      // A small six-point prism flash: thin white-violet spikes around a bright point.
+      this.burst(x, y, z, 0.6, 'violet', 0.18);
+      const forward = new THREE.Vector3(0, 0, 1);
+      for (let i = 0; i < 6; i += 1) {
+        const angle = (i / 6) * Math.PI * 2;
+        const out = new THREE.Vector3(Math.cos(angle), 0.35 * ((i % 2) * 2 - 1), Math.sin(angle)).normalize();
+        const spike = new THREE.Mesh(this.bolt, additive(i % 2 ? 0xffffff : 0xb98cff, 0.9));
+        spike.position.set(x, y, z).addScaledVector(out, 0.45);
+        spike.quaternion.setFromUnitVectors(forward, out);
+        spike.scale.set(0.05, 0.05, 0.9);
+        this.add(spike, 0.16, { fade: 0.9, kind: 'ball' });
+      }
     } else if (kind === 'lightning') {
       this.burst(x, y, z, 0.8, 'gold', 0.22);
       this.sparks(x, y, z, 8, 0xffe08a, 7);

@@ -341,7 +341,12 @@ test('[ALRT-01] alerts are rate-limited and tapping a toast jumps the camera', a
     window.__TC_TEST__?.raiseAlert('depositEmpty', 30, -30);
   });
   await expect(page.locator('.alert-toast')).toHaveCount(1);
-  await page.locator('.alert-toast').tap();
+  // A plain touch at the toast. Locator.tap() re-checks the element between slow frames
+  // (software rendering of the full models), and the toast can time out meanwhile.
+  const box = await page.locator('.alert-toast').boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) return;
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
   await expect.poll(async () => {
     const camera = await page.evaluate(() => window.__TC_TEST__?.camera() ?? null);
     if (!camera) return 999;

@@ -76,7 +76,7 @@ import type {
 } from './game/api';
 import { GameServices } from './game/services';
 import { FpsMeter } from './ui/fpsMeter';
-import { addUnit, placementValidity, structureAtPoint } from './sim/spawn';
+import { addStructure, addUnit, placementValidity, structureAtPoint } from './sim/spawn';
 import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
 import { missionAllows } from './sim/triggers';
 import { upgradeRejection } from './sim/upgrades';
@@ -1388,6 +1388,10 @@ export class App {
     return addUnit(this.world, { owner, typeId, x, z, heading })?.id ?? null;
   }
 
+  spawnStructureForTest(typeId: string, owner: number, x: number, z: number): number | null {
+    return addStructure(this.world, { owner, typeId, x, z })?.id ?? null;
+  }
+
   raiseAlertForTest(kind: AlertKind, x: number, z: number): void {
     this.services?.raiseAlert(kind, x, z);
   }
@@ -1624,6 +1628,11 @@ export class App {
         );
         world.aiStates = [];
         const view = new mod.RenderView(canvas, this.registry, world);
+        // The canvas stays invisible (CSS) until the models are in, then fades up; the gradient
+        // behind it shows meanwhile, never the grey placeholder tanks.
+        void view.whenReady().then(() => {
+          canvas.classList.add('ready');
+        });
         const pad = world.structures.find((item) => item.owner === 1);
         const centreX = pad?.x ?? 0;
         const centreZ = pad?.z ?? 0;
@@ -1717,9 +1726,15 @@ export class App {
           this.applySettings(this.services.settings());
           this.services.setMusic('human', false);
         }
-        this.startLoop();
+        // Hold the match (sim and drawing) until the models are in, so no placeholder boxes show.
+        const ready = view.whenReady().then(() => {
+          if (this.renderView === view) {
+            this.startLoop();
+          }
+        });
         return {
           error: null,
+          ready,
           dispose: (): void => {
             if (this.renderView === view) {
               this.stopLoop();

@@ -285,6 +285,8 @@ RIFT_ENEMY_A = (96, -40)
 RIFT_ENEMY_B = (40, -96)
 add_map('map.c_rift', 'The Rift', 240, [RIFT_HOME, RIFT_ENEMY_A, RIFT_ENEMY_B], [
     ('ore', -110, 80, 800), ('ore', -80, 110, 800), ('metal', -110, 110, 300), ('ore', -60, 60, 600),
+    # Two more home sites: the finale is long, and the home field must outlast it.
+    ('ore', -116, 44, 700), ('ore', -44, 116, 700),
     ('ore', 108, -20, 600), ('ore', 108, -64, 600), ('metal', 80, -20, 300),
     ('ore', 20, -108, 600), ('ore', 64, -108, 600), ('metal', 20, -80, 300),
     ('ore', -40, -20, 500), ('ore', 20, 40, 500),
@@ -1301,7 +1303,8 @@ def act3(f):
             'map.c_rift',
             [player_side(f, 2000, available=avail(f, *ACT3_UNITS, *(('bomber',) if terran else ('saucer',))),
                          research_done=base_research if terran else research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
-             enemy_side(e, 'ai', ore=1000, metal=200, difficulty='hard'), enemy_side('alien', player=3)],
+             # An easy AI: the Shard, two pads and their guns already make the finale the hardest fight.
+             enemy_side(e, 'ai', ore=800, metal=200, difficulty='easy'), enemy_side('alien', player=3)],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 26, hz - 4, 4)]
             + [U(1, R['artillery'], x, z, -0.785) for x, z in spread(hx + 10, hz - 24, 3)]
@@ -1318,7 +1321,11 @@ def act3(f):
             [
                 T('intro', at(0), msg(say('The Shard fires on anything near it. Break its spires with artillery first.',
                                           'The Shard fires on anything near it. Go round it, or break it.'), f)),
-                T('shard', {'t': 'allDestroyed', 'side': 3, 'unitType': SHARD_CORE}, done('shard')),
+                T('shard', {'t': 'allDestroyed', 'side': 3, 'unitType': SHARD_CORE}, done('shard'),
+                  # With the Shard gone the sky clears, and the reserves can land for the last push.
+                  msg(say('The Shard is down and the sky is clear. Reserves are landing at your pad.',
+                          'The Shard is broken. The brood reserves are landing at your nest.'), f),
+                  spawn(1, R['heavy'], 4, hx + 18, hz - 8, drop=True), spawn(1, R['light'], 4, hx + 8, hz - 18, drop=True)),
                 *([T('hive', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('hive'))] if terran else
                   [T('towers', {'t': 'allDestroyed', 'side': 2, 'unitType': E['tower_radar']}, done('towers')),
                    T('pads', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('pads'))]),

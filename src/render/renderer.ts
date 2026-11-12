@@ -252,6 +252,8 @@ interface StructureVisual {
   modelColors: Array<{ material: THREE.MeshStandardMaterial; base: THREE.Color }>;
   /** Model scale once fully unfolded (the rise animation scales up to it). */
   modelScale: number;
+  /** The Shard's floating heart (bobs, spins, and flares as it charges and fires). */
+  core: { node: THREE.Object3D; baseY: number; spin: number; flare: number } | null;
 }
 
 function structureHeight(kind: string): number {
@@ -442,6 +444,7 @@ export class RenderView {
   private readonly observer: ResizeObserver;
   private readonly loader: AssetLoader<THREE.Object3D, THREE.Texture, ArrayBuffer>;
   private readonly loadedModels: string[] = [];
+  private readonly ready: Promise<void>;
   private readonly raycaster = new THREE.Raycaster();
   private readonly overlay: HTMLDivElement;
   private readonly healthBars = new Map<number, HealthBar>();
@@ -464,6 +467,10 @@ export class RenderView {
       startZ: number;
       shooterId: number | undefined;
       aim: number;
+      /** Shard lance: where it started, and the seed and time of its last kink re-roll. */
+      from?: THREE.Vector3;
+      seed?: number;
+      rolled?: number;
     }
   >();
   private readonly unitInstances = new UnitInstances(this.scene);
@@ -573,7 +580,20 @@ export class RenderView {
     });
 
     this.scene.add(this.wrecksGroup);
-    void this.loadTemplate();
+    this.ready = this.loadTemplate().catch(() => undefined);
+  }
+
+  /**
+   * Resolves once every model, texture and landscape piece this view asked for has loaded or failed
+   * (or after `timeoutMs`), so callers can keep the scene hidden instead of showing placeholder boxes.
+   */
+  whenReady(timeoutMs = 20_000): Promise<void> {
+    return Promise.race([
+      this.ready,
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, timeoutMs);
+      }),
+    ]);
   }
 
   getCamera(): RtsCamera {
@@ -2018,7 +2038,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         const template = type.modelId ? this.templates.get(type.modelId) : undefined;
         if (template) {
           model = template.clone(true);
-          cloneMaterials(model, isHostile(this.world, 1, structure.owner), this.colorBlind);
+          // The Shard is a neutral force of nature: it keeps its own violet, never the enemy tint.
+          const shard = type.modelId.startsWith('structure.shard.');
+          cloneMaterials(model, !shard && isHostile(this.world, 1, structure.owner), this.colorBlind);
           model.scale.setScalar(size * 0.96);
           model.position.y = -height / 2;
           model.traverse((object) => {
@@ -2052,7 +2074,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           modelPivot,
           modelColors,
           modelScale: model ? model.scale.x : 1,
+          core: null,
         };
+        const coreNode = model?.getObjectByName('Core');
+        if (coreNode) {
+          visual.core = { node: coreNode, baseY: coreNode.position.y, spin: 0, flare: 0 };
+        }
         this.structureVisuals.set(structure.id, visual);
       }
       if (!this.structureSeen.has(structure.id)) {
@@ -2109,6 +2136,17 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
       for (const entry of visual.modelColors) {
         entry.material.color.copy(entry.base).multiplyScalar(shade);
+      }
+      if (visual.core) {
+        // Bob and spin; in the last half second before a shot the heart brightens and spins faster.
+        const core = visual.core;
+        const charging = structure.reloadLeft > 0 && structure.reloadLeft < 0.5 ? 1 - structure.reloadLeft / 0.5 : 0;
+        core.flare = Math.max(core.flare * 0.9, charging);
+        core.spin += 0.012 + core.flare * 0.08;
+        const t = performance.now() / 1000;
+        core.node.rotation.y = core.spin;
+        core.node.position.y = core.baseY + Math.sin(t * 1.3 + structure.id) * 0.06;
+        core.node.scale.setScalar(1 + core.flare * 0.18);
       }
       if (visual.modelPivot && !this.structureFolding.has(structure.id)) {
         // Model weapons point along +X, like the units: same heading convention as unit turrets.
@@ -2750,6 +2788,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         const at = visual.object.position;
         const ground = heightAt(this.world.map, at.x, at.z);
         this.effects.impact(visual.kind, at.x, at.y, at.z, ground, visual.splash);
+        if (visual.kind === 'shard' && visual.from) {
+          // A fading violet afterimage of the lance's path.
+          this.effects.shardLance(visual.from, at, 0.35, 0.3, visual.seed ?? 0);
+        }
         this.scene.remove(visual.object);
         this.effects.disposeProjectileMesh(visual.object);
         this.projectileVisuals.delete(id);
@@ -2794,6 +2836,18 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       if (direction.lengthSq() > 0.000001) {
         visual.object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction.normalize());
       }
+      // The Shard's lance runs from its heart to the shot's head, kinks re-rolled a few times a shot.
+      if (visual.kind === 'shard') {
+        const from = this.shardHeart(visual.shooterId);
+        if (from) {
+          visual.from = from;
+          this.effects.shardLance(from, visual.object.position, 1, 0.05, visual.seed ?? 0);
+          if (performance.now() - (visual.rolled ?? 0) > 110) {
+            visual.seed = Math.random() * 1000;
+            visual.rolled = performance.now();
+          }
+        }
+      }
       // Lightning and the ground beam are drawn from the gun to the shot's head every frame.
       if (visual.kind === 'lightning' || visual.kind === 'ground_beam') {
         const shooter = visual.shooterId === undefined ? undefined : this.unitRoots.get(visual.shooterId);
@@ -2808,6 +2862,19 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         }
       }
     }
+  }
+
+  /** World position of a Shard structure's heart (its Core node), for the lance to start from. */
+  private shardHeart(structureId: number | undefined): THREE.Vector3 | null {
+    if (structureId === undefined) {
+      return null;
+    }
+    const core = this.structureVisuals.get(structureId)?.core;
+    if (!core) {
+      return null;
+    }
+    core.flare = 1;
+    return core.node.getWorldPosition(new THREE.Vector3());
   }
 
   private syncWrecks(): void {

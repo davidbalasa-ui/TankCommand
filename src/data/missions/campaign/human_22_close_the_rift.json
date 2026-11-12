@@ -48,9 +48,9 @@
       "player": 2,
       "faction": "alien",
       "controller": "ai",
-      "ore": 1000,
+      "ore": 800,
       "metal": 200,
-      "difficulty": "hard"
+      "difficulty": "easy"
     },
     {
       "player": 3,
@@ -323,6 +323,29 @@
           "t": "setObjective",
           "id": "shard",
           "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "The Shard is down and the sky is clear. Reserves are landing at your pad."
+        },
+        {
+          "t": "spawn",
+          "side": 1,
+          "unitType": "unit.human.heavy_tank",
+          "count": 4,
+          "x": -82,
+          "z": 92,
+          "drop": true
+        },
+        {
+          "t": "spawn",
+          "side": 1,
+          "unitType": "unit.human.light_tank",
+          "count": 4,
+          "x": -92,
+          "z": 82,
+          "drop": true
         }
       ]
     },

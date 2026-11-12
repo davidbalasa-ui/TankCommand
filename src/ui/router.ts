@@ -21,6 +21,8 @@ export type ScreenId =
 
 export interface RendererHandle {
   error: string | null;
+  /** Resolves when the match's models have loaded (the screen hides the scene until then). */
+  ready?: Promise<void>;
   dispose: () => void;
 }
 

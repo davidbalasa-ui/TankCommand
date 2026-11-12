@@ -58,6 +58,8 @@ export const unitRowSchema = z
     modelAssetId: z.string(),
     // Render-only: drawn length relative to a light tank (1). The sim never reads it.
     visualScale: z.number().positive().optional(),
+    /** Drawn size only (defaults to visualScale); collision size keeps following visualScale. */
+    modelScale: z.number().positive().optional(),
     source: z.object({
       kind: z.enum(['placeholder', 'video', 'manual', 'tuned']),
       ref: z.string().optional(),

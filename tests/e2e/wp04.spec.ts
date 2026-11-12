@@ -88,6 +88,8 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
 
 test('[HUD-05] miner deposit tap, mine command and salvage button work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  // Full models from the first frame make software rendering slow; this ran at ~29 of 30 s.
+  test.setTimeout(60_000);
   await enterGame(page);
   const miner = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
@@ -286,7 +288,8 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   // Drop, two placements and the build-out run close to the default 30 s under
   // software rendering (it timed out at the last step before the HUD change too).
-  test.setTimeout(60_000);
+  // Matches now start only once the full models are in, which slows each frame further.
+  test.setTimeout(120_000);
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
   const padId = await page.evaluate(() => {
@@ -325,8 +328,8 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))
     .toBe(true);
-  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -35, targetZ: -46, distance: 60, yaw: 0 }));
-  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-35, -46) ?? null);
+  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -30, targetZ: -60, distance: 60, yaw: 0 }));
+  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-30, -60) ?? null);
   expect(screen).not.toBeNull();
   if (!screen) {
     return;
@@ -365,8 +368,8 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
 
   await page.locator('[data-control-id="inGame.buildMenu"]').tap();
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
-  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -35, targetZ: -46, distance: 60, yaw: 0 }));
-  const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-35, -46) ?? null);
+  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -30, targetZ: -60, distance: 60, yaw: 0 }));
+  const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-30, -60) ?? null);
   expect(again).not.toBeNull();
   if (!again) {
     return;
