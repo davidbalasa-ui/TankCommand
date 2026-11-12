@@ -45,7 +45,7 @@
       "player": 2,
       "faction": "human",
       "controller": "ai",
-      "ore": 100,
+      "ore": 0,
       "metal": 100,
       "difficulty": "normal"
     }

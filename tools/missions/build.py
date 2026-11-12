@@ -650,9 +650,9 @@ def act1(f):
             [player_side(f, 800, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar',
                                                  'heavy', 'station'),
                          research_done=research(f, 'heavy', 'sensors')),
-             enemy_side(e, 'ai', ore=250, metal=0, difficulty='easy')],
+             enemy_side(e, 'ai', ore=100, metal=0, difficulty='easy')],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 8, hz - 8, 6)]
-            + [U(1, R['miner'], hx - 8, hz + 2), U(1, R['tug'], hx - 4, hz + 8), U(1, R['radar'], hx + 2, hz - 4)]
+            + [U(1, R['miner'], hx - 8, hz + 2), U(1, R['tug'], hx - 4, hz + 8), U(1, R['radar'], hx + 2, hz - 4), U(1, R['heavy'], hx + 14, hz - 2, -0.785)]
             + [U(2, E['light'], x, z, 2.356) for x, z in spread(ex - 8, ez + 8, 3)]
             + [U(2, E['miner'], ex + 6, ez - 4), U(2, E['tug'], ex + 2, ez - 8)],
             [S(1, R['pad'], hx, hz), S(2, E['pad'], ex, ez), S(2, E['turret'], ex - 22, ez + 4)],
@@ -922,7 +922,7 @@ def act2(f):
             'map.c_iron_gate',
             [player_side(f, 1200, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair', 'hover'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover')),
-             enemy_side(e, 'ai', ore=100, metal=100, difficulty='normal')],
+             enemy_side(e, 'ai', ore=0, metal=100, difficulty='normal')],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 14, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 24, hz - 4, 2)]
             + [U(1, R['miner'], hx - 10, hz - 2), U(1, R['tug'], hx - 4, hz + 10), U(1, R['radar'], hx + 4, hz - 4)]

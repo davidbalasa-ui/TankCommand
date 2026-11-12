@@ -35,7 +35,7 @@
       "player": 2,
       "faction": "human",
       "controller": "ai",
-      "ore": 250,
+      "ore": 100,
       "metal": 0,
       "difficulty": "easy"
     }
@@ -103,6 +103,13 @@
       "x": -60,
       "z": 58,
       "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": -48,
+      "z": 60,
+      "heading": -0.785
     },
     {
       "side": 2,
