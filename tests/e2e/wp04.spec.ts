@@ -328,8 +328,8 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))
     .toBe(true);
-  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -30, targetZ: -60, distance: 60, yaw: 0 }));
-  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-30, -60) ?? null);
+  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -24, targetZ: -64, distance: 60, yaw: 0 }));
+  const screen = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-24, -64) ?? null);
   expect(screen).not.toBeNull();
   if (!screen) {
     return;
@@ -368,8 +368,8 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
 
   await page.locator('[data-control-id="inGame.buildMenu"]').tap();
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
-  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -30, targetZ: -60, distance: 60, yaw: 0 }));
-  const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-30, -60) ?? null);
+  await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -24, targetZ: -64, distance: 60, yaw: 0 }));
+  const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-24, -64) ?? null);
   expect(again).not.toBeNull();
   if (!again) {
     return;

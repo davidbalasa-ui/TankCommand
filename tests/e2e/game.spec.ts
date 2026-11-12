@@ -193,6 +193,8 @@ test('[UI-05] all controls meet touch size and do not overlap across the main fl
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  // The match loop only starts once the models are in; freeze it after it is running.
+  await page.waitForFunction(() => (window.__TC_TEST__?.renderStats().frame ?? 0) > 2, undefined, { timeout: 60_000 });
   await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
   await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
   await assertButtonLayout(page);
