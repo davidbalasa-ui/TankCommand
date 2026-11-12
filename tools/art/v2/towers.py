@@ -112,7 +112,7 @@ def spire():
     return dict(tz=tz, packed={
         'Base': trs(t=(-0.8, 0, deck), s=sb),
         # Launchers laid level, noses to the rear.
-        'Turret': trs(t=(-0.8, 0, deck + tz * sb[2] - tz), r=(0, -38, 180), s=(0.8, 0.8, 0.8), about=(0, 0, tz + 0.75)),
+        'Turret': trs(t=(-0.8, 0, deck + tz * sb[2] - tz), r=(0, 38, 180), s=(0.8, 0.8, 0.8), about=(0, 0, tz + 0.75)),
     })
 
 
