@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 16,
   "title": "Burning Sky",
-  "briefing": "Four Terran missile batteries cover the eastern plain, and their Falcons patrol above. Halos rule the sky: sweep the Falcons away so the Mortar Beasts and Gliders can burn all four batteries.",
+  "briefing": "Four Terran missile batteries cover the eastern plain, and their Falcons patrol above. Halos rule the sky: sweep the Falcons away so the Sunfalls and Gliders can burn all four batteries.",
   "mapId": "map.c_highwater",
   "sides": [
     {

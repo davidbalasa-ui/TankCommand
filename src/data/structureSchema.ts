@@ -4,6 +4,8 @@ export const structureRowSchema = z
   .object({
     id: z.string().regex(/^structure\.[a-z0-9]+(\.[a-z0-9_]+)+$/),
     name: z.string(),
+    /** Small grey plain-terms line shown under the unique name ("Gun tower"). */
+    roleLabel: z.string().optional(),
     faction: z.enum(['human', 'alien']),
     kind: z.enum(['pad', 'metalStation', 'turret', 'radar', 'lab', 'airBase']),
     cost: z.object({

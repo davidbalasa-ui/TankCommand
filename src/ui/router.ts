@@ -52,6 +52,8 @@ export interface KitView {
 export interface BuildItemView {
   id: string;
   name: string;
+  /** Plain-terms role shown small and grey under the name ("Light tank"). */
+  roleLabel?: string;
   kind: 'unit' | 'structure';
   ore: number;
   metal: number;

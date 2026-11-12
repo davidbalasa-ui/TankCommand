@@ -18,7 +18,8 @@
     "sightRange": 18,
     "modelId": "structure.human.landing_pad",
     "buildOnMetalDeposit": false,
-    "placeholder": false
+    "placeholder": false,
+    "roleLabel": "Landing pad"
   },
   {
     "id": "structure.human.metal_station",
@@ -26,7 +27,7 @@
     "faction": "human",
     "kind": "metalStation",
     "cost": {
-      "ore": 250,
+      "ore": 200,
       "metal": 0
     },
     "deliverySec": 12,
@@ -42,11 +43,12 @@
     "metalRatePerSec": 1.5,
     "containerSize": 10,
     "maxContainers": 5,
-    "placeholder": false
+    "placeholder": false,
+    "roleLabel": "Metal station"
   },
   {
     "id": "structure.alien.landing_pad",
-    "name": "Landing Nest",
+    "name": "Landing Ring",
     "faction": "alien",
     "kind": "pad",
     "cost": {
@@ -63,7 +65,8 @@
     "sightRange": 18,
     "modelId": "structure.alien.landing_pad",
     "buildOnMetalDeposit": false,
-    "placeholder": false
+    "placeholder": false,
+    "roleLabel": "Landing pad"
   },
   {
     "id": "structure.alien.metal_station",
@@ -71,7 +74,7 @@
     "faction": "alien",
     "kind": "metalStation",
     "cost": {
-      "ore": 250,
+      "ore": 200,
       "metal": 0
     },
     "deliverySec": 12,
@@ -87,7 +90,8 @@
     "metalRatePerSec": 1.5,
     "containerSize": 10,
     "maxContainers": 5,
-    "placeholder": false
+    "placeholder": false,
+    "roleLabel": "Metal station"
   },
   {
     "faction": "human",
@@ -98,7 +102,7 @@
     "name": "Bastion Gun",
     "kind": "turret",
     "cost": {
-      "ore": 190,
+      "ore": 150,
       "metal": 0
     },
     "deliverySec": 10,
@@ -129,7 +133,8 @@
     "upgrades": [
       "fireRate",
       "armor"
-    ]
+    ],
+    "roleLabel": "Gun tower"
   },
   {
     "faction": "human",
@@ -140,7 +145,7 @@
     "name": "Radar Tower",
     "kind": "radar",
     "cost": {
-      "ore": 160,
+      "ore": 150,
       "metal": 0
     },
     "deliverySec": 8,
@@ -153,7 +158,8 @@
     "modelId": "structure.human.radar",
     "sensorRange": 30,
     "dismantleSec": 3,
-    "dismantleRefundPercent": 70
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Radar tower"
   },
   {
     "faction": "human",
@@ -176,7 +182,8 @@
     "sightRange": 10,
     "modelId": "structure.human.lab",
     "dismantleSec": 4,
-    "dismantleRefundPercent": 70
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Research lab"
   },
   {
     "faction": "alien",
@@ -184,10 +191,10 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.alien.turret",
-    "name": "Thornmound",
+    "name": "Sentinel",
     "kind": "turret",
     "cost": {
-      "ore": 190,
+      "ore": 150,
       "metal": 0
     },
     "deliverySec": 10,
@@ -218,7 +225,8 @@
     "upgrades": [
       "fireRate",
       "armor"
-    ]
+    ],
+    "roleLabel": "Gun tower"
   },
   {
     "faction": "alien",
@@ -226,10 +234,10 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.alien.radar",
-    "name": "Seer Spire",
+    "name": "Oracle",
     "kind": "radar",
     "cost": {
-      "ore": 160,
+      "ore": 150,
       "metal": 0
     },
     "deliverySec": 8,
@@ -242,7 +250,8 @@
     "modelId": "structure.alien.radar",
     "sensorRange": 30,
     "dismantleSec": 3,
-    "dismantleRefundPercent": 70
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Radar tower"
   },
   {
     "faction": "alien",
@@ -250,7 +259,7 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.alien.lab",
-    "name": "Gene Vault",
+    "name": "Star Vault",
     "kind": "lab",
     "cost": {
       "ore": 300,
@@ -265,7 +274,8 @@
     "sightRange": 10,
     "modelId": "structure.alien.lab",
     "dismantleSec": 4,
-    "dismantleRefundPercent": 70
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Research lab"
   },
   {
     "faction": "human",
@@ -276,7 +286,7 @@
     "name": "Airfield",
     "kind": "airBase",
     "cost": {
-      "ore": 310,
+      "ore": 300,
       "metal": 0
     },
     "deliverySec": 14,
@@ -289,7 +299,8 @@
     "modelId": "structure.human.air_base",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
-    "airCapacity": 4
+    "airCapacity": 4,
+    "roleLabel": "Airfield"
   },
   {
     "faction": "alien",
@@ -297,10 +308,10 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.alien.air_base",
-    "name": "Hive Roost",
+    "name": "Aerie",
     "kind": "airBase",
     "cost": {
-      "ore": 310,
+      "ore": 300,
       "metal": 0
     },
     "deliverySec": 14,
@@ -313,7 +324,8 @@
     "modelId": "structure.alien.air_base",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
-    "airCapacity": 4
+    "airCapacity": 4,
+    "roleLabel": "Airfield"
   },
   {
     "faction": "human",
@@ -321,10 +333,10 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.human.missile_battery",
-    "name": "Spire Missile Battery",
+    "name": "Harpoon Battery",
     "kind": "turret",
     "cost": {
-      "ore": 250,
+      "ore": 200,
       "metal": 0
     },
     "deliverySec": 12,
@@ -356,7 +368,8 @@
     "upgrades": [
       "fireRate",
       "armor"
-    ]
+    ],
+    "roleLabel": "Missile tower"
   },
   {
     "faction": "alien",
@@ -364,10 +377,10 @@
     "buildOnMetalDeposit": false,
     "placeholder": false,
     "id": "structure.alien.missile_battery",
-    "name": "Spore Tower",
+    "name": "Corona",
     "kind": "turret",
     "cost": {
-      "ore": 250,
+      "ore": 200,
       "metal": 0
     },
     "deliverySec": 12,
@@ -399,7 +412,8 @@
     "upgrades": [
       "fireRate",
       "armor"
-    ]
+    ],
+    "roleLabel": "Missile tower"
   },
   {
     "cost": {
@@ -436,7 +450,8 @@
         "structure"
       ]
     },
-    "turretTurnDegPerSec": 90
+    "turretTurnDegPerSec": 90,
+    "roleLabel": "Crystal core"
   },
   {
     "cost": {
@@ -473,6 +488,7 @@
         "structure"
       ]
     },
-    "turretTurnDegPerSec": 120
+    "turretTurnDegPerSec": 120,
+    "roleLabel": "Crystal tower"
   }
 ]

@@ -35,7 +35,7 @@
       "player": 2,
       "faction": "human",
       "controller": "ai",
-      "ore": 500,
+      "ore": 250,
       "metal": 0,
       "difficulty": "easy"
     }
@@ -44,29 +44,43 @@
     {
       "side": 1,
       "unitType": "unit.alien.light_tank",
-      "x": -56.0,
-      "z": 52.0,
+      "x": -58.0,
+      "z": 50.0,
       "heading": -0.785
     },
     {
       "side": 1,
       "unitType": "unit.alien.light_tank",
-      "x": -52.0,
-      "z": 52.0,
+      "x": -54.0,
+      "z": 50.0,
       "heading": -0.785
     },
     {
       "side": 1,
       "unitType": "unit.alien.light_tank",
-      "x": -56.0,
-      "z": 56.0,
+      "x": -50.0,
+      "z": 50.0,
       "heading": -0.785
     },
     {
       "side": 1,
       "unitType": "unit.alien.light_tank",
-      "x": -52.0,
-      "z": 56.0,
+      "x": -58.0,
+      "z": 54.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -54.0,
+      "z": 54.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -50.0,
+      "z": 54.0,
       "heading": -0.785
     },
     {

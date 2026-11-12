@@ -54,7 +54,9 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
       miningRatePerSec: row.miningRatePerSec ?? 0,
       carryCapacity: row.carryCapacity ?? 0,
       salvageRefundPercent: row.salvageRefundPercent ?? 0,
-      repair: row.repair ? { radius: row.repair.radius, ratePerSec: row.repair.ratePerSec } : null,
+      repair: row.repair
+        ? { radius: row.repair.radius, ratePerSec: row.repair.ratePerSec, unitsOnly: row.repair.unitsOnly ?? false }
+        : null,
       deploysTo: row.deploysTo ?? null,
       deploySec: row.deploySec ?? 0,
       upgrades: [...row.upgrades],

@@ -14,24 +14,24 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | prop.nature.shrub | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
 | prop.nature.slab | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
 | prop.nature.tendril | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
-| structure.alien.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Hive Roost (structure) |
-| structure.alien.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Gene Vault (structure) |
-| structure.alien.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Nest (structure) |
+| structure.alien.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Aerie (structure) |
+| structure.alien.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Star Vault (structure) |
+| structure.alien.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Ring (structure) |
 | structure.alien.metal_station | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Siphon (structure) |
-| structure.alien.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spore Tower (structure) |
-| structure.alien.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Seer Spire (structure) |
-| structure.alien.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Thornmound (structure) |
+| structure.alien.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Corona (structure) |
+| structure.alien.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Oracle (structure) |
+| structure.alien.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Sentinel (structure) |
 | structure.human.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Airfield (structure) |
 | structure.human.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Research Lab (structure) |
 | structure.human.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Pad (structure) |
 | structure.human.metal_station | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Station (structure) |
-| structure.human.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Spire Missile Battery (structure) |
+| structure.human.missile_battery | TankCommand project (scripted Blender) | ORIGINAL | - | Harpoon Battery (structure) |
 | structure.human.radar | TankCommand project (scripted Blender) | ORIGINAL | - | Radar Tower (structure) |
 | structure.human.turret | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion Gun (structure) |
 | structure.shard.core | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Core (structure) |
 | structure.shard.spire | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Spire (structure) |
 | texture.terrain.detail | TankCommand project (scripted numpy) | ORIGINAL | - | Terrain surface |
-| unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Carapace (heavy tank) |
+| unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Aegis (heavy tank) |
 | unit.alien.carapace.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
 | unit.alien.darter.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
@@ -43,21 +43,21 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.alien.ferrier.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.glider | TankCommand project (scripted Blender) | ORIGINAL | - | Glider (glider) |
 | unit.alien.glider.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.gorger | TankCommand project (scripted Blender) | ORIGINAL | - | Gorger (ore miner) |
+| unit.alien.gorger | TankCommand project (scripted Blender) | ORIGINAL | - | Sifter (ore miner) |
 | unit.alien.gorger.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.halo | TankCommand project (scripted Blender) | ORIGINAL | - | Halo (fighter) |
 | unit.alien.halo.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.mortar_beast | TankCommand project (scripted Blender) | ORIGINAL | - | Mortar Beast (artillery) |
+| unit.alien.mortar_beast | TankCommand project (scripted Blender) | ORIGINAL | - | Sunfall (artillery) |
 | unit.alien.mortar_beast.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.seer | TankCommand project (scripted Blender) | ORIGINAL | - | Seer (radar) |
 | unit.alien.seer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.spitter | TankCommand project (scripted Blender) | ORIGINAL | - | Spitter (missile tank) |
+| unit.alien.spitter | TankCommand project (scripted Blender) | ORIGINAL | - | Flare (missile tank) |
 | unit.alien.spitter.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.spore_tower_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Spore Tower (packed) (missile battery packed) |
+| unit.alien.spore_tower_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Corona (packed) (missile battery packed) |
 | unit.alien.spore_tower_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.stinger | TankCommand project (scripted Blender) | ORIGINAL | - | Stinger (light tank) |
+| unit.alien.stinger | TankCommand project (scripted Blender) | ORIGINAL | - | Lumen (light tank) |
 | unit.alien.stinger.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
-| unit.alien.thornmound_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Thornmound (packed) (turret packed) |
+| unit.alien.thornmound_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Sentinel (packed) (turret packed) |
 | unit.alien.thornmound_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.weaver | TankCommand project (scripted Blender) | ORIGINAL | - | Weaver (repair) |
 | unit.alien.weaver.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |

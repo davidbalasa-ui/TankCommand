@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 1,
   "title": "First Seed",
-  "briefing": "A Terran outpost stands where our seed fell. Take four Stingers across the field and silence its three guards.",
+  "briefing": "A Terran outpost stands where our seed fell. Take four Lumens across the field and silence its three guards.",
   "mapId": "map.c_halden",
   "sides": [
     {

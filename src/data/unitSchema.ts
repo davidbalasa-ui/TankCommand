@@ -15,6 +15,8 @@ export const unitRowSchema = z
   .object({
     id: z.string().regex(/^unit\.[a-z0-9]+(\.[a-z0-9_]+)+$/),
     name: z.string(),
+    /** Small grey plain-terms line shown under the unique name ("Light tank"). */
+    roleLabel: z.string().optional(),
     faction: z.enum(['human', 'alien']),
     role: z.enum(['worker', 'scout', 'tank', 'artillery', 'support', 'air', 'structure']),
     techLevel: z.number().int().nonnegative(),
@@ -42,7 +44,12 @@ export const unitRowSchema = z
     miningRatePerSec: z.number().positive().optional(),
     salvageRefundPercent: z.number().min(0).max(100).optional(),
     repair: z
-      .object({ radius: z.number().positive(), ratePerSec: z.number().positive() })
+      .object({
+        radius: z.number().positive(),
+        ratePerSec: z.number().positive(),
+        /** Heals units only, never structures. */
+        unitsOnly: z.boolean().optional(),
+      })
       .optional(),
     movement: z.enum(['tracked', 'hover', 'air']).optional(),
     air: z

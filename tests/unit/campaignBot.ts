@@ -30,6 +30,8 @@ function conditionsOf(cond: Condition, out: Condition[] = []): Condition[] {
   return out;
 }
 
+const RESEARCH_SAVINGS = 250;
+
 export interface BotPlan {
   /** Ticks to gather the army at home before marching (unless a goal ring is waiting). */
   gatherTicks?: number;
@@ -166,7 +168,9 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     } else if (tower && towers < MAX_TOWERS && !pendingKit && enemyStructures.length === 0 && stats.ore >= tower.cost.ore) {
       out.push({ kind: 'buy', itemId: tower.id, padId: pad.id });
     } else {
-      const tank = tanks.find((t) => stats.ore >= t.oreCost && stats.metal >= t.metalCost);
+      // While a research goal waits on a free lab, keep enough ore back to start it.
+      const saving = lab && researching && !lab.research ? RESEARCH_SAVINGS : 0;
+      const tank = tanks.find((t) => stats.ore >= t.oreCost + saving && stats.metal >= t.metalCost);
       if (tank) {
         out.push({ kind: 'buy', itemId: tank.id, padId: pad.id });
       }

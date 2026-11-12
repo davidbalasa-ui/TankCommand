@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 6,
   "title": "Shell and Spine",
-  "briefing": "The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring your new Carapaces up the road and break it.",
+  "briefing": "The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring your new Aegis tanks up the road and break it.",
   "mapId": "map.c_relay_road",
   "sides": [
     {
@@ -158,7 +158,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "Carapaces shrug off gunfire. Lead with them; keep the Stingers behind."
+          "text": "Aegis tanks shrug off gunfire. Lead with them; keep the Lumens behind."
         }
       ]
     },

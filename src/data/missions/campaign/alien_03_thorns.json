@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 3,
   "title": "Thorns",
-  "briefing": "Terran patrols want our nest back. Hold it for six minutes. Grow a Thornmound where they attack.",
+  "briefing": "Terran patrols want our nest back. Hold it for six minutes. Grow a Sentinel where they attack.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -95,7 +95,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "First raid in one minute. Buy a Thornmound and place it facing south-west."
+          "text": "First raid in one minute. Buy a Sentinel and place it facing south-west."
         }
       ]
     },

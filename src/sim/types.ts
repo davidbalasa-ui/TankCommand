@@ -117,7 +117,7 @@ export interface SimUnitType {
   miningRatePerSec: number;
   carryCapacity: number;
   salvageRefundPercent: number;
-  repair: { radius: number; ratePerSec: number } | null;
+  repair: { radius: number; ratePerSec: number; unitsOnly?: boolean } | null;
   // Set on a packed structure: the structure type it deploys back into.
   deploysTo: string | null;
   deploySec: number;

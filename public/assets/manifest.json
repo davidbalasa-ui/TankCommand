@@ -208,8 +208,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Stinger",
-        "usedFor": "Stinger (light tank)"
+        "title": "Lumen",
+        "usedFor": "Lumen (light tank)"
       }
     },
     {
@@ -234,8 +234,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Gorger",
-        "usedFor": "Gorger (ore miner)"
+        "title": "Sifter",
+        "usedFor": "Sifter (ore miner)"
       }
     },
     {
@@ -273,8 +273,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Thornmound (packed)",
-        "usedFor": "Thornmound (packed) (turret packed)"
+        "title": "Sentinel (packed)",
+        "usedFor": "Sentinel (packed) (turret packed)"
       }
     },
     {
@@ -325,8 +325,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Carapace",
-        "usedFor": "Carapace (heavy tank)"
+        "title": "Aegis",
+        "usedFor": "Aegis (heavy tank)"
       }
     },
     {
@@ -338,8 +338,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spitter",
-        "usedFor": "Spitter (missile tank)"
+        "title": "Flare",
+        "usedFor": "Flare (missile tank)"
       }
     },
     {
@@ -351,8 +351,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Mortar Beast",
-        "usedFor": "Mortar Beast (artillery)"
+        "title": "Sunfall",
+        "usedFor": "Sunfall (artillery)"
       }
     },
     {
@@ -364,8 +364,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spore Tower (packed)",
-        "usedFor": "Spore Tower (packed) (missile battery packed)"
+        "title": "Corona (packed)",
+        "usedFor": "Corona (packed) (missile battery packed)"
       }
     },
     {
@@ -455,8 +455,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spire Missile Battery",
-        "usedFor": "Spire Missile Battery (structure)"
+        "title": "Harpoon Battery",
+        "usedFor": "Harpoon Battery (structure)"
       }
     },
     {
@@ -468,8 +468,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Landing Nest",
-        "usedFor": "Landing Nest (structure)"
+        "title": "Landing Ring",
+        "usedFor": "Landing Ring (structure)"
       }
     },
     {
@@ -494,8 +494,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Thornmound",
-        "usedFor": "Thornmound (structure)"
+        "title": "Sentinel",
+        "usedFor": "Sentinel (structure)"
       }
     },
     {
@@ -507,8 +507,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Seer Spire",
-        "usedFor": "Seer Spire (structure)"
+        "title": "Oracle",
+        "usedFor": "Oracle (structure)"
       }
     },
     {
@@ -520,8 +520,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Gene Vault",
-        "usedFor": "Gene Vault (structure)"
+        "title": "Star Vault",
+        "usedFor": "Star Vault (structure)"
       }
     },
     {
@@ -533,8 +533,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Hive Roost",
-        "usedFor": "Hive Roost (structure)"
+        "title": "Aerie",
+        "usedFor": "Aerie (structure)"
       }
     },
     {
@@ -546,8 +546,8 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spore Tower",
-        "usedFor": "Spore Tower (structure)"
+        "title": "Corona",
+        "usedFor": "Corona (structure)"
       }
     },
     {
@@ -952,7 +952,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Stinger (low detail)",
+        "title": "Lumen (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -984,7 +984,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Gorger (low detail)",
+        "title": "Sifter (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -1032,7 +1032,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Thornmound (packed) (low detail)",
+        "title": "Sentinel (packed) (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -1096,7 +1096,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Carapace (low detail)",
+        "title": "Aegis (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -1112,7 +1112,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spitter (low detail)",
+        "title": "Flare (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -1128,7 +1128,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Mortar Beast (low detail)",
+        "title": "Sunfall (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
@@ -1144,7 +1144,7 @@
       "credit": {
         "license": "ORIGINAL",
         "author": "TankCommand project (scripted Blender)",
-        "title": "Spore Tower (packed) (low detail)",
+        "title": "Corona (packed) (low detail)",
         "usedFor": "Low-detail version for the low quality tier and far zoom"
       },
       "tags": [
