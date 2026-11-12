@@ -44,6 +44,8 @@ export interface InputHost {
   setSelection: (ids: number[]) => void;
   sendCommand: (command: unknown) => boolean;
   getQueueMode?: () => boolean;
+  /** Select mode: a one-finger drag draws a box and a tap adds or removes a unit. */
+  isSelectMode?: () => boolean;
   getAttackMoveArmed?: () => boolean;
   clearAttackMove?: () => void;
   setAttackMoveArmed?: (value: boolean) => void;
@@ -358,8 +360,9 @@ export class InputController {
         this.panBy(event.clientX, event.clientY, dx, dy);
         return;
       }
-      if (this.longPressReady) {
+      if (this.longPressReady || (this.host.isSelectMode?.() ?? false)) {
         if (total > BOX_DRAG_THRESHOLD) {
+          this.clearLongPress();
           if (!this.boxSelecting) {
             this.boxSelecting = true;
             this.boxStart = { x: info.startX, y: info.startY };
@@ -451,7 +454,11 @@ export class InputController {
         this.panPointerId = null;
         this.panGrab = null;
       } else if (!this.longPressReady && total < TAP_MAX_MOVE && duration < TAP_MAX_MS) {
-        this.handleTap(info.startX, info.startY);
+        if (this.host.isSelectMode?.()) {
+          this.toggleTapped(info.startX, info.startY);
+        } else {
+          this.handleTap(info.startX, info.startY);
+        }
       }
       this.clearLongPress();
       this.longPressReady = false;
@@ -713,7 +720,36 @@ export class InputController {
         selected.push(unit.id);
       }
     }
-    this.host.setSelection(selected);
+    // A box that catches fighters leaves the miners and haulers out of it.
+    const fighters = selected.filter((id) => !this.isWorker(id));
+    const picked = fighters.length > 0 ? fighters : selected;
+    if (this.host.isSelectMode?.()) {
+      // Select mode adds the box to what is already picked.
+      const current = this.host.getSelection();
+      this.host.setSelection([...current, ...picked.filter((id) => !current.includes(id))]);
+      return;
+    }
+    this.host.setSelection(picked);
+  }
+
+  private isWorker(unitId: number): boolean {
+    const world = this.host.getWorld();
+    const unit = world.units.find((item) => item.id === unitId);
+    return Boolean(unit && world.unitTypes.get(unit.typeId)?.workerKind);
+  }
+
+  /** Select mode tap: adds an own unit to the selection, or takes it out again. */
+  private toggleTapped(x: number, y: number): void {
+    const own = this.host.renderView.pickUnit(x, y, true, true);
+    const world = this.host.getWorld();
+    const unit = own === null ? null : world.units.find((item) => item.id === own);
+    if (!unit || unit.owner !== 1) {
+      return;
+    }
+    const current = this.host.getSelection();
+    this.host.setSelection(
+      current.includes(unit.id) ? current.filter((id) => id !== unit.id) : [...current, unit.id],
+    );
   }
 
   private selectSameTypeOnScreen(unitId: number): void {

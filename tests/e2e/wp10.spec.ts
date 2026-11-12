@@ -79,19 +79,18 @@ test('[GAME-01] pause freezes the sim, refuses orders, and Android back opens an
   await waitScreen(page, 'inGame');
 });
 
-test('[GAME-02] speed settings change the sim multipliers from the top bar and the pause menu', async ({ page }, testInfo) => {
+test('[GAME-02] speed settings and the match clock live in the pause menu', async ({ page }, testInfo) => {
   requirePhone(testInfo);
   await enterGame(page);
   expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(1);
-  await tap(page, 'inGame.speed');
-  expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(2);
-  await tap(page, 'inGame.speed');
-  expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(0.5);
-  await tap(page, 'inGame.speed');
-  expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(1);
+  // The battlefield has no clock or speed chip any more.
+  await expect(page.locator('[data-control-id="inGame.speed"]')).toHaveCount(0);
 
   await tap(page, 'inGame.pause');
   await waitScreen(page, 'pause');
+  await expect(page.locator('.pause-clock')).toContainText('Match time');
+  await tap(page, 'pause.speedFast');
+  expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(2);
   await tap(page, 'pause.speedSlow');
   expect(await page.evaluate(() => window.__TC_TEST__?.simSpeed() ?? 0)).toBe(0.5);
   await tap(page, 'pause.speedNormal');
@@ -346,7 +345,8 @@ test('[ALRT-01] alerts are rate-limited and tapping a toast jumps the camera', a
   const box = await page.locator('.alert-toast').boundingBox();
   expect(box).not.toBeNull();
   if (!box) return;
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  // Tap the icon end: after a few seconds the text fades and the line shrinks to its icon.
+  await page.touchscreen.tap(box.x + 22, box.y + box.height / 2);
   await expect.poll(async () => {
     const camera = await page.evaluate(() => window.__TC_TEST__?.camera() ?? null);
     if (!camera) return 999;

@@ -328,7 +328,7 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
     return;
   }
 
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  // The Place tile sits in the queue strip at the top of the screen.
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))
@@ -371,7 +371,7 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.dropState().kits.length ?? 0))
     .toBe(1);
 
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  // The Place tile sits in the queue strip at the top of the screen.
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
   await page.evaluate(() => window.__TC_TEST__?.setCamera({ targetX: -24, targetZ: -64, distance: 60, yaw: 0 }));
   const again = await page.evaluate(() => window.__TC_TEST__?.worldToScreen(-24, -64) ?? null);

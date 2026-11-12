@@ -189,6 +189,7 @@ export class App {
   private simSpeedMultiplier = 1;
   private nextSeed = 1;
   private queueModeValue = false;
+  private selectModeValue = false;
   private attackMoveArmedValue = false;
   private leftHandedValue = false;
   private fogValue = true;
@@ -320,6 +321,11 @@ export class App {
       getBuildItems: () => this.buildItems(),
       thumbnail: (kind, typeId) => this.renderView?.thumbnail(kind, typeId) ?? null,
       itemName: (typeId) => this.itemName(typeId),
+      itemRole: (typeId) => this.itemRole(typeId),
+      isSelectMode: () => this.selectModeValue,
+      setSelectMode: (value) => {
+        this.selectModeValue = value;
+      },
       getOwnPads: () => this.ownPads(),
       getSelectedPadId: () => this.currentDropPadId(),
       setSelectedPad: (id) => {
@@ -387,6 +393,7 @@ export class App {
       setCameraTarget: (x, z) => {
         this.setCamera({ targetX: x, targetZ: z });
       },
+      worldToScreen: (x, z) => this.renderView?.worldToScreen(x, z) ?? null,
       setSimSpeed: (multiplier) => {
         this.simSpeedMultiplier = Math.min(8, Math.max(0.5, multiplier));
       },
@@ -1400,6 +1407,12 @@ export class App {
     this.services?.unlockAudio();
   }
 
+  private itemRole(itemId: string): string | undefined {
+    const unit = this.unitRows.find((row) => row.id === itemId) as { roleLabel?: string } | undefined;
+    const structure = this.world.structureTypes.get(itemId) as { roleLabel?: string } | undefined;
+    return unit?.roleLabel ?? structure?.roleLabel;
+  }
+
   private itemName(itemId: string): string {
     // Units only carry their id on `SimUnitType`, so the display name comes from
     // the raw data sheet. Structure types carry their own name. The previous
@@ -1688,6 +1701,7 @@ export class App {
           },
           sendCommand: (command) => this.sendCommand(command),
           getQueueMode: () => this.queueModeValue,
+          isSelectMode: () => this.selectModeValue,
           getAttackMoveArmed: () => this.attackMoveArmedValue,
           clearAttackMove: () => {
             this.attackMoveArmedValue = false;

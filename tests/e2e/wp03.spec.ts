@@ -449,9 +449,17 @@ test('[TCH-03] long-press then drag box-selects units', async ({ page }, testInf
     fire('pointerup', input.ex, input.ey, 0);
   }, { sx: left, sy: top, ex: right, ey: bottom });
 
+  // Every tank in the box is picked; miners and haulers stay out of a box that has tanks in it.
+  const workers = await page.evaluate(() =>
+    (window.__TC_TEST__?.units() ?? []).filter((u) => u.owner === 1 && u.workerKind).map((u) => u.id),
+  );
   const selection = await page.evaluate(() => window.__TC_TEST__?.selection() ?? []);
   for (const unit of centres) {
-    expect(selection).toContain(unit.id);
+    if (workers.includes(unit.id)) {
+      expect(selection).not.toContain(unit.id);
+    } else {
+      expect(selection).toContain(unit.id);
+    }
   }
 });
 
@@ -833,9 +841,9 @@ test('[HUD-01] command bar buttons disable with no selection and activate by tap
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queueMode ?? false))
     .toBe(true);
 
-  await page.locator('[data-control-id="inGame.groups"]').tap();
+  await page.locator('[data-control-id="inGame.selectMode"]').tap();
   await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.groupsOpen ?? false))
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.selectMode ?? false))
     .toBe(true);
 });
 
@@ -851,12 +859,8 @@ test('[HUD-02] in-game HUD has no overlaps, ≥ 44 px touch targets and ≥ 12 p
   expect(ownId).not.toBeNull();
   if (ownId === null) return;
   await page.evaluate((id) => window.__TC_TEST__?.setSelection([id]), ownId);
-  await page.evaluate(() => {
-    document.querySelector<HTMLButtonElement>('[data-control-id="inGame.groups"]')?.click();
-  });
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.groupsOpen ?? false))
-    .toBe(true);
+  // The group row is always on screen, so it is measured with everything else.
+  await expect(page.locator('[data-control-id="inGame.group1"]')).toBeVisible();
 
   const info = await page.evaluate(() => {
     interface Box {
@@ -1083,14 +1087,8 @@ test('[GRP-01] control groups assign, select and centre by keyboard and by touch
     })
     .toBeLessThan(0.5);
 
-  // --- Touch: open the groups strip, long-press tile 3, then two taps to centre ---
+  // --- Touch: long-press tile 3 to save, then two taps to centre ---
   await page.evaluate((id) => window.__TC_TEST__?.setSelection([id]), lastId);
-  await page.evaluate(() => {
-    document.querySelector<HTMLButtonElement>('[data-control-id="inGame.groups"]')?.click();
-  });
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.groupsOpen ?? false))
-    .toBe(true);
 
   await page.evaluate(async () => {
     const tile = document.querySelector<HTMLButtonElement>('[data-control-id="inGame.group3"]');

@@ -673,6 +673,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           },
           thumbnail: (kind, typeId) => ctx.thumbnail?.(kind, typeId) ?? null,
           itemName: (typeId) => ctx.itemName?.(typeId) ?? typeId,
+          itemRole: (typeId) => ctx.itemRole?.(typeId),
+          isSelectMode: () => ctx.isSelectMode?.() ?? false,
+          setSelectMode: (value) => {
+            ctx.setSelectMode?.(value);
+          },
         });
         ctx.registerHud?.(hud);
       }
@@ -754,6 +759,15 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
     // single inline row so it fits under the grid.
     pause: makeScreen('pause', 'Paused', (root, ctx) => {
       ctx.pauseSim(true);
+      // The match clock lives here rather than on the battlefield.
+      const world = ctx.getWorld?.();
+      if (world) {
+        const seconds = Math.floor(world.tick / SIM_TICK_HZ);
+        const clock = document.createElement('p');
+        clock.className = 'pause-clock';
+        clock.textContent = `Match time ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+        root.append(clock);
+      }
       const grid = document.createElement('div');
       grid.className = 'pause-grid';
       root.append(grid);

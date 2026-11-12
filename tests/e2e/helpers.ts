@@ -157,6 +157,7 @@ export interface RenderStats {
 export interface HudSnapshot {
   leftHanded: boolean;
   groupsOpen: boolean;
+  selectMode: boolean;
   queueMode: boolean;
   attackMoveArmed: boolean;
   selectedCount: number;

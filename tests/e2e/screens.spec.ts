@@ -51,7 +51,7 @@ test('[screens] wp03-3-units-selected-command-bar', async ({ page }, testInfo) =
   await page.screenshot({ path: 'test-results/shots/wp03-3-units-selected-command-bar.png' });
 });
 
-test('[screens] wp03-4-groups-open', async ({ page }, testInfo) => {
+test('[screens] wp03-4-group-row', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   await enterGame(page);
   const ids = await page.evaluate(() => {
@@ -60,21 +60,11 @@ test('[screens] wp03-4-groups-open', async ({ page }, testInfo) => {
     return hook.units().filter((u) => u.owner === 1).map((u) => u.id);
   });
   await page.evaluate((selection) => window.__TC_TEST__?.setSelection(selection), ids);
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        () => document.querySelector<HTMLButtonElement>('[data-control-id="inGame.groups"]')?.disabled ?? true,
-      ),
-    )
-    .toBe(false);
-  await page.evaluate(() => {
-    document.querySelector<HTMLButtonElement>('[data-control-id="inGame.groups"]')?.click();
-  });
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.groupsOpen ?? false))
-    .toBe(true);
+  // The group row (All army, then 1-4) is always on screen; empty tiles say how to fill them.
+  await expect(page.locator('[data-control-id="inGame.groupAll"]')).toBeVisible();
+  await expect(page.locator('[data-control-id="inGame.group1"]')).toBeVisible();
   await waitFrames(page, 3);
-  await page.screenshot({ path: 'test-results/shots/wp03-4-groups-open.png' });
+  await page.screenshot({ path: 'test-results/shots/wp03-4-group-row.png' });
 });
 
 test('[screens] wp03-5-left-handed', async ({ page }, testInfo) => {
@@ -207,7 +197,7 @@ test('[screens] wp04-4-placing-structure-kit', async ({ page }, testInfo) => {
   if (kitId === null) {
     return;
   }
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  // The Place tile sits in the queue strip at the top of the screen.
   await page.locator(`[data-control-id="build.place.${kitId}"]`).tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.placement() !== null))

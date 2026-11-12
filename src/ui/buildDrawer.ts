@@ -1,6 +1,13 @@
 /**
- * Build drawer (UI redesign v1): a right-side "Orbital drop" drawer with Units /
- * Structures / Research tabs of cost cards and a queue strip along the bottom.
+ * Drop menu (overhaul step 3): a strip along the bottom, about a third of the screen tall, with
+ * small Units / Structures / Research tabs and one sideways-scrolling row of cards. Orders show
+ * only in the queue strip at the top of the screen (queueStrip.ts), never here.
+ *
+ * - Card order is fixed for the match: unlocked cards first, then locked ones, in the order the
+ *   menu first saw them. A card you can't afford is dimmed with its cost in red, but never moves.
+ * - Each card: picture, name, grey plain-terms line and cost.
+ * - The tab and each tab's scroll position are remembered between opens.
+ * - The "Land at" picker shows only when you own more than one pad.
  *
  * Control ids are unchanged from the old bottom sheet (build.item.*, build.pad.*,
  * build.cancel.*, build.place.*, inGame.buildClose), so tests and the control
@@ -70,11 +77,12 @@ export class BuildDrawer {
   private readonly padSlot: HTMLDivElement;
   private readonly tabs = new Map<Tab, HTMLButtonElement>();
   private readonly panes = new Map<Tab, HTMLDivElement>();
-  private readonly queueStrip: HTMLDivElement;
-  private readonly progressRefs = new Map<number, HTMLElement>();
   private readonly thumbSlots: Array<{ slot: HTMLElement; kind: 'unit' | 'structure'; typeId: string }> = [];
-  private eta: HTMLSpanElement | null = null;
   private tab: Tab = 'unit';
+  /** Each tab's sideways scroll, kept between opens. */
+  private readonly scroll = new Map<Tab, number>();
+  /** Card order for this match: item id -> slot, fixed the first time the item is seen. */
+  private readonly order = new Map<string, number>();
   private signature = '';
   private open = false;
 
@@ -85,7 +93,6 @@ export class BuildDrawer {
     guardOpeningTap(this.element, () => this.open);
 
     const header = el('div', 'drawer-header');
-    const title = el('h2', 'drawer-title', 'Orbital drop');
     this.padSlot = el('div', 'drawer-pads');
     const close = button('inGame', 'buildClose', 'Close', () => {
       this.host.close();
@@ -93,7 +100,7 @@ export class BuildDrawer {
     close.classList.add('drawer-close');
     close.setAttribute('aria-label', 'Close');
     close.replaceChildren(icon('x'));
-    header.append(title, this.padSlot, close);
+    header.append(this.padSlot, close);
 
     const tabRow = el('div', 'drawer-tabs');
     tabRow.setAttribute('role', 'tablist');
@@ -114,11 +121,18 @@ export class BuildDrawer {
       tabRow.append(node);
       const pane = el('div', 'drawer-cards');
       pane.dataset.tab = tab;
+      pane.addEventListener('scroll', () => {
+        if (this.open && !pane.hidden) {
+          this.scroll.set(tab, pane.scrollLeft);
+        }
+      });
       this.panes.set(tab, pane);
     }
 
-    this.queueStrip = el('div', 'drawer-queue');
-    this.element.append(header, tabRow, ...this.panes.values(), this.queueStrip);
+    tabRow.append(header);
+    const body = el('div', 'drawer-body');
+    body.append(...this.panes.values());
+    this.element.append(tabRow, body);
     this.setTab('unit');
   }
 
@@ -129,14 +143,16 @@ export class BuildDrawer {
   setOpen(open: boolean): void {
     this.open = open;
     if (!open) {
-      this.element.querySelectorAll('.drawer-cards, .drawer-queue, .drawer-pads').forEach((node) => {
+      this.element.querySelectorAll('.drawer-cards, .drawer-pads').forEach((node) => {
         node.replaceChildren();
       });
-      this.progressRefs.clear();
       this.thumbSlots.length = 0;
       this.signature = '';
     }
     this.refresh();
+    if (open) {
+      this.restoreScroll();
+    }
   }
 
   setTab(tab: Tab): void {
@@ -148,20 +164,37 @@ export class BuildDrawer {
     for (const [key, pane] of this.panes) {
       pane.hidden = key !== tab;
     }
+    this.restoreScroll();
+  }
+
+  private restoreScroll(): void {
+    const pane = this.panes.get(this.tab);
+    if (pane) {
+      pane.scrollLeft = this.scroll.get(this.tab) ?? 0;
+    }
+  }
+
+  /** Items in their fixed card order (unlocked ones first the first time they are seen). */
+  private ordered(items: BuildItemView[]): BuildItemView[] {
+    const fresh = items.filter((item) => !this.order.has(item.id));
+    const open = fresh.filter((item) => item.disabledReason === null || item.disabledReason === 'Cannot afford');
+    const locked = fresh.filter((item) => !open.includes(item));
+    for (const item of [...open, ...locked]) {
+      this.order.set(item.id, this.order.size);
+    }
+    return items.slice().sort((a, b) => (this.order.get(a.id) ?? 0) - (this.order.get(b.id) ?? 0));
   }
 
   private computeSignature(): string {
     const items = this.host.getBuildItems();
     const pads = this.host.getOwnPads();
     const queue = this.host.getDropQueue();
-    const kits = this.host.getKits();
     const base = this.host.getBaseView();
     const parts: string[] = [`pad:${this.host.getSelectedPadId() ?? ''}`, pads.map((pad) => pad.id).join(',')];
     for (const item of items) {
       parts.push(`${item.id}|${item.name}|${item.ore}|${item.metal}|${item.deliverySec}|${item.disabledReason ?? ''}`);
     }
-    parts.push('::queue::', ...queue.map((order) => `${order.id}|${order.itemId}`));
-    parts.push('::kits::', ...kits.map((kit) => `${kit.id}|${kit.name}`));
+    parts.push('::queue::', ...queue.map((order) => order.itemId));
     parts.push(`::lab:${base.labId ?? ''}:${base.labBusy}`);
     parts.push(...base.nodes.map((node) => `${node.id}|${node.state}|${node.reason ?? ''}`));
     // Affordability changes which reason a locked card shows.
@@ -183,19 +216,6 @@ export class BuildDrawer {
   }
 
   private updateLive(): void {
-    const queue = this.host.getDropQueue();
-    for (const order of queue) {
-      const bar = this.progressRefs.get(order.id);
-      if (bar) {
-        bar.style.width = `${Math.round(Math.min(1, Math.max(0, order.progress)) * 100)}%`;
-      }
-    }
-    if (this.eta) {
-      const first = queue[0];
-      this.eta.textContent = first
-        ? `${first.name} lands in ${Math.max(0, Math.ceil(first.remainingSec))}s · tap a drop to cancel it for a full refund`
-        : '';
-    }
     for (const entry of this.thumbSlots) {
       if (entry.slot.dataset.loaded === 'true') {
         continue;
@@ -215,29 +235,15 @@ export class BuildDrawer {
     return slot;
   }
 
-  private reasonText(item: BuildItemView, res: { ore: number; metal: number }): string | null {
-    if (item.disabledReason !== 'Cannot afford') {
-      return item.disabledReason;
-    }
-    const needs: string[] = [];
-    if (item.ore > res.ore) {
-      needs.push(`${item.ore - res.ore} more ore`);
-    }
-    if (item.metal > res.metal) {
-      needs.push(`${item.metal - res.metal} more metal`);
-    }
-    return needs.length > 0 ? `Need ${needs.join(' and ')}` : item.disabledReason;
-  }
-
   private rebuild(): void {
-    this.progressRefs.clear();
     this.thumbSlots.length = 0;
-    const items = this.host.getBuildItems();
+    const items = this.ordered(this.host.getBuildItems());
     const queue = this.host.getDropQueue();
     const res = this.host.getResources();
 
-    // Pad picker: one chip per own pad when there is a choice, else a label.
-    const pads = this.host.getOwnPads();
+    // Pad picker: only when there is a choice of pad.
+    const owned = this.host.getOwnPads();
+    const pads = owned.length > 1 ? owned : [];
     const selectedPad = this.host.getSelectedPadId();
     this.padSlot.replaceChildren();
     if (pads.length > 0) {
@@ -270,20 +276,19 @@ export class BuildDrawer {
         card.dataset.controlId = `build.item.${item.id}`;
         card.disabled = item.disabledReason !== null;
         card.append(this.thumb('card-thumb', kind, item.id), el('span', 'card-name build-item-name', item.name));
-        card.append(costRow(item.ore, item.metal, item.deliverySec));
+        card.append(el('span', 'card-role', item.roleLabel ?? ''));
+        const cost = costRow(item.ore, item.metal, item.deliverySec);
+        // Short of ore or metal: the card dims and its price turns red, but it stays put.
+        const short = item.disabledReason === 'Cannot afford' || item.ore > res.ore || item.metal > res.metal;
+        card.classList.toggle('short', short);
+        card.append(cost);
         const count = queued.get(item.id);
         if (count) {
           card.append(el('span', 'card-count', `×${count}`));
         }
-        const reason = this.reasonText(item, res);
-        if (reason) {
+        if (item.disabledReason !== null && item.disabledReason !== 'Cannot afford') {
           const chip = el('span', 'card-reason build-reason');
-          if (item.disabledReason !== 'Cannot afford') {
-            chip.append(icon('lock'));
-          } else {
-            chip.classList.add('afford');
-          }
-          chip.append(reason);
+          chip.append(icon('lock'), item.disabledReason);
           card.append(chip);
         }
         card.addEventListener('click', () => {
@@ -297,7 +302,7 @@ export class BuildDrawer {
       }
     }
     this.renderResearch();
-    this.renderQueue(queue, this.host.getKits());
+    this.restoreScroll();
   }
 
   private renderResearch(): void {
@@ -349,46 +354,5 @@ export class BuildDrawer {
       this.refresh();
     });
     return card;
-  }
-
-  private renderQueue(queue: DropQueueView[], kits: KitView[]): void {
-    this.queueStrip.replaceChildren();
-    this.eta = null;
-    if (kits.length > 0) {
-      for (const kit of kits) {
-        const place = el('button', 'build-place primary');
-        place.type = 'button';
-        place.dataset.controlId = `build.place.${kit.id}`;
-        place.append(this.thumb('place-thumb', 'structure', kit.structureTypeId), el('span', '', `Place ${kit.name}`));
-        place.addEventListener('click', () => {
-          if (this.host.startPlacement(kit.id)) {
-            this.host.close();
-          }
-        });
-        this.queueStrip.append(place);
-      }
-    }
-    this.queueStrip.append(el('span', 'queue-label', 'Queue'));
-    if (queue.length === 0 && kits.length === 0) {
-      this.queueStrip.append(el('span', 'queue-eta', 'Tap a card to order it. Drops land at the pad.'));
-      return;
-    }
-    for (const order of queue) {
-      const kind = order.itemId.startsWith('structure.') ? 'structure' : 'unit';
-      const tile = el('button', 'build-cancel queue-tile');
-      tile.type = 'button';
-      tile.dataset.controlId = `build.cancel.${order.id}`;
-      tile.setAttribute('aria-label', `Cancel ${order.name}`);
-      const bar = el('span', 'queue-progress');
-      this.progressRefs.set(order.id, bar);
-      tile.append(this.thumb('queue-thumb', kind, order.itemId), el('span', 'queue-x', '×'), bar);
-      tile.addEventListener('click', () => {
-        this.host.cancelOrder(order.id);
-        this.refresh();
-      });
-      this.queueStrip.append(tile);
-    }
-    this.eta = el('span', 'queue-eta');
-    this.queueStrip.append(this.eta);
   }
 }

@@ -60,7 +60,7 @@ describe('alerts', () => {
     expect(jumps.at(-1)).toEqual({ x: 10, z: -10 });
   });
 
-  it('[ALRT-01] pad lost, structure lost, deposit empty, drop arrived and not enough resources fire from the economy state', () => {
+  it('[ALRT-01] pad lost, structure lost, deposit empty and not enough resources fire from the economy state', () => {
     let now = 0;
     center = new AlertCenter({
       host: document.body,
@@ -112,8 +112,8 @@ describe('alerts', () => {
     center.update(withAlerts);
     const kinds = center.list().map((alert) => alert.kind);
     expect(kinds).toContain('depositEmpty');
-    expect(kinds).toContain('dropArrived');
-    expect(center.list().filter((alert) => alert.kind === 'dropArrived')).toHaveLength(1);
+    // Drop arrived is not an alert any more: the order's tile leaving the queue strip says it.
+    expect(kinds).not.toContain('dropArrived');
 
     // The same sim alerts seen on a later frame are not raised again.
     now = 4000;
@@ -126,5 +126,39 @@ describe('alerts', () => {
       lastCommandOutcome: { tick: world.tick, kind: 'buy', ok: false, reason: 'unaffordable' },
     });
     expect(center.list().at(-1)?.kind).toBe('notEnoughResources');
+  });
+
+  it('[ALRT-02] alerts share one line: repeats of a kind merge into a count, and the text fades to an icon', async () => {
+    let now = 0;
+    const jumps: Array<{ x: number; z: number }> = [];
+    center = new AlertCenter({
+      host: document.body,
+      now: () => now,
+      rateLimitMs: 1000,
+      ttlMs: 50,
+      onJump: (x, z) => jumps.push({ x, z }),
+    });
+    center.setEnabled(true);
+    center.raiseAlert('unitLost', 1, 1);
+    now = 400;
+    center.raiseAlert('unitLost', 2, 2);
+    now = 1500;
+    center.raiseAlert('unitLost', 3, 3);
+    const lines = document.querySelectorAll<HTMLButtonElement>('.alert-toast');
+    expect(lines).toHaveLength(1);
+    const line = lines[0]!;
+    expect(line.hidden).toBe(false);
+    expect(line.textContent).toContain('3 units lost');
+    // A different kind starts a fresh line.
+    now = 3000;
+    center.raiseAlert('depositEmpty', 9, 9);
+    expect(line.textContent).toContain('Deposit empty');
+    expect(line.dataset.count).toBe('1');
+    // The text fades but the icon stays, and a tap still jumps to the newest alert.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(line.classList.contains('faded')).toBe(true);
+    expect(line.hidden).toBe(false);
+    line.click();
+    expect(jumps.at(-1)).toEqual({ x: 9, z: 9 });
   });
 });
