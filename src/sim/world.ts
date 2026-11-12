@@ -10,7 +10,7 @@ import {
   isBlockedAt,
   lineOfSightClear,
 } from './map';
-import { followPath, unitMap } from './motion';
+import { computePath, followPath, unitMap } from './motion';
 import { separateUnits } from './avoidance';
 import { obstacleMap, pushOutOfObstacles } from './obstacles';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
@@ -380,18 +380,6 @@ function ownedUnits(world: WorldState, issuer: PlayerId, ids: readonly number[])
   );
 }
 
-function computePath(
-  world: WorldState,
-  unit: UnitState,
-  goalX: number,
-  goalZ: number,
-): Point[] | null {
-  const path = findPath(unitMap(world, unit), unit.x, unit.z, goalX, goalZ);
-  if (!path || path.length === 0) {
-    return null;
-  }
-  return path;
-}
 
 type MoveOrderKind = 'move' | 'attackMove';
 
@@ -1014,6 +1002,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     ) {
       unit.stuckTicks = 0;
       unit.replans = 0;
+      unit.yieldTicks = 0;
       continue;
     }
 
@@ -1028,6 +1017,11 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     const moved = Math.hypot(unit.x - start.x, unit.z - start.z);
+    // Waiting its turn at a narrow spot is not being stuck.
+    if ((unit.yieldTicks ?? 0) > 0) {
+      unit.stuckTicks = 0;
+      continue;
+    }
     if (moved < MOVE_EPS) {
       unit.stuckTicks += 1;
     } else {
@@ -1047,7 +1041,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'move') {
-      const path = findPath(unitMap(world, unit), unit.x, unit.z, unit.order.x, unit.order.z);
+      const path = computePath(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1057,7 +1051,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'attackMove') {
-      const path = findPath(unitMap(world, unit), unit.x, unit.z, unit.order.x, unit.order.z);
+      const path = computePath(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1068,7 +1062,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
 
     const liveTarget = type ? selectTarget(world, unit, type) : null;
     if (liveTarget) {
-      unit.path = findPath(unitMap(world, unit), unit.x, unit.z, liveTarget.x, liveTarget.z) ?? [];
+      unit.path = computePath(world, unit, liveTarget.x, liveTarget.z) ?? [];
     } else {
       unit.order = { kind: 'idle' };
       unit.path = [];
@@ -1379,6 +1373,7 @@ export function hashWorld(world: WorldState): string {
         path: unit.path,
         reloadLeft: unit.reloadLeft,
         stuckTicks: unit.stuckTicks,
+        yieldTicks: unit.yieldTicks ?? 0,
         speed: unit.speed,
         replans: unit.replans,
         attackRepathTick: unit.attackRepathTick,

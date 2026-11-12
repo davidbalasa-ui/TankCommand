@@ -1,7 +1,7 @@
 export const MAX_SLOPE = 1.2; // placeholder until Stage 0
 export const UNIT_RADIUS = 1.6; // placeholder until Stage 0
-export const STUCK_TICKS = 40; // placeholder until Stage 0
-export const MAX_REPLANS = 3; // placeholder until Stage 0
+export const STUCK_TICKS = 20; // 1 s without progress: plan the route again (round whatever is in the way)
+export const MAX_REPLANS = 6; // give up the order after this many fruitless re-plans (about 6 s)
 export const MOVE_EPS = 0.05; // placeholder until Stage 0
 export const STOP_DISTANCE = 0.5; // placeholder until Stage 0
 export const WAYPOINT_REACHED = 1; // placeholder until Stage 0

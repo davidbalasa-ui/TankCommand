@@ -16,6 +16,8 @@ import type { UnitState, WorldState } from '../../src/sim/types';
 
 const THINK_EVERY = 40;
 const DEFEND_RADIUS = 32;
+/** Enemy fighters this close to the army's centre are dealt with before anything else. */
+const FIELD_RADIUS = 30;
 const MAX_TOWERS = 3;
 
 type Cmd = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
@@ -277,8 +279,17 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     !own.some((u) => w.unitTypes.get(u.typeId)?.workerKind === 'oreMiner');
   const ready = !enemyPad || (marching && army.length >= 4) || army.length >= wantSize || (broke && army.length >= 4);
   if (ids.length > 0) {
+    // Enemy fighters close to the army get fought first, before it drives on past them.
+    const c0 = centre(army);
+    const skirmish = enemies
+      .filter((e) => !e.air && isFightingUnitType(w.unitTypes.get(e.typeId)) && !w.unitTypes.get(e.typeId)?.workerKind)
+      .map((e) => ({ e, d: Math.hypot(e.x - c0.x, e.z - c0.z) }))
+      .filter((item) => item.d < FIELD_RADIUS)
+      .sort((a, b) => a.d - b.d)[0]?.e;
     if (threat) {
       out.push({ kind: 'attackMove', unitIds: ids, x: threat.x, z: threat.z });
+    } else if (skirmish && !escortGoal) {
+      out.push({ kind: 'attackMove', unitIds: ids, x: skirmish.x, z: skirmish.z });
     } else if (escortGoal) {
       // Clear the road a little ahead of the escorted units.
       const c = centre(ownProtected.length ? ownProtected : army);
