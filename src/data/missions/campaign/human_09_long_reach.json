@@ -1,0 +1,365 @@
+{
+  "id": "mission.human.09_long_reach",
+  "campaign": "human",
+  "order": 9,
+  "title": "Long Reach",
+  "briefing": "The Arcadians have dug guns into the hill at the centre of the valley. They outrange our tanks, but not our new Longbow artillery. Shell the hill until every gun is gone.",
+  "mapId": "map.c_long_reach",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 700,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -72.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -68.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -62.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -58.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -62.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -58.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -56,
+      "z": 70,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -82,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -76,
+      "z": 82,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 16.0,
+      "z": -12.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 20.0,
+      "z": -12.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 16.0,
+      "z": -8.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.missile_tank",
+      "x": 28,
+      "z": -26,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 60,
+      "z": -60,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 70,
+      "z": -68,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -74,
+      "z": 74
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 2,
+      "z": -2
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 24,
+      "z": -2
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 2,
+      "z": -26
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 26,
+      "z": -24
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.missile_battery",
+      "x": 14,
+      "z": -14
+    }
+  ],
+  "objectives": [
+    {
+      "id": "guns",
+      "text": "Destroy the towers on the hill",
+      "kind": "primary"
+    },
+    {
+      "id": "battery",
+      "text": "Destroy the missile battery",
+      "kind": "primary"
+    },
+    {
+      "id": "camp",
+      "text": "Destroy the camp behind the hill",
+      "kind": "optional"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Longbows hit from far beyond the guns. Keep tanks in front of them to spot targets."
+        }
+      ]
+    },
+    {
+      "id": "ca1",
+      "when": {
+        "t": "time",
+        "tick": 6000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Counter-attack coming off the hill!"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 4,
+          "z": -4,
+          "tag": "ca1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "ca1",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "ca2",
+      "when": {
+        "t": "time",
+        "tick": 11200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 4,
+          "z": -4,
+          "tag": "ca2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": 0,
+          "z": -8,
+          "tag": "ca2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "ca2",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "guns",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.turret"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "guns",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "battery",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.missile_battery"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "battery",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "campDone",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 66,
+        "z": -66,
+        "radius": 14
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "camp",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

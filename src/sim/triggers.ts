@@ -3,6 +3,7 @@ import { relation, setRelation } from './diplomacy';
 import { assignHome } from './air';
 import { addBeam } from './drops';
 import { ensureSideStats } from './economy';
+import { researchDone } from './research';
 import { sideAlive } from './match';
 import { addUnit, findNearestFreeSpot } from './spawn';
 import type { Action, Condition, Trigger } from './missionSchema';
@@ -125,12 +126,21 @@ export function evalCondition(world: WorldState, mission: MissionState, cond: Co
       return mission.objectives.some((o) => o.id === cond.id && o.status === 'done');
     case 'structureBuilt': {
       const count = world.structures.filter(
-        (s) => s.hp > 0 && s.owner === cond.side && s.typeId === cond.structureType && !s.work,
+        (s) =>
+          s.hp > 0 &&
+          s.owner === cond.side &&
+          s.typeId === cond.structureType &&
+          !s.work &&
+          (cond.radius === undefined || inCircle(s.x, s.z, cond.x ?? 0, cond.z ?? 0, cond.radius)),
       ).length;
       return count >= (cond.count ?? 1);
     }
     case 'relationIs':
       return relation(world, cond.a, cond.b) === cond.relation;
+    case 'researchDone': {
+      const done = researchDone(world, cond.side);
+      return cond.node ? done.has(cond.node) : done.size >= (cond.count ?? 1);
+    }
     case 'unitsAlive': {
       let count: number;
       if (cond.tag) {
@@ -309,8 +319,8 @@ export interface MissionMarker {
 }
 
 /**
- * Areas the player is meant to reach: every areaEntered (for the player's side) or unitEscorted
- * condition in a trigger that hasn't fired yet. Conditions under `not`, and triggers that lose the
+ * Areas the player is meant to reach: every areaEntered (for the player's side), unitEscorted or
+ * placed structureBuilt condition in a trigger that hasn't fired yet. Conditions under `not`, and triggers that lose the
  * mission or fail an objective, are skipped because they describe places to avoid. Read-only; the renderer and minimap draw these as goal rings.
  */
 export function missionMarkers(mission: MissionState | null): MissionMarker[] {
@@ -324,11 +334,17 @@ export function missionMarkers(mission: MissionState | null): MissionMarker[] {
       cond.conds.forEach(visit);
       return;
     }
+    let ring: MissionMarker | null = null;
     if ((cond.t === 'areaEntered' && cond.side === mission.humanSide) || cond.t === 'unitEscorted') {
-      const key = `${cond.x},${cond.z},${cond.radius}`;
+      ring = { x: cond.x, z: cond.z, radius: cond.radius };
+    } else if (cond.t === 'structureBuilt' && cond.side === mission.humanSide && cond.radius !== undefined) {
+      ring = { x: cond.x ?? 0, z: cond.z ?? 0, radius: cond.radius };
+    }
+    if (ring) {
+      const key = `${ring.x},${ring.z},${ring.radius}`;
       if (!seen.has(key)) {
         seen.add(key);
-        result.push({ x: cond.x, z: cond.z, radius: cond.radius });
+        result.push(ring);
       }
     }
   };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createWorld, hashWorld, step } from '../../src/sim/world';
 import { decodeSave, encodeSave } from '../../src/platform/saves';
 import { placementValidity } from '../../src/sim/spawn';
+import { padLayout, padQueueSpot } from '../../src/sim/pad';
 import { damageState } from '../../src/sim/structures';
 import { isItemUnlocked } from '../../src/sim/research';
 import {
@@ -119,6 +120,14 @@ describe('structures, research, upgrades, repair', () => {
     expect(placementValidity(world, 1, turret, -30, -30).reason).toBe('overlap');
     const kit = padType({ buildOnMetalDeposit: true });
     expect(placementValidity(world, 1, kit, -40, 20).reason).toBe('needsMetalDeposit');
+    // Nothing may be built on a landing pad's dock or exit lanes (haulers and deliveries use them).
+    const pad = world.structures.find((item) => item.owner === 1 && item.typeId === padType().id);
+    if (pad) {
+      const layout = padLayout(world, pad);
+      expect(placementValidity(world, 1, turret, layout.rallyX, layout.rallyZ).reason).toBe('padLane');
+      const queue = padQueueSpot(world, layout, 1);
+      expect(placementValidity(world, 1, turret, queue.x, queue.z).reason).toBe('padLane');
+    }
     let steep = 0;
     let blocked = 0;
     for (let x = -70; x <= 70; x += 2) {

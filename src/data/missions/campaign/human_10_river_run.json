@@ -1,0 +1,352 @@
+{
+  "id": "mission.human.10_river_run",
+  "campaign": "human",
+  "order": 10,
+  "title": "River Run",
+  "briefing": "An Arcadian camp sits on the far side of the delta. Tanks must go the long way round by the southern ford. Skimmers float straight across the water. Take the far bank and destroy the camp.",
+  "mapId": "map.c_delta",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 600,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.hover_tank",
+        "unit.human.missile_tank"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.aviation",
+        "research.human.missiles",
+        "research.human.heavy_ordnance"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -72.0,
+      "z": 6.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -68.0,
+      "z": 6.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -64.0,
+      "z": 6.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -72.0,
+      "z": 10.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -68.0,
+      "z": 10.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.hover_tank",
+      "x": -64.0,
+      "z": 10.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -76.0,
+      "z": 20.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -72.0,
+      "z": 20.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -86,
+      "z": 2,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -84,
+      "z": 18,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 64.0,
+      "z": -8.0,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 68.0,
+      "z": -8.0,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 50,
+      "z": -60,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 54,
+      "z": 50,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -78,
+      "z": 10
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": -64,
+      "z": 6
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 56,
+      "z": -6
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 80,
+      "z": 0
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.lab",
+      "x": 78,
+      "z": -16
+    }
+  ],
+  "objectives": [
+    {
+      "id": "bank",
+      "text": "Reach the far bank",
+      "kind": "primary"
+    },
+    {
+      "id": "camp",
+      "text": "Destroy the camp",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Skimmers ride over water. Select them and tap the far bank."
+        }
+      ]
+    },
+    {
+      "id": "bank",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": 46,
+        "z": -6,
+        "radius": 14
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "bank",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Far bank taken. Now the camp."
+        }
+      ]
+    },
+    {
+      "id": "raid",
+      "when": {
+        "t": "time",
+        "tick": 4000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Raiders crossing toward the colony. The Bastion gun will help."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 3,
+          "x": 50,
+          "z": 10,
+          "tag": "raid"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "raid",
+          "mode": "attack",
+          "x": -78,
+          "z": 10
+        }
+      ]
+    },
+    {
+      "id": "raid2",
+      "when": {
+        "t": "time",
+        "tick": 8400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.glider",
+          "count": 2,
+          "x": 50,
+          "z": -20,
+          "tag": "raid2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 30,
+          "z": 90,
+          "tag": "raid2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "raid2",
+          "mode": "attack",
+          "x": -78,
+          "z": 10
+        }
+      ]
+    },
+    {
+      "id": "camp",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.turret"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.radar"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.lab"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "camp",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1200,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

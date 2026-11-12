@@ -248,16 +248,19 @@ describe('placeholder missions', () => {
     }
   });
 
-  it('[MSN-03] every placeholder mission can be lost by doing nothing', () => {
-    for (const row of MISSIONS) {
+  for (const row of MISSIONS) {
+    it(`[MSN-03] ${row.id} can be lost by doing nothing`, async () => {
       let w = buildMissionWorld(data, row, 3);
       const limit = ((row.timeLimitSec ?? 900) + 5) * SEC;
       while (!w.result && w.tick < limit) {
         w = stepWithAi(w);
+        if (w.tick % 1000 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
       }
       expect(w.result, row.id).toEqual({ winner: null });
-    }
-  }, 120_000);
+    }, 120_000);
+  }
 
   it('[MSN-03] training missions are won by scripted commands', () => {
     const t1 = MISSIONS.find((m) => m.id === 'mission.training.1_drops');

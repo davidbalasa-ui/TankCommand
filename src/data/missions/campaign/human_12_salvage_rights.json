@@ -1,0 +1,376 @@
+{
+  "id": "mission.human.12_salvage_rights",
+  "campaign": "human",
+  "order": 12,
+  "title": "Salvage Rights",
+  "briefing": "Three rich metal seams lie east of the colony, and the Arcadians have already siphoned two of them. Destroy their siphons and put our own stations on all three seams.",
+  "mapId": "map.c_quiet_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1000,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 42.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46.0,
+      "z": 42.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -42.0,
+      "z": 52.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -38.0,
+      "z": 52.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -72,
+      "z": 54,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -58,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -54,
+      "z": 66,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 44,
+      "z": -2,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 64,
+      "z": 50,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 32,
+      "z": -10,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 52,
+      "z": 42,
+      "heading": 3.14
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 2,
+      "z": -62,
+      "heading": 3.14
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -62,
+      "z": 58
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.metal_station",
+      "x": 38,
+      "z": -6
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.metal_station",
+      "x": 58,
+      "z": 46
+    }
+  ],
+  "objectives": [
+    {
+      "id": "sites",
+      "text": "Put a metal station on all three eastern seams",
+      "kind": "primary"
+    },
+    {
+      "id": "keep",
+      "text": "Keep your landing pad",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "The three seams are marked. Clear the enemy off them, then build."
+        }
+      ]
+    },
+    {
+      "id": "r1",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Raiders heading for the seams."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 80,
+          "z": -30,
+          "tag": "r1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "r1",
+          "mode": "attack",
+          "x": 38,
+          "z": -6
+        }
+      ]
+    },
+    {
+      "id": "r2",
+      "when": {
+        "t": "time",
+        "tick": 9600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 20,
+          "z": -85,
+          "tag": "r2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 2,
+          "x": 26,
+          "z": -85,
+          "tag": "r2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "r2",
+          "mode": "attack",
+          "x": 8,
+          "z": -58
+        }
+      ]
+    },
+    {
+      "id": "r3",
+      "when": {
+        "t": "time",
+        "tick": 14400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 2,
+          "x": 80,
+          "z": 60,
+          "tag": "r3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 84,
+          "z": 54,
+          "tag": "r3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "r3",
+          "mode": "attack",
+          "x": 58,
+          "z": 46
+        }
+      ]
+    },
+    {
+      "id": "sites",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "structureBuilt",
+            "side": 1,
+            "structureType": "structure.human.metal_station",
+            "count": 1,
+            "x": 38,
+            "z": -6,
+            "radius": 10
+          },
+          {
+            "t": "structureBuilt",
+            "side": 1,
+            "structureType": "structure.human.metal_station",
+            "count": 1,
+            "x": 58,
+            "z": 46,
+            "radius": 10
+          },
+          {
+            "t": "structureBuilt",
+            "side": 1,
+            "structureType": "structure.human.metal_station",
+            "count": 1,
+            "x": 8,
+            "z": -58,
+            "radius": 10
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "sites",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "keep",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "keep",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

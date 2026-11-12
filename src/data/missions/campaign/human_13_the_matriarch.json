@@ -1,0 +1,414 @@
+{
+  "id": "mission.human.13_the_matriarch",
+  "campaign": "human",
+  "order": 13,
+  "title": "The Matriarch",
+  "briefing": "An Arcadian Matriarch, a huge Carapace that leads their broods, is touring the valley with her guard. Hunt her down before she leaves through the south-east pass in ten minutes.",
+  "mapId": "map.c_long_reach",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 900,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -62.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -58.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -62.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -58.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -54.0,
+      "z": 70.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -50.0,
+      "z": 70.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.missile_tank",
+      "x": -68,
+      "z": 58,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.radar",
+      "x": -70,
+      "z": 70,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -82,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -76,
+      "z": 82,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 66,
+      "z": -66,
+      "heading": 2.356,
+      "tag": "boss"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 60,
+      "z": -60,
+      "heading": 2.356,
+      "tag": "court"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.missile_tank",
+      "x": 72,
+      "z": -60,
+      "heading": 2.356,
+      "tag": "court"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 60,
+      "z": -72,
+      "heading": 2.356,
+      "tag": "court"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 72,
+      "z": -72,
+      "heading": 2.356,
+      "tag": "court"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 10,
+      "z": 10,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": -30,
+      "z": 30,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 40,
+      "z": 40,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -74,
+      "z": 74
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 60,
+      "z": -40
+    }
+  ],
+  "objectives": [
+    {
+      "id": "boss",
+      "text": "Destroy the Matriarch",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Watch the radar. She moves every couple of minutes; cut her off."
+        }
+      ]
+    },
+    {
+      "id": "leg1",
+      "when": {
+        "t": "time",
+        "tick": 2800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": 70,
+          "z": 20
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": 70,
+          "z": 20
+        }
+      ]
+    },
+    {
+      "id": "leg2",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": 20,
+          "z": 70
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": 20,
+          "z": 70
+        }
+      ]
+    },
+    {
+      "id": "leg3",
+      "when": {
+        "t": "time",
+        "tick": 6800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": -40,
+          "z": -10
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": -40,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "leg4",
+      "when": {
+        "t": "time",
+        "tick": 8800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": -70,
+          "z": -70
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": -70,
+          "z": -70
+        }
+      ]
+    },
+    {
+      "id": "leg5",
+      "when": {
+        "t": "time",
+        "tick": 10800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": 40,
+          "z": -70
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": 40,
+          "z": -70
+        }
+      ]
+    },
+    {
+      "id": "flee",
+      "when": {
+        "t": "time",
+        "tick": 11200
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "She is making for the pass!"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "boss",
+          "mode": "attack",
+          "x": 96,
+          "z": -96
+        },
+        {
+          "t": "aiOrder",
+          "tag": "court",
+          "mode": "attack",
+          "x": 96,
+          "z": -96
+        }
+      ]
+    },
+    {
+      "id": "escaped",
+      "when": {
+        "t": "unitEscorted",
+        "tag": "boss",
+        "x": 96,
+        "z": -96,
+        "radius": 8
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "boss",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "bossEscaped"
+        }
+      ]
+    },
+    {
+      "id": "boss",
+      "when": {
+        "t": "unitDestroyed",
+        "tag": "boss"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "boss",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 900,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

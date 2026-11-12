@@ -1,0 +1,287 @@
+{
+  "id": "mission.human.14_counterpunch",
+  "campaign": "human",
+  "order": 14,
+  "title": "Counterpunch",
+  "briefing": "The Arcadians have built a forward base behind the Iron Gate ridges. It is time to hit back. Build up, break through and destroy every building in the base.",
+  "mapId": "map.c_iron_gate",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1200,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "ai",
+      "ore": 800,
+      "metal": 100,
+      "difficulty": "normal"
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -72.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -72.0,
+      "z": 72.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 72.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -62.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -58.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -94,
+      "z": 82,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -88,
+      "z": 94,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.radar",
+      "x": -80,
+      "z": 80,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 52.0,
+      "z": -56.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 56.0,
+      "z": -56.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 52.0,
+      "z": -52.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 56.0,
+      "z": -52.0,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 48,
+      "z": -64,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.ore_miner",
+      "x": 74,
+      "z": -70,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.tug",
+      "x": 70,
+      "z": -76,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -84,
+      "z": 84
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.landing_pad",
+      "x": 66,
+      "z": -66
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 40,
+      "z": -60
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 60,
+      "z": -40
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.missile_battery",
+      "x": 48,
+      "z": -48
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 80,
+      "z": -56
+    }
+  ],
+  "objectives": [
+    {
+      "id": "base",
+      "text": "Destroy every enemy building",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Three ways in. The guns cover the west gap; artillery can open it."
+        }
+      ]
+    },
+    {
+      "id": "base",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.landing_pad"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.turret"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.missile_battery"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.radar"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.metal_station"
+          },
+          {
+            "t": "allDestroyed",
+            "side": 2,
+            "unitType": "structure.alien.lab"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "base",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 2700,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

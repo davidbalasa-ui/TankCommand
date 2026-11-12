@@ -11,8 +11,11 @@ export type Condition =
   | { t: 'allDestroyed'; side: number; unitType?: string }
   | { t: 'resourceReached'; side: number; ore?: number; metal?: number }
   | { t: 'objectiveDone'; id: string }
-  | { t: 'structureBuilt'; side: number; structureType: string; count?: number }
+  /** With x/z/radius, only structures standing inside that circle count. */
+  | { t: 'structureBuilt'; side: number; structureType: string; count?: number; x?: number; z?: number; radius?: number }
   | { t: 'relationIs'; a: number; b: number; relation: 'allied' | 'neutral' | 'hostile' }
+  /** The side has finished `node`, or with no node, has at least `count` (default 1) research nodes done in total. */
+  | { t: 'researchDone'; side: number; node?: string; count?: number }
   | { t: 'unitsAlive'; side?: number; tag?: string; op: '>=' | '<='; count: number }
   | { t: 'unitEscorted'; tag: string; x: number; z: number; radius: number }
   | { t: 'and'; conds: Condition[] }
@@ -43,8 +46,17 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       side,
       structureType: z.string().min(1),
       count: z.number().int().positive().optional(),
+      x: z.number().finite().optional(),
+      z: z.number().finite().optional(),
+      radius: z.number().positive().optional(),
     }),
     z.object({ t: z.literal('relationIs'), a: side, b: side, relation: relationSchema }),
+    z.object({
+      t: z.literal('researchDone'),
+      side,
+      node: z.string().min(1).optional(),
+      count: z.number().int().positive().optional(),
+    }),
     z.object({
       t: z.literal('unitsAlive'),
       side: side.optional(),

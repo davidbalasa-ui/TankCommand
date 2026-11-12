@@ -1,5 +1,6 @@
 import { clampToMap, heightAt, isBlockedAt } from './map';
 import { canStand } from './motion';
+import { padLayout, padQueueSpot } from './pad';
 import {
   DROP_SPAWN_RADIUS,
   DROP_SPAWN_TRIES,
@@ -28,7 +29,8 @@ export type PlacementReason =
   | 'overlap'
   | 'steep'
   | 'rubble'
-  | 'needsMetalDeposit';
+  | 'needsMetalDeposit'
+  | 'padLane';
 
 export interface PlacementResult {
   valid: boolean;
@@ -205,6 +207,30 @@ export function placementValidity(
       Math.abs(structure.z - z) < (size.z + otherSize.z) / 2 + PLACEMENT_CLEARANCE
     ) {
       return { valid: false, reason: 'overlap', depositId: null };
+    }
+  }
+
+  // Keep every landing pad's working lanes clear: the exit and rally point where deliveries drive
+  // off, and the dock with the first few waiting spots where haulers queue to unload. A building
+  // there would jam deliveries and the ore run.
+  for (const pad of world.structures) {
+    if (pad.hp <= 0 || world.structureTypes.get(pad.typeId)?.kind !== 'pad') {
+      continue;
+    }
+    const layout = padLayout(world, pad);
+    const lane = [
+      { x: layout.exitX, z: layout.exitZ },
+      { x: layout.rallyX, z: layout.rallyZ },
+      { x: layout.dockX, z: layout.dockZ },
+      ...[0, 1, 2].map((index) => padQueueSpot(world, layout, index)),
+    ];
+    if (
+      lane.some(
+        (point) =>
+          Math.abs(point.x - x) < size.x / 2 + UNIT_RADIUS && Math.abs(point.z - z) < size.z / 2 + UNIT_RADIUS,
+      )
+    ) {
+      return { valid: false, reason: 'padLane', depositId: null };
     }
   }
 

@@ -1,0 +1,386 @@
+{
+  "id": "mission.human.11_siege_of_tallis",
+  "campaign": "human",
+  "order": 11,
+  "title": "Siege of Tallis",
+  "briefing": "Tallis colony is about to be hit by five waves, each bigger than the last. Hold for ten minutes. The Mender repair vehicle mends damaged units nearby.",
+  "mapId": "map.c_quiet_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1100,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 42.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46.0,
+      "z": 42.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -46.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -42,
+      "z": 50,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.repair",
+      "x": -54,
+      "z": 52,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -72,
+      "z": 54,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -58,
+      "z": 68,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -62,
+      "z": 58
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": -44,
+      "z": 38
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.metal_station",
+      "x": -42,
+      "z": 72
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold",
+      "text": "Hold the colony for 10 minutes",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Waves come from the east and south. Keep the Mender behind your line."
+        }
+      ]
+    },
+    {
+      "id": "w1",
+      "when": {
+        "t": "time",
+        "tick": 1200
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "First wave inbound."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 70,
+          "z": -70,
+          "tag": "w1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w1",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "w2",
+      "when": {
+        "t": "time",
+        "tick": 3400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 76,
+          "z": 6,
+          "tag": "w2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 2,
+          "x": 76,
+          "z": 6,
+          "tag": "w2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w2",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "w3",
+      "when": {
+        "t": "time",
+        "tick": 5600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": -4,
+          "z": -80,
+          "tag": "w3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": -4,
+          "z": -80,
+          "tag": "w3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w3",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "w4",
+      "when": {
+        "t": "time",
+        "tick": 7800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 2,
+          "x": 70,
+          "z": -70,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 70,
+          "z": -70,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.artillery",
+          "count": 1,
+          "x": 70,
+          "z": -70,
+          "tag": "w4"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w4",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "w5",
+      "when": {
+        "t": "time",
+        "tick": 10000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Last wave. Everything they have left."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 2,
+          "x": 40,
+          "z": 70,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 40,
+          "z": 70,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.artillery",
+          "count": 1,
+          "x": 40,
+          "z": 70,
+          "tag": "w5"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w5",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "when": {
+        "t": "time",
+        "tick": 12000
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

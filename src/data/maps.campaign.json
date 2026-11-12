@@ -515,5 +515,593 @@
     },
     "placeholder": false,
     "campaignOnly": true
+  },
+  {
+    "id": "map.c_quiet_fields",
+    "name": "Quiet Fields",
+    "size": 180,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -62,
+        "z": 58
+      },
+      {
+        "player": 2,
+        "x": 66,
+        "z": -66
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -78,
+        "z": 44,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": 78,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -30,
+        "z": 44,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -42,
+        "z": 72,
+        "amount": 300
+      },
+      {
+        "kind": "metal",
+        "x": -76,
+        "z": 30,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 0,
+        "z": 10,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 66,
+        "z": -40,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 30,
+        "z": 70,
+        "amount": 400
+      },
+      {
+        "kind": "metal",
+        "x": 38,
+        "z": -6,
+        "amount": 300
+      },
+      {
+        "kind": "metal",
+        "x": 58,
+        "z": 46,
+        "amount": 300
+      },
+      {
+        "kind": "metal",
+        "x": 8,
+        "z": -58,
+        "amount": 300
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 505,
+        "roughness": 0.6,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": -10,
+            "z": 40,
+            "radius": 16,
+            "height": 3
+          },
+          {
+            "x": 30,
+            "z": 20,
+            "radius": 14,
+            "height": 3
+          },
+          {
+            "x": -40,
+            "z": -30,
+            "radius": 20,
+            "height": 4
+          },
+          {
+            "x": 64,
+            "z": 0,
+            "radius": 12,
+            "height": 3
+          }
+        ],
+        "ridges": [
+          {
+            "x0": -88,
+            "z0": -10,
+            "x1": -50,
+            "z1": -6,
+            "height": 7,
+            "width": 6
+          }
+        ],
+        "flats": [
+          {
+            "x": -62,
+            "z": 58,
+            "radius": 16
+          },
+          {
+            "x": 38,
+            "z": -6,
+            "radius": 8
+          },
+          {
+            "x": 58,
+            "z": 46,
+            "radius": 8
+          },
+          {
+            "x": 8,
+            "z": -58,
+            "radius": 8
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_long_reach",
+    "name": "Long Reach",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -74,
+        "z": 74
+      },
+      {
+        "player": 2,
+        "x": 66,
+        "z": -66
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -88,
+        "z": 58,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -58,
+        "z": 88,
+        "amount": 700
+      },
+      {
+        "kind": "metal",
+        "x": -86,
+        "z": 86,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": 50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 80,
+        "z": -48,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 48,
+        "z": -82,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": -50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 50,
+        "z": 50,
+        "amount": 500
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 606,
+        "roughness": 0.7,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": 14,
+            "z": -14,
+            "radius": 30,
+            "height": 6
+          },
+          {
+            "x": -40,
+            "z": 10,
+            "radius": 14,
+            "height": 4
+          },
+          {
+            "x": 10,
+            "z": 60,
+            "radius": 14,
+            "height": 4
+          }
+        ],
+        "ridges": [
+          {
+            "x0": -100,
+            "z0": -36,
+            "x1": -36,
+            "z1": -36,
+            "height": 8,
+            "width": 6
+          },
+          {
+            "x0": 36,
+            "z0": 36,
+            "x1": 36,
+            "z1": 100,
+            "height": 8,
+            "width": 6
+          }
+        ],
+        "flats": [
+          {
+            "x": -74,
+            "z": 74,
+            "radius": 15
+          },
+          {
+            "x": 66,
+            "z": -66,
+            "radius": 14
+          },
+          {
+            "x": 14,
+            "z": -14,
+            "radius": 16,
+            "height": 6
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_delta",
+    "name": "Sallow Delta",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -78,
+        "z": 10
+      },
+      {
+        "player": 2,
+        "x": 72,
+        "z": -6
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -88,
+        "z": -10,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -70,
+        "z": 34,
+        "amount": 700
+      },
+      {
+        "kind": "metal",
+        "x": -90,
+        "z": 30,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": -40,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 84,
+        "z": 20,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": -40,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 8,
+        "z": 0,
+        "amount": 400
+      }
+    ],
+    "features": {
+      "waterLevel": -0.5,
+      "lakes": [
+        {
+          "x": 6,
+          "z": -70,
+          "radius": 22,
+          "depth": 3
+        }
+      ],
+      "rivers": [
+        {
+          "x0": -22,
+          "z0": -100,
+          "x1": -16,
+          "z1": 100,
+          "width": 12,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.88,
+              "to": 0.97
+            }
+          ]
+        },
+        {
+          "x0": 28,
+          "z0": -100,
+          "x1": 34,
+          "z1": 100,
+          "width": 10,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.88,
+              "to": 0.97
+            }
+          ]
+        }
+      ],
+      "terrain": {
+        "seed": 707,
+        "roughness": 0.5,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": -60,
+            "z": -70,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": 70,
+            "z": 60,
+            "radius": 18,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -78,
+            "z": 10,
+            "radius": 15
+          },
+          {
+            "x": 72,
+            "z": -6,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_iron_gate",
+    "name": "Iron Gate",
+    "size": 220,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -84,
+        "z": 84
+      },
+      {
+        "player": 2,
+        "x": 66,
+        "z": -66
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -96,
+        "z": 66,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -66,
+        "z": 96,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -96,
+        "z": 96,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -62,
+        "z": 66,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 86,
+        "z": -48,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": 48,
+        "z": -86,
+        "amount": 700
+      },
+      {
+        "kind": "metal",
+        "x": 90,
+        "z": -90,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 0,
+        "z": 0,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": -40,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 40,
+        "z": 40,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -70,
+        "z": -10,
+        "amount": 300
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 808,
+        "roughness": 0.9,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": 10,
+            "z0": -110,
+            "x1": 14,
+            "z1": -56,
+            "height": 9,
+            "width": 8
+          },
+          {
+            "x0": 16,
+            "z0": -36,
+            "x1": 30,
+            "z1": -14,
+            "height": 9,
+            "width": 8
+          },
+          {
+            "x0": 50,
+            "z0": -10,
+            "x1": 110,
+            "z1": -14,
+            "height": 9,
+            "width": 8
+          }
+        ],
+        "hills": [
+          {
+            "x": -20,
+            "z": 30,
+            "radius": 20,
+            "height": 5
+          },
+          {
+            "x": 20,
+            "z": 70,
+            "radius": 18,
+            "height": 5
+          },
+          {
+            "x": -60,
+            "z": 20,
+            "radius": 14,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -84,
+            "z": 84,
+            "radius": 16
+          },
+          {
+            "x": 66,
+            "z": -66,
+            "radius": 18
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
   }
 ]

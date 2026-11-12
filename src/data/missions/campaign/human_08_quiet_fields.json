@@ -1,0 +1,295 @@
+{
+  "id": "mission.human.08_quiet_fields",
+  "campaign": "human",
+  "order": 8,
+  "title": "Quiet Fields",
+  "briefing": "The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the spare Hauler to carry the metal home, then build a lab and finish one research project.",
+  "mapId": "map.c_quiet_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 900,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -54.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 46.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -54.0,
+      "z": 50.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -50.0,
+      "z": 50.0,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -48,
+      "z": 56,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -72,
+      "z": 54,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -58,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -54,
+      "z": 66,
+      "heading": 0.0,
+      "tag": "metalHauler"
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -62,
+      "z": 58
+    }
+  ],
+  "objectives": [
+    {
+      "id": "station",
+      "text": "Build a metal station",
+      "kind": "primary"
+    },
+    {
+      "id": "lab",
+      "text": "Build a lab",
+      "kind": "primary"
+    },
+    {
+      "id": "research",
+      "text": "Finish one research",
+      "kind": "primary"
+    },
+    {
+      "id": "raid",
+      "text": "Drive off the scouting party",
+      "kind": "optional"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Metal is for research only. Buy a metal station and place it on the metal seam."
+        }
+      ]
+    },
+    {
+      "id": "station",
+      "when": {
+        "t": "structureBuilt",
+        "side": 1,
+        "structureType": "structure.human.metal_station",
+        "count": 1
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "station",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Station up. Select the spare Hauler and tap the station to put it on the metal run. Now the lab."
+        }
+      ]
+    },
+    {
+      "id": "lab",
+      "when": {
+        "t": "structureBuilt",
+        "side": 1,
+        "structureType": "structure.human.lab",
+        "count": 1
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "lab",
+          "status": "done"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Tap the lab to pick a research project."
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "when": {
+        "t": "researchDone",
+        "side": 1,
+        "count": 6
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "research",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "scouts",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "A small scouting party is coming in from the east."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 3,
+          "x": 70,
+          "z": -10,
+          "tag": "scouts"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 1,
+          "x": 74,
+          "z": -4,
+          "tag": "scouts"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "scouts",
+          "mode": "attack",
+          "x": -62,
+          "z": 58
+        }
+      ]
+    },
+    {
+      "id": "raid",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "time",
+            "tick": 5000
+          },
+          {
+            "t": "unitDestroyed",
+            "tag": "scouts"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "raid",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1200,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}
