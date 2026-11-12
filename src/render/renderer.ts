@@ -520,6 +520,8 @@ export class RenderView {
   /** Low-detail geometry per unit model id, one per mesh in traversal order. */
   private readonly lodGeometry = new Map<string, THREE.BufferGeometry[]>();
   private lodUnits = 0;
+  /** New portraits allowed this frame: each one reads pixels back, which stalls on the GPU. */
+  private thumbnailBudget = 1;
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
@@ -901,6 +903,7 @@ export class RenderView {
     this.updateFlashes();
     this.effects.update(1 / 60);
     this.frame += 1;
+    this.thumbnailBudget = 1;
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -1623,7 +1626,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
 
   /**
    * A small portrait of a unit or structure type (UI selection panel, build cards), rendered once
-   * from its loaded model and cached as a PNG data URL. Null until the model has loaded.
+   * from its loaded model and cached as a PNG data URL. Null until the model has loaded, and for
+   * all but one new portrait per frame (ask again later).
    */
   thumbnail(kind: 'unit' | 'structure', typeId: string): string | null {
     const key = `${kind}:${typeId}`;
@@ -1634,9 +1638,11 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const modelId =
       kind === 'unit' ? this.world.unitTypes.get(typeId)?.modelId : this.world.structureTypes.get(typeId)?.modelId;
     const template = modelId ? this.templates.get(modelId) : undefined;
-    if (!template || this.disposed) {
+    if (!template || this.disposed || this.thumbnailBudget <= 0) {
+      // Callers ask again on their next refresh; a menu fills in one portrait per frame.
       return null;
     }
+    this.thumbnailBudget -= 1;
     const width = THUMB_WIDTH;
     const height = THUMB_HEIGHT;
     const scene = new THREE.Scene();

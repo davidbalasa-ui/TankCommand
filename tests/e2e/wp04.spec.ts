@@ -4,16 +4,18 @@ import { enterGame, openBuildMenu, winSkirmish } from './helpers';
 const PHONE_ONLY = 'phone-only touch flow';
 
 async function tapUnit(page: Page, id: number): Promise<void> {
-  const frame = await page.evaluate((unitId) => {
+  await page.evaluate((unitId) => {
     const hook = window.__TC_TEST__;
     const unit = hook?.units().find((item) => item.id === unitId);
     if (hook && unit) {
       hook.setCamera({ targetX: unit.x, targetZ: unit.z, distance: 40, yaw: 0 });
     }
-    return hook?.renderStats().frame ?? 0;
   }, id);
-  // Read the unit's screen point only after a frame has drawn with the new camera.
-  await page.waitForFunction((start) => (window.__TC_TEST__?.renderStats().frame ?? 0) > start + 1, frame);
+  // Read the unit's screen point only after two animation frames with the new camera (the sim
+  // may be paused, so count browser frames rather than rendered game frames).
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
   const point = await page.evaluate((unitId) => window.__TC_TEST__?.unitScreenCentre(unitId) ?? null, id);
   expect(point).not.toBeNull();
   if (!point) {
@@ -60,7 +62,13 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0))
     .toBe(1);
-  const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue[0]?.id ?? null);
+  // A second order waits behind the first, so it is still cancellable however slowly the browser
+  // renders (the first can land before a slow tap arrives).
+  await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
+    .toBe(500);
+  const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.at(-1)?.id ?? null);
   expect(orderId).not.toBeNull();
   if (orderId === null) {
     return;
@@ -68,10 +76,12 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await page.locator(`[data-control-id="build.cancel.${orderId}"]`).tap();
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(600);
+    .toBe(550);
   await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? -1))
-    .toBe(0);
+    .poll(async () =>
+      page.evaluate((id) => window.__TC_TEST__?.hud()?.queue.some((order) => order.id === id) ?? true, orderId),
+    )
+    .toBe(false);
 });
 
 test('[HUD-05] miner deposit tap, mine command and salvage button work by touch', async ({ page }, testInfo) => {

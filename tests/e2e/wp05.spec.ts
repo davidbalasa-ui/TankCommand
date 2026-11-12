@@ -3,6 +3,8 @@ import { enterGame, openBuildMenu } from './helpers';
 
 test('[RES-01] locked build items show their requirement and the Base sheet opens by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone-only touch flow');
+  // The Base sheet over the detailed models renders at a few frames a second in software.
+  test.setTimeout(60_000);
   await enterGame(page);
 
   await openBuildMenu(page);
