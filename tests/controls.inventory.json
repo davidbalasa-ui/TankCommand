@@ -28,6 +28,8 @@
   "inGame.placeCancel",
   "inGame.placeConfirm",
   "inGame.queue",
+  "inGame.rotateLandscape",
+  "inGame.rotateMenu",
   "inGame.salvage",
   "inGame.speed",
   "inGame.stop",

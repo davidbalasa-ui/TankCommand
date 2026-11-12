@@ -18,6 +18,19 @@ import { mountSettings } from './settingsScreen';
 import { SIM_SPEED_FAST, SIM_SPEED_NORMAL, SIM_SPEED_SLOW } from '../sim/tuning';
 import { SIM_TICK_HZ } from '../sim/constants';
 
+/** Full screen plus a landscape lock, where the browser allows it. */
+async function lockLandscape(): Promise<void> {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    }
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    await orientation.lock?.('landscape');
+  } catch {
+    // Not supported (desktop, iOS Safari): the hint stays until the phone is turned.
+  }
+}
+
 // Working faction names (C-03). Final public names need David's approval.
 export const FACTION_NAMES = { human: 'Terran Coalition', alien: 'Kesh' } as const;
 
@@ -545,6 +558,28 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       canvas.className = 'game-canvas';
       root.append(canvas);
 
+      // Shown only on an upright phone (CSS): the match is played sideways.
+      const rotate = document.createElement('div');
+      rotate.className = 'rotate-hint';
+      rotate.setAttribute('role', 'status');
+      const hintText = document.createElement('span');
+      hintText.textContent = 'Turn your phone sideways to play';
+      const hintSub = document.createElement('small');
+      hintSub.textContent = 'The battlefield and controls are laid out for landscape.';
+      const hintActions = document.createElement('div');
+      hintActions.className = 'rotate-hint-actions';
+      // Phones only allow an orientation lock in full screen; best effort.
+      const landscape = button('inGame', 'rotateLandscape', 'Full screen sideways', () => {
+        void lockLandscape();
+      });
+      landscape.classList.add('primary');
+      const menu = button('inGame', 'rotateMenu', 'Menu', () => {
+        ctx.go('pause');
+      });
+      hintActions.append(landscape, menu);
+      rotate.append(icon('phone'), hintText, hintSub, hintActions);
+      root.append(rotate);
+
       const getWorld = ctx.getWorld;
       let hud: Hud | null = null;
       if (getWorld) {
@@ -719,15 +754,31 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       add('bugReport', 'Report bug', () => {
         ctx.go('bugReport');
       });
-      add('speedSlow', 'Speed slow', () => {
-        ctx.api?.setSpeedMultiplier(SIM_SPEED_SLOW);
-      });
-      add('speedNormal', 'Speed normal', () => {
-        ctx.api?.setSpeedMultiplier(SIM_SPEED_NORMAL);
-      });
-      add('speedFast', 'Speed fast', () => {
-        ctx.api?.setSpeedMultiplier(SIM_SPEED_FAST);
-      });
+      // Speed buttons show the active speed, so a tap visibly does something.
+      const speeds: Array<[string, string, number]> = [
+        ['speedSlow', 'Speed slow', SIM_SPEED_SLOW],
+        ['speedNormal', 'Speed normal', SIM_SPEED_NORMAL],
+        ['speedFast', 'Speed fast', SIM_SPEED_FAST],
+      ];
+      const speedButtons: Array<[HTMLButtonElement, number]> = [];
+      const markSpeed = (): void => {
+        const current = ctx.api?.simSpeed() ?? SIM_SPEED_NORMAL;
+        for (const [node, value] of speedButtons) {
+          const on = Math.abs(value - current) < 1e-6;
+          node.classList.toggle('on', on);
+          node.setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
+      };
+      for (const [name, label, value] of speeds) {
+        const node = button('pause', name, label, () => {
+          ctx.api?.setSpeedMultiplier(value);
+          markSpeed();
+        });
+        node.classList.add('speed-option');
+        grid.append(node);
+        speedButtons.push([node, value]);
+      }
+      markSpeed();
 
       let confirmPanel: HTMLDivElement | null = null;
       add('quit', 'Quit to title', () => {

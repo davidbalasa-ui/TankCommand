@@ -1145,12 +1145,10 @@ test('[GRP-01] control groups assign, select and centre by keyboard and by touch
         }),
       );
     };
+    // Both taps in one task: under software rendering a single 1080p frame can
+    // take 400+ ms, so even a 50 ms timer between the taps could land outside
+    // the 600 ms double-tap window and make this test flaky.
     tap();
-    await new Promise<void>((resolve) => {
-      window.setTimeout(() => {
-        resolve();
-      }, 50);
-    });
     tap();
   });
 
