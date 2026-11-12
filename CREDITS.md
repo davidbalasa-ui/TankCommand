@@ -35,6 +35,8 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.alien.darter.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.disc | TankCommand project (scripted Blender) | ORIGINAL | - | Disc (saucer) |
 | unit.alien.disc.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.alien.dragonfly | TankCommand project (scripted Blender) | ORIGINAL | - | Kesh aircraft, role not assigned yet |
+| unit.alien.dragonfly.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.ferrier | TankCommand project (scripted Blender) | ORIGINAL | - | Ferrier (tug) |
 | unit.alien.ferrier.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.glider | TankCommand project (scripted Blender) | ORIGINAL | - | Glider (glider) |
