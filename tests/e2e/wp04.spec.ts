@@ -132,7 +132,12 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
     return;
   }
   const oreBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
-  await tapUnit(page, tug.id);
+  // The tug drives between the pad and the miner, and software rendering is slow, so a tap can
+  // land just behind it: tap again (at its new position) until it is selected.
+  await expect(async () => {
+    await tapUnit(page, tug.id);
+    expect(await page.evaluate((id) => window.__TC_TEST__?.selection().includes(id) ?? false, tug.id)).toBe(true);
+  }).toPass({ timeout: 20_000 });
   // The salvage button is enabled for *any* selected worker, so a tap that
   // missed the tug would leave the earlier miner selected and still satisfy the
   // enabled check. Verify the tug actually became the selection before
