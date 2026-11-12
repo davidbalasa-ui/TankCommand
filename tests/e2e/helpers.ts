@@ -408,8 +408,9 @@ export async function winSkirmish(page: Page): Promise<void> {
           }
           return hook.units().filter((unit) => unit.owner === 1 && unit.typeId === 'unit.human.scout').length;
         }),
-      // Deliveries land one at a time (2.5 s each on the pad), so ten take a while.
-      { timeout: 60_000 },
+      // Deliveries land one at a time (2.5 s each on the pad), so ten take a while; longer still
+      // when software rendering of the detailed models slows the frame loop.
+      { timeout: 90_000 },
     )
     .toBeGreaterThanOrEqual(10);
 

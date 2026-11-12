@@ -16,20 +16,26 @@ test('[PERF-01] 192 units on the map draw in well under one call per unit', asyn
       return after > 1 && after === before;
     }, { timeout: 90_000 })
     .toBe(true);
-  const added = await page.evaluate(() => window.__TC_TEST__?.stressSpawn(64) ?? 0);
-  expect(added).toBe(192);
   await page.evaluate(() => {
     window.__TC_TEST__?.freezeSim(600_000);
     const camera = window.__TC_TEST__?.camera();
     window.__TC_TEST__?.setCamera({ targetX: 0, targetZ: 0, distance: (camera?.distance ?? 40) * 1.8 });
   });
-  const frame = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
-  await page.waitForFunction((start) => (window.__TC_TEST__?.renderStats().frame ?? 0) > start + 3, frame, { timeout: 120_000 });
+  const nextFrames = async () => {
+    const frame = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+    await page.waitForFunction((start) => (window.__TC_TEST__?.renderStats().frame ?? 0) > start + 3, frame, { timeout: 120_000 });
+  };
+  await nextFrames();
+  const empty = await page.evaluate(() => window.__TC_TEST__?.renderStats());
+  const added = await page.evaluate(() => window.__TC_TEST__?.stressSpawn(64) ?? 0);
+  expect(added).toBe(192);
+  await nextFrames();
   const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());
   expect(stats?.units ?? 0).toBeGreaterThanOrEqual(192);
   expect(stats?.drawCalls ?? Infinity).toBeLessThan(120);
-  // Zoomed out, units draw their low-detail models (about 2,500 triangles), keeping the whole
-  // scene near the old art's half a million triangles rather than ~1.7M with full detail.
+  // Zoomed out, units draw their low-detail models (budget about 2,500 triangles, 5,000 for big
+  // units), not the full ones (3k to 10k): the 192 units add well under 4,000 triangles each.
   expect(stats?.lodUnits ?? 0).toBeGreaterThanOrEqual(150);
-  expect(stats?.triangles ?? Infinity).toBeLessThan(1_000_000);
+  const perUnit = ((stats?.triangles ?? Infinity) - (empty?.triangles ?? 0)) / added;
+  expect(perUnit).toBeLessThan(4000);
 });

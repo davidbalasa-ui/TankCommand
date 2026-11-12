@@ -4,18 +4,17 @@ import { enterGame, openBuildMenu, winSkirmish } from './helpers';
 const PHONE_ONLY = 'phone-only touch flow';
 
 async function tapUnit(page: Page, id: number): Promise<void> {
-  const point = await page.evaluate((unitId) => {
+  const frame = await page.evaluate((unitId) => {
     const hook = window.__TC_TEST__;
-    if (!hook) {
-      return null;
+    const unit = hook?.units().find((item) => item.id === unitId);
+    if (hook && unit) {
+      hook.setCamera({ targetX: unit.x, targetZ: unit.z, distance: 40, yaw: 0 });
     }
-    const unit = hook.units().find((item) => item.id === unitId);
-    if (!unit) {
-      return null;
-    }
-    hook.setCamera({ targetX: unit.x, targetZ: unit.z, distance: 40, yaw: 0 });
-    return hook.unitScreenCentre(unitId);
+    return hook?.renderStats().frame ?? 0;
   }, id);
+  // Read the unit's screen point only after a frame has drawn with the new camera.
+  await page.waitForFunction((start) => (window.__TC_TEST__?.renderStats().frame ?? 0) > start + 1, frame);
+  const point = await page.evaluate((unitId) => window.__TC_TEST__?.unitScreenCentre(unitId) ?? null, id);
   expect(point).not.toBeNull();
   if (!point) {
     return;

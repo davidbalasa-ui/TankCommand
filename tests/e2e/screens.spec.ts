@@ -173,6 +173,8 @@ test('[screens] wp04-3-queue-in-progress', async ({ page }, testInfo) => {
 
 test('[screens] wp04-4-placing-structure-kit', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
+  // At 8x sim speed with the detailed models, software rendering manages only a few frames a second.
+  test.setTimeout(60_000);
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(8));
   const padId = await page.evaluate(() => {

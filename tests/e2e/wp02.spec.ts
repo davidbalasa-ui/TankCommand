@@ -612,6 +612,8 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
 });
 
 test('[INP-05] HUD button presses never issue map orders', async ({ page }, testInfo) => {
+  // Software rendering of the detailed models at desktop size leaves little time between frames.
+  test.setTimeout(60_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const own = (await units(page)).filter((unit) => unit.owner === 1);
