@@ -204,6 +204,12 @@ export function runAction(
         });
         if (unit) {
           assignHome(world, unit);
+          if (action.launch && unit.air) {
+            // Launched raiders start where the mission put them, already in the air.
+            unit.air.mode = 'flying';
+            unit.x = spot.x;
+            unit.z = spot.z;
+          }
           if (action.tag) {
             tagUnit(mission, action.tag, unit.id);
           }

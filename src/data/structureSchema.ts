@@ -42,10 +42,12 @@ export const structureRowSchema = z
     sensorRange: z.number().positive().optional(),
     airCapacity: z.number().int().positive().optional(),
     upgrades: z.array(z.enum(['fireRate', 'armor', 'stealth'])).optional(),
+    /** False for mission-only structures (the Shard): never offered for sale. Default true. */
+    buyable: z.boolean().optional(),
     placeholder: z.boolean(),
   })
   .superRefine((row, ctx) => {
-    if (row.kind === 'turret') {
+    if (row.kind === 'turret' && row.buyable !== false) {
       for (const key of ['weapon', 'turretTurnDegPerSec', 'packSec', 'packedUnitId'] as const) {
         if (row[key] === undefined) {
           ctx.addIssue({

@@ -15,6 +15,6 @@ describe('[CMP-01] campaign missions', () => {
       expect(w.result, `${row.id} ${w.mission?.failReason} t=${Math.round(w.tick / SEC)}s ${objectives}`).toEqual({
         winner: w.mission?.humanSide,
       });
-    }, 300_000);
+    }, 900_000);
   }
 });

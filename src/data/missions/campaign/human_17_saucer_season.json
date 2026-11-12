@@ -1,0 +1,346 @@
+{
+  "id": "mission.human.17_saucer_season",
+  "campaign": "human",
+  "order": 17,
+  "title": "Saucer Season",
+  "briefing": "The Arcadians have grown saucers: heavy fliers that burn whatever is under them. Waves of them will come at the colony. Shoot down six of them, then destroy the two roosts they fly from. Falcons and Javelin missile tanks can reach them.",
+  "mapId": "map.c_highwater",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1200,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.missile_tank",
+      "x": -62.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.missile_tank",
+      "x": -58.0,
+      "z": 60.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.missile_tank",
+      "x": -62.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.fighter",
+      "x": -68,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.fighter",
+      "x": -66,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -56.0,
+      "z": 70.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -52.0,
+      "z": 70.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -84,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -78,
+      "z": 84,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -74,
+      "z": 74
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.air_base",
+      "x": -64,
+      "z": 56
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.air_base",
+      "x": 68,
+      "z": -68
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.air_base",
+      "x": 54,
+      "z": -62
+    }
+  ],
+  "objectives": [
+    {
+      "id": "saucers",
+      "text": "Shoot down six saucers",
+      "kind": "primary"
+    },
+    {
+      "id": "roosts",
+      "text": "Destroy both saucer roosts",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Saucers need to fly right over a target to hit it. Meet them with missiles."
+        }
+      ]
+    },
+    {
+      "id": "s0",
+      "when": {
+        "t": "time",
+        "tick": 1200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.saucer",
+          "count": 2,
+          "x": 58,
+          "z": -58,
+          "tag": "saucers",
+          "launch": true
+        },
+        {
+          "t": "aiOrder",
+          "tag": "saucers",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "s1",
+      "when": {
+        "t": "time",
+        "tick": 3000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.saucer",
+          "count": 2,
+          "x": 58,
+          "z": -58,
+          "tag": "saucers",
+          "launch": true
+        },
+        {
+          "t": "aiOrder",
+          "tag": "saucers",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.saucer",
+          "count": 2,
+          "x": 58,
+          "z": -58,
+          "tag": "saucers",
+          "launch": true
+        },
+        {
+          "t": "aiOrder",
+          "tag": "saucers",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "when": {
+        "t": "time",
+        "tick": 6600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.saucer",
+          "count": 2,
+          "x": 58,
+          "z": -58,
+          "tag": "saucers",
+          "launch": true
+        },
+        {
+          "t": "aiOrder",
+          "tag": "saucers",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "saucers",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "time",
+            "tick": 6620
+          },
+          {
+            "t": "unitsAlive",
+            "tag": "saucers",
+            "op": "<=",
+            "count": 2
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "saucers",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "roosts",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.air_base"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "roosts",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1200,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

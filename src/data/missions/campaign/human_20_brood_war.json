@@ -1,0 +1,329 @@
+{
+  "id": "mission.human.20_brood_war",
+  "campaign": "human",
+  "order": 20,
+  "title": "Brood War",
+  "briefing": "Two Arcadian broods have dug in on either side of the rift. Destroy both of their landing nests.",
+  "mapId": "map.c_rift",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1600,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "ai",
+      "ore": 600,
+      "metal": 100,
+      "difficulty": "normal",
+      "team": 2
+    },
+    {
+      "player": 3,
+      "faction": "alien",
+      "controller": "ai",
+      "ore": 400,
+      "metal": 100,
+      "difficulty": "easy",
+      "team": 2
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -86.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -82.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -86.0,
+      "z": 88.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -82.0,
+      "z": 88.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -76.0,
+      "z": 94.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -72.0,
+      "z": 94.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -76.0,
+      "z": 98.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -90,
+      "z": 78,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.missile_tank",
+      "x": -80,
+      "z": 80,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -110,
+      "z": 98,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -104,
+      "z": 110,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -98,
+      "z": 112,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -92,
+      "z": 108,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 82.0,
+      "z": -42.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 86.0,
+      "z": -42.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 82.0,
+      "z": -38.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.ore_miner",
+      "x": 104,
+      "z": -36,
+      "heading": 0.0
+    },
+    {
+      "side": 3,
+      "unitType": "unit.alien.light_tank",
+      "x": 38.0,
+      "z": -86.0,
+      "heading": 0.0
+    },
+    {
+      "side": 3,
+      "unitType": "unit.alien.light_tank",
+      "x": 42.0,
+      "z": -86.0,
+      "heading": 0.0
+    },
+    {
+      "side": 3,
+      "unitType": "unit.alien.light_tank",
+      "x": 38.0,
+      "z": -82.0,
+      "heading": 0.0
+    },
+    {
+      "side": 3,
+      "unitType": "unit.alien.ore_miner",
+      "x": 44,
+      "z": -88,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -100,
+      "z": 100
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.landing_pad",
+      "x": 96,
+      "z": -40
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 78,
+      "z": -36
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.landing_pad",
+      "x": 40,
+      "z": -96
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.turret",
+      "x": 36,
+      "z": -78
+    }
+  ],
+  "objectives": [
+    {
+      "id": "a",
+      "text": "Destroy the eastern brood's nest",
+      "kind": "primary"
+    },
+    {
+      "id": "b",
+      "text": "Destroy the southern brood's nest",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Two enemies, one at each side of the rift. Take the weaker southern one first."
+        }
+      ]
+    },
+    {
+      "id": "a",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "a",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "when": {
+        "t": "allDestroyed",
+        "side": 3,
+        "unitType": "structure.alien.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "b",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 3000,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

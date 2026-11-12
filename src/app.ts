@@ -754,7 +754,7 @@ export class App {
     }
     for (const row of this.structureRows) {
       // Missions can hold items back so each one adds a single new idea; those are not listed.
-      if (row.faction !== faction || !missionAllows(this.world, 1, row.id)) {
+      if (row.faction !== faction || row.buyable === false || !missionAllows(this.world, 1, row.id)) {
         continue;
       }
       items.push({

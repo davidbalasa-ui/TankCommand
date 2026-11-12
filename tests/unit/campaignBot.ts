@@ -5,6 +5,7 @@
 import { stepWithAi } from '../../src/ai/driver';
 import { isFightingUnitType } from '../../src/sim/economy';
 import { isHostile } from '../../src/sim/diplomacy';
+import { hasFreeAirSlot } from '../../src/sim/air';
 import { isItemUnlocked, researchDone } from '../../src/sim/research';
 import { placementValidity } from '../../src/sim/spawn';
 import { missionAllows, missionMarkers } from '../../src/sim/triggers';
@@ -128,9 +129,19 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   if (pad && stats && !busy && !saving) {
     const towers = ownStructures.filter((s) => w.structureTypes.get(s.typeId)?.kind === 'turret').length;
     const tower = [...w.structureTypes.values()].find((t) => t.kind === 'turret' && t.faction === faction && usable(t.id));
+    // Against aircraft, guns that can hit them come first.
+    const enemyAir = enemies.some((u) => u.air !== null);
+    const hitsAir = (t: { weapon: { targets?: readonly string[] } | null }): number =>
+      t.weapon?.targets?.includes('air') ? 1 : 0;
     const tanks = [...w.unitTypes.values()]
-      .filter((t) => t.faction === faction && isFightingUnitType(t) && (t.role === 'tank' || t.role === 'artillery') && usable(t.id))
-      .sort((a, b) => b.oreCost - a.oreCost);
+      .filter(
+        (t) =>
+          t.faction === faction &&
+          isFightingUnitType(t) &&
+          (t.role === 'tank' || t.role === 'artillery' || (t.role === 'air' && hasFreeAirSlot(w, me))) &&
+          usable(t.id),
+      )
+      .sort((a, b) => (enemyAir ? hitsAir(b) - hitsAir(a) : 0) || b.oreCost - a.oreCost);
     const pendingKit = w.pendingKits.some((k) => k.owner === me);
     const needType = need ? w.structureTypes.get(need) : undefined;
     // A second miner and a hauler for each miner, as soon as the mission sells them.
@@ -217,6 +228,12 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     }
   }
 
+  // Aircraft sit on their base until launched; send up any that are armed.
+  const parked = own.filter((u) => u.air?.mode === 'parked' && u.air.ammo > 0).map((u) => u.id);
+  if (parked.length > 0) {
+    out.push({ kind: 'air', unitIds: parked, action: 'launch' });
+  }
+
   // The army.
   const army = own.filter((u) => {
     const type = w.unitTypes.get(u.typeId);
@@ -245,7 +262,10 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   const marching = army.some(
     (u) => u.order.kind === 'attack' && enemyStructures.some((st) => u.order.kind === 'attack' && st.id === u.order.targetId),
   );
-  const ready = !enemyPad || marching || army.length >= (plan.armySize ?? 7);
+  // Wait for a bigger group against more than one base; a dwindling attack falls back to regroup.
+  const enemyPads = enemyStructures.filter((st) => w.structureTypes.get(st.typeId)?.kind === 'pad').length;
+  const wantSize = plan.armySize ?? (enemyPads > 1 ? 12 : 7);
+  const ready = !enemyPad || (marching && army.length >= 4) || army.length >= wantSize;
   if (ids.length > 0) {
     if (threat) {
       out.push({ kind: 'attackMove', unitIds: ids, x: threat.x, z: threat.z });

@@ -1,0 +1,318 @@
+{
+  "id": "mission.alien.17_the_disc",
+  "campaign": "alien",
+  "order": 17,
+  "title": "The Disc",
+  "briefing": "The brood has grown its first saucers. A Terran tank column is crossing the plain toward the south-west pass. Burn it before it gets through.",
+  "mapId": "map.c_highwater",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 1000,
+      "metal": 0,
+      "available": [
+        "unit.alien.light_tank",
+        "unit.alien.light_skimmer",
+        "unit.alien.ore_miner",
+        "unit.alien.tug",
+        "structure.alien.turret",
+        "unit.alien.radar",
+        "structure.alien.radar",
+        "unit.alien.heavy_tank",
+        "structure.alien.metal_station",
+        "structure.alien.lab",
+        "unit.alien.missile_tank",
+        "unit.alien.artillery",
+        "structure.alien.missile_battery",
+        "unit.alien.repair",
+        "unit.alien.glider",
+        "structure.alien.air_base",
+        "unit.alien.fighter",
+        "unit.alien.saucer"
+      ],
+      "researchDone": [
+        "research.alien.armor_plating",
+        "research.alien.fortifications",
+        "research.alien.fire_control",
+        "research.alien.sensors",
+        "research.alien.heavy_armor",
+        "research.alien.missiles",
+        "research.alien.heavy_ordnance",
+        "research.alien.field_repair",
+        "research.alien.aviation",
+        "research.alien.disc_flight"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.saucer",
+      "x": -68,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.saucer",
+      "x": -66,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.saucer",
+      "x": -70,
+      "z": 64,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -60.0,
+      "z": 58.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -56.0,
+      "z": 58.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": -60.0,
+      "z": 62.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.ore_miner",
+      "x": -84,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.tug",
+      "x": -78,
+      "z": 84,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 66.0,
+      "z": -50.0,
+      "heading": 2.356,
+      "tag": "column"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 70.0,
+      "z": -50.0,
+      "heading": 2.356,
+      "tag": "column"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 66.0,
+      "z": -46.0,
+      "heading": 2.356,
+      "tag": "column"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 70.0,
+      "z": -46.0,
+      "heading": 2.356,
+      "tag": "column"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.heavy_tank",
+      "x": 58,
+      "z": -56,
+      "heading": 2.356,
+      "tag": "column"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.missile_tank",
+      "x": 76,
+      "z": -40,
+      "heading": 2.356,
+      "tag": "column"
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.alien.landing_pad",
+      "x": -74,
+      "z": 74
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.air_base",
+      "x": -64,
+      "z": 56
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.air_base",
+      "x": -52,
+      "z": 64
+    }
+  ],
+  "objectives": [
+    {
+      "id": "column",
+      "text": "Destroy the tank column",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "Saucers fly over the column and burn it. The Spitter missile tank can shoot back: kill it first."
+        }
+      ]
+    },
+    {
+      "id": "leg0",
+      "when": {
+        "t": "time",
+        "tick": 600
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "column",
+          "mode": "attack",
+          "x": 60,
+          "z": 60
+        }
+      ]
+    },
+    {
+      "id": "leg1",
+      "when": {
+        "t": "time",
+        "tick": 2800
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "column",
+          "mode": "attack",
+          "x": 0,
+          "z": 70
+        }
+      ]
+    },
+    {
+      "id": "leg2",
+      "when": {
+        "t": "time",
+        "tick": 5000
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "column",
+          "mode": "attack",
+          "x": -60,
+          "z": 20
+        }
+      ]
+    },
+    {
+      "id": "leg3",
+      "when": {
+        "t": "time",
+        "tick": 7200
+      },
+      "do": [
+        {
+          "t": "aiOrder",
+          "tag": "column",
+          "mode": "attack",
+          "x": -80,
+          "z": -40
+        }
+      ]
+    },
+    {
+      "id": "escaped",
+      "when": {
+        "t": "unitEscorted",
+        "tag": "column",
+        "x": -80,
+        "z": -40,
+        "radius": 12
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "column",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "columnEscaped"
+        }
+      ]
+    },
+    {
+      "id": "column",
+      "when": {
+        "t": "unitDestroyed",
+        "tag": "column"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "column",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 900,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

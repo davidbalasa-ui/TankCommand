@@ -886,7 +886,7 @@
       "armor"
     ],
     "movement": "air",
-    "modelAssetId": "unit.alien.halo",
+    "modelAssetId": "unit.alien.dragonfly",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"

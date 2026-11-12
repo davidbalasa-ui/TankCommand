@@ -400,5 +400,77 @@
       "fireRate",
       "armor"
     ]
+  },
+  {
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "buyable": false,
+    "faction": "alien",
+    "kind": "turret",
+    "id": "structure.alien.shard_core",
+    "name": "The Shard",
+    "hp": 6000,
+    "armor": 10,
+    "footprint": {
+      "cellsX": 4,
+      "cellsZ": 4
+    },
+    "sightRange": 30,
+    "modelId": "prop.deposit.ore",
+    "weapon": {
+      "damage": 70,
+      "range": 26,
+      "reloadSec": 3,
+      "projectileSpeed": 50,
+      "accuracy": 0.9,
+      "splashRadius": 2.5,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 90
+  },
+  {
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "buyable": false,
+    "faction": "alien",
+    "kind": "turret",
+    "id": "structure.alien.shard_spire",
+    "name": "Shard Spire",
+    "hp": 1000,
+    "armor": 6,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 22,
+    "modelId": "prop.deposit.ore",
+    "weapon": {
+      "damage": 30,
+      "range": 18,
+      "reloadSec": 2,
+      "projectileSpeed": 50,
+      "accuracy": 0.85,
+      "splashRadius": 1,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 120
   }
 ]

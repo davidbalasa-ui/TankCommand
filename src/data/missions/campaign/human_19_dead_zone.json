@@ -1,0 +1,335 @@
+{
+  "id": "mission.human.19_dead_zone",
+  "campaign": "human",
+  "order": 19,
+  "title": "Dead Zone",
+  "briefing": "The ground near the rift is covered in Shard spires that fire on anything that moves, Arcadian or Terran. Get a Watchman radar to the rift's edge so we can see what lies beyond. Keep it alive.",
+  "mapId": "map.c_crystal_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1200,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    },
+    {
+      "player": 3,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.radar",
+      "x": -82,
+      "z": 82,
+      "heading": -0.785,
+      "tag": "eye"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -74.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -70.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -74.0,
+      "z": 82.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -82.0,
+      "z": 66.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -78.0,
+      "z": 66.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 66.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -64.0,
+      "z": 66.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -68.0,
+      "z": 70.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -100,
+      "z": 88,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -94,
+      "z": 100,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 38.0,
+      "z": 8.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 42.0,
+      "z": 8.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 38.0,
+      "z": 12.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 66,
+      "z": -72,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -90,
+      "z": 90
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -40,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -10,
+      "z": -10
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 20,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 30,
+      "z": -40
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 60,
+      "z": -10
+    }
+  ],
+  "objectives": [
+    {
+      "id": "edge",
+      "text": "Bring the Watchman to the rift's edge",
+      "kind": "primary"
+    },
+    {
+      "id": "eye",
+      "text": "Keep the Watchman alive",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Spires hit hard and far. Artillery can break them from outside their reach."
+        }
+      ]
+    },
+    {
+      "id": "patrol",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 72,
+          "z": -72,
+          "tag": "patrol"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "patrol",
+          "mode": "attack",
+          "x": -90,
+          "z": 90
+        }
+      ]
+    },
+    {
+      "id": "eyeLost",
+      "when": {
+        "t": "unitDestroyed",
+        "tag": "eye"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "eye",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "radarLost"
+        }
+      ]
+    },
+    {
+      "id": "edge",
+      "when": {
+        "t": "unitEscorted",
+        "tag": "eye",
+        "x": 82,
+        "z": -82,
+        "radius": 12
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "edge",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "eye",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 2,
+      "relation": "hostile"
+    }
+  ]
+}

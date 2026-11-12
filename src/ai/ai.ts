@@ -90,7 +90,7 @@ class Planner {
 
   myStructureTypes(): SimStructureType[] {
     const f = faction(this.world, this.player);
-    return [...this.world.structureTypes.values()].filter((type) => type.faction === f);
+    return [...this.world.structureTypes.values()].filter((type) => type.faction === f && type.buyable);
   }
 
   canAfford(ore: number, metal: number, reserve: number, useMetalReserve = true): boolean {

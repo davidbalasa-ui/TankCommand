@@ -1,0 +1,301 @@
+{
+  "id": "mission.human.16_bombing_run",
+  "campaign": "human",
+  "order": 16,
+  "title": "Bombing Run",
+  "briefing": "Four Arcadian Thornmounds guard the eastern plain, covered by two missile batteries. Condor bombers can level them from above; Falcons keep the sky clear. Destroy all four Thornmounds.",
+  "mapId": "map.c_highwater",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 900,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.bomber",
+      "x": -68,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.bomber",
+      "x": -66,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.fighter",
+      "x": -70,
+      "z": 64,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -60.0,
+      "z": 58.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -56.0,
+      "z": 58.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -60.0,
+      "z": 62.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -56.0,
+      "z": 62.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -84,
+      "z": 72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -78,
+      "z": 84,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 46,
+      "z": -14,
+      "heading": 2.356
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 26,
+      "z": -44,
+      "heading": 2.356
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -74,
+      "z": 74
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.air_base",
+      "x": -64,
+      "z": 56
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 40,
+      "z": -20
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 20,
+      "z": -50
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 60,
+      "z": -40
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 50,
+      "z": 10
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.missile_battery",
+      "x": 30,
+      "z": -30
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.missile_battery",
+      "x": 64,
+      "z": -16
+    }
+  ],
+  "objectives": [
+    {
+      "id": "towers",
+      "text": "Destroy the four Thornmounds",
+      "kind": "primary"
+    },
+    {
+      "id": "aa",
+      "text": "Destroy both missile batteries",
+      "kind": "optional"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Select the Condors and tap a Thornmound to bomb it. Stay away from the batteries."
+        }
+      ]
+    },
+    {
+      "id": "patrol",
+      "when": {
+        "t": "time",
+        "tick": 4000
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Enemy fliers scrambled."
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.fighter",
+          "count": 2,
+          "x": 68,
+          "z": -68,
+          "tag": "patrol",
+          "launch": true
+        },
+        {
+          "t": "aiOrder",
+          "tag": "patrol",
+          "mode": "attack",
+          "x": -74,
+          "z": 74
+        }
+      ]
+    },
+    {
+      "id": "towers",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.turret"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "towers",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "aa",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.missile_battery"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "aa",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

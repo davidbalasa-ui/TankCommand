@@ -58,7 +58,7 @@ describe('unit data containers', () => {
       'unit.human.turret_packed',
     ]);
     const structureTable = loadStructureTable(structures);
-    expect(structureTable.size).toBe(14);
+    expect(structureTable.size).toBe(16);
     const mapTable = loadMapTable(maps);
     expect(mapTable).toHaveLength(2);
     expect(mapTable[0]?.deposits.filter((d) => d.kind === 'ore')).toHaveLength(8);

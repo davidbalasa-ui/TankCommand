@@ -132,6 +132,7 @@ export const NO_TURRET = {
   sensorRange: 10,
   upgrades: [] as string[],
   airCapacity: 0,
+  buyable: true,
 };
 
 export function turretType(overrides: Partial<SimStructureType> = {}): SimStructureType {

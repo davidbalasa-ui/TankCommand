@@ -72,7 +72,7 @@ function resolveItem(
       return { item: null, reason: 'notInRoster' };
     }
   }
-  if (unit && unit.deploysTo !== null) {
+  if ((unit && unit.deploysTo !== null) || (!unit && structure && !structure.buyable)) {
     return { item: null, reason: 'notInRoster' };
   }
   if (!missionAllows(world, player, itemId)) {

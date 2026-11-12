@@ -165,6 +165,8 @@ export interface SimStructureType {
   sensorRange: number;
   upgrades: string[];
   airCapacity: number;
+  /** False for mission-only structures that are never for sale. */
+  buyable: boolean;
 }
 
 export interface StructureState {

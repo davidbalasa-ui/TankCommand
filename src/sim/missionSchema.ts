@@ -81,6 +81,8 @@ export const actionSchema = z.discriminatedUnion('t', [
     z: z.number().finite(),
     tag: z.string().optional(),
     drop: z.boolean().optional(),
+    /** Aircraft take off at once instead of parking (at their side's air base, if it has one). */
+    launch: z.boolean().optional(),
   }),
   z.object({ t: z.literal('message'), text: z.string().min(1), speaker: z.string().optional() }),
   z.object({

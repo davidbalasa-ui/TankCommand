@@ -1,0 +1,516 @@
+{
+  "id": "mission.alien.18_orbital_relay",
+  "campaign": "alien",
+  "order": 18,
+  "title": "Orbital Relay",
+  "briefing": "The Terran orbital relay stands in the middle of the plain. Destroy the relay tower and its guns, but the colony will keep sending raids at your nest. Hold both ends.",
+  "mapId": "map.c_twin_colonies",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 1300,
+      "metal": 0,
+      "available": [
+        "unit.alien.light_tank",
+        "unit.alien.light_skimmer",
+        "unit.alien.ore_miner",
+        "unit.alien.tug",
+        "structure.alien.turret",
+        "unit.alien.radar",
+        "structure.alien.radar",
+        "unit.alien.heavy_tank",
+        "structure.alien.metal_station",
+        "structure.alien.lab",
+        "unit.alien.missile_tank",
+        "unit.alien.artillery",
+        "structure.alien.missile_battery",
+        "unit.alien.repair",
+        "unit.alien.glider",
+        "structure.alien.air_base",
+        "unit.alien.fighter",
+        "unit.alien.saucer"
+      ],
+      "researchDone": [
+        "research.alien.armor_plating",
+        "research.alien.fortifications",
+        "research.alien.fire_control",
+        "research.alien.sensors",
+        "research.alien.heavy_armor",
+        "research.alien.missiles",
+        "research.alien.heavy_ordnance",
+        "research.alien.field_repair",
+        "research.alien.aviation",
+        "research.alien.disc_flight"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 60.0,
+      "z": -68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 64.0,
+      "z": -68.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 60.0,
+      "z": -64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 64.0,
+      "z": -64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 54.0,
+      "z": -78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 58.0,
+      "z": -78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.artillery",
+      "x": 70,
+      "z": -60,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.ore_miner",
+      "x": 90,
+      "z": -78,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.tug",
+      "x": 84,
+      "z": -70,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 20.0,
+      "z": 30.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 24.0,
+      "z": 30.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.light_tank",
+      "x": 20.0,
+      "z": 34.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.human.missile_tank",
+      "x": 40,
+      "z": 40,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.alien.landing_pad",
+      "x": 80,
+      "z": -80
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.turret",
+      "x": 66,
+      "z": -66
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.radar",
+      "x": 30,
+      "z": 40
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.turret",
+      "x": 18,
+      "z": 34
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.turret",
+      "x": 36,
+      "z": 28
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.landing_pad",
+      "x": -86,
+      "z": -10
+    },
+    {
+      "side": 2,
+      "structureType": "structure.human.landing_pad",
+      "x": -10,
+      "z": 86
+    }
+  ],
+  "objectives": [
+    {
+      "id": "relay",
+      "text": "Destroy the relay tower",
+      "kind": "primary"
+    },
+    {
+      "id": "guns",
+      "text": "Destroy the relay guns",
+      "kind": "primary"
+    },
+    {
+      "id": "nest",
+      "text": "Keep your nest",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The relay is north-west of the nest. Raids will come from both colonies."
+        }
+      ]
+    },
+    {
+      "id": "w0",
+      "when": {
+        "t": "time",
+        "tick": 1200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": -86,
+          "z": -10,
+          "tag": "w0"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w0",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "w1",
+      "when": {
+        "t": "time",
+        "tick": 3000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": -10,
+          "z": 86,
+          "tag": "w1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w1",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "w2",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": -86,
+          "z": -10,
+          "tag": "w2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -86,
+          "z": -10,
+          "tag": "w2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w2",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "w3",
+      "when": {
+        "t": "time",
+        "tick": 6600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 3,
+          "x": -10,
+          "z": 86,
+          "tag": "w3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -10,
+          "z": 86,
+          "tag": "w3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w3",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "w4",
+      "when": {
+        "t": "time",
+        "tick": 8400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 3,
+          "x": -86,
+          "z": -10,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -86,
+          "z": -10,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.missile_tank",
+          "count": 1,
+          "x": -86,
+          "z": -10,
+          "tag": "w4"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w4",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "w5",
+      "when": {
+        "t": "time",
+        "tick": 10200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 3,
+          "x": -10,
+          "z": 86,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 2,
+          "x": -10,
+          "z": 86,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.missile_tank",
+          "count": 1,
+          "x": -10,
+          "z": 86,
+          "tag": "w5"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w5",
+          "mode": "attack",
+          "x": 80,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "relay",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.human.radar"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "relay",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "guns",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.human.turret"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "guns",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "nestKept",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "relay"
+          },
+          {
+            "t": "objectiveDone",
+            "id": "guns"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "nest",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.alien.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "nest",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 1500,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

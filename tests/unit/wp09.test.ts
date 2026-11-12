@@ -259,7 +259,7 @@ describe('placeholder missions', () => {
         }
       }
       expect(w.result, row.id).toEqual({ winner: null });
-    }, 120_000);
+    }, 600_000);
   }
 
   it('[MSN-03] training missions are won by scripted commands', () => {

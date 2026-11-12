@@ -95,6 +95,7 @@ export function buildStructureTypes(
       sensorRange: row.sensorRange ?? row.sightRange,
       upgrades: [...(row.upgrades ?? [])],
       airCapacity: row.airCapacity ?? 0,
+      buyable: row.buyable ?? true,
     });
   }
   return result;

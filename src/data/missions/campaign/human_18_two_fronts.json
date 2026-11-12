@@ -1,0 +1,530 @@
+{
+  "id": "mission.human.18_two_fronts",
+  "campaign": "human",
+  "order": 18,
+  "title": "Two Fronts",
+  "briefing": "Two colonies, Ashby and Corran, are in the path of the swarm. Hold both for twelve minutes. The waves switch between them, so you will have to split your forces or move fast.",
+  "mapId": "map.c_twin_colonies",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1400,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -74.0,
+      "z": -12.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -70.0,
+      "z": -12.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -74.0,
+      "z": -8.0,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -12.0,
+      "z": 70.0,
+      "heading": -1.57
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -8.0,
+      "z": 70.0,
+      "heading": -1.57
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -12.0,
+      "z": 74.0,
+      "heading": -1.57
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -68,
+      "z": -2,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -2,
+      "z": 68,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -94,
+      "z": -20,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -90,
+      "z": -2,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -20,
+      "z": 94,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -2,
+      "z": 90,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -86,
+      "z": -10
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -10,
+      "z": 86
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": -70,
+      "z": -18
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": -2,
+      "z": 70
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold",
+      "text": "Hold both colonies for 12 minutes",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Watch both colonies. The first wave hits Ashby in one minute."
+        }
+      ]
+    },
+    {
+      "id": "w0",
+      "when": {
+        "t": "time",
+        "tick": 1200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 80,
+          "z": -80,
+          "tag": "w0"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w0",
+          "mode": "attack",
+          "x": -86,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "w1",
+      "when": {
+        "t": "time",
+        "tick": 3000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 80,
+          "z": -80,
+          "tag": "w1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w1",
+          "mode": "attack",
+          "x": -10,
+          "z": 86
+        }
+      ]
+    },
+    {
+      "id": "w2",
+      "when": {
+        "t": "time",
+        "tick": 4800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 2,
+          "x": 80,
+          "z": -80,
+          "tag": "w2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": 74,
+          "z": -74,
+          "tag": "w2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w2",
+          "mode": "attack",
+          "x": -86,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "w3",
+      "when": {
+        "t": "time",
+        "tick": 6600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 80,
+          "z": -80,
+          "tag": "w3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": 74,
+          "z": -74,
+          "tag": "w3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w3",
+          "mode": "attack",
+          "x": -10,
+          "z": 86
+        }
+      ]
+    },
+    {
+      "id": "w4",
+      "when": {
+        "t": "time",
+        "tick": 8400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 80,
+          "z": -80,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 1,
+          "x": 74,
+          "z": -74,
+          "tag": "w4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 1,
+          "x": 86,
+          "z": -86,
+          "tag": "w4"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w4",
+          "mode": "attack",
+          "x": -86,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "w5",
+      "when": {
+        "t": "time",
+        "tick": 10200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 3,
+          "x": 80,
+          "z": -80,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 2,
+          "x": 74,
+          "z": -74,
+          "tag": "w5"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 1,
+          "x": 86,
+          "z": -86,
+          "tag": "w5"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w5",
+          "mode": "attack",
+          "x": -10,
+          "z": 86
+        }
+      ]
+    },
+    {
+      "id": "w6",
+      "when": {
+        "t": "time",
+        "tick": 12000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 4,
+          "x": 80,
+          "z": -80,
+          "tag": "w6"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 2,
+          "x": 74,
+          "z": -74,
+          "tag": "w6"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 1,
+          "x": 86,
+          "z": -86,
+          "tag": "w6"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w6",
+          "mode": "attack",
+          "x": -86,
+          "z": -10
+        }
+      ]
+    },
+    {
+      "id": "w7",
+      "when": {
+        "t": "time",
+        "tick": 13200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_tank",
+          "count": 4,
+          "x": 80,
+          "z": -80,
+          "tag": "w7"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.heavy_tank",
+          "count": 2,
+          "x": 74,
+          "z": -74,
+          "tag": "w7"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.missile_tank",
+          "count": 1,
+          "x": 86,
+          "z": -86,
+          "tag": "w7"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "w7",
+          "mode": "attack",
+          "x": -10,
+          "z": 86
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "not",
+        "cond": {
+          "t": "structureBuilt",
+          "side": 1,
+          "structureType": "structure.human.landing_pad",
+          "count": 2
+        }
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "colonyLost"
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "when": {
+        "t": "time",
+        "tick": 14400
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ]
+}

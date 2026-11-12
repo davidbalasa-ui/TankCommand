@@ -1,0 +1,327 @@
+{
+  "id": "mission.human.21_anchor_point",
+  "campaign": "human",
+  "order": 21,
+  "title": "Anchor Point",
+  "briefing": "The spires on the crystal fields anchor the rift to Vesper. Shatter all five while the Arcadians throw everything they have at you.",
+  "mapId": "map.c_crystal_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 1600,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "ai",
+      "ore": 800,
+      "metal": 150,
+      "difficulty": "hard"
+    },
+    {
+      "player": 3,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -76.0,
+      "z": 74.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -72.0,
+      "z": 74.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -76.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -72.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -66.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -62.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -66.0,
+      "z": 88.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -82.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -78.0,
+      "z": 64.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -100,
+      "z": 88,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -94,
+      "z": 100,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -88,
+      "z": 102,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -82,
+      "z": 98,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 66.0,
+      "z": -70.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 70.0,
+      "z": -70.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 66.0,
+      "z": -66.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 70.0,
+      "z": -66.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.ore_miner",
+      "x": 90,
+      "z": -78,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -90,
+      "z": 90
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.landing_pad",
+      "x": 82,
+      "z": -82
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 62,
+      "z": -76
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -40,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -10,
+      "z": -10
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 20,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 30,
+      "z": -40
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 60,
+      "z": -10
+    }
+  ],
+  "objectives": [
+    {
+      "id": "anchors",
+      "text": "Shatter all five spires",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Artillery outranges the spires. Keep tanks back until they are down."
+        }
+      ]
+    },
+    {
+      "id": "anchors",
+      "when": {
+        "t": "allDestroyed",
+        "side": 3,
+        "unitType": "structure.alien.shard_spire"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "anchors",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 2700,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 2,
+      "relation": "hostile"
+    }
+  ]
+}

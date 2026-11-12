@@ -1,0 +1,393 @@
+{
+  "id": "mission.human.22_close_the_rift",
+  "campaign": "human",
+  "order": 22,
+  "title": "Close the Rift",
+  "briefing": "This is it. The Shard holds the rift open, and the last Arcadian hive guards it. Destroy the Shard and the hive, and Vesper is ours.",
+  "mapId": "map.c_rift",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 2000,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "unit.human.ore_miner",
+        "unit.human.tug",
+        "structure.human.turret",
+        "unit.human.radar",
+        "structure.human.radar",
+        "unit.human.heavy_tank",
+        "structure.human.metal_station",
+        "structure.human.lab",
+        "unit.human.missile_tank",
+        "unit.human.artillery",
+        "structure.human.missile_battery",
+        "unit.human.repair",
+        "unit.human.hover_tank",
+        "structure.human.air_base",
+        "unit.human.fighter",
+        "unit.human.bomber"
+      ],
+      "researchDone": [
+        "research.human.armor_plating",
+        "research.human.fortifications",
+        "research.human.fire_control",
+        "research.human.sensors",
+        "research.human.heavy_armor",
+        "research.human.missiles",
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.aviation"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "ai",
+      "ore": 1000,
+      "metal": 200,
+      "difficulty": "hard"
+    },
+    {
+      "player": 3,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -86.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -82.0,
+      "z": 84.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -86.0,
+      "z": 88.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -82.0,
+      "z": 88.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -76.0,
+      "z": 94.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -72.0,
+      "z": 94.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -76.0,
+      "z": 98.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.heavy_tank",
+      "x": -72.0,
+      "z": 98.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -92.0,
+      "z": 74.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -88.0,
+      "z": 74.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.artillery",
+      "x": -92.0,
+      "z": 78.0,
+      "heading": -0.785
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -110,
+      "z": 98,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -104,
+      "z": 110,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.ore_miner",
+      "x": -98,
+      "z": 112,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -92,
+      "z": 108,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 82.0,
+      "z": -42.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 86.0,
+      "z": -42.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 82.0,
+      "z": -38.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_tank",
+      "x": 86.0,
+      "z": -38.0,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 80,
+      "z": -30,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.ore_miner",
+      "x": 104,
+      "z": -36,
+      "heading": 0.0
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.tug",
+      "x": 100,
+      "z": -30,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -100,
+      "z": 100
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.landing_pad",
+      "x": 96,
+      "z": -40
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.landing_pad",
+      "x": 40,
+      "z": -96
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 76,
+      "z": -36
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.turret",
+      "x": 36,
+      "z": -76
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 108,
+      "z": -52
+    },
+    {
+      "side": 2,
+      "structureType": "structure.alien.radar",
+      "x": 54,
+      "z": -90
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_core",
+      "x": 10,
+      "z": -10
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -6,
+      "z": -10
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 10,
+      "z": 6
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 24,
+      "z": -22
+    }
+  ],
+  "objectives": [
+    {
+      "id": "shard",
+      "text": "Destroy the Shard",
+      "kind": "primary"
+    },
+    {
+      "id": "hive",
+      "text": "Destroy the last hive",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "The Shard fires on anything near it. Break its spires with artillery first."
+        }
+      ]
+    },
+    {
+      "id": "shard",
+      "when": {
+        "t": "allDestroyed",
+        "side": 3,
+        "unitType": "structure.alien.shard_core"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "shard",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "hive",
+      "when": {
+        "t": "allDestroyed",
+        "side": 2,
+        "unitType": "structure.alien.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hive",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.human.landing_pad"
+      },
+      "do": [
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "timeLimitSec": 3600,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 2,
+      "relation": "hostile"
+    }
+  ]
+}

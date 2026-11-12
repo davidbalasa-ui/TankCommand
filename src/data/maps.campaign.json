@@ -1103,5 +1103,566 @@
     },
     "placeholder": false,
     "campaignOnly": true
+  },
+  {
+    "id": "map.c_highwater",
+    "name": "Highwater",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -74,
+        "z": 74
+      },
+      {
+        "player": 2,
+        "x": 68,
+        "z": -68
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -88,
+        "z": 58,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -58,
+        "z": 88,
+        "amount": 700
+      },
+      {
+        "kind": "metal",
+        "x": -88,
+        "z": 88,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": 40,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 84,
+        "z": -50,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 50,
+        "z": -84,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 86,
+        "z": -86,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 30,
+        "z": 30,
+        "amount": 500
+      }
+    ],
+    "features": {
+      "waterLevel": -0.5,
+      "lakes": [
+        {
+          "x": 0,
+          "z": 4,
+          "radius": 18,
+          "depth": 3
+        }
+      ],
+      "rivers": [],
+      "terrain": {
+        "seed": 909,
+        "roughness": 0.6,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": -30,
+            "z": -40,
+            "radius": 20,
+            "height": 5
+          },
+          {
+            "x": 40,
+            "z": 50,
+            "radius": 18,
+            "height": 5
+          },
+          {
+            "x": 10,
+            "z": -70,
+            "radius": 14,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -74,
+            "z": 74,
+            "radius": 16
+          },
+          {
+            "x": 68,
+            "z": -68,
+            "radius": 16
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_twin_colonies",
+    "name": "Twin Colonies",
+    "size": 220,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -86,
+        "z": -10
+      },
+      {
+        "player": 2,
+        "x": 80,
+        "z": -80
+      },
+      {
+        "player": 3,
+        "x": -10,
+        "z": 86
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -98,
+        "z": -28,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -98,
+        "z": 8,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -70,
+        "z": -30,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -28,
+        "z": 98,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": 8,
+        "z": 98,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -30,
+        "z": 70,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 96,
+        "z": -60,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": -96,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 0,
+        "z": 0,
+        "amount": 500
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 1010,
+        "roughness": 0.8,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": -60,
+            "z0": 20,
+            "x1": -20,
+            "z1": 60,
+            "height": 8,
+            "width": 7
+          }
+        ],
+        "hills": [
+          {
+            "x": 30,
+            "z": -10,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": -10,
+            "z": 30,
+            "radius": 12,
+            "height": 3
+          }
+        ],
+        "flats": [
+          {
+            "x": -86,
+            "z": -10,
+            "radius": 15
+          },
+          {
+            "x": -10,
+            "z": 86,
+            "radius": 15
+          },
+          {
+            "x": 80,
+            "z": -80,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_crystal_fields",
+    "name": "Crystal Fields",
+    "size": 220,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -90,
+        "z": 90
+      },
+      {
+        "player": 2,
+        "x": 82,
+        "z": -82
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -100,
+        "z": 72,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -72,
+        "z": 100,
+        "amount": 700
+      },
+      {
+        "kind": "metal",
+        "x": -100,
+        "z": 100,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -60,
+        "z": 60,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 96,
+        "z": -60,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": -96,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 96,
+        "z": -96,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 0,
+        "z": 60,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 60,
+        "z": 0,
+        "amount": 500
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 1111,
+        "roughness": 1.0,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": -60,
+            "z": -30,
+            "radius": 22,
+            "height": 6
+          },
+          {
+            "x": 40,
+            "z": 70,
+            "radius": 20,
+            "height": 6
+          },
+          {
+            "x": 10,
+            "z": 0,
+            "radius": 14,
+            "height": 3
+          }
+        ],
+        "flats": [
+          {
+            "x": -90,
+            "z": 90,
+            "radius": 16
+          },
+          {
+            "x": 82,
+            "z": -82,
+            "radius": 16
+          },
+          {
+            "x": -40,
+            "z": 30,
+            "radius": 6
+          },
+          {
+            "x": -10,
+            "z": -10,
+            "radius": 6
+          },
+          {
+            "x": 20,
+            "z": 30,
+            "radius": 6
+          },
+          {
+            "x": 30,
+            "z": -40,
+            "radius": 6
+          },
+          {
+            "x": 60,
+            "z": -10,
+            "radius": 6
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.c_rift",
+    "name": "The Rift",
+    "size": 240,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -100,
+        "z": 100
+      },
+      {
+        "player": 2,
+        "x": 96,
+        "z": -40
+      },
+      {
+        "player": 3,
+        "x": 40,
+        "z": -96
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -110,
+        "z": 80,
+        "amount": 800
+      },
+      {
+        "kind": "ore",
+        "x": -80,
+        "z": 110,
+        "amount": 800
+      },
+      {
+        "kind": "metal",
+        "x": -110,
+        "z": 110,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -60,
+        "z": 60,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 108,
+        "z": -20,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 108,
+        "z": -64,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 80,
+        "z": -20,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": 20,
+        "z": -108,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 64,
+        "z": -108,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 20,
+        "z": -80,
+        "amount": 300
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": -20,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 20,
+        "z": 40,
+        "amount": 500
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 1212,
+        "roughness": 0.9,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": -30,
+            "z0": -60,
+            "x1": -10,
+            "z1": -30,
+            "height": 8,
+            "width": 7
+          },
+          {
+            "x0": 30,
+            "z0": 10,
+            "x1": 60,
+            "z1": 30,
+            "height": 8,
+            "width": 7
+          }
+        ],
+        "hills": [
+          {
+            "x": -50,
+            "z": 20,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": 60,
+            "z": 70,
+            "radius": 20,
+            "height": 5
+          }
+        ],
+        "flats": [
+          {
+            "x": -100,
+            "z": 100,
+            "radius": 16
+          },
+          {
+            "x": 10,
+            "z": -10,
+            "radius": 12
+          },
+          {
+            "x": 96,
+            "z": -40,
+            "radius": 15
+          },
+          {
+            "x": 40,
+            "z": -96,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
   }
 ]

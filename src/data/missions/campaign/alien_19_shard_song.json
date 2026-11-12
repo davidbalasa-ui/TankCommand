@@ -1,0 +1,493 @@
+{
+  "id": "mission.alien.19_shard_song",
+  "campaign": "alien",
+  "order": 19,
+  "title": "Shard Song",
+  "briefing": "The brood has nested among the crystals at the rift. The Shard is waking, and it does not care whose side anyone is on. Hold the nest for ten minutes against the Terrans and the spires both.",
+  "mapId": "map.c_crystal_fields",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "alien",
+      "controller": "human",
+      "ore": 1200,
+      "metal": 0,
+      "available": [
+        "unit.alien.light_tank",
+        "unit.alien.light_skimmer",
+        "unit.alien.ore_miner",
+        "unit.alien.tug",
+        "structure.alien.turret",
+        "unit.alien.radar",
+        "structure.alien.radar",
+        "unit.alien.heavy_tank",
+        "structure.alien.metal_station",
+        "structure.alien.lab",
+        "unit.alien.missile_tank",
+        "unit.alien.artillery",
+        "structure.alien.missile_battery",
+        "unit.alien.repair",
+        "unit.alien.glider",
+        "structure.alien.air_base",
+        "unit.alien.fighter",
+        "unit.alien.saucer"
+      ],
+      "researchDone": [
+        "research.alien.armor_plating",
+        "research.alien.fortifications",
+        "research.alien.fire_control",
+        "research.alien.sensors",
+        "research.alien.heavy_armor",
+        "research.alien.missiles",
+        "research.alien.heavy_ordnance",
+        "research.alien.field_repair",
+        "research.alien.aviation",
+        "research.alien.disc_flight"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "human",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    },
+    {
+      "player": 3,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 64.0,
+      "z": -70.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 68.0,
+      "z": -70.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.heavy_tank",
+      "x": 64.0,
+      "z": -66.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.artillery",
+      "x": 72.0,
+      "z": -62.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.artillery",
+      "x": 76.0,
+      "z": -62.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 56.0,
+      "z": -80.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 60.0,
+      "z": -80.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.light_tank",
+      "x": 56.0,
+      "z": -76.0,
+      "heading": 2.356
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.repair",
+      "x": 78,
+      "z": -72,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.ore_miner",
+      "x": 92,
+      "z": -84,
+      "heading": 0.0
+    },
+    {
+      "side": 1,
+      "unitType": "unit.alien.tug",
+      "x": 86,
+      "z": -92,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.alien.landing_pad",
+      "x": 82,
+      "z": -82
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.turret",
+      "x": 64,
+      "z": -80
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -40,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": -10,
+      "z": -10
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 20,
+      "z": 30
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 30,
+      "z": -40
+    },
+    {
+      "side": 3,
+      "structureType": "structure.alien.shard_spire",
+      "x": 60,
+      "z": -10
+    }
+  ],
+  "objectives": [
+    {
+      "id": "hold",
+      "text": "Hold the nest for 10 minutes",
+      "kind": "primary"
+    },
+    {
+      "id": "spires",
+      "text": "Shatter the spires near the nest",
+      "kind": "optional"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The crystals are quiet for now. Get ready."
+        }
+      ]
+    },
+    {
+      "id": "wake",
+      "when": {
+        "t": "time",
+        "tick": 2400
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Brood-mind",
+          "text": "The Shard is singing. The spires are turning on us!"
+        },
+        {
+          "t": "setRelation",
+          "a": 1,
+          "b": 3,
+          "relation": "hostile"
+        }
+      ]
+    },
+    {
+      "id": "t0",
+      "when": {
+        "t": "time",
+        "tick": 1800
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 2,
+          "x": -80,
+          "z": 80,
+          "tag": "t0"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -74,
+          "z": 86,
+          "tag": "t0"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "t0",
+          "mode": "attack",
+          "x": 82,
+          "z": -82
+        }
+      ]
+    },
+    {
+      "id": "t1",
+      "when": {
+        "t": "time",
+        "tick": 4000
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 3,
+          "x": -80,
+          "z": 80,
+          "tag": "t1"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -74,
+          "z": 86,
+          "tag": "t1"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "t1",
+          "mode": "attack",
+          "x": 82,
+          "z": -82
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "when": {
+        "t": "time",
+        "tick": 6200
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 4,
+          "x": -80,
+          "z": 80,
+          "tag": "t2"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 1,
+          "x": -74,
+          "z": 86,
+          "tag": "t2"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "t2",
+          "mode": "attack",
+          "x": 82,
+          "z": -82
+        }
+      ]
+    },
+    {
+      "id": "t3",
+      "when": {
+        "t": "time",
+        "tick": 8400
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 5,
+          "x": -80,
+          "z": 80,
+          "tag": "t3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 2,
+          "x": -74,
+          "z": 86,
+          "tag": "t3"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.missile_tank",
+          "count": 1,
+          "x": -86,
+          "z": 74,
+          "tag": "t3"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "t3",
+          "mode": "attack",
+          "x": 82,
+          "z": -82
+        }
+      ]
+    },
+    {
+      "id": "t4",
+      "when": {
+        "t": "time",
+        "tick": 10600
+      },
+      "do": [
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.light_tank",
+          "count": 6,
+          "x": -80,
+          "z": 80,
+          "tag": "t4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.heavy_tank",
+          "count": 2,
+          "x": -74,
+          "z": 86,
+          "tag": "t4"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.human.missile_tank",
+          "count": 1,
+          "x": -86,
+          "z": 74,
+          "tag": "t4"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "t4",
+          "mode": "attack",
+          "x": 82,
+          "z": -82
+        }
+      ]
+    },
+    {
+      "id": "spires",
+      "when": {
+        "t": "allDestroyed",
+        "side": 3,
+        "unitType": "structure.alien.shard_spire"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "spires",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "padLost",
+      "when": {
+        "t": "allDestroyed",
+        "side": 1,
+        "unitType": "structure.alien.landing_pad"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "failed"
+        },
+        {
+          "t": "lose",
+          "reason": "padLost"
+        }
+      ]
+    },
+    {
+      "id": "held",
+      "when": {
+        "t": "time",
+        "tick": 12000
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "placeholder": false,
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "relation": "hostile"
+    },
+    {
+      "a": 3,
+      "b": 2,
+      "relation": "hostile"
+    }
+  ]
+}
