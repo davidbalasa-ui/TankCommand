@@ -340,3 +340,48 @@ def halo():
     import aircraft2
     aircraft2.halo()
     return dict(name='KeshHalo', single=True)
+
+
+@asset('alien/dragonfly.glb', 'Kesh Dragonfly (aircraft, role not assigned)')
+def dragonfly():
+    Z = 1.15
+    # Thorax and head: a compact layered lens hull with caged gold eyes at the nose.
+    fn = lensfn(-1.1, 2.3, 0.78, Z + 0.72, Z - 0.5, Z + 0.05, nose=0.75)
+    K.layered_hull(fn, sides=False, rear=True)
+    for s in (1, -1):
+        K.core((1.75, s * 0.42, Z + 0.3), 0.26, ring=False)
+        # Twin lances under the chin.
+        tube((1.2, s * 0.26, Z - 0.3), (3.3, s * 0.26, Z - 0.3), [(0, 0.11), (0.15, 0.13), (0.2, 0.065), (0.92, 0.05), (0.94, 0.085), (1, 0.085)], 8, 'barrel')
+        cyl((3.29, s * 0.26, Z - 0.3), (3.31, s * 0.26, Z - 0.3), 0.06, 8, 'glow')
+    K.core((0.2, 0, Z + 0.78), 0.24)
+    # Long segmented tail, tapering and lifting towards the tip.
+    n = 7
+    x, r = -0.8, 0.5
+    for k in range(n):
+        ln = 0.82 - k * 0.03
+        r1 = r * 0.86
+        z0 = Z + 0.05 + 0.035 * k * k * 0.5
+        z1 = Z + 0.05 + 0.035 * (k + 1) * (k + 1) * 0.5
+        tube((x, 0, z0), (x - ln, 0, z1), [(0, r * 0.72), (0.18, r), (0.7, r * 0.92), (1, r1 * 0.7)], 10,
+             'shell' if k % 2 == 0 else 'bronze')
+        K.ring((x - ln, 0, z1), r1 * 0.78, 0.035, 'glow', sides=10, tilt=(0, 90))
+        if k in (1, 3):
+            K.fin((x - ln * 0.5, 0, (z0 + z1) / 2 + r * 0.7), 0.62 - k * 0.06, 200, 75, 0.26, 0.05)
+        x, r = x - ln, r1
+    zt = Z + 0.05 + 0.035 * n * n * 0.5
+    for s in (1, -1):   # tail claspers
+        b = K.blade((x - 0.05, s * 0.75, zt), 0.75, s * -80, s * -190, 0.3, 0.06)
+    # Four long blade wings in two pairs, swept and raised at the tips, each with a glowing vein.
+    for s in (1, -1):
+        for (x0, span, sweep_, rise, chord) in ((0.75, 4.4, -0.5, 0.75, 0.58), (-0.25, 3.7, -1.5, 0.45, 0.5)):
+            pts = [(x0, s * 0.35, Z + 0.5), (x0 + sweep_ * 0.25, s * (0.35 + span * 0.35), Z + 0.5 + rise * 0.2),
+                   (x0 + sweep_ * 0.6, s * (0.35 + span * 0.7), Z + 0.5 + rise * 0.55), (x0 + sweep_, s * (0.35 + span), Z + 0.5 + rise)]
+            sweep(pts, [(chord * 0.45, 0.07), (chord, 0.06), (chord * 0.85, 0.045), (chord * 0.12, 0.02)], 'shell', sides=6, power=0.7)
+            spar = [(p[0] + chord * 0.55, p[1], p[2] + 0.03) for p in pts[:3]] + [(pts[3][0] + 0.05, pts[3][1], pts[3][2] + 0.02)]
+            sweep(spar, [(0.11, 0.07), (0.1, 0.06), (0.07, 0.05), (0.02, 0.02)], 'bronze', sides=6)
+            vein = [(p[0] - chord * 0.05, p[1], p[2] + 0.045) for p in pts[:3]]
+            sweep(vein, [(0.03, 0.02), (0.035, 0.02), (0.02, 0.015)], 'glow', sides=4)
+        # Wing root shoulder.
+        orb((0.3, s * 0.42, Z + 0.48), 0.3, 'bronze', seg=(10, 8), sq=(1.9, 0.8, 0.6))
+    K.lifters([(0.6, 0, Z - 0.5)], 0.3)
+    return dict(name='KeshDragonfly', single=True)
