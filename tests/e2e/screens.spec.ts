@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { enterGame, toggleLeftHandedViaSettings, winSkirmish } from './helpers';
+import { enterGame, openBuildMenu, toggleLeftHandedViaSettings, winSkirmish } from './helpers';
 
 const PHONE_ONLY = 'screens are captured on the phone project only';
 
@@ -145,7 +145,7 @@ test('[screens] wp04-1-start-of-match', async ({ page }, testInfo) => {
 test('[screens] wp04-2-build-menu-open', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   await enterGame(page);
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  await openBuildMenu(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false))
     .toBe(true);
@@ -156,7 +156,7 @@ test('[screens] wp04-2-build-menu-open', async ({ page }, testInfo) => {
 test('[screens] wp04-3-queue-in-progress', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
   await enterGame(page);
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  await openBuildMenu(page);
   // The build menu is opened with the units section already populated; tapping
   // the scout orders one through the normal drop path, so the queue bar shows
   // whatever progress the sim has reached for this item.

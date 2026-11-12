@@ -97,3 +97,11 @@
 | 2026-11-11 | AI desperation (spend ore on scouts) | Triggers when no metal is reachable: no own station on a non-empty deposit and no free deposit left. | Deposits held by an enemy station used to count as "metal left", so a side with ore but no metal never fought again. | Claude (C-03) |
 | 2026-11-11 | Reviewer findings on C-02/C-03 | AI now judges free metal deposits only from stations it can see or remembers (perception API), and a station kit with nowhere to go no longer blocks other purchases; goal markers skip triggers that lose or fail an objective; marker and contact meshes are disposed; AI-10 now starts from reachable research and checks the strike target and interception. Hover tanks stay behind Aviation (intended). | Independent review of 098c4ca and 776949f. | Claude |
 | 2026-11-11 | Skirmish opponent count in the redesigned setup screen | 1 or 2 AI (was 1 to 3). Old saved configs with 3 are trimmed to 2. | David's unit cap is 64 per side with at most two AI sides, and the approved v1 mockup shows "1 AI / 2 AI". Eight 44 px option rows also do not fit a 412 px phone screen. | Claude (UI v1) |
+
+## 2026-11-12 Context-only HUD
+
+David: buttons that can't be used right now should not be on screen; Build should appear only when the landing pad is tapped, Mine only with a miner. The permanent BUILD and Base dock buttons are gone. Tapping your landing pad opens Build; tapping any other of your structures opens Base (Build also links to Base). A small drop chip (same control id `inGame.buildMenu`) appears only while drops are due or a kit waits to be placed. Empty group tiles appear only while Set group is armed, the alerts bell only once an alert exists, and Deploy is a command shown only when a deployable unit is selected.
+
+## 2026-11-12 Landscape lock
+
+David asked to lock the phone sideways. Browser: on a touch phone a match requests full screen plus `screen.orientation.lock('landscape')` (only allowed in full screen); the in-game "turn sideways" overlay keeps a manual button. Android app: set `android:screenOrientation="sensorLandscape"` on the main activity when the Capacitor Android project is created.

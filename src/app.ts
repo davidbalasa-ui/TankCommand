@@ -1701,6 +1701,7 @@ export class App {
           onAssignOrder: (stationId) => this.assignAt(stationId),
           onHaulOrder: (depositId) => this.haulAt(depositId),
           onAttackStructure: (structureId) => this.attackStructure(structureId),
+          onOwnStructureTap: (structure) => this.hud?.openForStructure?.(structure) ?? false,
           isPlacementActive: () => this.placementState !== null,
           previewPlacement: (x, z) => {
             this.previewPlacement(x, z);

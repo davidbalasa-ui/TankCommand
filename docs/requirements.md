@@ -84,7 +84,7 @@
 | TCH-04 | No page scroll, browser zoom, text selection or context menu during any gesture. |
 | MM-01 | Minimap shows terrain, own and visible enemy units, and the camera footprint, and updates as the camera moves. |
 | MM-02 | Tapping/clicking or dragging the minimap moves the camera target to that map point; right click orders a move. |
-| HUD-01 | Command bar buttons (attack-move, hold, stop, queue, groups) work by touch and are hidden and disabled with no selection; the grid shows only commands the selection can use (UI redesign v1). |
+| HUD-01 | Command bar buttons (attack-move, hold, stop, queue, groups) work by touch and are hidden and disabled with no selection; the grid shows only commands the selection can use (UI redesign v1). Nothing unusable is on screen: Build opens by tapping your landing pad, Base by tapping another of your structures (or from Build); the drop chip shows only while drops are due or kits wait; empty group tiles show only while Set group is armed; the alerts bell shows only once there are alerts; Deploy shows only for a deployable selection. |
 | HUD-02 | On phone, tablet and desktop, no two HUD elements overlap, touch targets are ≥ 44×44 px and text is ≥ 12 px (measured from bounding boxes in e2e). |
 | HUD-03 | Left-handed layout (set in Settings) mirrors minimap, groups, command grid and dock, and persists across reload. |
 | HUD-04 | Selection panel shows selected units and narrows selection on tap. |

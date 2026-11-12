@@ -558,6 +558,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       canvas.className = 'game-canvas';
       root.append(canvas);
 
+      // On a phone, a match goes full screen and locks sideways by itself. The
+      // tap on Start/Continue still counts as the user gesture browsers require.
+      // (The Play Store build locks landscape in the Android manifest instead.)
+      if (window.matchMedia?.('(pointer: coarse)').matches && !navigator.webdriver) {
+        void lockLandscape();
+      }
+
       // Shown only on an upright phone (CSS): the match is played sideways.
       const rotate = document.createElement('div');
       rotate.className = 'rotate-hint';
@@ -834,12 +841,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           'Attack: move, but fight anything met on the way.',
           'Hold: stay put and fire at anything in range.',
           'Waypoints: queue several moves in a row.',
-          'Group tiles: long-press to save the selection, tap to pick it, double-tap to look at it.',
+          'Buttons only appear when the selection can use them.',
+          'Set group saves the selection to a tile; tap a tile to pick it, double-tap to look at it.',
         ]],
         ['build', 'Base', [
-          'Build orders units and structure kits by orbital drop onto a landing pad.',
+          'Tap your landing pad to open Build: units and structure kits arrive by orbital drop.',
           'Miners bring pink ore to the pad; stations dig metal that haulers carry home.',
-          'Base runs research and upgrades, and packs up, dismantles or redeploys structures.',
+          'Tap any other building of yours to open Base: research, upgrades, pack up or dismantle.',
         ]],
       ];
       const grid = document.createElement('div');

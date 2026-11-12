@@ -158,6 +158,8 @@ export interface HudHandle {
   snapshot(): HudSnapshot;
   /** Re-read the current selection and update the disabled state of the command bar. */
   refresh(): void;
+  /** The player tapped one of their structures: pad opens Build, others open Base. */
+  openForStructure?(structure: { id: number; owner: number; kind: string }): boolean;
   dispose(): void;
 }
 

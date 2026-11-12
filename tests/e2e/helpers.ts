@@ -602,3 +602,57 @@ export async function toggleLeftHandedViaSettings(page: Page): Promise<void> {
   await click('pause.resume');
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
 }
+
+/**
+ * Opens the Build drawer the way a player does: tap (or click) your own landing
+ * pad on the battlefield. Picks a point on the pad that no unit stands on and the
+ * HUD does not cover, then puts the camera back where it was.
+ */
+export async function openBuildMenu(page: Page): Promise<void> {
+  const point = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return null;
+    }
+    const pad = hook.structures().find((item) => item.owner === 1 && item.kind === 'pad' && item.hp > 0);
+    if (!pad) {
+      return null;
+    }
+    const before = hook.camera();
+    hook.setCamera({ targetX: pad.x, targetZ: pad.z, distance: 40, yaw: 0 });
+    const units = hook.units();
+    const offsets = [0, 1.5, -1.5, 3, -3];
+    for (const dx of offsets) {
+      for (const dz of offsets) {
+        const wx = pad.x + dx;
+        const wz = pad.z + dz;
+        if (units.some((unit) => Math.hypot(unit.x - wx, unit.z - wz) < 4)) {
+          continue;
+        }
+        const screen = hook.worldToScreen(wx, wz);
+        if (!screen) {
+          continue;
+        }
+        const hit = document.elementFromPoint(screen.x, screen.y);
+        if (hit instanceof HTMLCanvasElement && hit.classList.contains('game-canvas')) {
+          return { x: screen.x, y: screen.y, before };
+        }
+      }
+    }
+    return null;
+  });
+  expect(point).not.toBeNull();
+  if (!point) {
+    return;
+  }
+  const touch = await page.evaluate(() => navigator.maxTouchPoints > 0);
+  if (touch) {
+    await page.touchscreen.tap(point.x, point.y);
+  } else {
+    await page.mouse.click(point.x, point.y);
+  }
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false))
+    .toBe(true);
+  await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera), point.before);
+}

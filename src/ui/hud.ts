@@ -264,9 +264,9 @@ export class Hud implements HudHandle {
   private readonly mineButton: HTMLButtonElement;
   private readonly assignButton: HTMLButtonElement;
   private readonly salvageButton: HTMLButtonElement;
+  private readonly deployButton: HTMLButtonElement;
   private readonly buildDrawer: BuildDrawer;
   private readonly basePanel: BasePanel;
-  private readonly baseButton: HTMLButtonElement;
   private baseOpen = false;
   private readonly placementBar: HTMLDivElement;
   private readonly confirmPlacement: HTMLButtonElement;
@@ -402,6 +402,9 @@ export class Hud implements HudHandle {
       ctx.salvageSelected?.();
       this.refresh();
     });
+    this.deployButton = commandButton('deploy', 'Deploy', 'deploy', () => {
+      this.issueDeploy();
+    });
     this.airButton = commandButton('air', 'Launch', 'air', () => {
       this.issueAir();
     });
@@ -421,26 +424,23 @@ export class Hud implements HudHandle {
       this.holdButton,
       this.queueButton,
       this.salvageButton,
+      this.deployButton,
       this.airButton,
       this.groupsButton,
     );
 
-    // Bottom-right dock: Base and the big Build button, always visible.
+    // Bottom-right dock: only while drops are on their way or a kit waits to be
+    // placed. Build itself opens by tapping your landing pad, Base by tapping
+    // any other of your structures (or from the Build drawer).
     const dock = el('div', 'hud-dock');
     dock.dataset.hudItem = 'dock';
-    this.baseButton = button('inGame', 'base', 'Base', () => {
-      this.setBase(!this.baseOpen);
-    });
-    this.baseButton.classList.add('hud-base-button');
-    this.baseButton.setAttribute('aria-label', 'Base');
-    this.baseButton.replaceChildren(icon('base'), el('span', 'hud-cmd-label', 'Base'));
-    this.buildButton = button('inGame', 'buildMenu', 'Build', () => {
+    this.buildButton = button('inGame', 'buildMenu', 'Drops', () => {
       this.setBuildMenu(!this.buildMenuOpen);
     });
     this.buildButton.classList.add('hud-build-button');
-    this.buildButton.setAttribute('aria-label', 'Build');
-    this.buildButton.replaceChildren(icon('build'), 'BUILD');
-    dock.append(this.baseButton, this.buildButton);
+    this.buildButton.setAttribute('aria-label', 'Drops');
+    this.buildButton.hidden = true;
+    dock.append(this.buildButton);
 
     // Bottom-centre: selection panel (portraits, or one unit's details).
     this.selectionPanel = el('div', 'hud-selection panel');
@@ -626,9 +626,10 @@ export class Hud implements HudHandle {
     show(this.mineButton, actions.canMine);
     show(this.assignButton, actions.canAssign);
     show(this.salvageButton, actions.canSalvage);
+    show(this.deployButton, hasSelection && this.deployableSelected(selection).length > 0);
     this.refreshAir(selection);
     this.refreshMission();
-    this.buildButton.disabled = false;
+    this.refreshDock();
     this.queueButton.classList.toggle('active', this.ctx.isQueueMode());
     this.attackButton.classList.toggle('active', this.ctx.isAttackMoveArmed());
     if (!hasSelection) {
@@ -685,6 +686,8 @@ export class Hud implements HudHandle {
     this.alertBadge.hidden = unread === 0;
     this.alertBadge.textContent = unread > 9 ? '9+' : String(unread);
     this.alertButton.classList.toggle('has-unread', unread > 0);
+    // No alerts yet: nothing to jump to, so no bell.
+    this.alertButton.hidden = alerts.length === 0;
   }
 
   /** Bell: jump the camera to the newest alert and mark everything read. */
@@ -713,6 +716,8 @@ export class Hud implements HudHandle {
         members.every((id, index) => id === selected[index]);
       element.classList.toggle('selected', same);
       element.classList.toggle('empty', members.length === 0);
+      // Empty tiles appear only while "Set group" is armed, to pick where to save.
+      element.hidden = members.length === 0 && !this.groupsOpen;
       const caption = element.querySelector('.group-caption');
       if (caption) {
         const text = members.length === 0 ? 'empty' : this.groupCaption(world, members);
@@ -734,6 +739,70 @@ export class Hud implements HudHandle {
     const only = roles.size === 1 ? [...roles][0] : undefined;
     const words = (only ? ROLE_PLURAL[only] : undefined) ?? ['unit', 'units'];
     return `${n} ${n === 1 ? words[0] : words[1]}`;
+  }
+
+  /** Selected units that can unfold into a structure right now. */
+  private deployableSelected(selection: readonly number[]): number[] {
+    // Cheap check first: the full base view is only built when a selected unit
+    // is of a type that unfolds into a structure.
+    const world = this.ctx.getWorld();
+    const candidate = selection.some((id) => {
+      const unit = world.units.find((item) => item.id === id);
+      return unit ? Boolean(world.unitTypes.get(unit.typeId)?.deploysTo) : false;
+    });
+    if (!candidate) {
+      return [];
+    }
+    const units = this.baseView().units;
+    return selection.filter((id) => units.some((unit) => unit.id === id && unit.canDeploy));
+  }
+
+  private issueDeploy(): void {
+    for (const unitId of this.deployableSelected(this.ctx.getSelection())) {
+      this.ctx.baseAction?.({ kind: 'deploy', unitId });
+    }
+    this.refresh();
+  }
+
+  /** Tap on one of your structures: the landing pad opens Build, anything else opens Base. */
+  openForStructure(structure: { id: number; owner: number; kind: string }): boolean {
+    if (structure.owner !== 1) {
+      return false;
+    }
+    this.ctx.setSelection([]);
+    if (structure.kind === 'pad') {
+      this.ctx.setSelectedPad?.(structure.id);
+      this.setBuildMenu(true);
+    } else {
+      this.setBase(true);
+    }
+    return true;
+  }
+
+  /** The drop chip shows only while something is coming down or waiting to be placed. */
+  private refreshDock(): void {
+    const queue = this.ctx.getDropQueue?.() ?? [];
+    const kits = this.ctx.getKits?.() ?? [];
+    let text = '';
+    let label = '';
+    const firstKit = kits[0];
+    const firstOrder = queue[0];
+    if (firstKit) {
+      text = kits.length > 1 ? `Place ${kits.length} kits` : `Place ${firstKit.name}`;
+      label = text;
+    } else if (firstOrder) {
+      const eta = formatClock(Math.ceil(firstOrder.remainingSec));
+      text = `${queue.length} drop${queue.length === 1 ? '' : 's'} · ${eta}`;
+      label = `Drops: ${queue.length}`;
+    }
+    const visible = text !== '';
+    this.buildButton.hidden = !visible;
+    this.buildButton.disabled = !visible;
+    if (visible && this.buildButton.dataset.text !== text) {
+      this.buildButton.dataset.text = text;
+      this.buildButton.replaceChildren(icon(firstKit ? 'build' : 'clock'), el('span', '', text));
+      this.buildButton.setAttribute('aria-label', label);
+    }
   }
 
   private setBase(open: boolean): void {

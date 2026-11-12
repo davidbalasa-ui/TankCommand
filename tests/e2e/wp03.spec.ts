@@ -771,6 +771,10 @@ test('[MM-02] minimap tap/drag jumps the camera; right-click orders a move', asy
 
 test('[HUD-01] command bar buttons disable with no selection and activate by tap', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'desktop', 'touch-only command bar test');
+  // Under software rendering this test takes ~29 s on the tablet profile, right
+  // at the default 30 s limit, so it gets a longer budget (same before and after
+  // the context-only HUD change).
+  test.setTimeout(60_000);
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.setSelection([]));
   await expect

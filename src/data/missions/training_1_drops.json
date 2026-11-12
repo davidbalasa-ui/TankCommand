@@ -3,7 +3,7 @@
   "campaign": "training",
   "order": 1,
   "title": "Drops and Movement",
-  "briefing": "Commander, welcome to the field. Orders arrive by drop pod. Open Build, buy a Light Tank, then drive any tank to the marked area.",
+  "briefing": "Commander, welcome to the field. Orders arrive by drop pod. Tap your landing pad to open Build, buy a Light Tank, then drive any tank to the marked area.",
   "mapId": "map.wp02_skirmish",
   "sides": [
     {

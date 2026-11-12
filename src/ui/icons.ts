@@ -40,6 +40,7 @@ export const ICON_PATHS = {
   save: '<path d="M5 4 h11 l3 3 v13 H5 Z"/><path d="M8 4 v5 h7 V4 M8 20 v-6 h8 v6"/>',
   list: '<path d="M9 6 h11 M9 12 h11 M9 18 h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18 h2"/>',
+  deploy: '<path d="M3 21 h18"/><path d="M6 21 v-5 h12 v5"/><path d="M12 16 V4 M8 8 l4-4 4 4"/>',
   speed: '<path d="M4 6 L11 12 L4 18 Z"/><path d="M12 6 L19 12 L12 18 Z"/>',
 } as const;
 

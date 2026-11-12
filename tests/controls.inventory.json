@@ -17,6 +17,7 @@
   "inGame.baseClose",
   "inGame.buildClose",
   "inGame.buildMenu",
+  "inGame.deploy",
   "inGame.deselect",
   "inGame.groups",
   "inGame.hold",

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { enterGame, winSkirmish } from './helpers';
+import { enterGame, openBuildMenu, winSkirmish } from './helpers';
 
 const PHONE_ONLY = 'phone-only touch flow';
 
@@ -46,7 +46,7 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? -1))
     .toBe(500);
 
-  await page.locator('[data-control-id="inGame.buildMenu"]').tap();
+  await openBuildMenu(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false))
     .toBe(true);

@@ -57,6 +57,8 @@ export interface InputHost {
   onAssignOrder?: (stationId: number) => boolean;
   onHaulOrder?: (depositId: number) => boolean;
   onAttackStructure?: (structureId: number) => boolean;
+  /** Tap on one of the player's own structures: opens its panel (pad: Build). */
+  onOwnStructureTap?: (structure: StructureHit) => boolean;
   isPlacementActive?: () => boolean;
   previewPlacement?: (x: number, z: number) => void;
 }
@@ -776,6 +778,18 @@ export class InputController {
     return false;
   }
 
+  /** Own structure under the point: hand it to the HUD (pad opens Build, others open Base). */
+  private tryOwnStructure(ground: { x: number; z: number } | null): boolean {
+    if (!ground || !this.host.onOwnStructureTap) {
+      return false;
+    }
+    const structure = this.host.getStructureAt?.(ground.x, ground.z) ?? null;
+    if (!structure || structure.owner !== 1) {
+      return false;
+    }
+    return this.host.onOwnStructureTap(structure);
+  }
+
   private handleLeftClick(x: number, y: number, shift: boolean): void {
     this.lastGroundPick = this.host.renderView.pickGround(x, y);
     const unitId = this.host.renderView.pickUnit(x, y, true, false);
@@ -817,6 +831,9 @@ export class InputController {
       if (this.tryDepositOrStructure(ground)) {
         return;
       }
+      if (this.tryOwnStructure(ground)) {
+        return;
+      }
       this.host.setSelection([]);
     }
   }
@@ -854,6 +871,10 @@ export class InputController {
     }
 
     if (selection.length > 0 && this.tryDepositOrStructure(ground)) {
+      return;
+    }
+
+    if (this.tryOwnStructure(ground)) {
       return;
     }
 
