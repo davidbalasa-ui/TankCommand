@@ -21,10 +21,13 @@ import {
 import {
   PAD_CARGO_LIFT_SEC,
   PAD_DOCK_REACH,
+  PAD_DOCK_WAIT_COST,
   PAD_QUEUE_JOIN_DISTANCE,
   PAD_UNLOAD_SEC,
   padLayout,
   padLine,
+  type PadDock,
+  type PadLayout,
   padQueueSpot,
 } from './pad';
 import type { DepositState, SimUnitType, StructureState, UnitState, WorkerJob, WorldState } from './types';
@@ -48,9 +51,15 @@ function moveWorkerTo(
     stopMoving(unit, type);
     return true;
   }
+  // Re-plan only when the destination itself moved (e.g. a place in the pad's delivery line).
+  // A path to a blocked or walled-in goal ends short of it; planning again would end in the same
+  // place, so that path is kept rather than re-planned every tick.
   const last = unit.path[unit.path.length - 1];
-  if (last && Math.hypot(last.x - x, last.z - z) > Math.max(reach, world.map.cellSize * 1.5)) {
-    unit.path = []; // the destination moved (e.g. a place in the pad's delivery line)
+  const goal = unit.pathGoal;
+  const ownPath = !!last && !!goal && last.x === goal.endX && last.z === goal.endZ;
+  const planned = ownPath && goal ? goal : last;
+  if (planned && Math.hypot(planned.x - x, planned.z - z) > Math.max(reach, world.map.cellSize * 1.5)) {
+    unit.path = [];
   }
   if (unit.path.length === 0) {
     const path = computePath(world, unit, x, z);
@@ -58,6 +67,8 @@ function moveWorkerTo(
       return false;
     }
     unit.path = path;
+    const end = path[path.length - 1]!;
+    unit.pathGoal = { x, z, endX: end.x, endZ: end.z };
   }
   followPath(world, unit, type, { x, z });
   return Math.hypot(unit.x - x, unit.z - z) <= reach;
@@ -85,6 +96,7 @@ function ownPadById(world: WorldState, owner: number, id: number | null | undefi
 
 function leaveLine(job: WorkerJob): void {
   job.dockPadId = null;
+  job.dockSide = undefined;
   job.queuedAt = undefined;
   job.unloadLeft = undefined;
 }
@@ -120,10 +132,11 @@ function deliverAtPad(
     if (job.unloadLeft > 0) {
       return false;
     }
+    const lift = layout.docks[job.dockSide ?? 0] ?? layout.docks[0]!;
     world.dropBeams.push({
       owner: unit.owner,
-      x: layout.liftX,
-      z: layout.liftZ,
+      x: lift.liftX,
+      z: lift.liftZ,
       ttl: PAD_CARGO_LIFT_SEC,
       total: PAD_CARGO_LIFT_SEC,
       kind: cargo,
@@ -133,27 +146,68 @@ function deliverAtPad(
   }
 
   if (job.queuedAt === undefined) {
-    if (Math.hypot(unit.x - layout.dockX, unit.z - layout.dockZ) > PAD_QUEUE_JOIN_DISTANCE) {
-      moveWorkerTo(world, unit, type, layout.dockX, layout.dockZ, PAD_DOCK_REACH);
+    // Head for the nearest open dock; on joining, settle on the one with the shortest wait.
+    const near = nearestDock(layout, unit.x, unit.z);
+    if (Math.hypot(unit.x - near.x, unit.z - near.z) > PAD_QUEUE_JOIN_DISTANCE) {
+      moveWorkerTo(world, unit, type, near.x, near.z, PAD_DOCK_REACH);
       return false;
     }
+    job.dockSide = pickDock(world, pad, layout, unit);
     job.queuedAt = world.tick;
   }
-  const line = padLine(world, pad).filter(
+  const side = job.dockSide ?? 0;
+  const dock = layout.docks[side] ?? layout.docks[0]!;
+  const line = padLine(world, pad, side).filter(
     (item) => item.job?.stage === 'unloading' || item.job?.queuedAt !== undefined,
   );
   const place = line.indexOf(unit);
   if (place <= 0) {
-    if (moveWorkerTo(world, unit, type, layout.dockX, layout.dockZ, PAD_DOCK_REACH)) {
+    if (moveWorkerTo(world, unit, type, dock.x, dock.z, PAD_DOCK_REACH)) {
       job.stage = 'unloading';
       job.unloadLeft = PAD_UNLOAD_SEC;
       stopMoving(unit, type);
     }
     return false;
   }
-  const spot = padQueueSpot(world, layout, place - 1);
+  const spot = padQueueSpot(world, layout, place - 1, side);
   moveWorkerTo(world, unit, type, spot.x, spot.z, PAD_DOCK_REACH);
   return false;
+}
+
+function nearestDock(layout: PadLayout, x: number, z: number): PadDock {
+  let best = layout.docks[0]!;
+  let bestDistance = Infinity;
+  for (const dock of layout.docks) {
+    const distance = Math.hypot(dock.x - x, dock.z - z);
+    if (dock.open && distance < bestDistance) {
+      best = dock;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/**
+ * The dock a worker joining the pad's lines should use: the nearest open one, unless another
+ * open dock has a shorter line by enough to make up the drive round. Ties go to the lower index.
+ */
+function pickDock(world: WorldState, pad: StructureState, layout: PadLayout, unit: UnitState): number {
+  let best = 0;
+  let bestScore = Infinity;
+  layout.docks.forEach((dock, index) => {
+    if (!dock.open) {
+      return;
+    }
+    const waiting = padLine(world, pad, index).filter(
+      (item) => item !== unit && (item.job?.stage === 'unloading' || item.job?.queuedAt !== undefined),
+    ).length;
+    const score = Math.hypot(dock.x - unit.x, dock.z - unit.z) + waiting * PAD_DOCK_WAIT_COST;
+    if (score < bestScore - 1e-9) {
+      best = index;
+      bestScore = score;
+    }
+  });
+  return best;
 }
 
 export function updateWorkers(world: WorldState): void {

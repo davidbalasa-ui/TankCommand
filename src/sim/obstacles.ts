@@ -1,6 +1,6 @@
 // Solid things on the ground that units steer around: buildings, and for fighting units the
-// ore and metal sites too (workers drive in to mine them). Landing pads are not solid: units land
-// on them and drive off.
+// ore and metal sites too (workers drive in to mine them). Landing pads are solid except for the
+// landing circle and the exit lane, where deliveries come down and drive off (see padShapes).
 //
 // Terrain blocking lives in map.ts. This adds the obstacles on top as a per-tick view of the map
 // (`MapDef.obstacles`), so pathfinding, steering and the step check all see them without the
@@ -8,6 +8,7 @@
 // sites), so a unit's centre staying outside a shape keeps its hull clear. Deterministic: built from world state
 // in world order, cached for the current tick only.
 import { isBlockedAt, mapFor, type MapDef, type MapObstacles, type MovementClass, type ObstacleShape } from './map';
+import { padShapes } from './pad';
 import { UNIT_RADIUS } from './tuning';
 import type { UnitState, WorldState } from './types';
 
@@ -36,7 +37,14 @@ function buildShapes(world: WorldState, withDeposits: boolean): ObstacleShape[] 
       continue;
     }
     const type = world.structureTypes.get(structure.typeId);
-    if (!type || type.kind === 'pad') {
+    if (!type) {
+      continue;
+    }
+    if (type.kind === 'pad') {
+      const half = (Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize) / 2;
+      for (const rect of padShapes(structure, half, margin)) {
+        shapes.push({ ...rect, round: false });
+      }
       continue;
     }
     shapes.push({

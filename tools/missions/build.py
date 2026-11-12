@@ -8,7 +8,9 @@ src/data/missions/campaign.ts. Edit this file, not the generated JSON.
 Pacing (David, 2026-11-12): mission 1 is easy and short; every later mission adds at most one new
 idea and a little more enemy pressure. Speakers and briefings are original text.
 """
-import json, os, math
+import json
+import math
+import os
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 SEC = 20  # sim ticks per second
@@ -125,7 +127,7 @@ add_map('map.c_blind_ridge', 'Blind Ridge', 180, [RIDGE_START, (60, -50)], [
 ROAD_START = (-76, 72)
 RELAY = (72, -72)
 add_map('map.c_relay_road', 'Relay Road', 200, [ROAD_START, RELAY], [
-    ('ore', -86, 58, 500), ('ore', -62, 86, 500), ('ore', 84, -56, 400), ('metal', 58, -86, 250),
+    ('ore', -86, 58, 500), ('ore', -62, 86, 500), ('ore', 80, -60, 400), ('metal', 58, -86, 250),
 ], {
     'seed': 303, 'roughness': 0.7, 'centreRidge': False, 'symmetric': False,
     'ridges': [
@@ -1336,6 +1338,84 @@ def act3(f):
 
 act3('human')
 act3('alien')
+
+# ---------------------------------------------------------------- site spacing
+
+# Ore and metal sites stay 12-14 m clear of every landing pad's edge, so pad traffic (arrivals
+# driving off, haulers queueing at the three delivery spots) has room. Sites closer than that are
+# pushed straight out from the pad; a station built on a moved site moves with it.
+PAD_HALF = 6
+SITE_GAP_MIN = 12
+SITE_GAP_STEP = 1  # targets cycle 12, 13, 14 so sites don't all sit on one ring
+
+
+# Hand-picked spots where pushing straight out would land a site on a cliff or in water
+# (the generator can't see terrain; tests/unit/siteSpacing.test.ts checks every site).
+SITE_SPOTS = {
+    ('map.c_relay_road', -86, 58): (-78, 54),
+    ('map.c_relay_road', -62, 86): (-68, 90),
+}
+
+
+def pad_gap(px, pz, x, z):
+    return math.hypot(max(0.0, abs(x - px) - PAD_HALF), max(0.0, abs(z - pz) - PAD_HALF))
+
+
+def space_sites():
+    for m in MAPS:
+        # The pads the missions actually place (map starts are only camera spots in the campaign).
+        pads = []
+        users = [ms for ms in MISSIONS if ms['mapId'] == m['id']]
+        for ms in users:
+            for st in ms['structures']:
+                if st['structureType'].endswith('landing_pad') and (st['x'], st['z']) not in pads:
+                    pads.append((st['x'], st['z']))
+        if not pads:
+            continue
+        for i, dep in enumerate(m['deposits']):
+            x0, z0 = dep['x'], dep['z']
+            x, z = SITE_SPOTS.get((m['id'], x0, z0), (x0, z0))
+            for _ in range(4):
+                near = min(pads, key=lambda p: pad_gap(p[0], p[1], x, z))
+                if pad_gap(near[0], near[1], x, z) >= SITE_GAP_MIN - 1e-6:
+                    break
+                # +1.5 so rounding to even metres never lands inside the minimum. Even
+                # coordinates keep a station's footprint on the 2 m path grid, so haulers can
+                # park within reach of it.
+                target = SITE_GAP_MIN + SITE_GAP_STEP * (i % 3) + 1.5
+                dx, dz = x - near[0], z - near[1]
+                length = math.hypot(dx, dz)
+                if length < 1e-6:
+                    dx, dz, length = -near[0] or 1.0, -near[1], math.hypot(-near[0] or 1.0, -near[1])
+                base = math.atan2(dz, dx)
+                half = m['size'] / 2 - 6
+                # Straight out from the pad; if the map edge is in the way, swing round the pad.
+                for turn in [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6]:
+                    angle = base + turn * math.radians(15)
+                    ux, uz = math.cos(angle), math.sin(angle)
+                    lo, hi = 0.0, 80.0
+                    for _ in range(50):
+                        mid = (lo + hi) / 2
+                        if pad_gap(near[0], near[1], near[0] + ux * mid, near[1] + uz * mid) < target:
+                            lo = mid
+                        else:
+                            hi = mid
+                    x = 2 * round((near[0] + ux * hi) / 2)
+                    z = 2 * round((near[1] + uz * hi) / 2)
+                    if abs(x) <= half and abs(z) <= half:
+                        break
+                x = int(max(-half, min(half, x)))
+                z = int(max(-half, min(half, z)))
+            if (x, z) != (x0, z0):
+                dep['x'], dep['z'] = x, z
+                for ms in users:
+                    for st in ms['structures']:
+                        if (st['x'], st['z']) == (x0, z0):
+                            st['x'], st['z'] = x, z
+                print(f"  {m['id']}: {dep['kind']} ({x0},{z0}) -> ({x},{z})")
+
+
+space_sites()
 
 # ---------------------------------------------------------------- write
 

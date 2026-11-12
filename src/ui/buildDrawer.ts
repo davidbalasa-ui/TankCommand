@@ -13,6 +13,7 @@
  */
 import { button } from './controls';
 import { icon, resourceIcon } from './icons';
+import { guardOpeningTap } from './widgets';
 import type { BaseAction, BaseView, ResearchNodeView } from './basePanel';
 import type { BuildItemView, DropQueueView, KitView } from './router';
 
@@ -81,6 +82,7 @@ export class BuildDrawer {
     this.host = host;
     this.element = el('div', 'hud-build-panel hud-drawer');
     this.element.dataset.hudItem = 'buildPanel';
+    guardOpeningTap(this.element, () => this.open);
 
     const header = el('div', 'drawer-header');
     const title = el('h2', 'drawer-title', 'Orbital drop');

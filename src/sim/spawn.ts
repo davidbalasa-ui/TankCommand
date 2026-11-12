@@ -211,7 +211,8 @@ export function placementValidity(
   }
 
   // Keep every landing pad's working lanes clear: the exit and rally point where deliveries drive
-  // off, and the dock with the first few waiting spots where haulers queue to unload. A building
+  // off, and the main dock with the first few waiting spots where haulers queue to unload. The two
+  // spare docks may be built over; a building there just shuts that dock (see padLayout). A building
   // there would jam deliveries and the ore run.
   for (const pad of world.structures) {
     if (pad.hp <= 0 || world.structureTypes.get(pad.typeId)?.kind !== 'pad') {

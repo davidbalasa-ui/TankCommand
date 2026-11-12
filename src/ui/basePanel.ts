@@ -1,5 +1,6 @@
 import { button } from './controls';
 import { icon } from './icons';
+import { guardOpeningTap } from './widgets';
 
 export interface ResearchNodeView {
   id: string;
@@ -116,6 +117,7 @@ export class BasePanel {
     this.content = document.createElement('div');
     this.content.className = 'build-content';
     this.element.append(header, this.content);
+    guardOpeningTap(this.element, () => this.open);
   }
 
   setOpen(open: boolean): void {

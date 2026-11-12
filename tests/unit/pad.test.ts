@@ -137,7 +137,7 @@ describe('[PAD] landing pad traffic', () => {
     expect(world.dropQueue).toHaveLength(1);
   });
 
-  it('[PAD-04] workers unload at the dock one at a time, in the order they arrive', () => {
+  it('[PAD-04] workers unload at the delivery spots, one at a time per spot, in the order they arrive', () => {
     // Two miners fill crates; three haulers carry them to the pad's dock.
     const units: StartUnit[] = [0, 1, 2, 3, 4].map((i) => ({
       owner: 1,
@@ -154,14 +154,22 @@ describe('[PAD] landing pad traffic', () => {
     ]);
     const layout = padLayout(world, myPad(world));
     let maxUnloading = 0;
+    const docksUsed = new Set<number>();
     const credits: number[] = [];
     let previous = world.resources.find((r) => r.player === 1)?.ore ?? 0;
     for (let i = 0; i < 90 * HZ; i += 1) {
       world = step(world, []);
       const unloading = world.units.filter((unit) => unit.job?.stage === 'unloading');
-      maxUnloading = Math.max(maxUnloading, unloading.length);
+      for (const side of [0, 1, 2]) {
+        const atSide = unloading.filter((unit) => (unit.job?.dockSide ?? 0) === side);
+        maxUnloading = Math.max(maxUnloading, atSide.length);
+      }
       for (const unit of unloading) {
-        expect(Math.hypot(unit.x - layout.dockX, unit.z - layout.dockZ)).toBeLessThanOrEqual(1.7);
+        const side = unit.job?.dockSide ?? 0;
+        docksUsed.add(side);
+        const dock = layout.docks[side]!;
+        expect(dock.open).toBe(true);
+        expect(Math.hypot(unit.x - dock.x, unit.z - dock.z)).toBeLessThanOrEqual(1.7);
       }
       const ore = world.resources.find((r) => r.player === 1)?.ore ?? previous;
       if (ore > previous) {
@@ -173,8 +181,52 @@ describe('[PAD] landing pad traffic', () => {
       }
     }
     expect(maxUnloading).toBe(1);
+    expect(docksUsed.size).toBeGreaterThanOrEqual(1);
     expect(credits.length).toBeGreaterThanOrEqual(6);
     // A cargo pod lifts off the dock for every load.
     expect(world.dropBeams.some((beam) => beam.kind === 'ore')).toBe(true);
+  });
+
+  it('[PAD-05] the pad has a delivery spot off every edge except the exit, and a worker takes a shorter line', () => {
+    const world = padWorld({});
+    const pad = myPad(world);
+    const layout = padLayout(world, pad);
+    expect(layout.docks).toHaveLength(3);
+    const exitDir = { x: Math.cos(layout.facing), z: Math.sin(layout.facing) };
+    for (const dock of layout.docks) {
+      expect(dock.open).toBe(true);
+      // Outside the pad, off the middle of an edge, and never on the exit edge.
+      expect(Math.max(Math.abs(dock.x - pad.x), Math.abs(dock.z - pad.z))).toBeGreaterThan(layout.half);
+      expect(dock.dirX * exitDir.x + dock.dirZ * exitDir.z).toBeLessThan(0.5);
+    }
+    const sides = new Set(layout.docks.map((dock) => `${dock.dirX},${dock.dirZ}`));
+    expect(sides.size).toBe(3);
+  });
+
+  it('[PAD-06] the pad deck is solid: units drive round it, and only the landing circle and exit lane are open', () => {
+    // A scout west of the pad ordered to a spot east of it, straight across the deck.
+    const pad0 = { x: -50, z: -50 };
+    let world = padWorld({ units: [{ owner: 1, typeId: 'unit.test.scout', x: pad0.x - 14, z: pad0.z }] });
+    const pad = myPad(world);
+    const layout = padLayout(world, pad);
+    const scout = world.units[0]!;
+    world = step(world, [
+      { kind: 'move', unitIds: [scout.id], x: pad.x + 14, z: pad.z + 2, queue: false, tick: 1, issuer: 1 },
+    ]);
+    const lane = 2;
+    for (let i = 0; i < 40 * HZ; i += 1) {
+      world = step(world, []);
+      const unit = world.units.find((item) => item.id === scout.id)!;
+      const u = (unit.x - pad.x) * Math.cos(layout.facing) + (unit.z - pad.z) * Math.sin(layout.facing);
+      const v = -(unit.x - pad.x) * Math.sin(layout.facing) + (unit.z - pad.z) * Math.cos(layout.facing);
+      const onDeck = Math.abs(u) < layout.half && Math.abs(v) < layout.half;
+      if (onDeck) {
+        // Only the landing circle and the lane out of it are drivable.
+        expect(Math.abs(v)).toBeLessThan(lane + 0.2);
+        expect(u).toBeGreaterThan(-lane - 0.2);
+      }
+    }
+    const unit = world.units.find((item) => item.id === scout.id)!;
+    expect(Math.hypot(unit.x - (pad.x + 14), unit.z - (pad.z + 2))).toBeLessThan(3);
   });
 });

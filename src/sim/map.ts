@@ -121,9 +121,25 @@ function inObstacle(obstacles: MapObstacles, x: number, z: number): boolean {
   return false;
 }
 
-// The same terrain seen by a unit of another movement class.
+// The same terrain seen by a unit of another movement class. Views are cached per map, so path
+// caches keyed on the view (component labels) survive across calls.
+const movementViews = new WeakMap<MapDef, Map<MovementClass, MapDef>>();
+
 export function mapFor(map: MapDef, movement: MovementClass): MapDef {
-  return (map.movement ?? 'tracked') === movement ? map : { ...map, movement };
+  if ((map.movement ?? 'tracked') === movement) {
+    return map;
+  }
+  let views = movementViews.get(map);
+  if (!views) {
+    views = new Map();
+    movementViews.set(map, views);
+  }
+  let view = views.get(movement);
+  if (!view) {
+    view = { ...map, movement };
+    views.set(movement, view);
+  }
+  return view;
 }
 
 function clamp(value: number, min: number, max: number): number {

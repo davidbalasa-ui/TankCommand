@@ -611,6 +611,7 @@ export async function toggleLeftHandedViaSettings(page: Page): Promise<void> {
  * HUD does not cover, then puts the camera back where it was.
  */
 export async function openBuildMenu(page: Page): Promise<void> {
+  const queuedBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0);
   const point = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
     if (!hook) {
@@ -656,5 +657,11 @@ export async function openBuildMenu(page: Page): Promise<void> {
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false))
     .toBe(true);
+  // The tap that opened the menu must not also buy the card that opened under the finger.
+  const frame = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0))
+    .toBeGreaterThanOrEqual(frame + 2);
+  expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBe(queuedBefore);
   await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera), point.before);
 }

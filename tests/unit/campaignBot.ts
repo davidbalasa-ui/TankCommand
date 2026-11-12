@@ -7,6 +7,7 @@ import { isFightingUnitType } from '../../src/sim/economy';
 import { isHostile } from '../../src/sim/diplomacy';
 import { hasFreeAirSlot } from '../../src/sim/air';
 import { isItemUnlocked, researchDone } from '../../src/sim/research';
+import { PAD_RALLY_DISTANCE, padLayout } from '../../src/sim/pad';
 import { placementValidity } from '../../src/sim/spawn';
 import { missionAllows, missionMarkers } from '../../src/sim/triggers';
 import type { Command } from '../../src/sim/commands';
@@ -34,6 +35,8 @@ export interface BotPlan {
   gatherTicks?: number;
   /** Army size to wait for before attacking an enemy that has a landing pad. */
   armySize?: number;
+  /** How far past the pad's exit edge the army gathers at home (default: the rally point). */
+  gatherOffEdge?: number;
 }
 
 export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
@@ -288,8 +291,10 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
       const m = markers[0]!;
       out.push({ kind: 'attackMove', unitIds: ids, x: m.x, z: m.z });
     } else if (!ready && pad) {
-      // An enemy that can rebuild is worth waiting for: gather a proper group by the pad first.
-      out.push({ kind: 'attackMove', unitIds: ids, x: pad.x + 6, z: pad.z + 6 });
+      // An enemy that can rebuild is worth waiting for: gather a proper group at the pad's rally
+      // point first (the deck itself is solid now).
+      const home = gatherSpot(w, pad, plan.gatherOffEdge);
+      out.push({ kind: 'attackMove', unitIds: ids, x: home.x, z: home.z });
     } else if (w.tick >= (plan.gatherTicks ?? 0)) {
       const c = centre(army);
       const near = (p: { x: number; z: number }): number => Math.hypot(p.x - c.x, p.z - c.z);
@@ -305,7 +310,8 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
       if (foe) {
         out.push({ kind: 'attack', unitIds: ids, targetId: foe.id });
       } else if (pad && Math.hypot(c.x - pad.x, c.z - pad.z) > 20) {
-        out.push({ kind: 'attackMove', unitIds: ids, x: pad.x + 6, z: pad.z + 6 });
+        const home = gatherSpot(w, pad, plan.gatherOffEdge);
+        out.push({ kind: 'attackMove', unitIds: ids, x: home.x, z: home.z });
       }
     }
   }
@@ -325,6 +331,18 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   }
 
   return out.map((c) => ({ ...c, issuer: me, tick: w.tick + 1 }) as Command);
+}
+
+/** Where the army gathers at home: just off the pad's exit edge (the deck itself is solid). */
+function gatherSpot(
+  w: WorldState,
+  pad: { x: number; z: number; id: number },
+  offEdge = PAD_RALLY_DISTANCE,
+): { x: number; z: number } {
+  const layout = padLayout(w, pad as Parameters<typeof padLayout>[1]);
+  const fx = Math.cos(layout.facing);
+  const fz = Math.sin(layout.facing);
+  return { x: pad.x + fx * (layout.half + offEdge), z: pad.z + fz * (layout.half + offEdge) };
 }
 
 /** Play the mission to the end (or the tick cap). */

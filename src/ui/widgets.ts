@@ -111,3 +111,31 @@ export function segmentRow<T extends string | number | boolean>(
   row.append(key, group);
   return row;
 }
+
+/**
+ * Tap fall-through guard for panels that open from a tap on the map. The tap that opens the panel
+ * ends with a click the browser can deliver to whatever button now sits under the finger. Only a
+ * click whose press began inside the panel while it was already open counts. Keyboard and
+ * scripted clicks (detail 0) have no press and always pass.
+ */
+export function guardOpeningTap(element: HTMLElement, isOpen: () => boolean): void {
+  let pressStartedInside = false;
+  element.addEventListener(
+    'pointerdown',
+    () => {
+      pressStartedInside = isOpen();
+    },
+    true,
+  );
+  element.addEventListener(
+    'click',
+    (event) => {
+      if (event.detail > 0 && !pressStartedInside) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      pressStartedInside = false;
+    },
+    true,
+  );
+}

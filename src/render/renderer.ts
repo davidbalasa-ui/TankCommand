@@ -15,7 +15,7 @@ import { damageState } from '../sim/structures';
 import { crateOre } from '../sim/economy';
 import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
-import type { DropOrder, SimStructureType, UnitState, WorldState } from '../sim/types';
+import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import {
   QUALITY_LADDER,
@@ -256,6 +256,43 @@ interface StructureVisual {
   core: { node: THREE.Object3D; baseY: number; spin: number; flare: number } | null;
 }
 
+/**
+ * A landing pad's deck, measured from its model: heights above the ground at the pad centre,
+ * sampled every DECK_STEP metres along the exit axis from `u0`. Past the deck the samples fall off
+ * no steeper than DECK_MAX_SLOPE, which is the ramp units drive down.
+ */
+interface PadDeck {
+  x: number;
+  z: number;
+  fx: number;
+  fz: number;
+  half: number;
+  u0: number;
+  ground: number;
+  heights: number[];
+}
+
+const DECK_STEP = 0.5;
+const DECK_MAX_SLOPE = 0.45; // rise per metre on the exit ramp
+
+function deckHeightAt(deck: PadDeck, x: number, z: number): number | null {
+  const dx = x - deck.x;
+  const dz = z - deck.z;
+  const u = dx * deck.fx + dz * deck.fz;
+  const v = -dx * deck.fz + dz * deck.fx;
+  if (Math.abs(v) > deck.half + 0.5) {
+    return null;
+  }
+  const index = (u - deck.u0) / DECK_STEP;
+  if (index < 0 || index > deck.heights.length - 1) {
+    return null;
+  }
+  const i = Math.floor(index);
+  const a = deck.heights[i] ?? 0;
+  const b = deck.heights[Math.min(deck.heights.length - 1, i + 1)] ?? 0;
+  return deck.ground + a + (b - a) * (index - i);
+}
+
 function structureHeight(kind: string): number {
   switch (kind) {
     case 'pad':
@@ -451,6 +488,8 @@ export class RenderView {
   private readonly workerLabels = new Map<number, HTMLDivElement>();
   private readonly unitRoots = new Map<number, UnitVisual>();
   private readonly structureVisuals = new Map<number, StructureVisual>();
+  /** Measured deck height along each pad's exit axis, so units sit on the deck and roll down. */
+  private readonly padDecks = new Map<number, PadDeck>();
   private landscape: Landscape | null = null;
   private terrainDetail: { value: THREE.Texture | null } = { value: null };
   private readonly beamPool: THREE.Mesh[] = [];
@@ -714,6 +753,73 @@ export class RenderView {
     return result;
   }
 
+  /** Ground height for a unit: the terrain, or a landing pad's deck and ramp where it stands on one. */
+  private unitGroundAt(x: number, z: number): number {
+    const ground = heightAt(this.world.map, x, z);
+    for (const deck of this.padDecks.values()) {
+      if (Math.abs(x - deck.x) > deck.half + 8 || Math.abs(z - deck.z) > deck.half + 8) {
+        continue;
+      }
+      const top = deckHeightAt(deck, x, z);
+      if (top !== null && top > ground) {
+        return top;
+      }
+    }
+    return ground;
+  }
+
+  /** Samples the pad model's deck along the exit axis with downward rays (once, when it loads). */
+  private measurePadDeck(world: WorldState, structure: StructureState, visual: StructureVisual, half: number): void {
+    const model = visual.model;
+    if (!model) {
+      return;
+    }
+    // Parents too: the pad's body was only just positioned this frame.
+    model.updateWorldMatrix(true, true);
+    const facing = padFacing(structure);
+    const fx = Math.round(Math.cos(facing));
+    const fz = Math.round(Math.sin(facing));
+    const ground = heightAt(world.map, structure.x, structure.z);
+    const ray = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+    const origin = new THREE.Vector3();
+    const u0 = -half;
+    const heights: number[] = [];
+    for (let u = u0; u <= half + 0.001; u += DECK_STEP) {
+      // Take the lowest of three rays across the lane, so a railing or light doesn't count as deck.
+      let top = Number.POSITIVE_INFINITY;
+      for (const v of [-1.2, 0, 1.2]) {
+        origin.set(structure.x + fx * u - fz * v, ground + 30, structure.z + fz * u + fx * v);
+        ray.set(origin, down);
+        const hit = ray.intersectObject(model, true)[0];
+        top = Math.min(top, hit ? hit.point.y - ground : 0);
+      }
+      heights.push(Math.max(0, Math.min(4, top)));
+    }
+    // Ramp: past the highest point toward the exit, never drop faster than the max slope, and
+    // carry on past the edge until it reaches the ground.
+    let peak = 0;
+    heights.forEach((height, index) => {
+      if (height >= (heights[peak] ?? 0)) {
+        peak = index;
+      }
+    });
+    for (let i = peak + 1; i < heights.length; i += 1) {
+      heights[i] = Math.max(heights[i] ?? 0, (heights[i - 1] ?? 0) - DECK_MAX_SLOPE * DECK_STEP);
+    }
+    while ((heights[heights.length - 1] ?? 0) > 0.01) {
+      heights.push(Math.max(0, (heights[heights.length - 1] ?? 0) - DECK_MAX_SLOPE * DECK_STEP));
+    }
+    this.padDecks.set(structure.id, { x: structure.x, z: structure.z, fx, fz, half, u0, ground, heights });
+  }
+
+  /** Deck height at a pad's centre, where deliveries touch down. */
+  private padDeckTop(world: WorldState, pad: StructureState): number {
+    const deck = this.padDecks.get(pad.id);
+    const top = deck ? deckHeightAt(deck, pad.x, pad.z) : null;
+    return top ?? heightAt(world.map, pad.x, pad.z) + structureHeight('pad') * 0.35;
+  }
+
   unitScreenCentre(id: number): { x: number; y: number } | null {
     const unit = this.world.units.find((item) => item.id === id);
     if (!unit) {
@@ -721,7 +827,7 @@ export class RenderView {
     }
     return this.projectPoint(
       unit.x,
-      heightAt(this.world.map, unit.x, unit.z) + UNIT_PICK_HEIGHT,
+      this.unitGroundAt(unit.x, unit.z) + UNIT_PICK_HEIGHT,
       unit.z,
     );
   }
@@ -786,7 +892,7 @@ export class RenderView {
     for (const unit of this.world.units) {
       const screen = this.projectPoint(
         unit.x,
-        heightAt(this.world.map, unit.x, unit.z) + UNIT_PICK_HEIGHT,
+        this.unitGroundAt(unit.x, unit.z) + UNIT_PICK_HEIGHT,
         unit.z,
       );
       if (!screen) {
@@ -1956,8 +2062,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           ? (airType?.cruiseHeight ?? 6)
           : 0;
       visual.lift += (wantLift - visual.lift) * 0.08;
-      const map = this.world.map;
-      const ground = heightAt(map, x, z);
+      const ground = this.unitGroundAt(x, z);
       // Sit the hull on the slope: pitch from the ground ahead and behind, roll from either side.
       let wantPitch = 0;
       let wantRoll = 0;
@@ -1965,11 +2070,11 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         const r = visual.reach;
         const fx = Math.cos(heading) * r;
         const fz = Math.sin(heading) * r;
-        const front = heightAt(map, x + fx, z + fz);
-        const back = heightAt(map, x - fx, z - fz);
+        const front = this.unitGroundAt(x + fx, z + fz);
+        const back = this.unitGroundAt(x - fx, z - fz);
         // Local +Z of the model is world (-sin h, cos h).
-        const side = heightAt(map, x - fz, z + fx);
-        const otherSide = heightAt(map, x + fz, z - fx);
+        const side = this.unitGroundAt(x - fz, z + fx);
+        const otherSide = this.unitGroundAt(x + fz, z - fx);
         wantPitch = Math.atan2(front - back, 2 * r);
         wantRoll = -Math.atan2(side - otherSide, 2 * r);
       }
@@ -2127,6 +2232,15 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         heightAt(world.map, structure.x, structure.z) + visual.height / 2,
         structure.z,
       );
+      if (
+        type.kind === 'pad' &&
+        visual.model &&
+        !this.padDecks.has(structure.id) &&
+        !this.structureBorn.has(structure.id) &&
+        !this.structureFolding.has(structure.id)
+      ) {
+        this.measurePadDeck(world, structure, visual, (Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize) / 2);
+      }
       const damage = damageState(structure.hp, type.hp);
       const shade = damage === 'ok' ? 1 : damage === 'light' ? 0.8 : damage === 'heavy' ? 0.55 : 0.35;
       const material = visual.mesh.material;
@@ -2165,6 +2279,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         this.disposeStructureVisual(visual);
         this.structureVisuals.delete(id);
         this.structureFolding.delete(id);
+        this.padDecks.delete(id);
       }
     }
     for (const id of this.deployingUnits.keys()) {
@@ -2364,7 +2479,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
       const t = Math.min(1, Math.max(0, (order.landingSec + alpha * tickSec) / PAD_LAND_SEC));
       const eased = 1 - (1 - t) ** 3; // fast from high up, settling gently onto the deck
-      const deck = heightAt(world.map, pad.x, pad.z) + structureHeight('pad') * 0.35;
+      const deck = this.padDeckTop(world, pad);
       visual.position.set(pad.x, deck + (1 - eased) * 42, pad.z);
       visual.rotation.y = -padFacing(pad);
       const flame = visual.getObjectByName('LandingFlame');
@@ -2401,10 +2516,11 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         this.cargoVisuals.set(key, mesh);
       }
       const layout = padLayout(world, pad);
+      const dock = layout.docks[job.dockSide ?? 0] ?? layout.docks[0]!;
       const left = Math.max(0, (job.unloadLeft ?? PAD_UNLOAD_SEC) - alpha * tickSec);
       const t = Math.min(1, Math.max(0, 1 - left / PAD_UNLOAD_SEC));
-      const x = unit.x + (layout.liftX - unit.x) * t;
-      const z = unit.z + (layout.liftZ - unit.z) * t;
+      const x = unit.x + (dock.liftX - unit.x) * t;
+      const z = unit.z + (dock.liftZ - unit.z) * t;
       const ground = heightAt(world.map, x, z);
       mesh.position.set(x, ground + 1.6 + Math.sin(t * Math.PI) * 1.8, z);
       mesh.rotation.y = -layout.facing;
@@ -2632,7 +2748,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
       ring.position.set(
         unit.x,
-        heightAt(this.world.map, unit.x, unit.z) + 0.06,
+        this.unitGroundAt(unit.x, unit.z) + 0.06,
         unit.z,
       );
     }

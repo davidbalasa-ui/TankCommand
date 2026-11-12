@@ -3,8 +3,11 @@
 // A pad has three working spots, all derived from its position so nothing extra has to be saved:
 //   - the landing circle at its centre, where deliveries come down one at a time;
 //   - the exit edge, facing the map centre: new arrivals drive off the pad that way to a rally point;
-//   - the dock edge, at right angles to the exit: miners and haulers unload there, one at a time,
-//     and the others wait in a line behind it.
+//   - three dock spots, one off the middle of every edge except the exit: haulers unload at the
+//     nearest free one, one at a time per dock, and the others wait in a line behind it.
+//
+// The pad deck is solid (see padShapes): units can only stand on the landing circle and the exit
+// lane, so nothing drives across the pad's raised deck.
 import { clampToMap } from './map';
 import { canStand } from './motion';
 import { UNIT_RADIUS } from './tuning';
@@ -18,6 +21,21 @@ export const PAD_CARGO_LIFT_SEC = 2.5; // placeholder until Stage 0: cargo lifts
 export const PAD_DOCK_REACH = 1.6; // placeholder until Stage 0
 export const PAD_QUEUE_SPACING = 5.5; // placeholder until Stage 0
 export const PAD_QUEUE_JOIN_DISTANCE = 30; // placeholder until Stage 0: workers queue once this close
+export const PAD_DOCK_WAIT_COST = 18; // placeholder until Stage 0: metres of extra drive one waiting worker is worth
+
+/** One unloading spot off a pad edge, with its waiting line extending outward. */
+export interface PadDock {
+  x: number;
+  z: number;
+  dirX: number; // outward from the pad; the waiting line extends this way
+  dirZ: number;
+  liftX: number; // where on the deck the cargo lifts off from this dock
+  liftZ: number;
+  open: boolean; // false when the dock spot is off the map or on blocked ground
+}
+
+/** Half-width of the exit lane (unit centres), so the landing circle and lane stay drivable. */
+export const PAD_LANE_HALF = 2;
 
 export interface PadLayout {
   half: number;
@@ -32,6 +50,7 @@ export interface PadLayout {
   liftZ: number;
   dockDirX: number; // outward along the dock side; the waiting line extends this way
   dockDirZ: number;
+  docks: PadDock[]; // [0] = the dock above (left of the exit), [1] = right of the exit, [2] = back
 }
 
 /** Exit faces the map centre, snapped to the nearest axis so the pad sits square on the grid. */
@@ -54,21 +73,38 @@ export function padLayout(world: WorldState, pad: StructureState): PadLayout {
   const facing = padFacing(pad);
   const fx = Math.round(Math.cos(facing));
   const fz = Math.round(Math.sin(facing));
-  // Dock side: the exit direction turned a quarter to the left (toward +heading).
-  const dx = -fz;
-  const dz = fx;
   const rally = clampToMap(
     world.map,
     pad.x + fx * (half + PAD_RALLY_DISTANCE),
     pad.z + fz * (half + PAD_RALLY_DISTANCE),
     UNIT_RADIUS,
   );
-  const dock = clampToMap(
-    world.map,
-    pad.x + dx * (half + UNIT_RADIUS + 0.4),
-    pad.z + dz * (half + UNIT_RADIUS + 0.4),
-    UNIT_RADIUS,
-  );
+  // Dock sides: left of the exit (a quarter turn toward +heading), right of it, and the back.
+  const sides: Array<[number, number]> = [
+    [-fz, fx],
+    [fz, -fx],
+    [-fx, -fz],
+  ];
+  const docks = sides.map(([dx, dz]): PadDock => {
+    const wantX = pad.x + dx * (half + UNIT_RADIUS + 0.4);
+    const wantZ = pad.z + dz * (half + UNIT_RADIUS + 0.4);
+    const spot = clampToMap(world.map, wantX, wantZ, UNIT_RADIUS);
+    const moved = Math.hypot(spot.x - wantX, spot.z - wantZ) > 0.5;
+    return {
+      x: spot.x,
+      z: spot.z,
+      dirX: dx,
+      dirZ: dz,
+      liftX: pad.x + dx * (half * 0.62),
+      liftZ: pad.z + dz * (half * 0.62),
+      open: !moved && canStand(world, spot.x, spot.z) && !underBuilding(world, spot.x, spot.z),
+    };
+  });
+  // Dock 0 is the fallback: treat it as open if every dock is shut, so a worker always has one.
+  if (!docks.some((dock) => dock.open)) {
+    docks[0]!.open = true;
+  }
+  const first = docks[0]!;
   return {
     half,
     facing,
@@ -76,28 +112,81 @@ export function padLayout(world: WorldState, pad: StructureState): PadLayout {
     exitZ: pad.z + fz * half,
     rallyX: rally.x,
     rallyZ: rally.z,
-    dockX: dock.x,
-    dockZ: dock.z,
-    liftX: pad.x + dx * (half * 0.62),
-    liftZ: pad.z + dz * (half * 0.62),
-    dockDirX: dx,
-    dockDirZ: dz,
+    dockX: first.x,
+    dockZ: first.z,
+    liftX: first.liftX,
+    liftZ: first.liftZ,
+    dockDirX: first.dirX,
+    dockDirZ: first.dirZ,
+    docks,
   };
 }
 
-/** Waiting spot `index` (0 = first in line) behind the dock. */
+/** True when a standing building (not a pad) covers this spot, hull included. */
+function underBuilding(world: WorldState, x: number, z: number): boolean {
+  for (const structure of world.structures) {
+    if (structure.hp <= 0) {
+      continue;
+    }
+    const type = world.structureTypes.get(structure.typeId);
+    if (!type || type.kind === 'pad') {
+      continue;
+    }
+    const hx = (type.footprint.cellsX * world.map.cellSize) / 2 + UNIT_RADIUS;
+    const hz = (type.footprint.cellsZ * world.map.cellSize) / 2 + UNIT_RADIUS;
+    if (Math.abs(structure.x - x) < hx && Math.abs(structure.z - z) < hz) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The solid parts of a pad, as obstacle rectangles already widened by `margin`: the whole square
+ * except the landing circle at the centre and the exit lane leading off it.
+ */
+export function padShapes(
+  pad: { x: number; z: number },
+  half: number,
+  margin: number,
+): Array<{ x: number; z: number; hx: number; hz: number }> {
+  const facing = padFacing(pad);
+  const fx = Math.round(Math.cos(facing));
+  const fz = Math.round(Math.sin(facing));
+  const outer = half + margin;
+  const lane = PAD_LANE_HALF;
+  // In the pad's frame: u along the exit, v across it.
+  const rects: Array<{ u0: number; u1: number; v0: number; v1: number }> = [
+    { u0: -outer, u1: -lane, v0: -outer, v1: outer }, // back block, behind the landing circle
+    { u0: -lane, u1: outer, v0: lane, v1: outer }, // side block, one side of the lane
+    { u0: -lane, u1: outer, v0: -outer, v1: -lane }, // side block, the other side
+  ];
+  return rects.map((rect) => {
+    const cu = (rect.u0 + rect.u1) / 2;
+    const cv = (rect.v0 + rect.v1) / 2;
+    const hu = (rect.u1 - rect.u0) / 2;
+    const hv = (rect.v1 - rect.v0) / 2;
+    // u axis = (fx, fz); v axis = (-fz, fx). Both are along world axes, so the box stays square.
+    const alongX = fx !== 0;
+    return {
+      x: pad.x + fx * cu - fz * cv,
+      z: pad.z + fz * cu + fx * cv,
+      hx: alongX ? hu : hv,
+      hz: alongX ? hv : hu,
+    };
+  });
+}
+
+/** Waiting spot `index` (0 = first in line) behind dock `dock` (default the first). */
 export function padQueueSpot(
   world: WorldState,
   layout: PadLayout,
   index: number,
+  dock = 0,
 ): { x: number; z: number } {
+  const spot = layout.docks[dock] ?? layout.docks[0]!;
   const distance = PAD_QUEUE_SPACING * (index + 1);
-  return clampToMap(
-    world.map,
-    layout.dockX + layout.dockDirX * distance,
-    layout.dockZ + layout.dockDirZ * distance,
-    UNIT_RADIUS,
-  );
+  return clampToMap(world.map, spot.x + spot.dirX * distance, spot.z + spot.dirZ * distance, UNIT_RADIUS);
 }
 
 /** True while a fresh arrival still sits on the pad, so the next delivery has to wait. */
@@ -131,15 +220,19 @@ export function updatePadClearing(world: WorldState, dt: number): void {
   }
 }
 
-/** Workers heading to `pad`, in the order they joined its line (oldest first). */
-export function padLine(world: WorldState, pad: StructureState): UnitState[] {
+/**
+ * Workers heading to `pad`, in the order they joined its line (oldest first). With `dock`, only
+ * the line at that dock (workers that have not picked a dock yet count as dock 0).
+ */
+export function padLine(world: WorldState, pad: StructureState, dock?: number): UnitState[] {
   return world.units
     .filter(
       (unit) =>
         unit.hp > 0 &&
         unit.job !== null &&
         unit.job.dockPadId === pad.id &&
-        (unit.job.stage === 'toPad' || unit.job.stage === 'unloading'),
+        (unit.job.stage === 'toPad' || unit.job.stage === 'unloading') &&
+        (dock === undefined || (unit.job.dockSide ?? 0) === dock),
     )
     .sort((a, b) => {
       const ua = a.job?.stage === 'unloading' ? 0 : 1;

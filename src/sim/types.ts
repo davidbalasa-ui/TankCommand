@@ -40,6 +40,7 @@ export interface WorkerJob {
   // Delivery line at a landing pad: which pad, when this worker joined its line (tick),
   // and the unload time left once it is at the dock.
   dockPadId?: number | null;
+  dockSide?: number; // which of the pad's three docks (index into PadLayout.docks)
   queuedAt?: number;
   unloadLeft?: number;
   // Haulers only: what they collect from ('station' = metal containers, 'deposit' = the ore
@@ -60,6 +61,9 @@ export interface UnitState {
   order: Order;
   stance: Stance;
   path: Point[];
+  // Workers: the spot the current path was planned for (its end may stop short of a blocked
+  // goal), and where that path ended, so a path set by anything else is never mistaken for it.
+  pathGoal?: { x: number; z: number; endX: number; endZ: number };
   reloadLeft: number;
   stuckTicks: number;
   speed: number;
