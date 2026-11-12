@@ -705,6 +705,454 @@
         "title": "Ground detail",
         "usedFor": "Terrain surface"
       }
+    },
+    {
+      "id": "unit.human.lancer.lod",
+      "kind": "model",
+      "path": "assets/models/human/lancer_lod.glb",
+      "bytes": 159968,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Lancer (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.outrider.lod",
+      "kind": "model",
+      "path": "assets/models/human/outrider_lod.glb",
+      "bytes": 154120,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Outrider (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.prospector.lod",
+      "kind": "model",
+      "path": "assets/models/human/prospector_lod.glb",
+      "bytes": 163768,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Prospector (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.hauler.lod",
+      "kind": "model",
+      "path": "assets/models/human/hauler_lod.glb",
+      "bytes": 159204,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Hauler (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.mender.lod",
+      "kind": "model",
+      "path": "assets/models/human/mender_lod.glb",
+      "bytes": 161276,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Mender (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.bastion_packed.lod",
+      "kind": "model",
+      "path": "assets/models/human/bastion_packed_lod.glb",
+      "bytes": 159928,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Bastion (packed) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.watchman.lod",
+      "kind": "model",
+      "path": "assets/models/human/watchman_lod.glb",
+      "bytes": 156272,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Watchman (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.skimmer.lod",
+      "kind": "model",
+      "path": "assets/models/human/skimmer_lod.glb",
+      "bytes": 144116,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Skimmer (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.falcon.lod",
+      "kind": "model",
+      "path": "assets/models/human/falcon_lod.glb",
+      "bytes": 142456,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Falcon (Hornet-Trident design) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.condor.lod",
+      "kind": "model",
+      "path": "assets/models/human/condor_lod.glb",
+      "bytes": 147024,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Condor (Hammerhead design) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.bulwark.lod",
+      "kind": "model",
+      "path": "assets/models/human/bulwark_lod.glb",
+      "bytes": 314228,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Bulwark (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.javelin.lod",
+      "kind": "model",
+      "path": "assets/models/human/javelin_lod.glb",
+      "bytes": 160604,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Javelin (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.longbow.lod",
+      "kind": "model",
+      "path": "assets/models/human/longbow_lod.glb",
+      "bytes": 303764,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Longbow (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.human.spire_packed.lod",
+      "kind": "model",
+      "path": "assets/models/human/spire_packed_lod.glb",
+      "bytes": 160728,
+      "faction": "human",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spire (packed) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.stinger.lod",
+      "kind": "model",
+      "path": "assets/models/alien/stinger_lod.glb",
+      "bytes": 107184,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Stinger (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.darter.lod",
+      "kind": "model",
+      "path": "assets/models/alien/darter_lod.glb",
+      "bytes": 98992,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Darter (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.gorger.lod",
+      "kind": "model",
+      "path": "assets/models/alien/gorger_lod.glb",
+      "bytes": 106672,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Gorger (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.ferrier.lod",
+      "kind": "model",
+      "path": "assets/models/alien/ferrier_lod.glb",
+      "bytes": 99732,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Ferrier (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.weaver.lod",
+      "kind": "model",
+      "path": "assets/models/alien/weaver_lod.glb",
+      "bytes": 103816,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Weaver (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.thornmound_packed.lod",
+      "kind": "model",
+      "path": "assets/models/alien/thornmound_packed_lod.glb",
+      "bytes": 111964,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Thornmound (packed) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.seer.lod",
+      "kind": "model",
+      "path": "assets/models/alien/seer_lod.glb",
+      "bytes": 102452,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Seer (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.glider.lod",
+      "kind": "model",
+      "path": "assets/models/alien/glider_lod.glb",
+      "bytes": 99756,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Glider (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.disc.lod",
+      "kind": "model",
+      "path": "assets/models/alien/disc_lod.glb",
+      "bytes": 99556,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Disc (competition winner, procedural textures) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.carapace.lod",
+      "kind": "model",
+      "path": "assets/models/alien/carapace_lod.glb",
+      "bytes": 199632,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Carapace (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.spitter.lod",
+      "kind": "model",
+      "path": "assets/models/alien/spitter_lod.glb",
+      "bytes": 106384,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spitter (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.mortar_beast.lod",
+      "kind": "model",
+      "path": "assets/models/alien/mortar_beast_lod.glb",
+      "bytes": 184604,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Mortar Beast (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.spore_tower_packed.lod",
+      "kind": "model",
+      "path": "assets/models/alien/spore_tower_packed_lod.glb",
+      "bytes": 113020,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Spore Tower (packed) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
+      "id": "unit.alien.halo.lod",
+      "kind": "model",
+      "path": "assets/models/alien/halo_lod.glb",
+      "bytes": 136004,
+      "faction": "alien",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Halo (ring blade fighter) (low detail)",
+        "usedFor": "Low-detail version for the low quality tier and far zoom"
+      },
+      "tags": [
+        "lod"
+      ]
     }
   ]
 }
