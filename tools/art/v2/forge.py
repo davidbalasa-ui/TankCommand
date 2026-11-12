@@ -1103,6 +1103,10 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
             made[g].location = tuple(-c for c in loc)
             pivots[g] = e
     bpy.context.view_layer.update()
+    for o in made.values():
+        for key in ('zone', 'group', 'uv'):
+            if key in o:
+                del o[key]
     # Unfold poses: the node transform is the finished (deployed) pose, extras.packed the folded one.
     anim = {}
     for g, ps in (poses or {}).items():
