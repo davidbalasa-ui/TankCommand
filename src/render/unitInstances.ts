@@ -53,8 +53,12 @@ export class UnitInstances {
     }
   }
 
-  /** Adds one unit (its world matrices must be current). `key` names its model and look. */
-  add(key: string, root: THREE.Object3D): void {
+  /**
+   * Adds one unit (its world matrices must be current). `key` names its model and look. `geometries`
+   * swaps in other geometry per instanced part, in traversal order (low-detail models share the
+   * full model's node layout, so the part matrices still fit); give it its own key.
+   */
+  add(key: string, root: THREE.Object3D, geometries?: readonly THREE.BufferGeometry[]): void {
     const parts = instancedParts(root);
     if (parts.length === 0) {
       return;
@@ -68,7 +72,7 @@ export class UnitInstances {
       this.batches.set(key, batch);
     }
     if (batch.count >= batch.capacity) {
-      this.grow(batch, parts, Math.max(MIN_CAPACITY, batch.capacity * 2));
+      this.grow(batch, parts, Math.max(MIN_CAPACITY, batch.capacity * 2), geometries);
     }
     const slot = batch.count;
     parts.forEach((part, index) => {
@@ -97,10 +101,15 @@ export class UnitInstances {
     this.batches.clear();
   }
 
-  private grow(batch: Batch, parts: THREE.Mesh[], capacity: number): void {
+  private grow(
+    batch: Batch,
+    parts: THREE.Mesh[],
+    capacity: number,
+    geometries?: readonly THREE.BufferGeometry[],
+  ): void {
     const old = batch.meshes;
     batch.meshes = parts.map((part, index) => {
-      const mesh = new THREE.InstancedMesh(part.geometry, part.material, capacity);
+      const mesh = new THREE.InstancedMesh(geometries?.[index] ?? part.geometry, part.material, capacity);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       // Instances spread over the whole map; per-instance culling is not worth it at this count.
       mesh.frustumCulled = false;

@@ -28,4 +28,8 @@ test('[PERF-01] 192 units on the map draw in well under one call per unit', asyn
   const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());
   expect(stats?.units ?? 0).toBeGreaterThanOrEqual(192);
   expect(stats?.drawCalls ?? Infinity).toBeLessThan(120);
+  // Zoomed out, units draw their low-detail models (about 2,500 triangles), keeping the whole
+  // scene near the old art's half a million triangles rather than ~1.7M with full detail.
+  expect(stats?.lodUnits ?? 0).toBeGreaterThanOrEqual(150);
+  expect(stats?.triangles ?? Infinity).toBeLessThan(1_000_000);
 });

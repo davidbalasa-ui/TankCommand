@@ -29,6 +29,10 @@ const TANK_ASSET_ID = 'unit.human.poc_tank';
 const TERRAIN_DETAIL_ID = 'texture.terrain.detail';
 /** How long a newly deployed structure takes to unfold. */
 const UNFOLD_MS = 1200;
+/** Units further than this from the camera draw their low-detail model (metres). */
+const LOD_DISTANCE = 60;
+/** From this quality level (shadows off) every unit draws its low-detail model. */
+const LOD_QUALITY_LEVEL = 2;
 /** How long a packed tower takes to fold out into its structure. */
 const TOWER_UNFOLD_MS = 1500;
 /** Metres covered by one repeat of the ground detail texture. */
@@ -78,6 +82,8 @@ export interface RenderStats {
   triangles: number;
   frame: number;
   units: number;
+  /** Units drawn with their low-detail model last frame. */
+  lodUnits?: number;
 }
 
 export interface ScreenBounds {
@@ -212,6 +218,8 @@ interface UnitVisual {
   reach: number;
   /** Instancing batch: model and look shared by every unit drawn in the same InstancedMesh. */
   batchKey: string;
+  /** Low-detail geometry per instanced part (same order), when the model has a _lod file. */
+  lod: THREE.BufferGeometry[] | null;
 }
 
 interface PositionSnapshot {
@@ -509,6 +517,9 @@ export class RenderView {
   private readonly structureFolding = new Map<number, { born: number; start: UnfoldStart }>();
   /** Where units that are packing up into a structure stand and face, for the fold-out to start from. */
   private readonly deployingUnits = new Map<number, { x: number; z: number; heading: number }>();
+  /** Low-detail geometry per unit model id, one per mesh in traversal order. */
+  private readonly lodGeometry = new Map<string, THREE.BufferGeometry[]>();
+  private lodUnits = 0;
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
@@ -1014,6 +1025,7 @@ export class RenderView {
       triangles: this.renderer.info.render.triangles,
       frame: this.frame,
       units: this.unitRoots.size,
+      lodUnits: this.lodUnits,
     };
   }
 
@@ -1566,10 +1578,31 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     }
     // Fetch and decode in parallel (about 40 small files), then register in a fixed order.
     const sorted = [...ids].sort();
-    const results = await Promise.allSettled(sorted.map((id) => this.loader.load(id)));
+    const lodIds = sorted.filter((id) => !id.startsWith('structure.') && this.registry.has(`${id}.lod`));
+    const [results, lodResults] = await Promise.all([
+      Promise.allSettled(sorted.map((id) => this.loader.load(id))),
+      Promise.allSettled(lodIds.map((id) => this.loader.load(`${id}.lod`))),
+    ]);
     if (this.disposed) {
       return;
     }
+    lodIds.forEach((id, index) => {
+      const result = lodResults[index];
+      if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
+        // Geometry only: the low-detail file's placeholder material is replaced by the full model's.
+        const geometries: THREE.BufferGeometry[] = [];
+        result.value.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            geometries.push(object.geometry as THREE.BufferGeometry);
+            const material: unknown = object.material;
+            if (material instanceof THREE.Material) {
+              material.dispose();
+            }
+          }
+        });
+        this.lodGeometry.set(id, geometries);
+      }
+    });
     let loaded = false;
     sorted.forEach((id, index) => {
       const result = results[index];
@@ -1830,6 +1863,20 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     });
     const enemy = isHostile(this.world, 1, unit.owner);
     markInstanced(root);
+    const modelId = this.world.unitTypes.get(unit.typeId)?.modelId;
+    let lod = template && modelId ? (this.lodGeometry.get(modelId) ?? null) : null;
+    if (lod) {
+      let meshes = 0;
+      root.traverse((object) => {
+        if (object instanceof THREE.Mesh && isInstancedPart(object)) {
+          meshes += 1;
+        }
+      });
+      // Only when the low-detail file has exactly the full model's meshes.
+      if (meshes !== lod.length) {
+        lod = null;
+      }
+    }
     this.scene.add(root);
     return {
       root,
@@ -1840,6 +1887,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       roll: 0,
       reach: Math.max(0.6, (this.world.unitTypes.get(unit.typeId)?.radius ?? 1.6) * 0.75),
       batchKey: `${template ? unit.typeId : 'fallback'}|${enemy ? 'enemy' : 'own'}`,
+      lod,
     };
   }
 
@@ -1852,6 +1900,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
     }
     this.unitInstances.begin();
+    const allLod = this.effectiveQualityLevel() >= LOD_QUALITY_LEVEL;
+    const eye = this.camera.position;
+    this.lodUnits = 0;
 
     for (const unit of this.world.units) {
       let visual = this.unitRoots.get(unit.id);
@@ -1907,7 +1958,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
       if (visual.root.visible) {
         visual.root.updateMatrixWorld(true);
-        this.unitInstances.add(visual.batchKey, visual.root);
+        const far = allLod || visual.root.position.distanceToSquared(eye) > LOD_DISTANCE * LOD_DISTANCE;
+        if (visual.lod && far) {
+          this.lodUnits += 1;
+          this.unitInstances.add(`${visual.batchKey}|lod`, visual.root, visual.lod);
+        } else {
+          this.unitInstances.add(visual.batchKey, visual.root);
+        }
       }
     }
     this.unitInstances.end(this.shadowsEnabled);

@@ -151,6 +151,7 @@ export interface RenderStats {
   frame: number;
   units: number;
   triangles: number;
+  lodUnits?: number;
 }
 
 export interface HudSnapshot {
