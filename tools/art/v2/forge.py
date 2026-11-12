@@ -636,6 +636,8 @@ ZONES = {
         'glow': dict(kind='glow', emit=GOLD, strength=2.0),
         'core': dict(kind='orb', emit=GOLD, strength=1.1),
         'violet': dict(kind='glow', emit=(0.35, 0.08, 1.0), strength=2.0),
+        'copper': dict(kind='etched', base=(0.3, 0.13, 0.06), base2=(0.16, 0.07, 0.035), rough=0.36, veins=0.25),
+        'wing': dict(kind='membrane', base=(0.8, 0.72, 0.5), emit=GOLD, strength=0.22),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
@@ -647,6 +649,8 @@ ZONES = {
         'frond': dict(kind='frond', base=(0.07, 0.04, 0.12), emit=(0.25, 0.9, 0.7), strength=2.2),
         'gem_pink': dict(kind='gem', base=(0.42, 0.015, 0.2), base2=(1.0, 0.42, 0.72), emit=(1.0, 0.08, 0.3), strength=0.4),
         'gem_opal': dict(kind='gem', base=(0.03, 0.1, 0.45), base2=(0.6, 0.85, 1.0), emit=(0.08, 0.3, 1.0), strength=0.4, opal=True),
+        'gem_shard': dict(kind='gem', base=(0.02, 0.008, 0.05), base2=(0.78, 0.62, 1.0), emit=(0.5, 0.16, 1.0), strength=0.7),
+        'obsidian': dict(kind='rock', base=(0.022, 0.02, 0.028), base2=(0.075, 0.065, 0.09), moss=0.0),
         'redrock': dict(kind='rock', base=(0.2, 0.07, 0.05), base2=(0.38, 0.16, 0.11), moss=0.0),
         'metalrock': dict(kind='rock', base=(0.12, 0.14, 0.18), base2=(0.3, 0.34, 0.4), moss=0.0, metal=0.6),
     },
@@ -766,6 +770,10 @@ def zone_mat(zone):
         n.out(col, n.m('ADD', z['rough'] - 0.06, n.m('ADD', n.m('MULTIPLY', fine, 0.14), n.m('MULTIPLY', eng, 0.25))),
               0.92, GOLD, n.m('MULTIPLY', vein, 1.7) if vein != 0.0 else 0.0)
         n.bump(n.m('SUBTRACT', n.m('MULTIPLY', fine, 0.05), eng), 0.6, 0.025)
+    elif kind == 'membrane':
+        b = z['base']
+        haze = n.smooth(n.noise(1.6, 3.0), 0.3, 0.8)
+        n.out(n.mix(haze, b, (b[0] * 0.75, b[1] * 0.7, b[2] * 0.55)), 0.18, 0.2, z['emit'], z['strength'])
     elif kind == 'ribs':
         # Dark bronze inner body with thin glowing seams across it.
         x = n.sep(n.co)[0]
@@ -921,7 +929,7 @@ def tri_count(obj):
 
 def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=None, label=None,
            ao_floor=0.35, views=None, report=None, crevice=None, supersample=2, edge_color=None,
-           poses=None, bake_offset=None, clip=None):
+           poses=None, bake_offset=None, clip=None, clear=None, clear_alpha=0.42):
     """pivot = (group_name, (x, y, z)) puts that group under an empty called TurretPivot.
     single = one mesh named `name` with no parent (props). gem = zone name kept as a second
     material called OreGem (deposits)."""
@@ -942,7 +950,7 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         me.materials.clear()
         me.materials.append(zone_mat(o['zone']))
         att = me.attributes.new('grp', 'INT', 'FACE')
-        gi = groups.index(o['group']) + (100 if gem and o['zone'] == gem else 0)
+        gi = groups.index(o['group']) + (100 if (gem and o['zone'] == gem) or (clear and o['zone'] == clear) else 0)
         att.data.foreach_set('value', [gi] * len(me.polygons))
         uk = me.attributes.new('uvk', 'FLOAT', 'FACE')
         uk.data.foreach_set('value', [float(o.get('uv', UV_PRIORITY.get(o['zone'], 1.0)))] * len(me.polygons))
@@ -1052,8 +1060,16 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
     me.materials.append(main)
     grp = np.zeros(len(me.polygons), dtype=np.int32)
     me.attributes['grp'].data.foreach_get('value', grp)
-    if gem:
-        me.materials.append(final_mat('OreGem'))
+    if gem or clear:
+        second = final_mat('OreGem' if gem else f'{name}Clear')
+        if clear:   # see-through membrane: same textures, blended
+            second.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = clear_alpha
+            for attr, val in (('surface_render_method', 'BLENDED'), ('blend_method', 'BLEND')):
+                try:
+                    setattr(second, attr, val)
+                except (AttributeError, TypeError):
+                    pass
+        me.materials.append(second)
         me.polygons.foreach_set('material_index', (grp >= 100).astype(np.int32))
     else:
         me.polygons.foreach_set('material_index', np.zeros(len(me.polygons), dtype=np.int32))

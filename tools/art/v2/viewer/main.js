@@ -66,8 +66,21 @@ camera.lookAt(0, 0, cz);
 
 let loaded = 0;
 const loader = new GLTFLoader();
+const lod = q.get('lod') === '1';
+const loadModel = (file, done, fail) => {
+  if (!lod) { loader.load(`./models/${file}`, done, undefined, fail); return; }
+  // Low-detail files carry no textures: borrow the material from the full model, as the game does.
+  loader.load(`./models/${file}`, (full) => {
+    let mat = null;
+    full.scene.traverse((o) => { if (o.isMesh && !mat) mat = o.material; });
+    loader.load(`./models/${file.replace('.glb', '_lod.glb')}`, (low) => {
+      low.scene.traverse((o) => { if (o.isMesh) o.material = mat; });
+      done(low);
+    }, undefined, fail);
+  }, undefined, fail);
+};
 files.forEach((file, i) => {
-  loader.load(`./models/${file}`, (gltf) => {
+  loadModel(file, (gltf) => {
     const root = gltf.scene;
     let box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
@@ -84,7 +97,7 @@ files.forEach((file, i) => {
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(holder);
     loaded += 1;
-  }, undefined, () => { loaded += 1; });
+  }, () => { loaded += 1; });
 });
 window.__ready = () => loaded === files.length;
 function loop() {
