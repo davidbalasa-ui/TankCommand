@@ -36,8 +36,9 @@ def register(key, faction, build, unit, structure):
                 o['uv'] = float(o.get('uv', F.UV_PRIORITY.get(o['zone'], 1.0))) * 0.5
         poses = {g: dict(packed=m) for g, m in info['packed'].items()}
         poses['Carrier'] = dict(deployed=HIDE)
+        pivot = info['pivot'] if 'pivot' in info else (0, 0, info['tz'])
         F.finish(structure[2], glb, render=render, report=report, label=structure[1], size=1024,
-                 pivot=('Turret', (0, 0, info['tz'])), poses=poses, bake_offset={'Carrier': (40.0, 0, 0)},
+                 pivot=('Turret', pivot) if pivot else None, poses=poses, bake_offset={'Carrier': (40.0, 0, 0)},
                  clip=render[:-4] + '_unfold.mp4', **crev)
 
     ASSETS[key + '_packed'] = dict(fn=run_unit, path=unit[0], set=faction)
@@ -165,3 +166,196 @@ register('thornmound', 'kesh', thornmound,
 register('spore_tower', 'kesh', spore_tower,
          ('alien/spore_tower_packed.glb', 'Kesh Spore Tower, packed for transport', 'SporeTowerPacked'),
          ('structures/kesh_spore_tower.glb', 'Kesh Spore Tower (missile battery)', 'KeshSporeTower'))
+
+
+# ------------------------------------------------------------------ packed buildings
+# Radar, metal station and airfield also travel folded on a carrier. They reuse the finished
+# building: its parts are sorted into a few rigid groups, and each group has a stowed pose.
+import contextlib
+
+
+def centre(o):
+    vs = o.data.vertices
+    n = max(len(vs), 1)
+    return (sum(v.co.x for v in vs) / n, sum(v.co.y for v in vs) / n, sum(v.co.z for v in vs) / n)
+
+
+@contextlib.contextmanager
+def tagged(mod, **names):
+    """While active, parts made by mod.<function> go into the given group."""
+    saved = {}
+    for fname, grp in names.items():
+        orig = getattr(mod, fname)
+        saved[fname] = orig
+
+        def wrap(*a, _o=orig, _g=grp, **k):
+            with F.group(_g):
+                return _o(*a, **k)
+        setattr(mod, fname, wrap)
+    try:
+        yield
+    finally:
+        for fname, orig in saved.items():
+            setattr(mod, fname, orig)
+
+
+def sort_rest(rule, rename=None):
+    """Give every part still in the 'Rest' group its real group, from where it sits."""
+    for o in F.ST['parts']:
+        if o['group'] == 'Rest':
+            o['group'] = rule(*centre(o))
+        elif rename and o['group'] in rename:
+            o['group'] = rename[o['group']]
+
+
+def stow(c, to, s, r=(0, 0, 0)):
+    """Pose that scales and turns a group about c and carries c to `to`."""
+    if isinstance(s, (int, float)):
+        s = (s, s, s)
+    return trs(t=(to[0] - c[0], to[1] - c[1], to[2] - c[2]), r=r, s=s, about=c)
+
+
+def terran_radar_tower():
+    deck = terran_carrier()
+    with tagged(TS, foundation='Base'), F.group('Rest'):
+        TS.terran_radar.build()
+    z, top = 0.34, 0.34 + 4.6
+    sort_rest(lambda x, y, zz: 'Mast' if zz > 1.3 else 'Base', rename={'Dish': 'Turret'})
+    tz = top + 0.16
+    return dict(tz=tz, packed={
+        'Base': trs(t=(-0.8, 0, deck), s=(0.68, 0.68, 0.55)),
+        # The lattice mast telescopes down over the equipment hut; the dish rides on top, facing aft.
+        'Mast': stow((0, 0, z + 0.1), (-0.8, 0, deck + 0.19), (0.62, 0.62, 0.2)),
+        'Turret': stow((0, 0, tz), (-0.8, 0, deck + 1.14), 0.55, r=(0, 0, 180)),
+    })
+
+
+def terran_metal_station():
+    deck = terran_carrier()
+    with tagged(TS, foundation='Base'), F.group('Rest'):
+        TS.terran_metal_station.build()
+    z = 0.32
+
+    def rule(x, y, zz):
+        if y < -1.2:
+            return 'Hopper'
+        if x > 1.9:
+            return 'Tanks'
+        if abs(x - 0.6) < 0.6 and abs(y - 1.3) < 0.6 and zz > z + 2.3:
+            return 'Stack'
+        return 'Smelter'
+    sort_rest(rule)
+    zb = deck + 0.1
+    return dict(pivot=None, packed={
+        'Base': trs(t=(-0.9, 0, deck), s=(0.5, 0.3, 0.3)),
+        'Smelter': stow((-0.6, 1.0, z), (-2.0, 0.1, zb), 0.45),
+        'Hopper': stow((0, -2.3, z), (0.5, 0.2, zb), 0.42),
+        'Tanks': stow((2.6, 0.75, z), (-0.7, 0.75, zb), 0.45),
+        # The chimney is carried lying down along the deck.
+        'Stack': stow((0.6, 1.3, z + 2.2), (-1.0, -0.78, zb + 0.36), 0.6, r=(0, 90, 0)),
+    })
+
+
+def terran_air_base():
+    deck = terran_carrier()
+    with tagged(TS, foundation='Base'), F.group('Rest'):
+        TS.terran_air_base.build()
+    z = 0.3
+
+    def rule(x, y, zz):
+        if (x - 3.8) ** 2 + (y + 3.6) ** 2 < 1.6 ** 2:
+            return 'Tower'
+        if x < -1.0 and y < -1.2:
+            return 'Hangar'
+        if -0.2 <= x <= 2.6 and y < -1.3:
+            return 'Fuel'
+        return 'Base'
+    sort_rest(rule)
+    zb = deck + 0.1
+    return dict(pivot=None, packed={
+        'Base': trs(t=(-0.9, 0, deck), s=(0.34, 0.2, 0.3)),
+        'Hangar': stow((-3.1, -3.4, z), (-2.0, 0, zb), 0.42),
+        # The control tower is carried lying down, cab to the rear.
+        'Tower': stow((3.8, -3.6, z), (1.0, -0.6, zb + 0.56), 0.4, r=(0, -90, 0)),
+        'Fuel': stow((1.4, -3.95, z), (-0.2, 0.62, zb), 0.5),
+    })
+
+
+def kesh_seer_spire():
+    deck = kesh_carrier()
+    with tagged(KS, dais='Base'), F.group('Rest'):
+        KS.kesh_seer_spire.build()
+    z = 0.56
+    sort_rest(lambda x, y, zz: 'Horns', rename={'Eye': 'Turret'})
+    tz = z + 3.4
+    return dict(tz=tz, packed={
+        'Base': trs(t=(-0.6, 0, deck), s=(0.55, 0.55, 0.5)),
+        # Horns drawn in low, cradling the eye.
+        'Horns': stow((0, 0, z), (-0.6, 0, deck + z * 0.5), (0.55, 0.55, 0.3)),
+        'Turret': stow((0, 0, tz), (-0.6, 0, deck + 1.25), 0.65),
+    })
+
+
+def kesh_metal_siphon():
+    deck = kesh_carrier()
+    with tagged(KS, dais='Base', horn='Horns'), F.group('Rest'):
+        KS.kesh_metal_siphon.build()
+    z = 0.59
+
+    def rule(x, y, zz):
+        if y < -1.0:
+            return 'Basin'
+        if x > 1.8 or zz < z + 0.8:
+            return 'Base'
+        return 'Turret'
+    sort_rest(rule)
+    pv = (0, 0.5, z + 3.9)
+    return dict(pivot=pv, packed={
+        'Base': trs(t=(-0.7, 0, deck), s=(0.32, 0.32, 0.4)),
+        'Horns': stow((0, 0.5, z), (-0.7, 0.16, deck + z * 0.4), (0.3, 0.3, 0.26)),
+        # The core sinks down its column into the folded horns.
+        'Turret': stow(pv, (-0.7, 0.16, deck + 1.3), (0.42, 0.42, 0.28)),
+        'Basin': stow((0, -2.2, z), (0.9, 0, deck + 0.02), 0.4),
+    })
+
+
+def kesh_hive_roost():
+    deck = kesh_carrier()
+    with tagged(KS, dais='Base', horn='Ribs'), F.group('Rest'):
+        KS.kesh_hive_roost.build()
+    z = 0.59
+
+    def rule(x, y, zz):
+        if zz > z + 4.5:
+            return 'Turret'
+        if zz > z + 1.2:
+            return 'Perches'
+        return 'Base'
+    sort_rest(rule)
+    pv = (0, 0, z + 4.9)
+    return dict(pivot=pv, packed={
+        'Base': trs(t=(-0.6, 0, deck), s=(0.21, 0.21, 0.4)),
+        'Ribs': stow((0, 0, z), (-0.6, 0, deck + z * 0.4), (0.24, 0.24, 0.3)),
+        'Turret': stow(pv, (-0.6, 0, deck + 1.65), 0.45),
+        'Perches': stow((0, 0, z + 2.7), (-0.6, 0, deck + 0.8), 0.3),
+    })
+
+
+register('terran_radar_tower', 'terran', terran_radar_tower,
+         ('human/radar_tower_packed.glb', 'Terran Radar Tower, packed for transport', 'RadarTowerPacked'),
+         ('structures/terran_radar.glb', 'Terran Radar Tower', 'TerranRadar'))
+register('terran_metal_station', 'terran', terran_metal_station,
+         ('human/metal_station_packed.glb', 'Terran Metal Station, packed for transport', 'MetalStationPacked'),
+         ('structures/terran_metal_station.glb', 'Terran Metal Station (refinery)', 'TerranMetalStation'))
+register('terran_air_base', 'terran', terran_air_base,
+         ('human/air_base_packed.glb', 'Terran Airfield, packed for transport', 'AirBasePacked'),
+         ('structures/terran_air_base.glb', 'Terran Airfield', 'TerranAirBase'))
+register('kesh_seer_spire', 'kesh', kesh_seer_spire,
+         ('alien/radar_tower_packed.glb', 'Arcadian Seer Spire, packed for transport', 'SeerSpirePacked'),
+         ('structures/kesh_seer_spire.glb', 'Kesh Seer Spire (sensor)', 'KeshSeerSpire'))
+register('kesh_metal_siphon', 'kesh', kesh_metal_siphon,
+         ('alien/metal_station_packed.glb', 'Arcadian Metal Siphon, packed for transport', 'MetalSiphonPacked'),
+         ('structures/kesh_metal_siphon.glb', 'Kesh Metal Siphon (refinery)', 'KeshMetalSiphon'))
+register('kesh_hive_roost', 'kesh', kesh_hive_roost,
+         ('alien/air_base_packed.glb', 'Arcadian Hive Roost, packed for transport', 'HiveRoostPacked'),
+         ('structures/kesh_hive_roost.glb', 'Kesh Hive Roost (air base)', 'KeshHiveRoost'))

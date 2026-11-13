@@ -13,7 +13,7 @@ import sys
 
 import bpy
 
-BIG = {'bulwark', 'longbow', 'carapace', 'mortar_beast', 'condor'}
+BIG = {'bulwark', 'longbow', 'carapace', 'mortar_beast', 'condor', 'metal_station_packed', 'air_base_packed'}
 
 
 def tris(o):

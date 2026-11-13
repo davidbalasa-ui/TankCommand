@@ -17,6 +17,7 @@ def asset(path, label, size=1024):
             F.finish(kw.pop('name'), glb, render=render, report=report, label=label, size=kw.pop('size', size),
                      crevice=(0.75, 0.55, 0.4), **kw)
         ASSETS[fn.__name__] = dict(fn=run, path=path, set='structures')
+        run.build = fn
         return run
     return deco
 
