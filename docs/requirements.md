@@ -119,6 +119,7 @@
 | MATCH-02 | Results screen shows outcome, time, units built/lost and resources gathered. |
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | HINT-01 | Hint bubbles grow to fit their text on a phone screen instead of cutting it off, and every mission objective, mission message and help hint stays within the word limits set in src/ui/textLimits.ts. |
+| PART-01 | Model parts with anim extras (spin or swing about their own axis) move only while their condition holds (always, mining, working, moving), use busySpeed while working, and a spinning TurretPivot is never aimed. |
 | DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |
 | DIP-01 | Relations exist for every side pair, default per setup, saved and deterministic; allied/neutral/hostile queries are the only way the sim decides who is an enemy. |
 | DIP-02 | Units auto-engage only hostile targets; neutral sides are never auto-attacked; allied fire including splash never damages allies. |

@@ -18,6 +18,7 @@ import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
+import { collectPartMotions, pivotIsSpinner, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
 import {
   QUALITY_LADDER,
   QualityController,
@@ -231,6 +232,12 @@ interface UnitVisual {
   recoil: number;
   /** The turret pivot's rest position, for the recoil kick. */
   pivotRest: THREE.Vector3 | null;
+  /** Moving parts from the model's anim extras (drums, dishes, wings). */
+  parts: PartMotion[];
+  /** Hover units and aircraft bob gently. */
+  floats: boolean;
+  /** Aircraft lean into turns (radians of roll, smoothed). */
+  bank: number;
 }
 
 interface PositionSnapshot {
@@ -265,6 +272,8 @@ interface StructureVisual {
   modelScale: number;
   /** The Shard's floating heart (bobs, spins, and flares as it charges and fires). */
   core: { node: THREE.Object3D; baseY: number; spin: number; flare: number } | null;
+  /** Moving parts from the model's anim extras (radar dishes, spinning crowns). */
+  parts: PartMotion[];
 }
 
 /**
@@ -592,6 +601,9 @@ export class RenderView {
   private readonly structureBorn = new Map<number, number>();
   /** Towers folding out part by part (models with packed poses), keyed by structure id. */
   private readonly structureFolding = new Map<number, { born: number; start: UnfoldStart }>();
+  /** Real seconds since the last rendered frame, for moving model parts. */
+  private motionDt = 0;
+  private lastMotionAt: number | null = null;
   /** Where units that are packing up into a structure stand and face, for the fold-out to start from. */
   private readonly deployingUnits = new Map<number, { x: number; z: number; heading: number }>();
   /** Low-detail geometry per unit model id, one per mesh in traversal order. */
@@ -1038,6 +1050,9 @@ export class RenderView {
 
   render(alpha: number, world: WorldState): void {
     this.world = world;
+    const now = performance.now();
+    this.motionDt = this.lastMotionAt === null ? 0 : (now - this.lastMotionAt) / 1000;
+    this.lastMotionAt = now;
     this.updateQuality();
     this.updateSnapshots(world);
     this.applyCamera();
@@ -2049,9 +2064,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
     }
     this.scene.add(root);
+    const parts = collectPartMotions(root);
+    // A TurretPivot with its own motion is a spinner, not a gun: it is never aimed or kicked.
+    const aimed = pivotIsSpinner(parts) ? null : (root.getObjectByName('TurretPivot') ?? null);
     return {
       root,
-      turretPivot: root.getObjectByName('TurretPivot') ?? null,
+      turretPivot: aimed,
       owner: unit.owner,
       lift: 0,
       pitch: 0,
@@ -2062,7 +2080,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       typeId: unit.typeId,
       alien: this.world.factions.find((item) => item.player === unit.owner)?.faction === 'alien',
       recoil: 0,
-      pivotRest: root.getObjectByName('TurretPivot')?.position.clone() ?? null,
+      pivotRest: aimed?.position.clone() ?? null,
+      parts,
+      floats: this.world.unitTypes.get(unit.typeId)?.movement === 'hover',
+      bank: 0,
     };
   }
 
@@ -2127,8 +2148,21 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       visual.roll += (wantRoll - visual.roll) * 0.25;
       // The middle of the hull follows the average of the four samples' plane, which the centre
       // height already approximates; lift keeps aircraft above it.
-      visual.root.position.set(x, ground + visual.lift, z);
-      visual.root.rotation.set(visual.roll, -heading, visual.pitch, 'YZX');
+      // Hover units and aircraft in the air bob gently, each on its own beat.
+      const airborne = visual.lift > 0.3;
+      const bob =
+        visual.floats || airborne
+          ? Math.sin(performance.now() / 1000 * (airborne ? 1.4 : 2.1) + unit.id * 1.7) * (airborne ? 0.18 : 0.07)
+          : 0;
+      // Aircraft lean into turns: roll follows how fast the heading is changing.
+      let wantBank = 0;
+      if (airborne) {
+        const turnRate = Math.atan2(Math.sin(current.heading - previous.heading), Math.cos(current.heading - previous.heading));
+        wantBank = Math.max(-0.55, Math.min(0.55, turnRate * 6));
+      }
+      visual.bank += (wantBank - visual.bank) * 0.1;
+      visual.root.position.set(x, ground + visual.lift + bob, z);
+      visual.root.rotation.set(visual.roll + visual.bank, -heading, visual.pitch, 'YZX');
       if (visual.turretPivot) {
         const rel = heading - turretHeading;
         visual.turretPivot.rotation.y = rel;
@@ -2146,6 +2180,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         visual.root.rotation.z += visual.recoil * 0.07 * Math.cos(heading - turretHeading);
         visual.recoil *= 0.82;
       }
+      if (visual.parts.length > 0) {
+        updatePartMotions(visual.parts, this.unitMotionState(unit, current, previous), this.motionDt);
+      }
       if (visual.alien && visual.root.visible && arcBudget > 0 && Math.random() < 0.025) {
         arcBudget -= 1;
         this.effects.arcAround(x, ground + visual.lift + 0.9 * visual.root.scale.y, z, 1.1 * visual.root.scale.y);
@@ -2162,6 +2199,26 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       }
     }
     this.unitInstances.end(this.shadowsEnabled);
+  }
+
+  /** What a unit is doing, for its moving parts (miner drums, repair turrets, wings). */
+  private unitMotionState(unit: UnitState, current: PositionSnapshot, previous: PositionSnapshot): PartMotionState {
+    const moving = Math.hypot(current.x - previous.x, current.z - previous.z) > 1e-4 || unit.speed > 0.05;
+    const job = unit.job;
+    const mining = job?.kind === 'oreMiner' && job.stage === 'digging';
+    let working = mining || job?.stage === 'loading' || job?.stage === 'unloading';
+    const repair = this.world.unitTypes.get(unit.typeId)?.repair;
+    if (!working && repair && unit.hp > 0 && !unit.transform) {
+      // A repair vehicle works while anything friendly and hurt is in reach (as updateRepair heals).
+      working = this.world.units.some((other) => {
+        if (other.id === unit.id || other.hp <= 0 || !isAllied(this.world, unit.owner, other.owner)) {
+          return false;
+        }
+        const max = this.world.unitTypes.get(other.typeId)?.hp ?? other.hp;
+        return other.hp < max && Math.hypot(other.x - unit.x, other.z - unit.z) <= repair.radius;
+      });
+    }
+    return { mining, working, moving };
   }
 
   private syncStructures(world: WorldState): void {
@@ -2203,6 +2260,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         this.scene.add(mesh);
         let model: THREE.Object3D | null = null;
         let modelPivot: THREE.Object3D | null = null;
+        let structureParts: PartMotion[] = [];
         const modelColors: StructureVisual['modelColors'] = [];
         const template = type.modelId ? this.templates.get(type.modelId) : undefined;
         if (template) {
@@ -2222,7 +2280,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
               }
             }
           });
-          modelPivot = model.getObjectByName('TurretPivot') ?? null;
+          structureParts = collectPartMotions(model);
+          modelPivot = pivotIsSpinner(structureParts) ? null : (model.getObjectByName('TurretPivot') ?? null);
           if (type.kind === 'pad') {
             // The model's ramp (+X) points along the pad's exit edge.
             model.rotation.y = -padFacing(structure);
@@ -2244,6 +2303,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           modelColors,
           modelScale: model ? model.scale.x : 1,
           core: null,
+          parts: structureParts,
         };
         const coreNode = model?.getObjectByName('Core');
         if (coreNode) {
@@ -2325,6 +2385,14 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         core.node.rotation.y = core.spin;
         core.node.position.y = core.baseY + Math.sin(t * 1.3 + structure.id) * 0.06;
         core.node.scale.setScalar(1 + core.flare * 0.18);
+      }
+      if (visual.parts.length > 0 && !this.structureFolding.has(structure.id)) {
+        // Packed structures only start their motion once fully unfolded.
+        updatePartMotions(
+          visual.parts,
+          { mining: structure.depositId != null, working: structure.depositId != null, moving: false },
+          this.motionDt,
+        );
       }
       if (visual.modelPivot && !this.structureFolding.has(structure.id)) {
         // Model weapons point along +X, like the units: same heading convention as unit turrets.
