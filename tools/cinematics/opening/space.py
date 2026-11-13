@@ -1286,7 +1286,8 @@ class Space:
         bpy.context.scene.frame_set(1)
 
     def dogfight(self):
-        pass
+        import dogfight
+        dogfight.Dogfight(self)
 
     def squid_hunt(self):
         import squid
@@ -1295,6 +1296,8 @@ class Space:
     def camera_for(self, sid):
         if sid.startswith('07'):
             return self.squid.camera(sid)
+        if sid == '06':
+            return self.dogfight_data.camera(sid)
         return None
 
     def drop(self):

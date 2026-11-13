@@ -37,7 +37,7 @@ SHOTS = {
     '05b3': (fr(19), fr(20) - 1, 'space', ('barrage',)),
     '05b4': (fr(20), fr(22) - 1, 'space', ('barrage',)),
     '05b5': (fr(22), fr(23) - 1, 'space', ('barrage', 'beam')),
-    '06': (fr(23), fr(26) - 1, 'space', ('dogfight',)),
+    '06': (fr(23), fr(26) - 1, 'space', ('dogfight', 'barrage')),
     '07a': (fr(26), fr(31) - 1, 'space', ('squid',)),
     '07b': (fr(31), fr(32) - 1, 'space', ('squid',)),
     '07c': (fr(32), fr(34) - 1, 'space', ('squid',)),
@@ -151,7 +151,11 @@ def build_camera(keys, lens=28):
     for k in keys:
         f, p, tgt = k[:3]
         cam.location = p
-        e = (Vector(tgt) - Vector(p)).to_track_quat('-Z', 'Y').to_euler()
+        q = (Vector(tgt) - Vector(p)).to_track_quat('-Z', 'Y')
+        if len(k) > 4 and k[4]:
+            from mathutils import Quaternion
+            q = q @ Quaternion((0, 0, 1), k[4])          # roll about the view axis
+        e = q.to_euler()
         if prev is not None:
             e.make_compatible(prev)
         cam.rotation_euler = e
