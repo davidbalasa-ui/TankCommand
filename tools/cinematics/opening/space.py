@@ -236,10 +236,49 @@ def bolt(p0, p1, f0, frames, col, size=(4.0, 0.12, 0.12), strength=30.0, mat=Non
 _bmats = {}
 
 
+def gas_fireball_mat(name, hot, cool, seed=0.0):
+    """Billowing gas fireball: churning 4D noise, dense hot core, ragged see-through edges.
+    Value nodes 'S' (emission strength) and 'V' (visibility 0..1) are keyed by boom()."""
+    m, n = BP._new_mat(name)
+    out = n.node('ShaderNodeOutputMaterial')
+    tc = n.node('ShaderNodeTexCoord')
+    t = BP.time_value(m, 'time', 1.6)
+    nz = n.node('ShaderNodeTexNoise', Scale=1.9, Detail=8.0, Distortion=0.25, Roughness=0.6)
+    nz.noise_dimensions = '4D'
+    n.set(nz.inputs['Vector'], tc.outputs['Object'])
+    n.set(nz.inputs['W'], n.math('ADD', t, seed))
+    lw = n.node('ShaderNodeLayerWeight', Blend=0.5)
+    body = n.math('POWER', n.math('SUBTRACT', 1.0, lw.outputs['Facing']), 1.4)
+    st = n.maprange(nz.outputs['Fac'], 0.35, 0.68, 0.0, 1.0)          # billow structure
+    heat = n.math('MULTIPLY', st, body)
+    sv = value_node(m, 'S', 3.0).outputs[0]
+    vv = value_node(m, 'V', 1.0).outputs[0]
+    ramp = n.node('ShaderNodeValToRGB')
+    n.set(ramp.inputs[0], heat)
+    els = ramp.color_ramp.elements
+    els[0].position, els[0].color = 0.0, (*[c * 0.08 for c in cool], 1)
+    els[1].position, els[1].color = 1.0, (*[min(1.0, c * 0.4 + 0.6) for c in hot], 1)
+    e = els.new(0.35)
+    e.color = (*cool, 1)
+    e = els.new(0.75)
+    e.color = (*hot, 1)
+    em = n.node('ShaderNodeEmission')
+    n.set(em.inputs['Color'], ramp.outputs[0])
+    n.set(em.inputs['Strength'], n.math('MULTIPLY', n.math('POWER', heat, 1.3), n.math('MULTIPLY', sv, 0.7)))
+    tr = n.node('ShaderNodeBsdfTransparent')
+    mx = n.node('ShaderNodeMixShader')
+    alpha = n.math('MULTIPLY', n.math('MULTIPLY_ADD', st, 0.7, 0.3), n.math('MULTIPLY', body, 1.5))
+    n.set(mx.inputs[0], n.math('MINIMUM', n.math('MULTIPLY', alpha, vv), 1.0))
+    n.set(mx.inputs[1], tr.outputs[0])
+    n.set(mx.inputs[2], em.outputs[0])
+    n.set(out.inputs['Surface'], mx.outputs[0])
+    return m
+
+
 def boom(p, f0, size, hot=(1.0, 0.45, 0.06), cool=(0.35, 0.03, 0.005), life=1.2, light=0.0, follow=None, seed=0):
     """Fireball at global frame f0 (wraps common.Shot.boom on the global clock)."""
     k = _uid('boom')
-    m = OS.fireball_mat(k, hot, cool)
+    m = gas_fireball_mat(k, hot, cool, seed=_n[0] * 1.7)
     o = C.uv_sphere('B' + k, 1.0, seg=(24, 14), mat=m)
     o.visible_shadow = False
     rnd = random.Random(seed + _n[0])
@@ -249,6 +288,15 @@ def boom(p, f0, size, hot=(1.0, 0.45, 0.06), cool=(0.35, 0.03, 0.005), life=1.2,
     for f, s in [(f0, size * 0.15), (f0 + step, size * 0.75), (f1, size * 1.25)]:
         o.scale = (s, s, s)
         o.keyframe_insert('scale', frame=f)
+    for j in range(3):                    # lumpy outline: secondary puffs share the material
+        sub = C.uv_sphere('B' + k + f'_{j}', 1.0, seg=(18, 10), mat=m)
+        sub.parent = o
+        dv = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized() * rnd.uniform(0.45, 0.7)
+        sub.location = dv
+        sc_ = rnd.uniform(0.5, 0.7)
+        sub.scale = (sc_, sc_, sc_)
+        sub.visible_shadow = False
+    o.scale = (1, 1, 1)
     o.location = p
     o.keyframe_insert('location', frame=f0)
     if follow is not None:
@@ -279,7 +327,7 @@ def boom(p, f0, size, hot=(1.0, 0.45, 0.06), cool=(0.35, 0.03, 0.005), life=1.2,
 
 
 def blue_boom(p, f0, size, **kw):
-    return boom(p, f0, size, hot=(0.45, 0.75, 1.0), cool=(0.02, 0.08, 0.4), **kw)
+    return boom(p, f0, size, hot=(0.2, 0.55, 1.0), cool=(0.01, 0.04, 0.3), **kw)
 
 
 def gold_boom(p, f0, size, **kw):
@@ -1065,7 +1113,7 @@ class Space:
             boom(self.world_at(dread, lp, f), f, rnd.uniform(4, 8), life=1.4, light=6e4 if i % 3 == 0 else 0,
                  follow=(0, 0, 2))
         # long-lived fires on the hull for the rest of the minute
-        fm = OS.fireball_mat('HullFire', (1.0, 0.45, 0.06), (0.35, 0.03, 0.005))
+        fm = gas_fireball_mat('HullFire', (1.0, 0.45, 0.06), (0.35, 0.03, 0.005))
         C.key_value(fm, 'S', 1, 3.0)
         C.key_value(fm, 'V', 1, 1.0)
         for i, lp in enumerate([b['entry_l'], b['exit_l'], Vector((-8, 2, 3)), Vector((9, -3, 2))]):
@@ -1212,9 +1260,10 @@ class Space:
             v = Vector(drift[i])
             key_loc(p_, [(1, (0, 0, 0)), (bf[i], (0, 0, 0)), (bf[i] + 24, v * 0.6), (NF, v * (NF - bf[i]) / 24 * 0.45)], 'LINEAR')
             key_rot(p_, [(1, (0, 0, 0)), (bf[i], (0, 0, 0)), (NF, spin[i])], 'LINEAR')
-        blue_boom(self.world_at(shell, cen_l, 498), 498, 16.0, life=1.0, light=4e5)
-        blue_boom(self.world_at(shell, cen_l + Vector((-10, 0, 0)), 504), 504, 26.0, life=1.4, light=6e5)
-        blue_boom(self.world_at(shell, cen_l, 510), 510, 45.0, life=2.0, light=1.2e6)
+        for f_, off, sz, lt in [(498, (0, 0, 0), 14.0, 4e5), (504, (-10, 0, 0), 22.0, 6e5), (510, (0, 0, 0), 36.0, 1.2e6)]:
+            pw = self.world_at(shell, cen_l + Vector(off), f_)
+            blue_boom(pw, f_, sz * 0.55, life=0.35, light=lt * 0.5)        # energy flash
+            gold_boom(pw, f_ + 1, sz, life=1.4 + sz / 40, light=lt * 0.5)   # the ship's own fire
         shards(self.world_at(shell, cen_l, 510), 510, 160, (1.0, 0.7, 0.3), 0.9, 80, seed=74, life=2.4, kind='hex',
                strength=12.0)
         # 0:22 the battleship's cannons glow and vent; the Crescent gathers lightning between its horns
