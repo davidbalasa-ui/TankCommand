@@ -132,6 +132,12 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
     return;
   }
   const oreBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
+  // Salvage refunds half the tug's ore price (read from the build list so price changes don't break this).
+  const tugOre = await page.evaluate(
+    (typeId) => window.__TC_TEST__?.buildItems().find((item) => item.id === typeId)?.ore ?? null,
+    tug.typeId,
+  );
+  expect(tugOre).not.toBeNull();
   // The tug drives between the pad and the miner, and software rendering is slow, so a tap can
   // land just behind it: tap again (at its new position) until it is selected.
   await expect(async () => {
@@ -170,7 +176,7 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
     .toBe(false);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(oreBefore + 35);
+    .toBe(oreBefore + Math.floor(((tugOre ?? 0) * 50) / 100));
 });
 
 test('[HUD-05] tug assign button works by touch after a station is placed', async ({ page }, testInfo) => {
