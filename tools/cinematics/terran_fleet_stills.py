@@ -40,7 +40,7 @@ VIEWS = {   # direction to the camera, lens
     'side': (Vector((0.0, -1.0, 0.1)), 50),
     'top': (Vector((0.0, -0.02, 1.0)), 50),
 }
-HERO = {'fighter': Vector((0.75, -0.6, 0.38)), 'missile_ship': Vector((0.8, -0.62, 0.36)),
+HERO = {'fighter': Vector((0.8, -0.5, 0.33)), 'missile_ship': Vector((0.8, -0.62, 0.36)),
         'battleship': Vector((0.5, -0.85, 0.5))}
 
 
@@ -173,7 +173,8 @@ def build(key):
         ship, _ = T.broadside_battleship()
     elif key == 'fighter':
         ship, wname = T.twin_x_fighter()
-        extra.append(bpy.data.objects[wname])
+        extra += [bpy.data.objects[wname]] + list(ship.children_recursive)
+        extra = list(dict.fromkeys(extra))
     elif key == 'missile_ship':
         ship, tubes = T.missile_ship()
         # a stream leaving both tubes: one still half inside, the rest downrange
@@ -186,7 +187,7 @@ def build(key):
         ship = T.BUILDERS[key]()
     for p in ship.data.polygons:
         p.use_smooth = True
-    tris = tris_of(ship) + sum(tris_of(o) for o in extra if o.name.endswith('Wings'))
+    tris = tris_of(ship) + sum(tris_of(o) for o in extra if key == 'fighter')
     return ship, extra, tris
 
 
@@ -195,6 +196,9 @@ def sheet(key):
     sc, cam, camkey = setup(float(args.get('exposure', 1.3)))
     ship, extra, tris = build(key)
     dims = tuple(round(v, 1) for v in ship.dimensions)
+    if key == 'fighter':                # the core alone is short; measure core + wings + guns
+        xs = [(o.matrix_world @ Vector(b)).x for o in [ship] + extra for b in o.bound_box]
+        dims = (round(max(xs) - min(xs), 1),) + dims[1:]
     print(f'SHIP {key} SHAPES {ship["shapes"]} TRIS {tris} DIMS {dims}', flush=True)
     views = args.get('views', 'hero,side,top' + (',fire' if key == 'battleship' else '')).split(',')
     ims = {}
@@ -207,7 +211,28 @@ def sheet(key):
         aim(sc, cam, camkey, [ship] + extra, d, lens, margin=0.84 if v == 'hero' else 1.1)
         ims[v] = bloom(render(sc, f'{key}_{v}', (1280, 720) if v == 'hero' else (640, 360)))
     if len(ims) == 3:
-        out = Image.new('RGB', (1920, 720))
+        rows = []
+        if key == 'fighter':            # extra row: front view, and the wings caught mid-spin
+            wings = bpy.data.objects[ship['wings']]
+            fit = [ship, wings]
+            aim(sc, cam, camkey, fit, Vector((1.0, -0.12, 0.1)), 50, margin=1.1)
+            rows.append(label(bloom(render(sc, 'fighter_front', (640, 360))), 'front'))
+            wings.rotation_mode = 'XYZ'
+            for fr, ang in ((0, -22.0), (2, 22.0)):
+                wings.rotation_euler = (math.radians(ang), 0, 0)
+                wings.keyframe_insert('rotation_euler', frame=fr)
+            for o in [wings] + list(wings.children):
+                o.cycles.motion_steps = 5
+            sc.render.use_motion_blur = True
+            sc.render.motion_blur_shutter = 0.9
+            sc.frame_set(1)
+            rows.append(label(bloom(render(sc, 'fighter_spin_front', (640, 360))), 'front, mid-spin (motion blur)'))
+            aim(sc, cam, camkey, fit, HERO[key], 40, margin=0.95)
+            rows.append(label(bloom(render(sc, 'fighter_spin', (640, 360))), 'mid-spin (motion blur)'))
+            sc.render.use_motion_blur = False
+        out = Image.new('RGB', (1920, 720 + (360 if rows else 0)))
+        for i, im in enumerate(rows):
+            out.paste(im, (i * 640, 720))
         out.paste(ims['hero'], (0, 0))
         out.paste(label(ims['side'], 'side'), (1280, 0))
         out.paste(label(ims['top'], 'top'), (1280, 360))
@@ -222,21 +247,21 @@ def fire(sc, cam, camkey, ship, out):
     """The battleship rolled gun-side down, mid salvo: bow gun has fired (slug far downrange),
     middle gun is firing, aft gun is charging."""
     ship.rotation_euler = Euler((math.radians(38), math.radians(-6), math.radians(8)), 'XYZ')
-    stages = [dict(scale=0.6, bolt_at=22.0, strength=30.0), dict(scale=1.0, bolt_at=7.0, strength=45.0),
-              dict(charge=True, bolt=False, strength=28.0)]
+    stages = [dict(scale=0.47, bolt_at=20.0, strength=30.0), dict(scale=0.78, bolt_at=6.0, strength=45.0),
+              dict(charge=True, bolt=False, scale=0.78, strength=28.0)]
     for i, (mz, st) in enumerate(zip(ship['muzzles'], stages)):
         fl = T.muzzle_flash(f'Flash{i}', **st)
         fl.parent = ship
         fl.location = mz
         fl.rotation_euler = (0, 0, math.radians(-90))          # +X of the flash -> ship's fire direction
         ld = bpy.data.lights.new(f'FlashLight{i}', 'POINT')
-        ld.energy = (1.2e5, 5e5, 1.5e5)[i]
+        ld.energy = (0.5e5, 2e5, 0.6e5)[i]
         ld.color = (0.45, 0.8, 1.0)
         ld.shadow_soft_size = 1.5
         lo = bpy.data.objects.new(f'FlashLight{i}', ld)
         sc.collection.objects.link(lo)
         lo.parent = ship
-        lo.location = Vector(mz) + Vector((0, -3.0, 0))
+        lo.location = Vector(mz) + Vector((0, -2.4, 0))
     bpy.data.objects['Key'].data.energy = 4.0
     bpy.data.objects['CamKey'].data.energy = 1.5
     aim(sc, cam, camkey, [ship], Vector((0.5, -0.8, -0.3)), 35, margin=0.93)

@@ -4,8 +4,9 @@
                                                 local points, ship['fire_dir'] = (0, -1, 0)
     terran_corvette()      -> ship              fork-prowed fast attack ship, ~10 long
     terran_frigate_v2()    -> ship              trimaran gun frigate, ~21 long
-    twin_x_fighter()       -> (ship, wings)     wings = name of the child object holding all 8 wings;
-                                                spin it round its local X axis
+    twin_x_fighter()       -> (ship, wings)     ship = the central core; wings = name of the child object
+                                                holding all 8 free-floating wings (plasma arcs are its
+                                                children); spin it round its local X axis
     missile_ship()         -> (ship, tubes)     tubes = local centre points of the two bow tube mouths
     missile()              -> missile object    points along +X, origin at its middle
     muzzle_flash()         -> emissive flash    fires along +X from its origin (for the cannon shots)
@@ -217,12 +218,15 @@ def _soft(obj, mat):
 B_SECS = [(-22, 3.6, -2.7, 2.8), (-16, 4.4, -3.2, 3.3), (-4, 4.6, -3.4, 3.4), (10, 4.4, -3.2, 3.2),
           (17, 3.4, -2.4, 2.4), (21, 2.3, -1.6, 1.5), (23.5, 1.1, -0.7, 0.7)]
 B_GUNS = (11.0, 0.0, -11.0)   # x of each cannon, bow first
-B_MUZZLE_Y = 19.6
+B_GUN_R, B_GUN_L = 0.78, 0.6        # cannon diameter / length factors (1, 1 = the first, oversized design)
+B_ROOT_Y = 4.2
+B_MUZZLE_Y = B_ROOT_Y + (19.6 - B_ROOT_Y) * B_GUN_L
 
 
 def _broadside_gun(gx, s=-1, gz=0.0):
     """One giant fixed cannon firing sideways (s = -1: towards -Y). Returns the muzzle point."""
     c = (gx, 0, gz)
+    m0 = F.mark()
     o = F.tube((gx, s * 4.2, gz), (gx, s * 7.0, gz), [(0, 3.15), (0.55, 2.95), (1, 2.15)], 8, 'armor', bevel=0.08)
     F.rot(o, 'Y', 22.5, c)                                                    # casemate collar
     F.cyl((gx, s * 6.98, gz), (gx, s * 7.25, gz), 2.2, 20, 'hazard')
@@ -243,9 +247,9 @@ def _broadside_gun(gx, s=-1, gz=0.0):
         F.box((gx, s * 9.5, gz + 1.9), (0.36, 0.4, 0.32), 'armor', bevel=0.03)
         F.box((gx, s * 17.3, gz + 1.72), (0.34, 0.3, 0.22), 'armor', bevel=0.03)
         F.rot_all(m, 'Y', a, c)
-    F.tube((gx, s * 17.8, gz), (gx, s * B_MUZZLE_Y, gz), [(0, 1.4), (0.14, 1.82), (0.86, 1.82), (1, 1.62)], 20, 'armor',
+    F.tube((gx, s * 17.8, gz), (gx, s * 19.6, gz), [(0, 1.4), (0.14, 1.82), (0.86, 1.82), (1, 1.62)], 20, 'armor',
            caps=False)                                                         # muzzle brake
-    F.tube((gx, s * B_MUZZLE_Y, gz), (gx, s * 16.4, gz), [(0, 1.62), (0.06, 1.08), (1, 1.02)], 20, 'dark', caps=False)
+    F.tube((gx, s * 19.6, gz), (gx, s * 16.4, gz), [(0, 1.62), (0.06, 1.08), (1, 1.02)], 20, 'dark', caps=False)
     F.cyl((gx, s * 17.0, gz), (gx, s * 16.9, gz), 1.04, 20, 'glow')            # charge glow deep in the bore
     for a in range(0, 360, 45):                                                # brake vents
         m = F.mark()
@@ -256,6 +260,8 @@ def _broadside_gun(gx, s=-1, gz=0.0):
         m = F.mark()
         F.cyl((gx, s * 5.6, gz + 3.0), (gx, s * 11.2, gz + 1.45), 0.2, 8, 'barrel')
         F.rot_all(m, 'Y', a, c)
+    for o in F.since(m0):                       # the gun is modelled full size, then scaled about its root
+        F.scale(o, (B_GUN_R, B_GUN_L, B_GUN_R), about=(gx, s * B_ROOT_Y, gz))
     # far side: breech block and recoil thruster
     F.box((gx, -s * 5.1, gz), (2.5, 1.0, 2.5), 'armor', bevel=0.08)
     F.box((gx, -s * 6.0, gz), (1.9, 0.35, 1.9), 'plate', bevel=0.06)
@@ -287,7 +293,7 @@ def broadside_battleship(name='Broadside'):
         return True
 
     def side_ok(x, s):
-        return not any(abs(x - g) < (3.4 if s < 0 else 2.8) for g in B_GUNS) and not (abs(x - 18) < 1.6 or abs(x + 19.3) < 1.6)
+        return not any(abs(x - g) < (2.9 if s < 0 else 2.8) for g in B_GUNS) and not (abs(x - 18) < 1.6 or abs(x + 19.3) < 1.6)
 
     _dress(rnd, B_SECS, 'slab', -21.5, 21.5, k=1.0, greebles=2600, deck_ok=deck_ok, side_ok=side_ok, rows=4, belly=700)
 
@@ -522,95 +528,135 @@ def terran_frigate_v2(name='FrigateV2'):
 
 
 # ================================================================== twin-X fighter
-def twin_x_fighter(name='TwinX'):
-    """~1.4 long. One slim unmanned fuselage carrying two four-wing sets on rotating collars: a
-    long gun-tipped X set and, just behind it and turned 45 degrees, a shorter forward-swept set
-    with tip thrusters that drive the spin. Seen from the front it is an eight-point star.
-    Returns (ship, wings_name). The wings are one child object of the ship whose origin is on the
-    spin axis: rotate it about its local X. ship['wings_a'] / ['wings_b'] give the same split into
-    the two sets if a shot wants them counter-rotating (then hide the combined one)."""
+def twin_x_fighter(name='TwinX', seed=4):
+    """~1.5 long, no fuselage and no cockpit. A compact reactor core (violet plasma orb in an
+    armoured cage, sensor spike in front, short engine behind) with eight free-floating wings
+    round it: a long gun-tipped set of four and, further aft and turned 45 degrees, a shorter
+    forward-swept set with amber tip thrusters. Nothing solid joins wings to core; crackling
+    violet plasma arcs and a faint plasma haze hold them in place.
+    Returns (ship, wings_name). ship is the core. The wings are one child object whose origin is
+    on the spin axis: rotate it about its local X and all eight wings, their arcs and the haze
+    turn as one (arcs and haze are children of the wings object: <name>_Arcs, <name>_Haze).
+    The orb is <name>_Orb, a child of the core. Duplicate the ship with its children."""
+    rnd = random.Random(seed)
     base._faction('terran')
+    CX = -0.08                                                        # orb centre
     m = F.mark()
-    secs = [(-0.6, 0.075, -0.07, 0.075), (-0.3, 0.1, -0.085, 0.1), (0.12, 0.09, -0.075, 0.09), (0.48, 0.05, -0.04, 0.045),
-            (0.8, 0.01, -0.008, 0.008)]
-    F.hull([(x, _prof('slab', w, zb, zt)) for x, w, zb, zt in secs], 'hull', bevel=0.006)
-    # sensor canopy (no pilot), spine and chin plating
-    F.prism([(0.0, 0.085), (0.4, 0.045), (0.2, 0.125), (0.04, 0.12)], -0.04, 0.04, 'glass', taper=0.6, bevel=0.004)
-    F.prism([(-0.5, 0.07), (0.02, 0.085), (0.02, 0.118), (-0.42, 0.105)], -0.03, 0.03, 'armor', taper=0.7, bevel=0.004)
-    F.box((-0.2, 0, 0.115), (0.2, 0.006, 0.006), 'glow')
-    F.sym(F.box((0.42, 0.052, 0.0), (0.2, 0.003, 0.006), 'glow'))
-    F.sym(F.box((0.05, 0.097, 0.0), (0.12, 0.003, 0.012), 'plate'))
-    F.prism([(-0.1, -0.075), (0.5, -0.04), (0.42, -0.07), (0.0, -0.105)], -0.03, 0.03, 'armor', bevel=0.004)
-    F.orb((0.8, 0, 0), 0.014, 'amber', seg=(8, 5))
-    for s in (-1, 1):                                                             # cheek intakes + side engines
-        F.prism([(-0.5, -0.045), (0.12, -0.045), (0.22, 0.0), (0.12, 0.045), (-0.5, 0.045)], s * 0.085, s * 0.15, 'armor', bevel=0.005)
-        F.box((0.16, s * 0.118, 0.0), (0.012, 0.022, 0.03), 'dark')
-        F.box((-0.2, s * 0.152, 0.0), (0.22, 0.003, 0.007), 'glow')
-        F.tube((-0.5, s * 0.118, 0), (-0.6, s * 0.118, 0), [(0, 0.035), (1, 0.047)], 10, 'dark', caps=False)
-        F.cyl((-0.55, s * 0.118, 0), (-0.555, s * 0.118, 0), 0.04, 10, 'glow')
-    for s in (-1, 1):                                                             # chin guns
-        F.cyl((0.1, s * 0.035, -0.09), (0.62, s * 0.035, -0.06), 0.008, 6, 'barrel')
-    # fixed bearing rings between the collars, tail engine
-    for xx in (0.02, -0.235, -0.49):
-        F.cyl((xx, 0, 0), (xx - 0.025, 0, 0), 0.168, 16, 'armor')
-    F.tube((-0.58, 0, 0), (-0.72, 0, 0), [(0, 0.08), (0.3, 0.1), (1, 0.115)], 14, 'dark', caps=False)
-    F.cyl((-0.66, 0, 0), (-0.67, 0, 0), 0.1, 14, 'glow')
+    # cage round the orb: three hoops and four ribs
+    for xx in (-0.2, CX, 0.04):
+        F.tube((xx - 0.014, 0, 0), (xx + 0.014, 0, 0), [(0, 0.128), (1, 0.128)], 16, 'plate', caps=False)
+        F.tube((xx - 0.014, 0, 0), (xx + 0.014, 0, 0), [(0, 0.118), (1, 0.118)], 16, 'dark', caps=False)
+    for a in (0, 90, 180, 270):
+        o = F.box((CX, 0, 0.126), (0.15, 0.014, 0.008), 'armor')
+        F.rot(o, 'X', a)
+    # nose: angular sensor spike (no canopy)
+    o = F.tube((0.05, 0, 0), (0.52, 0, 0), [(0, 0.118), (0.12, 0.105), (0.5, 0.055), (0.93, 0.014), (1, 0.008)], 8, 'hull',
+               bevel=0.004)
+    F.rot(o, 'X', 22.5)
+    F.cyl((0.05, 0, 0), (0.035, 0, 0), 0.1, 12, 'dark')
+    for a in (0, 90, 180, 270):
+        mm = F.mark()
+        F.box((0.24, 0, 0.083), (0.12, 0.012, 0.004), 'glow')
+        F.box((0.13, 0, 0.112), (0.05, 0.03, 0.008), 'plate')
+        F.rot_all(mm, 'X', a)
+    F.orb((0.525, 0, 0), 0.014, 'amber', seg=(8, 5))
+    # tail: reactor block and a short engine
+    F.cyl((-0.22, 0, 0), (-0.2, 0, 0), 0.1, 12, 'dark')
+    o = F.tube((-0.21, 0, 0), (-0.5, 0, 0), [(0, 0.118), (0.2, 0.125), (0.8, 0.11), (1, 0.09)], 8, 'armor', bevel=0.004)
+    F.rot(o, 'X', 22.5)
+    for xx in (-0.3, -0.38):
+        F.cyl((xx, 0, 0), (xx - 0.02, 0, 0), 0.128, 16, 'coil')
+    F.tube((-0.5, 0, 0), (-0.7, 0, 0), [(0, 0.075), (0.3, 0.095), (1, 0.115)], 14, 'dark', caps=False)
+    F.cyl((-0.56, 0, 0), (-0.57, 0, 0), 0.085, 14, 'glow')
     for a in range(0, 360, 60):
-        o = F.box((-0.62, 0, 0.105), (0.07, 0.012, 0.01), 'plate')
+        o = F.box((-0.62, 0, 0.108), (0.07, 0.012, 0.008), 'plate')
         F.rot(o, 'X', a)
     ship = _finish(m, name)
+    for p in ship.data.polygons:
+        p.use_smooth = True
+    F.orb((CX, 0, 0), 0.098, 'glow', seg=(20, 12))
+    orb = base._join(F.since(0), f'{name}_Orb')
+    _soft(orb, _emit_mat('twinx_orb', (0.4, 0.08, 1.0), 5.0))
+    orb.parent = ship
 
-    def wing(x0, span, chord, sweep, ang, gun):
-        mm = F.mark()
+    # (x of the root middle, root radius, tip radius, root chord, sweep back, first angle, gun tip?)
+    sets = ((0.0, 0.37, 0.86, 0.4, 0.13, 45, True), (-0.34, 0.33, 0.66, 0.3, -0.07, 0, False))
+
+    def wing(x0, r0, span, chord, sweep, gun):
         xt = x0 - sweep
-        F.plate([(x0 + chord * 0.5, 0.1), (xt + chord * 0.2, span), (xt - chord * 0.2, span), (x0 - chord * 0.5, 0.1)],
-                -0.011, 0.011, 'armor', bevel=0.003)
-        F.plate([(x0 + chord * 0.5, 0.1), (x0 + chord * 0.32, span * 0.45), (x0 - chord * 0.34, span * 0.45), (x0 - chord * 0.5, 0.1)],
-                -0.017, 0.017, 'plate', bevel=0.003)                               # root armour
-        t0, t1 = 0.48, 0.93
-        F.plate([(x0 + (xt - x0) * t0 + 0.012, 0.1 + (span - 0.1) * t0), (x0 + (xt - x0) * t1 + 0.012, 0.1 + (span - 0.1) * t1),
-                 (x0 + (xt - x0) * t1 - 0.012, 0.1 + (span - 0.1) * t1), (x0 + (xt - x0) * t0 - 0.012, 0.1 + (span - 0.1) * t0)],
-                -0.0135, 0.0135, 'glow')
+        F.plate([(x0 + chord * 0.5, r0), (xt + chord * 0.2, span), (xt - chord * 0.2, span), (x0 - chord * 0.5, r0)],
+                -0.012, 0.012, 'armor', bevel=0.003)
+        rm = r0 + (span - r0) * 0.42
+        F.plate([(x0 + chord * 0.5, r0), (x0 + chord * 0.36 - sweep * 0.42, rm), (x0 - chord * 0.36 - sweep * 0.42, rm),
+                 (x0 - chord * 0.5, r0)], -0.019, 0.019, 'plate', bevel=0.003)                      # root armour
+        F.box((x0, r0 + 0.012, 0), (chord * 0.42, 0.016, 0.03), 'dark', bevel=0.004)                # field emitter bar
+        t0, t1 = 0.5, 0.93
+        F.plate([(x0 + (xt - x0) * t0 + 0.013, r0 + (span - r0) * t0), (x0 + (xt - x0) * t1 + 0.013, r0 + (span - r0) * t1),
+                 (x0 + (xt - x0) * t1 - 0.013, r0 + (span - r0) * t1), (x0 + (xt - x0) * t0 - 0.013, r0 + (span - r0) * t0)],
+                -0.0145, 0.0145, 'glow')
         if gun:
-            F.cyl((xt - 0.13, span, 0), (xt + 0.12, span, 0), 0.026, 8, 'plate')
-            F.cyl((xt + 0.1, span, 0), (xt + 0.5, span, 0), 0.011, 6, 'barrel')
-            F.cyl((xt + 0.3, span, 0), (xt + 0.42, span, 0), 0.016, 6, 'coil')
-            F.orb((xt + 0.5, span, 0), 0.014, 'glow', seg=(8, 5))
-            F.cyl((xt - 0.13, span, 0), (xt - 0.14, span, 0), 0.02, 8, 'glow')
+            F.cyl((xt - 0.15, span, 0), (xt + 0.14, span, 0), 0.03, 8, 'plate')
+            F.cyl((xt + 0.12, span, 0), (xt + 0.86, span, 0), 0.012, 6, 'barrel')
+            F.cyl((xt + 0.5, span, 0), (xt + 0.7, span, 0), 0.018, 6, 'coil')
+            F.orb((xt + 0.86, span, 0), 0.015, 'glow', seg=(8, 5))
+            F.cyl((xt - 0.15, span, 0), (xt - 0.16, span, 0), 0.022, 8, 'glow')
         else:
-            F.tube((xt + 0.1, span, 0), (xt - 0.14, span, 0), [(0, 0.01), (0.25, 0.026), (1, 0.031)], 10, 'plate', caps=False)
-            F.cyl((xt - 0.09, span, 0), (xt - 0.1, span, 0), 0.026, 10, 'amber')
-            F.orb((xt + 0.1, span, 0), 0.013, 'amber', seg=(8, 5))
-        F.rot_all(mm, 'X', ang)
+            F.tube((xt + 0.12, span, 0), (xt - 0.16, span, 0), [(0, 0.01), (0.25, 0.028), (1, 0.034)], 10, 'plate', caps=False)
+            F.cyl((xt - 0.1, span, 0), (xt - 0.11, span, 0), 0.028, 10, 'amber')
+            F.orb((xt + 0.12, span, 0), 0.013, 'amber', seg=(8, 5))
 
-    def collar(x0, half):
-        F.cyl((x0 - half, 0, 0), (x0 + half, 0, 0), 0.158, 16, 'plate')
-        F.cyl((x0 - 0.012, 0, 0), (x0 + 0.012, 0, 0), 0.162, 16, 'glow')
+    def arcs(x0, r0, chord):
+        """Jagged plasma bolts from the wing's emitter bar in to the orb, with a few forks."""
+        for _ in range(4):
+            a = Vector((x0 + rnd.uniform(-0.4, 0.4) * chord, r0 - 0.004, rnd.uniform(-0.02, 0.02)))
+            b = Vector((CX + rnd.uniform(-0.07, 0.07), 0.09, rnd.uniform(-0.03, 0.03)))
+            n = rnd.randint(5, 7)
+            pts = [a]
+            for i in range(1, n):
+                p = a.lerp(b, i / n)
+                pts.append(p + Vector((rnd.uniform(-1, 1), rnd.uniform(-0.4, 0.4), rnd.uniform(-1, 1))) * 0.03)
+            pts.append(b)
+            w = rnd.uniform(0.0035, 0.006)
+            for p, q in zip(pts, pts[1:]):
+                F.cyl(p, q, w, 4, 'glow')
+            if rnd.random() < 0.6:                                   # a fork that dies in the gap
+                p = pts[rnd.randint(1, n - 1)]
+                for _ in range(2):
+                    q = p + Vector((rnd.uniform(-1, 1), rnd.uniform(-0.6, 0.2), rnd.uniform(-1, 1))) * 0.045
+                    F.cyl(p, q, w * 0.6, 4, 'glow')
+                    p = q
+        F.box((x0, r0 - 0.006, 0), (chord * 0.4, 0.004, 0.02), 'glow')        # emitter face glows violet
 
-    sets = (('A', (-0.11, 0.68, 0.3, 0.12, 45, True)), ('B', (-0.365, 0.5, 0.23, -0.08, 0, False)))
-    names = []
-    for label in ('A', 'B', ''):
+    def haze(x0, r0, chord):
+        F.tube((x0, r0 - 0.005, 0), (CX, 0.07, 0), [(0, chord * 0.16), (0.4, 0.03), (1, 0.05)], 10, 'glow', caps=False)
+
+    def ring(fn, label):
         F.ST['parts'] = []
-        for lab, sp in sets:
-            if label and lab != label:
-                continue
-            x0, span, chord, sweep, a0, gun = sp
-            collar(x0, 0.1 if gun else 0.085)
+        for (x0, r0, span, chord, sweep, a0, gun) in sets:
             for q in range(4):
-                wing(x0, span, chord, sweep, a0 + 90 * q, gun)
+                mm = F.mark()
+                fn(x0, r0, span, chord, sweep, gun)
+                F.rot_all(mm, 'X', a0 + 90 * q)
+        if label == 'Haze':
+            F.orb((CX, 0, 0), 0.17, 'glow', seg=(16, 10))
         n = len(F.ST['parts'])
-        o = base._join(F.since(0), f'{name}_Wings{label}')
+        o = base._join(F.since(0), f'{name}_{label}')
         for p in o.data.polygons:
             p.use_smooth = True
-        o.parent = ship
-        if label:
-            o.hide_render = True
-            o.hide_viewport = True
-        else:
-            ship['shapes'] += n
-        names.append(o.name)
-    ship['wings_a'], ship['wings_b'], ship['wings'] = names
-    return ship, names[2]
+        return o, n
+
+    wings, n = ring(wing, 'Wings')
+    wings.parent = ship
+    ship['shapes'] += n
+    arc, n = ring(lambda x0, r0, span, chord, sweep, gun: arcs(x0, r0, chord), 'Arcs')
+    _soft(arc, _emit_mat('twinx_arc', (0.33, 0.04, 1.0), 14.0))
+    arc.parent = wings
+    ship['shapes'] += n
+    hz, n = ring(lambda x0, r0, span, chord, sweep, gun: haze(x0, r0, chord), 'Haze')
+    _soft(hz, _emit_mat('twinx_haze', (0.3, 0.03, 1.0), 1.4, soft=2.2, alpha=0.22))
+    hz.parent = wings
+    ship['wings'], ship['arcs'], ship['haze'], ship['orb'] = wings.name, arc.name, hz.name, orb.name
+    return ship, wings.name
 
 
 # ================================================================== missile ship + missile
