@@ -93,6 +93,7 @@ export interface TestBuildItem {
   metal: number;
   deliverySec: number;
   disabledReason: string | null;
+  research?: { nodeId: string; label: string; state: 'ready' | 'short' | 'running' | 'busy' };
 }
 
 export interface TestDropState {
@@ -174,6 +175,7 @@ export interface HudSnapshot {
   unitCount: number;
   unitCap: number;
   queue: TestDropQueue[];
+  research: Array<{ nodeId: string; name: string; progress: number; waiting: boolean }>;
   kits: TestKit[];
   selectedPadId: number | null;
   placementActive: boolean;
@@ -664,6 +666,7 @@ export async function openBuildMenu(page: Page): Promise<void> {
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0))
     .toBeGreaterThanOrEqual(frame + 2);
-  expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBe(queuedBefore);
+  // An earlier order may land meanwhile, so the queue can shrink, but it must not grow.
+  expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBeLessThanOrEqual(queuedBefore);
   await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera), point.before);
 }

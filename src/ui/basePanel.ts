@@ -151,9 +151,10 @@ export class BasePanel {
     this.signature = signature;
     this.bars.clear();
     this.content.replaceChildren();
+    // Opened from the Upgrade command, the selected vehicles' upgrades come first.
+    this.renderUnits(view);
     this.renderResearch(view);
     this.renderStructures(view);
-    this.renderUnits(view);
   }
 
   private section(text: string): void {

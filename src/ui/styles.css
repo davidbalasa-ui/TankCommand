@@ -2005,31 +2005,6 @@ button.corner-action {
   color: var(--green);
 }
 
-.research-card .research-icon {
-  position: absolute;
-  inset: 0 0 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--cyan);
-}
-
-.research-card .research-icon .ico {
-  width: 30px;
-  height: 30px;
-}
-
-.research-note {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: var(--dim);
-}
-
-.hud-shell button.research-more {
-  grid-column: 1 / -1;
-  height: 44px;
-}
-
 .build-empty {
   grid-column: 1 / -1;
   font-size: 12px;
@@ -2923,23 +2898,6 @@ button.corner-action {
   opacity: 1;
 }
 
-.hud-build-panel .research-card {
-  flex: none;
-  width: 140px;
-}
-
-.hud-shell .hud-build-panel button.research-more {
-  flex: none;
-  width: 110px;
-  height: auto;
-}
-
-.hud-build-panel .research-note {
-  flex: none;
-  width: 120px;
-  align-self: center;
-}
-
 /* While the drop menu is open it covers the minimap, selection, groups, commands and select
  * mode; the battlefield above stays live. */
 .hud-shell.build-open .hud-minimap,
@@ -3042,4 +3000,82 @@ button.corner-action {
   font-size: 12px;
   line-height: 1.3;
   text-align: left;
+}
+
+/* Research (overhaul step 4): a locked card is its own unlock. The picture is dimmed, the label
+ * says what one tap researches, and the price and time are the research's. */
+.hud-build-panel .locked-card .card-thumb {
+  opacity: 0.45;
+  filter: saturate(0.4);
+}
+
+.hud-build-panel .locked-card .research-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 2px 5px;
+  font-size: 10px;
+  line-height: 12px;
+  white-space: normal;
+  color: var(--cyan);
+}
+
+.hud-build-panel .locked-card .research-label .ico {
+  display: inline-block;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+.hud-build-panel .locked-card[data-research-state='busy'] .research-label {
+  color: var(--dim);
+}
+
+.hud-build-panel .locked-card .card-cost {
+  color: var(--cyan);
+}
+
+.hud-build-panel .locked-card.short .card-cost {
+  color: #ff7b7b;
+}
+
+.card-research-track {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 2px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.card-research-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--cyan);
+}
+
+/* Research tiles in the top queue strip: cyan, a little wider for the name. */
+.hud-shell button.hud-queue-tile.research {
+  width: 72px;
+  border-color: var(--cyan);
+}
+
+.hud-shell button.hud-queue-tile.research .hud-queue-progress {
+  background: var(--cyan);
+}
+
+.hud-shell button.hud-queue-tile.research .hud-queue-cost {
+  display: block;
+  padding: 0 3px;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-shell button.hud-queue-tile.research.waiting {
+  opacity: 0.6;
 }

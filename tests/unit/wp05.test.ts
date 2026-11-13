@@ -4,7 +4,7 @@ import { decodeSave, encodeSave } from '../../src/platform/saves';
 import { placementValidity } from '../../src/sim/spawn';
 import { padLayout, padQueueSpot } from '../../src/sim/pad';
 import { damageState } from '../../src/sim/structures';
-import { isItemUnlocked } from '../../src/sim/research';
+import { convertResearchIds, isItemUnlocked, loadResearchSides } from '../../src/sim/research';
 import {
   UPGRADE_ARMOR_BONUS,
   UPGRADE_COST_METAL,
@@ -282,38 +282,60 @@ describe('structures, research, upgrades, repair', () => {
     expect(world.dropQueue).toHaveLength(0);
   });
 
-  it('[RES-02] research needs resources and prerequisites, deducts at start, refunds on cancel, unlocks on completion', () => {
-    const lab: StartStructure = { owner: 1, typeId: 'structure.test.lab', x: -35, z: 25 };
+  it('[RES-02] research needs no building, starts from the item (parents first), pays each step as it starts, refunds on cancel, unlocks on completion', () => {
+    // No lab: research is ordered straight from the locked item (overhaul step 4).
     const structures: StartStructure[] = [
       { owner: 1, typeId: 'structure.test.pad', x: -50, z: -50 },
       { owner: 2, typeId: 'structure.test.pad', x: 50, z: 50 },
-      lab,
     ];
     let poor = build({ structures, ore: 10, metal: 0 });
-    const labId = structureId(poor, 'structure.test.lab');
-    poor = run(poor, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.armor' }], 1);
+    poor = run(poor, [{ ...OWN, kind: 'research', nodeId: 'research.human.forts' }], 1);
     expect(poor.lastCommandOutcome).toMatchObject({ ok: false, reason: 'unaffordable' });
+    expect(poor.research.find((side) => side.player === 1)?.active ?? null).toBeNull();
 
+    // Fortifications needs Armor Plating: one order queues both, and only the first is paid now.
     let world = build({ structures, ore: 500, metal: 100 });
-    world = run(world, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.forts' }], 1);
-    expect(world.lastCommandOutcome).toMatchObject({ ok: false, reason: 'prerequisite' });
-
-    world = run(world, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.armor' }], 1);
+    world = run(world, [{ ...OWN, kind: 'research', nodeId: 'research.human.forts' }], 1);
     expect(world.lastCommandOutcome?.ok).toBe(true);
-    const spent = world.resources.find((item) => item.player === 1);
-    expect(spent?.ore).toBe(450);
-    expect(spent?.metal).toBe(90);
+    let side = world.research.find((item) => item.player === 1);
+    expect(side?.active?.nodeId).toBe('research.human.armor');
+    expect(side?.queue).toEqual(['research.human.forts']);
+    expect(world.resources.find((item) => item.player === 1)).toMatchObject({ ore: 450, metal: 90 });
 
-    world = run(world, [{ ...OWN, kind: 'cancelResearch', labId }], 1);
-    const refunded = world.resources.find((item) => item.player === 1);
-    expect(refunded?.ore).toBe(500);
-    expect(refunded?.metal).toBe(100);
+    // One research at a time.
+    world = run(world, [{ ...OWN, kind: 'research', nodeId: 'research.human.armor' }], 1);
+    expect(world.lastCommandOutcome).toMatchObject({ ok: false, reason: 'alreadyResearching' });
 
-    world = run(world, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.armor' }], 1);
+    world = run(world, [{ ...OWN, kind: 'cancelResearch' }], 1);
+    side = world.research.find((item) => item.player === 1);
+    expect(side?.active ?? null).toBeNull();
+    expect(side?.queue).toEqual([]);
+    expect(world.resources.find((item) => item.player === 1)).toMatchObject({ ore: 500, metal: 100 });
+
+    world = run(world, [{ ...OWN, kind: 'research', nodeId: 'research.human.forts' }], SEC + 5);
+    side = world.research.find((item) => item.player === 1);
+    expect(side?.done).toContain('research.human.armor');
+    expect(side?.active?.nodeId).toBe('research.human.forts');
+    expect(world.resources.find((item) => item.player === 1)).toMatchObject({ ore: 370, metal: 70 });
+    expect(isItemUnlocked(world, 1, 'structure.test.turret')).toBe(false);
     world = run(world, [], SEC + 5);
-    expect(world.research.find((side) => side.player === 1)?.done).toContain('research.human.armor');
-    world = run(world, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.forts' }], SEC + 5);
     expect(isItemUnlocked(world, 1, 'structure.test.turret')).toBe(true);
+    expect(world.alerts.some((alert) => alert.kind === 'researchDone' && alert.owner === 1)).toBe(true);
+
+    // Saves from before step 4: old ids map to the new tree, and a lab's running research
+    // becomes the side's running step.
+    expect(convertResearchIds(['research.human.armor_plating', 'research.human.fortifications', 'research.alien.aviation'])).toEqual([
+      'research.human.fortifications',
+      'research.alien.aviation',
+      'research.alien.hover_drive',
+    ]);
+    const loaded = loadResearchSides(
+      [{ player: 1, done: ['research.human.fire_control'] }],
+      [{ owner: 1, research: { nodeId: 'research.human.sensors', left: 4 } }],
+    );
+    expect(loaded).toEqual([
+      { player: 1, done: ['research.human.missiles'], active: { nodeId: 'research.human.sensors', left: 4 }, queue: [] },
+    ]);
   });
 
   it('[UPG-01] an upgrade changes only the chosen vehicle, once per type, and needs its research', () => {
@@ -333,8 +355,7 @@ describe('structures, research, upgrades, repair', () => {
     world = run(world, [{ ...OWN, kind: 'upgrade', targetId: a ?? 0, upgrade: 'armor' }], 1);
     expect(world.lastCommandOutcome).toMatchObject({ ok: false, reason: 'notResearched' });
 
-    const labId = structureId(world, 'structure.test.lab');
-    world = run(world, [{ ...OWN, kind: 'research', labId, nodeId: 'research.human.armor' }], SEC + 5);
+    world = run(world, [{ ...OWN, kind: 'research', nodeId: 'research.human.armor' }], SEC + 5);
     const oreBefore = world.resources.find((item) => item.player === 1)?.ore ?? 0;
     world = run(world, [{ ...OWN, kind: 'upgrade', targetId: a ?? 0, upgrade: 'armor' }], 1);
     expect(world.lastCommandOutcome?.ok).toBe(true);
@@ -441,12 +462,11 @@ describe('structures, research, upgrades, repair', () => {
       ],
       units: [{ owner: 1, typeId: 'unit.test.tank', x: -30, z: -30 }],
     });
-    const labId = structureId(world, 'structure.test.lab');
     const turretId = structureId(world, 'structure.test.turret');
     world = run(
       world,
       [
-        { ...OWN, kind: 'research', labId, nodeId: 'research.human.armor' },
+        { ...OWN, kind: 'research', nodeId: 'research.human.forts' },
         { ...OWN, kind: 'pack', structureId: turretId },
       ],
       15,

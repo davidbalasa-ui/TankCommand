@@ -324,7 +324,7 @@ export class BuildDrawer {
    */
   private researchCard(kind: 'unit' | 'structure', item: BuildItemView): HTMLButtonElement {
     const research = item.research!;
-    const card = el('button', 'build-item build-card research-card');
+    const card = el('button', 'build-item build-card locked-card');
     card.type = 'button';
     card.dataset.controlId = `build.item.${item.id}`;
     card.dataset.researchNode = research.nodeId;
@@ -339,7 +339,7 @@ export class BuildDrawer {
       research.state === 'running'
         ? 'Researching'
         : research.state === 'busy'
-          ? 'After the current research'
+          ? 'Research busy'
           : research.label;
     chip.append(icon('lock'), text);
     card.append(chip);
