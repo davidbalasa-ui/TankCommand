@@ -664,8 +664,9 @@ def tshield(name, size, hit=None, hole=None):
         rg = n.math('MULTIPLY', n.maprange(n.math('ABSOLUTE', n.math('SUBTRACT', dist, ring)), 0.0, 0.05, 1.0, 0.0),
                     n.math('GREATER_THAN', ring, 0.001))
         rg = n.math('MULTIPLY', rg, edge)
-        col = n.mix(n.math('MULTIPLY', rg, 0.8), col, (0.0, 0.02, 0.35))
+        col = n.mix(n.math('MULTIPLY', rg, 0.8), col, (0.35, 0.75, 1.0))
         opa = n.math('MULTIPLY_ADD', rg, 0.5, opa)
+        strength = n.math('MULTIPLY_ADD', rg, 5.0, strength)        # ripples flare as they race out
         flash = n.math('MULTIPLY', n.maprange(dist, 0.0, 0.08, 14.0, 0.0), hitk)
         strength = n.math('ADD', strength, flash)
         # hole
@@ -1064,17 +1065,41 @@ class Space:
             L.data.energy = e
             L.data.keyframe_insert('energy', frame=f)
         lin(L.data)
-        # shield: holds for one second, dark ripples every 6 frames, then breaks
-        sm = self.tsh['dread'].data.materials[0]
-        key_node(sm, 'hitk', [(1, 0.0), (self.F_BEAM + 2, 0.0), (self.F_BEAM + 4, 1.0), (self.F_OFF, 1.0), (self.F_OFF + 8, 0.0)])
-        rk = [(1, 0.0)]
-        for f in range(self.F_BEAM + 3, self.F_BREAK, 6):
-            rk += [(f, 0.04), (f + 5, 0.5)]
+        # shield (David 21:26): the beam hits and the shield warbles, faster and faster; it pops open
+        # where the beam punches through; when the ship loses power the whole shield peels back from
+        # the hole and pulls away from the hull, gone. Nothing of it is left while the ship burns.
+        sh = self.tsh['dread']
+        sm = sh.data.materials[0]
+        key_node(sm, 'hitk', [(1, 0.0), (self.F_BEAM + 2, 0.0), (self.F_BEAM + 4, 0.7), (self.F_BREAK - 1, 1.0),
+                              (self.F_BREAK + 2, 1.0), (self.F_OFF + 2, 0.6)])
+        rk, f, n_ = [(1, 0.0)], float(self.F_BEAM + 3), 0
+        while f < self.F_BREAK - 1:                    # ripples racing outward, each one quicker
+            u = (f - self.F_BEAM) / float(self.F_BREAK - self.F_BEAM)
+            per = max(2.0, 8.0 - 6.5 * u)
+            rk += [(int(round(f)), 0.03), (int(round(f + per)) - 1, 0.45 + 0.2 * u)]
+            f += per
         rk += [(self.F_BREAK, 0.0)]
         key_node(sm, 'ring', rk)
-        key_node(sm, 'hole', [(1, 0.0), (self.F_BREAK - 1, 0.0), (self.F_BREAK, 0.05), (self.F_BREAK + 3, 0.14)])
-        key_node(sm, 'vis', [(self.F_OFF, 0.65), (self.F_OFF + 2, 0.15), (self.F_OFF + 4, 0.55), (self.F_OFF + 6, 0.1),
-                             (self.F_OFF + 8, 0.4), (self.F_OFF + 10, 0.0)], 'CONSTANT')
+        key_node(sm, 'hole', [(1, 0.0), (self.F_BREAK - 1, 0.0), (self.F_BREAK + 1, 0.16), (self.F_BREAK + 4, 0.24),
+                              (self.F_OFF, 0.34), (self.F_OFF + 4, 0.8), (self.F_OFF + 9, 2.2)])
+        # brightens as it strains, then fades as it peels away (vis keys are stepped, so key each frame)
+        key_node(sm, 'vis', [(self.F_BEAM + 6 + 3 * k, min(1.0, 0.7 + 0.06 * k)) for k in range(6)]
+                 + [(self.F_OFF + 2 + k, 1.0 * (1 - k / 7.0)) for k in range(8)], 'CONSTANT')
+        # warble: the field wobbles under the beam, faster and harder until it gives
+        s0 = Vector(sh.scale)
+        ph = 0.0
+        for f in range(self.F_BEAM, self.F_OFF + 10):
+            if f <= self.F_BREAK:
+                u = (f - self.F_BEAM) / float(self.F_BREAK - self.F_BEAM)
+                amp, w = 0.01 + 0.05 * u * u, 0.35 + 2.2 * u
+            else:
+                amp, w = 0.02, 1.5
+            ph += w
+            pull = 0.0 if f <= self.F_OFF else 0.22 * ((f - self.F_OFF) / 9.0) ** 1.5   # pulls away, gone
+            sh.scale = (s0.x * (1 + amp * math.sin(ph) + pull), s0.y * (1 - amp * math.sin(ph + 1.7) + pull),
+                        s0.z * (1 + amp * math.sin(ph + 3.1) + pull))
+            sh.keyframe_insert('scale', frame=f)
+        show(sh, 1, self.F_OFF + 9, tree=False)
         shards(b['shield_w'], self.F_BREAK, 30, (0.35, 0.7, 1.0), 1.6, 70, seed=60, life=1.4, drift=-d * 0.6)
         blue_boom(b['shield_w'], self.F_BREAK, 4.0, life=0.5, light=2e5)
         # hull: white-hot spot (0:15-0:15.5), molten hole, spray out of the far side (0:15.5)
