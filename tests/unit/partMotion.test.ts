@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { collectPartMotions, pivotIsSpinner, readPartMotion, updatePartMotions } from '../../src/render/partMotion';
+import { collectPartMotions, pivotIsSpinner, readPartMotion, treadTilesPerMetre, updatePartMotions } from '../../src/render/partMotion';
 import { UnitInstances, markInstanced } from '../../src/render/unitInstances';
 
 const idle = { mining: false, working: false, moving: false };
@@ -121,5 +121,29 @@ describe('moving model parts', () => {
     // The hull keeps the model's own geometry; only the tread gets a copy.
     const hull = meshes.find((mesh) => mesh !== scrolled);
     expect(hull?.geometry.getAttribute('instanceUvScroll')).toBeUndefined();
+  });
+
+  it('[PART-01] tread scroll is matched to ground speed so the top run moves forward without slipping', () => {
+    // A 4 m long top run whose U runs 2 tiles per metre toward +X (forward).
+    const geometry = new THREE.PlaneGeometry(4, 1);
+    geometry.rotateX(-Math.PI / 2);
+    const uv = geometry.getAttribute('uv');
+    const position = geometry.getAttribute('position');
+    for (let i = 0; i < uv.count; i += 1) {
+      uv.setX(i, position.getX(i) * 2);
+    }
+    const tread = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map: new THREE.Texture() }));
+    tread.userData.anim = { type: 'scroll', speed: 3, when: 'moving' };
+    expect(treadTilesPerMetre(tread)).toBeCloseTo(2, 6);
+    const root = new THREE.Object3D();
+    root.scale.setScalar(0.5);
+    root.add(tread);
+    root.updateMatrixWorld(true);
+    const parts = collectPartMotions(root);
+    // 0.5 world units/s at half scale is 1 model metre/s: 2 tiles/s, toward lower U (forward).
+    updatePartMotions(parts, { ...idle, moving: true, travel: 0.5 }, 0.1);
+    expect(tread.userData.uvScroll as number).toBeCloseTo(-0.2, 6);
+    updatePartMotions(parts, { ...idle, moving: false, travel: 0 }, 0.1);
+    expect(tread.userData.uvScroll as number).toBeCloseTo(-0.2, 6);
   });
 });

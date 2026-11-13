@@ -6,6 +6,11 @@
 //   { type: 'swing', axis: [x, y, z], amp: rad, speed: Hz, when, busySpeed? }
 //   { type: 'scroll', speed: tiles/s, when }   (tank treads: slides the texture along U)
 //
+// Treads are matched to the ground instead of using `speed`: the game measures how many texture
+// tiles one metre of the top run holds (and which way U runs) from the mesh, then moves the top
+// run forward at exactly the unit's ground speed, so cleats never slip. `speed` is the fallback
+// for a mesh it cannot measure.
+//
 // `when` is 'always' | 'mining' | 'working' | 'moving'. The axis is in the node's own space and
 // each node already sits on its part's axis, so the part turns by rotating the node about that
 // axis on top of its rest rotation. busySpeed replaces speed while the unit is working.
@@ -36,6 +41,8 @@ export interface PartMotion {
   phase: number;
   /** 0..1: eases the part in and out as its condition starts and stops. */
   blend: number;
+  /** Scroll only: texture tiles per metre along +X on the top run (signed), or null if unknown. */
+  tilesPerMetre: number | null;
 }
 
 /** What the owning unit or structure is doing this frame. */
@@ -43,8 +50,10 @@ export interface PartMotionState {
   mining: boolean;
   working: boolean;
   moving: boolean;
-  /** How fast it is going compared with its top speed (0..1); scales tread scroll. */
+  /** How fast it is going compared with its top speed (0..1); scales the fallback scroll. */
   pace?: number;
+  /** Ground speed in world units per second; drives tread scroll. */
+  travel?: number;
 }
 
 /** userData key a scrolling mesh carries its texture offset (in tiles) under. */
@@ -96,7 +105,14 @@ export function collectPartMotions(root: THREE.Object3D): PartMotion[] {
   root.traverse((node) => {
     const spec = readPartMotion(node.userData.anim);
     if (spec) {
-      out.push({ node, spec, rest: node.quaternion.clone(), phase: 0, blend: spec.when === 'always' ? 1 : 0 });
+      out.push({
+        node,
+        spec,
+        rest: node.quaternion.clone(),
+        phase: 0,
+        blend: spec.when === 'always' ? 1 : 0,
+        tilesPerMetre: spec.type === 'scroll' ? treadTilesPerMetre(node) : null,
+      });
       if (spec.type === 'scroll') {
         node.traverse((child) => {
           if (child instanceof THREE.Mesh) {
@@ -108,6 +124,75 @@ export function collectPartMotions(root: THREE.Object3D): PartMotion[] {
   });
   return out;
 }
+
+const densityCache = new WeakMap<THREE.BufferGeometry, number | null>();
+
+/**
+ * Texture tiles per metre along the node's +X (forward) on the top run of a tread mesh: the median
+ * dU/dX over triangles lying wholly on the top run. Signed, so it also says which way U runs.
+ */
+export function treadTilesPerMetre(node: THREE.Object3D): number | null {
+  let found: number | null = null;
+  node.traverse((child) => {
+    if (found !== null || !(child instanceof THREE.Mesh)) {
+      return;
+    }
+    const geometry = child.geometry as THREE.BufferGeometry;
+    if (!densityCache.has(geometry)) {
+      densityCache.set(geometry, measureTopRun(geometry));
+    }
+    const value = densityCache.get(geometry) ?? null;
+    if (value !== null) {
+      // Into the node's frame (a child mesh may be scaled under the node).
+      const scale = child === node ? 1 : child.scale.x;
+      found = value / (scale || 1);
+    }
+  });
+  return found;
+}
+
+function measureTopRun(geometry: THREE.BufferGeometry): number | null {
+  const position = geometry.getAttribute('position');
+  const uv = geometry.getAttribute('uv');
+  if (!position || !uv) {
+    return null;
+  }
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < position.count; i += 1) {
+    minY = Math.min(minY, position.getY(i));
+    maxY = Math.max(maxY, position.getY(i));
+  }
+  const cut = maxY - Math.max(0.05, (maxY - minY) * 0.08);
+  const index = geometry.getIndex();
+  const count = index ? index.count : position.count;
+  const ratios: number[] = [];
+  for (let t = 0; t + 2 < count; t += 3) {
+    const v = [0, 1, 2].map((k) => (index ? index.getX(t + k) : t + k));
+    if (!v.every((i) => position.getY(i) >= cut)) {
+      continue;
+    }
+    // The edge running most along X gives dU/dX for this triangle.
+    let best: [number, number] | null = null;
+    for (const [a, b] of [[v[0], v[1]], [v[1], v[2]], [v[0], v[2]]] as Array<[number, number]>) {
+      const dx = position.getX(b) - position.getX(a);
+      if (!best || Math.abs(dx) > Math.abs(best[0])) {
+        best = [dx, uv.getX(b) - uv.getX(a)];
+      }
+    }
+    if (best && Math.abs(best[0]) > 1e-4) {
+      ratios.push(best[1] / best[0]);
+    }
+  }
+  if (ratios.length === 0) {
+    return null;
+  }
+  ratios.sort((a, b) => a - b);
+  const median = ratios[Math.floor(ratios.length / 2)] ?? 0;
+  return Math.abs(median) > 1e-4 ? median : null;
+}
+
+const worldScale = new THREE.Vector3();
 
 /** True when this model's TurretPivot is a spinner (so it must not be aimed). */
 export function pivotIsSpinner(parts: readonly PartMotion[]): boolean {
@@ -138,8 +223,18 @@ export function updatePartMotions(parts: readonly PartMotion[], state: PartMotio
     part.blend = on ? Math.min(1, part.blend + step * EASE_PER_SEC) : Math.max(0, part.blend - step * EASE_PER_SEC);
     const speed = state.working && spec.busySpeed !== null ? spec.busySpeed : spec.speed;
     if (spec.type === 'scroll') {
-      // Tiles per second, scaled by how fast the unit is actually going; wraps to stay precise.
-      part.phase = (part.phase + speed * part.blend * (state.pace ?? 1) * step) % 1;
+      let rate: number;
+      if (part.tilesPerMetre !== null && state.travel !== undefined) {
+        // The top run moves forward (+X) at ground speed relative to the hull. Sampling at
+        // u + offset moves the pattern toward lower U, hence the minus sign.
+        part.node.getWorldScale(worldScale);
+        const metres = on ? state.travel / (worldScale.x || 1) : 0;
+        rate = -part.tilesPerMetre * metres;
+      } else {
+        rate = speed * part.blend * (state.pace ?? 1);
+      }
+      // Wraps to stay precise.
+      part.phase = (part.phase + rate * step) % 1;
       const offset = part.phase;
       part.node.traverse((child) => {
         if (child instanceof THREE.Mesh) {
