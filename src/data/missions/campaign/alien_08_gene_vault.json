@@ -140,7 +140,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "Metal feeds research only. Grow a siphon on the metal seam."
+          "text": "Metal feeds research only. Grow a siphon. It crawls to the metal seam by itself."
         }
       ]
     },
@@ -161,7 +161,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "The siphon drinks. Send the spare Ferrier to it to carry the metal. Then tap the locked Weaver in the drop menu, or the Star Vault, to research it."
+          "text": "Siphon grown. Send the spare Ferrier to it, then tap the locked Weaver in the drop menu to research it."
         }
       ]
     },

@@ -713,13 +713,11 @@ def act2(f):
             [('station', f'Build a {station}', 'primary'),
              ('research', f'Research the {mender}', 'primary'), ('raid', 'Drive off the scouting party', 'optional')],
             [
-                T('intro', at(0), msg(say('Metal is for research only. Buy a metal station and place it on the metal seam.',
-                                          'Metal feeds research only. Grow a siphon on the metal seam.'), f)),
+                T('intro', at(0), msg(say('Metal is for research only. Buy a metal station. It drives to the metal seam by itself.',
+                                          'Metal feeds research only. Grow a siphon. It crawls to the metal seam by itself.'), f)),
                 T('station', built(1, R['station']), done('station'),
-                  msg(say(f'Station up. Select the spare Hauler and tap the station to put it on the metal run. Then tap the '
-                          f'locked {mender} card in the drop menu, or the {lab}, to research it.',
-                          f'The siphon drinks. Send the spare Ferrier to it to carry the metal. Then tap the locked {mender} '
-                          f'in the drop menu, or the {lab}, to research it.'), f)),
+                  msg(say(f'Station up. Send the spare Hauler to it, then tap the locked {mender} in the drop menu to research it.',
+                          f'Siphon grown. Send the spare Ferrier to it, then tap the locked {mender} in the drop menu to research it.'), f)),
                 T('research', {'t': 'researchDone', 'side': 1, 'node': f'research.{f}.field_repair'}, done('research')),
                 T('scouts', at(240), msg(say('A small scouting party is coming in from the east.',
                                              'Terran scouts are sniffing around.'), f),

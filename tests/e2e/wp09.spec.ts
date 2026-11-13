@@ -73,6 +73,43 @@ test('[MSN-06] trigger messages show as a toast and the objectives sheet works b
   await expect(page.locator('.objective-list')).toHaveCount(0);
 });
 
+test('[HINT-01] the objective bubble grows to fit a full-length message instead of cutting it off', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone-only layout');
+  await gotoQuiet(page);
+  await waitForHook(page);
+  await openTrainingMission(page);
+  await page.getByRole('button', { name: 'Start mission', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await page.waitForFunction(() => (window.__TC_TEST__?.renderStats().frame ?? 0) > 0);
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
+  const line = page.locator('.hud-objective');
+  await expect(line).toBeVisible();
+  // A message at the word limit (20 words), with a speaker, as the longest a mission may send.
+  const words = 'Station up. Send the spare Hauler to it, then tap the locked Mender in the drop menu to research it.';
+  // Put the message in and measure in one go, before the HUD's next refresh can swap it back.
+  const fit = await page.evaluate((text) => {
+    const node = document.querySelector('.hud-objective') as HTMLElement;
+    const target = node.querySelector('.hud-objective-text') as HTMLElement;
+    target.innerHTML = `<span class="hud-toast"><strong>Command: </strong>${text}</span>`;
+    node.classList.add('message');
+    const box = node.getBoundingClientRect();
+    return {
+      clipped: target.scrollHeight > target.clientHeight + 1 || target.scrollWidth > target.clientWidth + 1,
+      left: box.left,
+      right: box.right,
+      viewport: window.innerWidth,
+      lines: Math.round(target.clientHeight / parseFloat(getComputedStyle(target).lineHeight)),
+      shown: target.textContent ?? '',
+    };
+  }, words);
+  await page.screenshot({ path: 'test-results/shots/hint-01-objective.png' });
+  expect(fit.clipped).toBe(false);
+  expect(fit.left).toBeGreaterThanOrEqual(90);
+  expect(fit.right).toBeLessThanOrEqual(fit.viewport - 90);
+  expect(fit.lines).toBeLessThanOrEqual(3);
+  expect(fit.shown).toContain('to research it.');
+});
+
 test('[SKR-01] every skirmish setup option takes effect in the started match', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone-only touch flow');
   await page.addInitScript(() => {

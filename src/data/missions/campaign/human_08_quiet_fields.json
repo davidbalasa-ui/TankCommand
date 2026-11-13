@@ -140,7 +140,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Metal is for research only. Buy a metal station and place it on the metal seam."
+          "text": "Metal is for research only. Buy a metal station. It drives to the metal seam by itself."
         }
       ]
     },
@@ -161,7 +161,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Station up. Select the spare Hauler and tap the station to put it on the metal run. Then tap the locked Mender card in the drop menu, or the Research Lab, to research it."
+          "text": "Station up. Send the spare Hauler to it, then tap the locked Mender in the drop menu to research it."
         }
       ]
     },

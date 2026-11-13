@@ -21,6 +21,7 @@ import type {
   PlacementView,
   WorkerActions,
 } from './router';
+import { SELECT_HINT_TEXT } from './textLimits';
 
 export interface HudCamera {
   targetX: number;
@@ -557,7 +558,7 @@ export class Hud implements HudHandle {
     } catch {
       return;
     }
-    const hint = el('button', 'hud-hint', 'Double-tap a unit to pick all of its kind. Hold, then drag, for a box. Or turn on Select.');
+    const hint = el('button', 'hud-hint', SELECT_HINT_TEXT);
     hint.type = 'button';
     hint.dataset.hudItem = 'selectHint';
     const close = (): void => {
