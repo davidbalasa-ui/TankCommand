@@ -16,7 +16,7 @@ import type {
   UnitState,
   WorldState,
 } from '../sim/types';
-import { AI_DATA, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
+import { AI_DATA, AI_RESEARCH_ORDER, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
 
 type Untimed = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
 
@@ -503,19 +503,16 @@ function strategic(planner: Planner): void {
     }
   }
 
-  // Army, research and defences.
-  const labType = planner.myStructureTypes().find((t) => t.kind === 'lab');
-  const lab = structures.find((s) => planner.structureKind(s) === 'lab');
-  if (data.useLab && labType && !lab && !hasKit && fighters.length >= 3 && planner.queued(labType.id) === 0) {
-    planner.buyStructure(labType, data.reserveOre);
-  }
-  if (lab && lab.research === null && lab.work === null) {
+  // Army, research and defences. Research needs no building: one step at a time once an army exists.
+  const sideRes = world.research.find((r) => r.player === planner.player);
+  const researchIdle = !sideRes || (sideRes.active === null && sideRes.queue.length === 0);
+  if (data.research && researchIdle && fighters.length >= 3) {
     const done = researchDone(world, planner.player);
-    const node = [...world.researchTree.values()]
-      .filter((n) => n.faction === faction(world, planner.player) && !done.has(n.id) && n.requires.every((r) => done.has(r)))
-      .sort((a, b) => a.cost.ore + a.cost.metal - (b.cost.ore + b.cost.metal) || a.id.localeCompare(b.id))[0];
+    const prefix = `research.${faction(world, planner.player)}.`;
+    const node = AI_RESEARCH_ORDER.map((name) => world.researchTree.get(prefix + name))
+      .find((n) => n !== undefined && !done.has(n.id) && n.requires.every((r) => done.has(r)));
     if (node && planner.canAfford(node.cost.ore, node.cost.metal, data.reserveOre + 100)) {
-      planner.commands.push({ kind: 'research', labId: lab.id, nodeId: node.id });
+      planner.commands.push({ kind: 'research', nodeId: node.id });
     }
   }
   // Every other defence is anti-air once enemy aircraft have shown up (and it is unlocked).

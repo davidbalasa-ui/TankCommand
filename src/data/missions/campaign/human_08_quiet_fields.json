@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 8,
   "title": "Quiet Fields",
-  "briefing": "The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the spare Hauler to carry the metal home, then build a lab and finish one research project.",
+  "briefing": "The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the spare Hauler to carry the metal home, then research the Mender repair truck.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -22,12 +22,11 @@
         "structure.human.radar",
         "unit.human.heavy_tank",
         "structure.human.metal_station",
-        "structure.human.lab"
+        "unit.human.repair"
       ],
       "researchDone": [
-        "research.human.armor_plating",
         "research.human.fortifications",
-        "research.human.fire_control",
+        "research.human.missiles",
         "research.human.sensors",
         "research.human.heavy_armor"
       ]
@@ -105,6 +104,12 @@
       "structureType": "structure.human.landing_pad",
       "x": -62,
       "z": 58
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.lab",
+      "x": -74,
+      "z": 68
     }
   ],
   "objectives": [
@@ -114,13 +119,8 @@
       "kind": "primary"
     },
     {
-      "id": "lab",
-      "text": "Build a lab",
-      "kind": "primary"
-    },
-    {
       "id": "research",
-      "text": "Finish one research",
+      "text": "Research the Mender",
       "kind": "primary"
     },
     {
@@ -161,28 +161,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Station up. Select the spare Hauler and tap the station to put it on the metal run. Now the lab."
-        }
-      ]
-    },
-    {
-      "id": "lab",
-      "when": {
-        "t": "structureBuilt",
-        "side": 1,
-        "structureType": "structure.human.lab",
-        "count": 1
-      },
-      "do": [
-        {
-          "t": "setObjective",
-          "id": "lab",
-          "status": "done"
-        },
-        {
-          "t": "message",
-          "speaker": "Command",
-          "text": "Tap the lab to pick a research project."
+          "text": "Station up. Select the spare Hauler and tap the station to put it on the metal run. Then tap the locked Mender card in the drop menu, or the Research Lab, to research it."
         }
       ]
     },
@@ -191,7 +170,7 @@
       "when": {
         "t": "researchDone",
         "side": 1,
-        "count": 6
+        "node": "research.human.field_repair"
       },
       "do": [
         {

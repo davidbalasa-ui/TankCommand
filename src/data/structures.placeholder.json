@@ -183,7 +183,8 @@
     "modelId": "structure.human.lab",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
-    "roleLabel": "Research lab"
+    "roleLabel": "Research lab",
+    "buyable": false
   },
   {
     "faction": "alien",
@@ -275,7 +276,8 @@
     "modelId": "structure.alien.lab",
     "dismantleSec": 4,
     "dismantleRefundPercent": 70,
-    "roleLabel": "Research lab"
+    "roleLabel": "Research lab",
+    "buyable": false
   },
   {
     "faction": "human",

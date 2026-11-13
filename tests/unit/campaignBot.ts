@@ -6,7 +6,7 @@ import { stepWithAi } from '../../src/ai/driver';
 import { isFightingUnitType } from '../../src/sim/economy';
 import { isHostile } from '../../src/sim/diplomacy';
 import { hasFreeAirSlot } from '../../src/sim/air';
-import { isItemUnlocked, researchDone } from '../../src/sim/research';
+import { isItemUnlocked, researchDone, researchRejection } from '../../src/sim/research';
 import { PAD_RALLY_DISTANCE, padLayout } from '../../src/sim/pad';
 import { placementValidity } from '../../src/sim/spawn';
 import { missionAllows, missionMarkers } from '../../src/sim/triggers';
@@ -117,15 +117,13 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     (c): c is Extract<Condition, { t: 'structureBuilt' }> =>
       c.t === 'structureBuilt' && c.side === me && built(c) < (c.count ?? 1) && usable(c.structureType),
   );
-  // Research needs a lab, and a lab's research needs metal: a station and a hauler.
+  // Research needs metal: a station and a hauler. It needs no building (overhaul step 4).
   const researching = open.some((c) => c.t === 'researchDone' && c.side === me);
-  const lab = ownStructures.find((s) => w.structureTypes.get(s.typeId)?.kind === 'lab');
+  const sideResearch = w.research.find((r) => r.player === me);
+  const researchIdle = !sideResearch || (sideResearch.active === null && sideResearch.queue.length === 0);
   const station = ownStructures.find((s) => w.structureTypes.get(s.typeId)?.kind === 'metalStation');
   const needs: string[] = wanted.map((c) => c.structureType);
   if (researching && faction) {
-    if (!lab) {
-      needs.push(`structure.${faction}.lab`);
-    }
     if (!station) {
       needs.push(`structure.${faction}.metal_station`);
     }
@@ -170,23 +168,24 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     } else if (tower && towers < MAX_TOWERS && !pendingKit && enemyStructures.length === 0 && stats.ore >= tower.cost.ore) {
       out.push({ kind: 'buy', itemId: tower.id, padId: pad.id });
     } else {
-      // While a research goal waits on a free lab, keep enough ore back to start it.
-      const saving = lab && researching && !lab.research ? RESEARCH_SAVINGS : 0;
+      // While a research goal waits to start, keep enough ore back to start it.
+      const saving = researching && researchIdle ? RESEARCH_SAVINGS : 0;
       const tank = tanks.find((t) => stats.ore >= t.oreCost + saving && stats.metal >= t.metalCost);
       if (tank) {
         out.push({ kind: 'buy', itemId: tank.id, padId: pad.id });
       }
     }
   }
-  if (lab && researching && !lab.research && stats) {
+  if (researching && researchIdle && stats) {
+    // Like a player: tap the locked card of something this mission offers.
     const done = researchDone(w, me);
     const goal = open.find((c): c is Extract<Condition, { t: 'researchDone' }> => c.t === 'researchDone' && c.side === me);
     const node = [...w.researchTree.values()]
-      .filter((n) => n.id.startsWith(`research.${faction}.`) && !done.has(n.id) && n.requires.every((r) => done.has(r)))
-      .filter((n) => !goal?.node || n.id === goal.node)
-      .sort((a, b) => a.cost.ore + a.cost.metal * 3 - (b.cost.ore + b.cost.metal * 3))[0];
-    if (node && stats.ore >= node.cost.ore && stats.metal >= node.cost.metal) {
-      out.push({ kind: 'research', labId: lab.id, nodeId: node.id });
+      .filter((n) => n.id.startsWith(`research.${faction}.`) && !done.has(n.id))
+      .filter((n) => (goal?.node ? n.id === goal.node : n.unlocks.some((item) => missionAllows(w, me, item))))
+      .sort((a, b) => a.cost.ore + a.cost.metal * 3 - (b.cost.ore + b.cost.metal * 3) || a.id.localeCompare(b.id))[0];
+    if (node && researchRejection(w, me, node.id) === null) {
+      out.push({ kind: 'research', nodeId: node.id });
     }
   }
   const stations = ownStructures.filter((s) => w.structureTypes.get(s.typeId)?.kind === 'metalStation');

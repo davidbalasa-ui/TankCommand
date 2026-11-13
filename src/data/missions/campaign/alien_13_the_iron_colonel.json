@@ -22,7 +22,6 @@
         "structure.alien.radar",
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
-        "structure.alien.lab",
         "unit.alien.missile_tank",
         "unit.alien.artillery",
         "structure.alien.missile_battery",
@@ -30,15 +29,13 @@
         "unit.alien.glider"
       ],
       "researchDone": [
-        "research.alien.armor_plating",
         "research.alien.fortifications",
-        "research.alien.fire_control",
+        "research.alien.missiles",
         "research.alien.sensors",
         "research.alien.heavy_armor",
-        "research.alien.missiles",
         "research.alien.heavy_ordnance",
         "research.alien.field_repair",
-        "research.alien.aviation"
+        "research.alien.hover_drive"
       ]
     },
     {

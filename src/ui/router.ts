@@ -59,6 +59,36 @@ export interface BuildItemView {
   metal: number;
   deliverySec: number;
   disabledReason: string | null;
+  /** Set while the item is locked: its card is the research order (overhaul step 4). */
+  research?: ItemResearchView;
+}
+
+/** The research a locked card starts: its parents first, then the step that unlocks the item. */
+export interface ItemResearchView {
+  /** The node that unlocks the item (tapping queues any missing parent first). */
+  nodeId: string;
+  /** "Research Sensors, then Aviation". */
+  label: string;
+  /** Price and time of the first step (each step is paid when it starts). */
+  ore: number;
+  metal: number;
+  timeSec: number;
+  /** ready: tap to start. short: can't afford the first step. running: this chain is underway. busy: other research is. */
+  state: 'ready' | 'short' | 'running' | 'busy';
+  /** 0..1 progress of the running step when state is running. */
+  progress: number;
+}
+
+/** One research tile in the top queue strip: the running step, or one waiting after it. */
+export interface ResearchQueueView {
+  nodeId: string;
+  name: string;
+  /** An item the step unlocks, for the tile's picture. */
+  pictureId: string | null;
+  progress: number;
+  remainingSec: number;
+  /** A queued step that hasn't started (it starts, and is paid, when the one before it ends). */
+  waiting: boolean;
 }
 
 export interface PlacementView {
@@ -155,6 +185,7 @@ export interface HudSnapshot {
   unitCount: number;
   unitCap: number;
   queue: DropQueueView[];
+  research: ResearchQueueView[];
   kits: KitView[];
   selectedPadId: number | null;
   placementActive: boolean;
@@ -214,6 +245,8 @@ export interface ScreenContext {
   setSelectedPad?: (id: number) => void;
   buyItem?: (itemId: string) => boolean;
   getDropQueue?: () => DropQueueView[];
+  /** The side's research: the running step first, then any waiting after it. */
+  getResearchQueue?: () => ResearchQueueView[];
   cancelOrder?: (orderId: number) => void;
   getKits?: () => KitView[];
   startPlacement?: (kitId: number) => boolean;

@@ -135,7 +135,6 @@ export function addStructure(world: WorldState, start: StartStructure): Structur
     reloadLeft: 0,
     turretHeading: 0,
     work: null,
-    research: null,
   };
   world.structures.push(structure);
   return structure;

@@ -74,7 +74,7 @@ describe('alerts', () => {
     const base = makeWorld(1, [{ owner: 1, typeId: 'unit.test.tank', x: -50, z: -50 }]);
     const pad: StructureState = {
       id: 900, owner: 1, typeId: padType().id, x: 5, z: 6, hp: 200, containers: 0, fill: 0, depositId: null,
-      upgrades: [], reloadLeft: 0, turretHeading: 0, work: null, research: null,
+      upgrades: [], reloadLeft: 0, turretHeading: 0, work: null,
     };
     const station: StructureState = {
       ...pad, id: 901, typeId: metalStationType().id, x: 20, z: 21, hp: 100,

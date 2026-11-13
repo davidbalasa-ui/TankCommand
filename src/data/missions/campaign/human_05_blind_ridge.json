@@ -22,9 +22,8 @@
         "structure.human.radar"
       ],
       "researchDone": [
-        "research.human.armor_plating",
         "research.human.fortifications",
-        "research.human.fire_control",
+        "research.human.missiles",
         "research.human.sensors"
       ]
     },

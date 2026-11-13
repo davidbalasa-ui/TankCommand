@@ -9,7 +9,8 @@ export interface AiDifficultyData {
   focusFire: boolean;
   retreatLossFraction: number;
   fightersPerTurret: number;
-  useLab: boolean;
+  /** Researches new units and towers (one at a time, like the player). */
+  research: boolean;
   maxStations: number;
   defends: boolean;
   // Air: build an air base once the army has this many fighting units (0 = never use aircraft).
@@ -27,7 +28,7 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     focusFire: false,
     retreatLossFraction: 0.6,
     fightersPerTurret: 99,
-    useLab: false,
+    research: false,
     maxStations: 1,
     defends: false,
     airBaseAfterFighters: 0,
@@ -41,7 +42,7 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     focusFire: true,
     retreatLossFraction: 0.6,
     fightersPerTurret: 5,
-    useLab: true,
+    research: true,
     maxStations: 2,
     defends: true,
     airBaseAfterFighters: 5,
@@ -55,13 +56,26 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     focusFire: true,
     retreatLossFraction: 0.7,
     fightersPerTurret: 4,
-    useLab: true,
+    research: true,
     maxStations: 2,
     defends: true,
     airBaseAfterFighters: 4,
     airStrikeSize: 2,
   },
 };
+
+// The order the computer researches in (node names without the faction): the units it fights with
+// first, then towers, sensors and air.
+export const AI_RESEARCH_ORDER = [
+  'missiles',
+  'heavy_armor',
+  'fortifications',
+  'hover_drive',
+  'heavy_ordnance',
+  'sensors',
+  'field_repair',
+  'aviation',
+];
 
 export const TACTICAL_EVERY_TICKS = 2;
 export const RETREAT_HP_FRACTION = 0.3;

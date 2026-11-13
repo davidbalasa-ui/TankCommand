@@ -22,9 +22,8 @@
         "structure.alien.radar"
       ],
       "researchDone": [
-        "research.alien.armor_plating",
         "research.alien.fortifications",
-        "research.alien.fire_control",
+        "research.alien.missiles",
         "research.alien.sensors"
       ]
     },

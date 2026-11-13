@@ -190,7 +190,6 @@ export interface StructureState {
   turretHeading: number;
   // Pack or dismantle in progress; the structure can't fire while it runs.
   work: { kind: 'pack' | 'dismantle'; left: number } | null;
-  research: { nodeId: string; left: number } | null;
   // Landing pads only: the unit that just came down and is still driving off, and how long
   // the pad keeps waiting for it before the next delivery may land anyway.
   padUnitId?: number | null;
@@ -243,6 +242,10 @@ export interface ResearchNode {
 export interface ResearchSideState {
   player: PlayerId;
   done: string[];
+  /** The step being researched now (paid when it started). */
+  active: { nodeId: string; left: number } | null;
+  /** Steps that start after it, each paid when it starts (a parent, then the item tapped). */
+  queue: string[];
 }
 
 export interface WreckState {

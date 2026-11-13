@@ -103,12 +103,13 @@ const commandSchema = z.discriminatedUnion('kind', [
   }),
   baseCommand.extend({
     kind: z.literal('research'),
-    labId: entityId,
+    // Research no longer needs a building; older replays still carry a lab id, which is ignored.
+    labId: entityId.optional(),
     nodeId: z.string().min(1),
   }),
   baseCommand.extend({
     kind: z.literal('cancelResearch'),
-    labId: entityId,
+    labId: entityId.optional(),
   }),
   baseCommand.extend({
     kind: z.literal('upgrade'),

@@ -28,8 +28,10 @@ import {
   type DropQueueView,
   type HudHandle,
   type HudSnapshot,
+  type ItemResearchView,
   type KitView,
   type PlacementView,
+  type ResearchQueueView,
   type RendererHandle,
   type ScreenContext,
   type ScreenId,
@@ -77,7 +79,7 @@ import type {
 import { GameServices } from './game/services';
 import { FpsMeter } from './ui/fpsMeter';
 import { addStructure, addUnit, placementValidity, structureAtPoint } from './sim/spawn';
-import { isItemUnlocked, researchDone, researchRejection, unlockingNode } from './sim/research';
+import { isItemUnlocked, researchDone, researchPlan, researchRejection, researchStatus, unlockingNode } from './sim/research';
 import { missionAllows } from './sim/triggers';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
@@ -85,7 +87,7 @@ import { perceivedUnits } from './sim/vision';
 import { stepWithAi } from './ai/driver';
 import { missionMarkers } from './sim/triggers';
 import type { StructureState } from './sim/types';
-import type { BaseAction, BaseView } from './ui/basePanel';
+import type { BaseAction, BaseView, ResearchNodeView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
 
 export type { IssuedCommand } from './ui/input';
@@ -333,6 +335,7 @@ export class App {
       },
       buyItem: (itemId) => this.buyItem(itemId),
       getDropQueue: () => this.dropQueue(),
+      getResearchQueue: () => this.researchQueue(),
       cancelOrder: (orderId) => {
         this.cancelOrder(orderId);
       },
@@ -508,7 +511,6 @@ export class App {
           reloadLeft: 0,
           turretHeading: 0,
           work: null,
-          research: null,
         },
       ];
     });
@@ -730,8 +732,7 @@ export class App {
       itemId: string,
     ): string | null => {
       if (!isItemUnlocked(this.world, 1, itemId)) {
-        const node = unlockingNode(this.world, 1, itemId);
-        return `Needs: ${node?.name ?? 'research'}`;
+        return 'Research first';
       }
       if (pads.length === 0) {
         return 'No landing pad';
@@ -758,6 +759,7 @@ export class App {
         metal: row.cost.metal,
         deliverySec: row.deliverySec,
         disabledReason: disabled('unit', row.cost.ore, row.cost.metal, row.id),
+        research: this.itemResearch(row.id),
       });
     }
     for (const row of this.structureRows) {
@@ -774,9 +776,71 @@ export class App {
         metal: row.cost.metal,
         deliverySec: row.deliverySec,
         disabledReason: disabled('structure', row.cost.ore, row.cost.metal, row.id),
+        research: this.itemResearch(row.id),
       });
     }
     return items;
+  }
+
+  /** The research a locked card starts (undefined when the item is unlocked). */
+  private itemResearch(itemId: string): ItemResearchView | undefined {
+    const node = unlockingNode(this.world, 1, itemId);
+    return node ? this.researchView(node.id) : undefined;
+  }
+
+  private researchView(nodeId: string): ItemResearchView | undefined {
+    const plan = researchPlan(this.world, 1, nodeId);
+    const first = plan?.[0];
+    if (!plan || !first) {
+      return undefined;
+    }
+    const status = researchStatus(this.world, 1);
+    const chain = [status.active?.node.id, ...status.queue.map((item) => item.id)];
+    const running = plan.some((step) => chain.includes(step.id));
+    const busy = status.active !== null || status.queue.length > 0;
+    const stats = this.sideStats(1);
+    const short = !stats || stats.ore < first.cost.ore || stats.metal < first.cost.metal;
+    const names = plan.map((step) => step.name);
+    const active = status.active;
+    return {
+      nodeId,
+      label: `Research ${names.join(', then ')}`,
+      ore: first.cost.ore,
+      metal: first.cost.metal,
+      timeSec: first.timeSec,
+      state: running ? 'running' : busy ? 'busy' : short ? 'short' : 'ready',
+      progress: running && active && active.node.timeSec > 0 ? 1 - active.left / active.node.timeSec : 0,
+    };
+  }
+
+  /** The side's research for the top queue strip: the running step, then those waiting. */
+  researchQueue(): ResearchQueueView[] {
+    const status = researchStatus(this.world, 1);
+    const picture = (unlocks: readonly string[]): string | null =>
+      unlocks.find((id) => !id.includes('_packed')) ?? null;
+    const views: ResearchQueueView[] = [];
+    if (status.active) {
+      const node = status.active.node;
+      views.push({
+        nodeId: node.id,
+        name: node.name,
+        pictureId: picture(node.unlocks),
+        progress: node.timeSec > 0 ? 1 - status.active.left / node.timeSec : 1,
+        remainingSec: status.active.left,
+        waiting: false,
+      });
+    }
+    for (const node of status.queue) {
+      views.push({
+        nodeId: node.id,
+        name: node.name,
+        pictureId: picture(node.unlocks),
+        progress: 0,
+        remainingSec: node.timeSec,
+        waiting: true,
+      });
+    }
+    return views;
   }
 
   baseView(): BaseView {
@@ -784,39 +848,49 @@ export class App {
     const stats = this.sideStats(1);
     const faction = this.factionFor(1);
     const own = world.structures.filter((item) => item.owner === 1 && item.hp > 0);
-    const labs = own.filter((item) => world.structureTypes.get(item.typeId)?.kind === 'lab');
-    const idleLab = labs.find((item) => item.research === null && item.work === null) ?? null;
     const done = researchDone(world, 1);
+    const status = researchStatus(world, 1);
+    const queued = status.queue.map((node) => node.id);
+    const itemNames = (ids: readonly string[]): string =>
+      ids.filter((id) => missionAllows(world, 1, id)).map((id) => this.itemName(id)).join(', ');
+    // The research building shows the same unlocks as the locked cards: only research that
+    // unlocks something this match offers.
     const nodes = [...world.researchTree.values()]
-      .filter((node) => node.faction === faction)
+      .filter((node) => node.faction === faction && (done.has(node.id) || itemNames(node.unlocks) !== ''))
       .map((node) => {
-        const running = own.find((item) => item.research?.nodeId === node.id);
-        let state: 'done' | 'researching' | 'available' | 'locked' = 'available';
+        const view = this.researchView(node.id);
+        let state: ResearchNodeView['state'] = 'available';
         let reason: string | null = null;
         if (done.has(node.id)) {
           state = 'done';
-        } else if (running) {
+        } else if (status.active?.node.id === node.id) {
           state = 'researching';
-        } else if (node.requires.some((req) => !done.has(req))) {
-          state = 'locked';
-          const need = node.requires.find((req) => !done.has(req));
-          reason = `Needs: ${world.researchTree.get(need ?? '')?.name ?? 'research'}`;
-        } else if (!stats || stats.ore < node.cost.ore || stats.metal < node.cost.metal) {
+        } else if (queued.includes(node.id)) {
+          state = 'queued';
+        } else if (view?.state === 'busy' || view?.state === 'running') {
+          reason = 'After the current research';
+        } else if (view?.state === 'short') {
           reason = 'Cannot afford';
-        } else if (idleLab) {
-          const code = researchRejection(world, 1, idleLab.id, node.id);
+        } else {
+          const code = researchRejection(world, 1, node.id);
           reason = code === null ? null : code;
         }
         return {
           id: node.id,
           name: node.name,
-          ore: node.cost.ore,
-          metal: node.cost.metal,
-          timeSec: node.timeSec,
+          unlocks: itemNames(node.unlocks),
+          label: view?.label ?? `Research ${node.name}`,
+          ore: view?.ore ?? node.cost.ore,
+          metal: view?.metal ?? node.cost.metal,
+          timeSec: view?.timeSec ?? node.timeSec,
           state,
           reason,
           progress:
-            running?.research && node.timeSec > 0 ? 1 - running.research.left / node.timeSec : state === 'done' ? 1 : 0,
+            state === 'researching' && status.active && node.timeSec > 0
+              ? 1 - status.active.left / node.timeSec
+              : state === 'done'
+                ? 1
+                : 0,
         };
       });
     const structures = own
@@ -862,8 +936,7 @@ export class App {
         };
       });
     return {
-      labId: idleLab?.id ?? labs[0]?.id ?? null,
-      labBusy: labs.length > 0 && idleLab === null,
+      researchBusy: status.active !== null || status.queue.length > 0,
       nodes,
       structures,
       units,
@@ -875,30 +948,10 @@ export class App {
   baseAction(action: BaseAction): boolean {
     const base = { tick: this.world.tick + 1, issuer: 1 };
     switch (action.kind) {
-      case 'research': {
-        const view = this.baseView();
-        const lab = this.world.structures.find(
-          (item) =>
-            item.owner === 1 &&
-            item.hp > 0 &&
-            this.world.structureTypes.get(item.typeId)?.kind === 'lab' &&
-            item.research === null &&
-            item.work === null,
-        );
-        if (!lab || view.labId === null) {
-          return false;
-        }
-        return this.sendCommand({ ...base, kind: 'research', labId: lab.id, nodeId: action.nodeId });
-      }
-      case 'cancelResearch': {
-        const lab = this.world.structures.find(
-          (item) =>
-            item.owner === 1 &&
-            item.research !== null &&
-            (action.nodeId === undefined || item.research.nodeId === action.nodeId),
-        );
-        return lab ? this.sendCommand({ ...base, kind: 'cancelResearch', labId: lab.id }) : false;
-      }
+      case 'research':
+        return this.sendCommand({ ...base, kind: 'research', nodeId: action.nodeId });
+      case 'cancelResearch':
+        return this.sendCommand({ ...base, kind: 'cancelResearch' });
       case 'pack':
         return this.sendCommand({ ...base, kind: 'pack', structureId: action.structureId });
       case 'dismantle':

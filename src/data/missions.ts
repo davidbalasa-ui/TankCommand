@@ -3,6 +3,7 @@ import { parseMission, type MissionRow } from '../sim/missionSchema';
 import { SIM_TICK_HZ } from '../sim/constants';
 import { createWorld } from '../sim/world';
 import { tagUnit, type MissionState } from '../sim/triggers';
+import { convertResearchIds, sideResearch } from '../sim/research';
 import type { SimData } from './simData';
 import type { WorldState } from '../sim/types';
 import training1 from './missions/training_1_drops.json';
@@ -120,11 +121,11 @@ export function buildMissionWorld(
   });
   for (const side of mission.sides) {
     if (side.researchDone && side.researchDone.length > 0) {
-      const entry = world.research.find((item) => item.player === side.player);
-      if (entry) {
-        entry.done.push(...side.researchDone);
-      } else {
-        world.research.push({ player: side.player, done: [...side.researchDone] });
+      const entry = sideResearch(world, side.player);
+      for (const id of convertResearchIds(side.researchDone)) {
+        if (!entry.done.includes(id)) {
+          entry.done.push(id);
+        }
       }
     }
     if (side.controller === 'ai') {

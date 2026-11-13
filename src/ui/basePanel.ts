@@ -5,10 +5,15 @@ import { guardOpeningTap } from './widgets';
 export interface ResearchNodeView {
   id: string;
   name: string;
+  /** What it unlocks, by name ("Javelin, Harpoon Battery"). */
+  unlocks: string;
+  /** "Research Sensors, then Aviation": the steps one tap starts. */
+  label: string;
+  /** Price and time of the first step. */
   ore: number;
   metal: number;
   timeSec: number;
-  state: 'done' | 'researching' | 'available' | 'locked';
+  state: 'done' | 'researching' | 'queued' | 'available';
   reason: string | null;
   progress: number;
 }
@@ -40,8 +45,8 @@ export interface UnitActionView {
 }
 
 export interface BaseView {
-  labId: number | null;
-  labBusy: boolean;
+  /** Research is running or waiting; one at a time per side. */
+  researchBusy: boolean;
   nodes: ResearchNodeView[];
   structures: StructureActionView[];
   units: UnitActionView[];
@@ -72,10 +77,8 @@ function dyn(id: string, label: string, onClick: () => void): HTMLButtonElement 
 }
 
 const REASONS: Record<string, string> = {
-  prerequisite: 'Needs earlier research',
   unaffordable: 'Cannot afford',
-  labBusy: 'Lab busy',
-  noLab: 'Build a Lab first',
+  researchBusy: 'After the current research',
   notResearched: 'Not researched',
   alreadyHave: 'Owned',
 };
@@ -184,26 +187,37 @@ export class BasePanel {
   }
 
   private renderResearch(view: BaseView): void {
-    this.section(view.labId === null ? 'Research (build a Lab to research)' : 'Research');
+    if (view.nodes.length === 0) {
+      return;
+    }
+    // The same unlocks as the locked cards in the drop menu; starting one here is the same order.
+    this.section('Research');
     for (const node of view.nodes) {
       const cost = `${node.ore} O · ${node.metal} M · ${node.timeSec}s`;
       const state =
-        node.state === 'done' ? 'Done' : node.state === 'researching' ? 'Researching' : (node.reason ?? '');
-      const { row, bar } = this.row(node.name, `${cost}${state ? ` · ${state}` : ''}`);
+        node.state === 'done'
+          ? 'Done'
+          : node.state === 'researching'
+            ? 'Researching'
+            : node.state === 'queued'
+              ? 'Next'
+              : (node.reason ?? '');
+      const unlocks = node.unlocks ? ` · ${node.unlocks}` : '';
+      const { row, bar } = this.row(node.name, `${cost}${unlocks}${state ? ` · ${state}` : ''}`);
       row.dataset.researchNode = node.id;
       row.dataset.researchState = node.state;
       this.bars.set(node.id, bar);
       bar.style.width = `${Math.round(node.progress * 100)}%`;
-      if (node.state === 'researching') {
+      if (node.state === 'researching' || node.state === 'queued') {
         const cancel = dyn(`inGame.cancelResearch.${node.id}`, 'Cancel', () => {
           this.act({ kind: 'cancelResearch', nodeId: node.id });
         });
         row.append(cancel);
       } else if (node.state !== 'done') {
-        const start = dyn(`inGame.research.${node.id}`, 'Research', () => {
+        const start = dyn(`inGame.research.${node.id}`, node.label, () => {
           this.act({ kind: 'research', nodeId: node.id });
         });
-        start.disabled = node.state === 'locked' || view.labId === null || view.labBusy;
+        start.disabled = view.researchBusy || node.reason !== null;
         row.append(start);
       }
       this.content.append(row);

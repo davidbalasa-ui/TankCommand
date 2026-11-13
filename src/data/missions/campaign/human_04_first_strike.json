@@ -21,7 +21,6 @@
         "structure.human.metal_station"
       ],
       "researchDone": [
-        "research.human.armor_plating",
         "research.human.fortifications"
       ]
     },

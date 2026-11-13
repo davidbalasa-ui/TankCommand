@@ -645,6 +645,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           },
           buyItem: (itemId) => ctx.buyItem?.(itemId) ?? false,
           getDropQueue: () => ctx.getDropQueue?.() ?? [],
+          getResearchQueue: () => ctx.getResearchQueue?.() ?? [],
           cancelOrder: (orderId) => {
             ctx.cancelOrder?.(orderId);
           },
@@ -661,7 +662,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
               canAssign: false,
               canSalvage: false,
             },
-          getBaseView: () => ctx.getBaseView?.() ?? { labId: null, labBusy: false, nodes: [], structures: [], units: [], ore: 0, metal: 0 },
+          getBaseView: () => ctx.getBaseView?.() ?? { researchBusy: false, nodes: [], structures: [], units: [], ore: 0, metal: 0 },
           baseAction: (action) => ctx.baseAction?.(action) ?? false,
           salvageSelected: () => {
             ctx.salvageSelected?.();

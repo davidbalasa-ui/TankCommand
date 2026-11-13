@@ -22,18 +22,15 @@
         "structure.human.radar",
         "unit.human.heavy_tank",
         "structure.human.metal_station",
-        "structure.human.lab",
         "unit.human.hover_tank",
         "unit.human.missile_tank"
       ],
       "researchDone": [
-        "research.human.armor_plating",
         "research.human.fortifications",
-        "research.human.fire_control",
+        "research.human.missiles",
         "research.human.sensors",
         "research.human.heavy_armor",
-        "research.human.aviation",
-        "research.human.missiles",
+        "research.human.hover_drive",
         "research.human.heavy_ordnance"
       ]
     },

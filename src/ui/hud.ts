@@ -3,6 +3,7 @@ import { isHostile } from '../sim/diplomacy';
 import { cellState } from '../sim/vision';
 import { heightAt } from '../sim/map';
 import { UNIT_CAP } from '../sim/tuning';
+import { isUpgradeAvailable } from '../sim/research';
 import type { WorldState } from '../sim/types';
 import { button } from './controls';
 import { BasePanel, type BaseAction, type BaseView } from './basePanel';
@@ -16,6 +17,7 @@ import type {
   HudHandle,
   HudSnapshot,
   KitView,
+  ResearchQueueView,
   PlacementView,
   WorkerActions,
 } from './router';
@@ -54,6 +56,7 @@ export interface HudContext {
   setSelectedPad?: (id: number) => void;
   buyItem?: (itemId: string) => boolean;
   getDropQueue?: () => DropQueueView[];
+  getResearchQueue?: () => ResearchQueueView[];
   cancelOrder?: (orderId: number) => void;
   getKits?: () => KitView[];
   startPlacement?: (kitId: number) => boolean;
@@ -261,6 +264,7 @@ export class Hud implements HudHandle {
   private readonly assignButton: HTMLButtonElement;
   private readonly salvageButton: HTMLButtonElement;
   private readonly deployButton: HTMLButtonElement;
+  private readonly upgradeButton: HTMLButtonElement;
   private readonly buildDrawer: BuildDrawer;
   private readonly basePanel: BasePanel;
   private baseOpen = false;
@@ -315,9 +319,14 @@ export class Hud implements HudHandle {
     this.queueStrip = new QueueStrip({
       getDropQueue: () => this.ctx.getDropQueue?.() ?? [],
       getKits: () => this.ctx.getKits?.() ?? [],
+      getResearch: () => this.ctx.getResearchQueue?.() ?? [],
       cancelOrder: (orderId) => {
         this.ctx.cancelOrder?.(orderId);
       },
+      cancelResearch: () => {
+        this.ctx.baseAction?.({ kind: 'cancelResearch' });
+      },
+      research: (nodeId) => this.ctx.baseAction?.({ kind: 'research', nodeId }) ?? false,
       buyItem: (itemId) => this.ctx.buyItem?.(itemId) ?? false,
       startPlacement: (kitId) => {
         const started = this.ctx.startPlacement?.(kitId) ?? false;
@@ -424,6 +433,11 @@ export class Hud implements HudHandle {
     this.deployButton = commandButton('deploy', 'Deploy', 'deploy', () => {
       this.issueDeploy();
     });
+    // Researched upgrades (armour, fire rate, stealth) for the selected vehicles: opens Base with
+    // the vehicles listed, each upgrade bought per vehicle.
+    this.upgradeButton = commandButton('upgrade', 'Upgrade', 'star', () => {
+      this.setBase(true);
+    });
     this.airButton = commandButton('air', 'Launch', 'air', () => {
       this.issueAir();
     });
@@ -440,6 +454,7 @@ export class Hud implements HudHandle {
       this.queueButton,
       this.salvageButton,
       this.deployButton,
+      this.upgradeButton,
       this.airButton,
     );
 
@@ -469,7 +484,6 @@ export class Hud implements HudHandle {
       },
       getKits: () => this.ctx.getKits?.() ?? [],
       startPlacement: (kitId) => this.ctx.startPlacement?.(kitId) ?? false,
-      getBaseView: () => this.baseView(),
       baseAction: (action) => this.ctx.baseAction?.(action) ?? false,
       getResources: () => {
         const stats = this.ctx.getWorld().resources.find((item) => item.player === 1);
@@ -478,9 +492,6 @@ export class Hud implements HudHandle {
       thumbnail: (kind, typeId) => this.ctx.thumbnail?.(kind, typeId) ?? null,
       close: () => {
         this.setBuildMenu(false);
-      },
-      openBase: () => {
-        this.setBase(true);
       },
     });
 
@@ -586,6 +597,7 @@ export class Hud implements HudHandle {
       unitCount: ownUnits.length,
       unitCap: UNIT_CAP,
       queue: this.ctx.getDropQueue?.() ?? [],
+      research: this.ctx.getResearchQueue?.() ?? [],
       kits: this.ctx.getKits?.() ?? [],
       selectedPadId: this.ctx.getSelectedPadId?.() ?? null,
       placementActive: this.ctx.getPlacement?.() !== null,
@@ -600,8 +612,7 @@ export class Hud implements HudHandle {
   private baseView(): BaseView {
     return (
       this.ctx.getBaseView?.() ?? {
-        labId: null,
-        labBusy: false,
+        researchBusy: false,
         nodes: [],
         structures: [],
         units: [],
@@ -654,6 +665,7 @@ export class Hud implements HudHandle {
     show(this.assignButton, actions.canAssign);
     show(this.salvageButton, actions.canSalvage);
     show(this.deployButton, hasSelection && this.deployableSelected(selection).length > 0);
+    show(this.upgradeButton, hasSelection && this.canUpgrade(selection));
     this.refreshAir(selection);
     this.refreshMission();
     this.queueStrip.refresh();
@@ -763,6 +775,21 @@ export class Hud implements HudHandle {
   }
 
   /** Selected units that can unfold into a structure right now. */
+  /** True when a selected vehicle has an upgrade it doesn't own yet and its research is done. */
+  private canUpgrade(selection: readonly number[]): boolean {
+    const world = this.ctx.getWorld();
+    return selection.some((id) => {
+      const unit = world.units.find((item) => item.id === id && item.owner === 1 && item.hp > 0);
+      const kinds = unit ? (world.unitTypes.get(unit.typeId)?.upgrades ?? []) : [];
+      return kinds.some(
+        (kind) =>
+          (kind === 'fireRate' || kind === 'armor' || kind === 'stealth') &&
+          !unit?.upgrades.includes(kind) &&
+          isUpgradeAvailable(world, 1, kind),
+      );
+    });
+  }
+
   private deployableSelected(selection: readonly number[]): number[] {
     // Cheap check first: the full base view is only built when a selected unit
     // is of a type that unfolds into a structure.

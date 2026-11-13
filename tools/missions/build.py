@@ -40,17 +40,18 @@ ROLE = {
 OTHER = {'human': 'alien', 'alien': 'human'}
 SPEAKER = {'human': 'Command', 'alien': 'Brood-mind'}
 
-# Research each step of the campaign hands the player for free, so new items arrive by mission,
-# not by a lab the player cannot build yet.
+# Research each step of the campaign hands the player for free, so new items arrive by mission.
+# The basic gun tower needs no research. Fortifications brings the armour upgrade and Missiles the
+# fire-rate upgrade, so each group keeps the upgrades it gave before the step-4 tree.
 RESEARCH = {
-    'towers': ['armor_plating', 'fortifications'],
-    'sensors': ['fire_control', 'sensors'],
-    'heavy': ['armor_plating', 'fortifications', 'heavy_armor'],
-    'artillery': ['fire_control', 'missiles', 'heavy_ordnance'],
-    'hover': ['fire_control', 'sensors', 'aviation'],
-    'repair': ['armor_plating', 'fortifications', 'field_repair'],
-    'air': ['fire_control', 'sensors', 'aviation'],
-    'disc': ['fire_control', 'sensors', 'aviation', 'disc_flight'],
+    'towers': ['fortifications'],
+    'sensors': ['missiles', 'sensors'],
+    'heavy': ['fortifications', 'heavy_armor'],
+    'artillery': ['missiles', 'heavy_ordnance'],
+    'hover': ['hover_drive'],
+    'repair': ['fortifications', 'field_repair'],
+    'air': ['sensors', 'aviation'],
+    'disc': ['sensors', 'aviation'],
 }
 
 
@@ -672,7 +673,8 @@ act1('alien')
 # ---------------------------------------------------------------- act 2 (both sides)
 
 ACT2_BASE = ('towers', 'sensors', 'heavy')
-ACT2_UNITS = ('light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar', 'heavy', 'station', 'lab')
+# The lab is not bought any more (research starts from a locked card); missions may still place one.
+ACT2_UNITS = ('light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar', 'heavy', 'station')
 
 
 def built(side, structure, count=1, x=None, z=None, radius=None):
@@ -690,33 +692,35 @@ def act2(f):
     def say(human_text, alien_text):
         return human_text if terran else alien_text
 
-    # 8: breather. Metal, a lab and the first research of the player's own.
+    # 8: breather. Metal and the first research of the player's own, started from a locked card
+    # (the repair vehicle) or from the research building the colony already has.
     hx, hz = FIELDS_HOME
     start8 = research(f, *ACT2_BASE)
-    lab = say('lab', 'Star Vault')
+    lab = say('Research Lab', 'Star Vault')
+    mender = say('Mender', 'Weaver')
     station = say('metal station', 'siphon')
     mission(f, 8, say('quiet_fields', 'gene_vault'), say('Quiet Fields', 'The Star Vault'),
             say('The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the '
-                'spare Hauler to carry the metal home, then build a lab and finish one research project.',
+                'spare Hauler to carry the metal home, then research the Mender repair truck.',
                 'The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry '
-                'the metal home, then grow a Star Vault and finish one research.'),
+                'the metal home, then wake the Star Vault and research the Weaver.'),
             'map.c_quiet_fields',
-            [player_side(f, 900, available=avail(f, *ACT2_UNITS), research_done=start8), enemy_side(e)],
+            [player_side(f, 900, available=avail(f, *ACT2_UNITS, 'repair'), research_done=start8), enemy_side(e)],
             [U(1, R['light'], x, z, -0.7) for x, z in spread(hx + 10, hz - 10, 4)]
             + [U(1, R['heavy'], hx + 14, hz - 2, -0.7), U(1, R['miner'], hx - 10, hz - 4), U(1, R['tug'], hx + 4, hz + 10),
                U(1, R['tug'], hx + 8, hz + 8, tag='metalHauler')],
-            [S(1, R['pad'], hx, hz)],
-            [('station', f'Build a {station}', 'primary'), ('lab', f'Build a {lab}', 'primary'),
-             ('research', 'Finish one research', 'primary'), ('raid', 'Drive off the scouting party', 'optional')],
+            [S(1, R['pad'], hx, hz), S(1, R['lab'], hx - 12, hz + 10)],
+            [('station', f'Build a {station}', 'primary'),
+             ('research', f'Research the {mender}', 'primary'), ('raid', 'Drive off the scouting party', 'optional')],
             [
                 T('intro', at(0), msg(say('Metal is for research only. Buy a metal station and place it on the metal seam.',
                                           'Metal feeds research only. Grow a siphon on the metal seam.'), f)),
                 T('station', built(1, R['station']), done('station'),
-                  msg(say('Station up. Select the spare Hauler and tap the station to put it on the metal run. Now the lab.',
-                          'The siphon drinks. Send the spare Ferrier to it to carry the metal. Now the Star Vault.'), f)),
-                T('lab', built(1, R['lab']), done('lab'),
-                  msg(say('Tap the lab to pick a research project.', 'Tap the Star Vault to pick a research.'), f)),
-                T('research', {'t': 'researchDone', 'side': 1, 'count': len(start8) + 1}, done('research')),
+                  msg(say(f'Station up. Select the spare Hauler and tap the station to put it on the metal run. Then tap the '
+                          f'locked {mender} card in the drop menu, or the {lab}, to research it.',
+                          f'The siphon drinks. Send the spare Ferrier to it to carry the metal. Then tap the locked {mender} '
+                          f'in the drop menu, or the {lab}, to research it.'), f)),
+                T('research', {'t': 'researchDone', 'side': 1, 'node': f'research.{f}.field_repair'}, done('research')),
                 T('scouts', at(240), msg(say('A small scouting party is coming in from the east.',
                                              'Terran scouts are sniffing around.'), f),
                   spawn(2, E['scout'], 3, 70, -10, tag='scouts'), spawn(2, E['light'], 1, 74, -4, tag='scouts'),

@@ -22,10 +22,9 @@
         "unit.alien.heavy_tank"
       ],
       "researchDone": [
-        "research.alien.armor_plating",
         "research.alien.fortifications",
         "research.alien.heavy_armor",
-        "research.alien.fire_control",
+        "research.alien.missiles",
         "research.alien.sensors"
       ]
     },

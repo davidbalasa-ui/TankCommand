@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 8,
   "title": "The Star Vault",
-  "briefing": "The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry the metal home, then grow a Star Vault and finish one research.",
+  "briefing": "The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry the metal home, then wake the Star Vault and research the Weaver.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -22,12 +22,11 @@
         "structure.alien.radar",
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
-        "structure.alien.lab"
+        "unit.alien.repair"
       ],
       "researchDone": [
-        "research.alien.armor_plating",
         "research.alien.fortifications",
-        "research.alien.fire_control",
+        "research.alien.missiles",
         "research.alien.sensors",
         "research.alien.heavy_armor"
       ]
@@ -105,6 +104,12 @@
       "structureType": "structure.alien.landing_pad",
       "x": -62,
       "z": 58
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.lab",
+      "x": -74,
+      "z": 68
     }
   ],
   "objectives": [
@@ -114,13 +119,8 @@
       "kind": "primary"
     },
     {
-      "id": "lab",
-      "text": "Build a Star Vault",
-      "kind": "primary"
-    },
-    {
       "id": "research",
-      "text": "Finish one research",
+      "text": "Research the Weaver",
       "kind": "primary"
     },
     {
@@ -161,28 +161,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "The siphon drinks. Send the spare Ferrier to it to carry the metal. Now the Star Vault."
-        }
-      ]
-    },
-    {
-      "id": "lab",
-      "when": {
-        "t": "structureBuilt",
-        "side": 1,
-        "structureType": "structure.alien.lab",
-        "count": 1
-      },
-      "do": [
-        {
-          "t": "setObjective",
-          "id": "lab",
-          "status": "done"
-        },
-        {
-          "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Tap the Star Vault to pick a research."
+          "text": "The siphon drinks. Send the spare Ferrier to it to carry the metal. Then tap the locked Weaver in the drop menu, or the Star Vault, to research it."
         }
       ]
     },
@@ -191,7 +170,7 @@
       "when": {
         "t": "researchDone",
         "side": 1,
-        "count": 6
+        "node": "research.alien.field_repair"
       },
       "do": [
         {

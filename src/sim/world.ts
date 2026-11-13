@@ -64,6 +64,7 @@ import {
 import {
   applyCancelResearchCommand,
   applyResearchCommand,
+  loadResearchSides,
   updateResearch,
 } from './research';
 import { applyUpgradeCommand, reloadSeconds, unitArmor, structureArmor } from './upgrades';
@@ -197,8 +198,11 @@ function cloneStructure(structure: StructureState): StructureState {
     ...structure,
     upgrades: [...structure.upgrades],
     work: structure.work ? { ...structure.work } : null,
-    research: structure.research ? { ...structure.research } : null,
   };
+}
+
+function cloneResearchSide(side: ResearchSideState): ResearchSideState {
+  return { ...side, done: [...side.done], active: side.active ? { ...side.active } : null, queue: [...side.queue] };
 }
 
 function cloneVision(item: VisionSideState): VisionSideState {
@@ -218,7 +222,7 @@ function cloneWorld(world: WorldState): WorldState {
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
     rubble: world.rubble.map((item) => ({ ...item })),
-    research: world.research.map((item) => ({ ...item, done: [...item.done] })),
+    research: world.research.map(cloneResearchSide),
     mission: world.mission ? cloneMission(world.mission) : null,
     vision: world.vision.map(cloneVision),
     aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
@@ -1441,7 +1445,7 @@ export function worldToPayload(world: WorldState): unknown {
     projectiles: world.projectiles.map((projectile) => ({ ...projectile })),
     wrecks: world.wrecks.map((wreck) => ({ ...wreck })),
     rubble: world.rubble.map((item) => ({ ...item })),
-    research: world.research.map((side) => ({ ...side, done: [...side.done] })),
+    research: world.research.map(cloneResearchSide),
     lastCommandOutcome: world.lastCommandOutcome ? { ...world.lastCommandOutcome } : null,
     result: world.result ? { winner: world.result.winner } : null,
     unitTypes,
@@ -1527,7 +1531,6 @@ export function payloadToWorld(input: unknown): WorldState | null {
         reloadLeft: structure.reloadLeft ?? 0,
         turretHeading: structure.turretHeading ?? 0,
         work: structure.work ?? null,
-        research: structure.research ?? null,
       }))
     : [];
   const researchTree = new Map<string, ResearchNode>();
@@ -1537,9 +1540,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
     }
   }
   const rubble: RubbleState[] = Array.isArray(input.rubble) ? (input.rubble as RubbleState[]) : [];
-  const research: ResearchSideState[] = Array.isArray(input.research)
-    ? (input.research as ResearchSideState[])
-    : [];
+  const research = loadResearchSides(input.research, input.structures);
   const deposits: DepositState[] = Array.isArray(input.deposits)
     ? (input.deposits as DepositState[])
     : [];

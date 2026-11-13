@@ -20,7 +20,6 @@
         "structure.human.turret"
       ],
       "researchDone": [
-        "research.human.armor_plating",
         "research.human.fortifications"
       ]
     },

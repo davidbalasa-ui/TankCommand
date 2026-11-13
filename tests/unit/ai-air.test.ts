@@ -5,8 +5,8 @@ import { assignHome } from '../../src/sim/air';
 import { addStructure, addUnit } from '../../src/sim/spawn';
 import type { WorldState } from '../../src/sim/types';
 
-// Research as normal play reaches it: Aviation needs Sensors, which needs Fire Control.
-const AVIATION = ['research.human.fire_control', 'research.human.sensors', 'research.human.aviation'];
+// Research as normal play reaches it: Aviation needs Sensors.
+const AVIATION = ['research.human.sensors', 'research.human.aviation'];
 
 function setUp(): WorldState {
   const world = aiMatch(3, 'normal', 'hard', false);
@@ -14,7 +14,7 @@ function setUp(): WorldState {
   if (side) {
     side.done = [...AVIATION];
   } else {
-    world.research.push({ player: 1, done: [...AVIATION] });
+    world.research.push({ player: 1, done: [...AVIATION], active: null, queue: [] });
   }
   for (const stats of world.resources) {
     // Units and buildings cost ore only now; the old 1500 metal's worth moves into ore.

@@ -20,7 +20,6 @@
         "structure.alien.turret"
       ],
       "researchDone": [
-        "research.alien.armor_plating",
         "research.alien.fortifications"
       ]
     },

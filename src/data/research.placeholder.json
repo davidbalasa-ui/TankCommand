@@ -1,26 +1,10 @@
 [
   {
-    "id": "research.alien.armor_plating",
-    "name": "Armor Plating",
-    "faction": "alien",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "armor"
-    ],
-    "placeholder": false
-  },
-  {
     "id": "research.alien.aviation",
     "name": "Aviation",
     "faction": "alien",
     "cost": {
-      "ore": 220,
+      "ore": 150,
       "metal": 100
     },
     "timeSec": 45,
@@ -29,25 +13,7 @@
     ],
     "unlocks": [
       "structure.alien.air_base",
-      "unit.alien.glider",
-      "unit.alien.fighter"
-    ],
-    "upgrades": [],
-    "placeholder": false
-  },
-  {
-    "id": "research.alien.disc_flight",
-    "faction": "alien",
-    "name": "Disc Flight",
-    "cost": {
-      "ore": 300,
-      "metal": 150
-    },
-    "timeSec": 60,
-    "requires": [
-      "research.alien.aviation"
-    ],
-    "unlocks": [
+      "unit.alien.fighter",
       "unit.alien.saucer"
     ],
     "upgrades": [],
@@ -58,13 +24,11 @@
     "name": "Field Repair",
     "faction": "alien",
     "cost": {
-      "ore": 150,
-      "metal": 60
+      "ore": 100,
+      "metal": 50
     },
-    "timeSec": 35,
-    "requires": [
-      "research.alien.fortifications"
-    ],
+    "timeSec": 30,
+    "requires": [],
     "unlocks": [
       "unit.alien.repair"
     ],
@@ -72,52 +36,33 @@
     "placeholder": false
   },
   {
-    "id": "research.alien.fire_control",
-    "name": "Fire Control",
-    "faction": "alien",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "fireRate"
-    ],
-    "placeholder": false
-  },
-  {
     "id": "research.alien.fortifications",
     "name": "Fortifications",
     "faction": "alien",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 100,
+      "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.alien.armor_plating"
-    ],
+    "requires": [],
     "unlocks": [
-      "structure.alien.turret"
+      "structure.alien.missile_battery"
     ],
-    "upgrades": [],
+    "upgrades": [
+      "armor"
+    ],
     "placeholder": false
   },
   {
     "id": "research.alien.heavy_armor",
-    "faction": "alien",
     "name": "Heavy Armor",
+    "faction": "alien",
     "cost": {
-      "ore": 200,
-      "metal": 80
+      "ore": 100,
+      "metal": 50
     },
-    "timeSec": 40,
-    "requires": [
-      "research.alien.armor_plating",
-      "research.alien.fortifications"
-    ],
+    "timeSec": 30,
+    "requires": [],
     "unlocks": [
       "unit.alien.heavy_tank"
     ],
@@ -129,10 +74,10 @@
     "name": "Heavy Ordnance",
     "faction": "alien",
     "cost": {
-      "ore": 200,
+      "ore": 150,
       "metal": 100
     },
-    "timeSec": 40,
+    "timeSec": 45,
     "requires": [
       "research.alien.missiles"
     ],
@@ -143,22 +88,37 @@
     "placeholder": false
   },
   {
-    "id": "research.alien.missiles",
+    "id": "research.alien.hover_drive",
+    "name": "Hover Drive",
     "faction": "alien",
-    "name": "Missiles",
     "cost": {
-      "ore": 120,
+      "ore": 100,
       "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.alien.fire_control"
-    ],
+    "requires": [],
     "unlocks": [
-      "unit.alien.missile_tank",
-      "structure.alien.missile_battery"
+      "unit.alien.glider"
     ],
     "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.missiles",
+    "name": "Missiles",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.alien.missile_tank"
+    ],
+    "upgrades": [
+      "fireRate"
+    ],
     "placeholder": false
   },
   {
@@ -166,13 +126,11 @@
     "name": "Sensors",
     "faction": "alien",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 100,
+      "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.alien.fire_control"
-    ],
+    "requires": [],
     "unlocks": [
       "structure.alien.radar",
       "unit.alien.radar"
@@ -183,27 +141,11 @@
     "placeholder": false
   },
   {
-    "id": "research.human.armor_plating",
-    "name": "Armor Plating",
-    "faction": "human",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "armor"
-    ],
-    "placeholder": false
-  },
-  {
     "id": "research.human.aviation",
     "name": "Aviation",
     "faction": "human",
     "cost": {
-      "ore": 220,
+      "ore": 150,
       "metal": 100
     },
     "timeSec": 45,
@@ -212,9 +154,8 @@
     ],
     "unlocks": [
       "structure.human.air_base",
-      "unit.human.hover_tank",
-      "unit.human.bomber",
-      "unit.human.fighter"
+      "unit.human.fighter",
+      "unit.human.bomber"
     ],
     "upgrades": [],
     "placeholder": false
@@ -224,13 +165,11 @@
     "name": "Field Repair",
     "faction": "human",
     "cost": {
-      "ore": 150,
-      "metal": 60
+      "ore": 100,
+      "metal": 50
     },
-    "timeSec": 35,
-    "requires": [
-      "research.human.fortifications"
-    ],
+    "timeSec": 30,
+    "requires": [],
     "unlocks": [
       "unit.human.repair"
     ],
@@ -238,52 +177,33 @@
     "placeholder": false
   },
   {
-    "id": "research.human.fire_control",
-    "name": "Fire Control",
-    "faction": "human",
-    "cost": {
-      "ore": 80,
-      "metal": 20
-    },
-    "timeSec": 20,
-    "requires": [],
-    "unlocks": [],
-    "upgrades": [
-      "fireRate"
-    ],
-    "placeholder": false
-  },
-  {
     "id": "research.human.fortifications",
     "name": "Fortifications",
     "faction": "human",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 100,
+      "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.human.armor_plating"
-    ],
+    "requires": [],
     "unlocks": [
-      "structure.human.turret"
+      "structure.human.missile_battery"
     ],
-    "upgrades": [],
+    "upgrades": [
+      "armor"
+    ],
     "placeholder": false
   },
   {
     "id": "research.human.heavy_armor",
-    "faction": "human",
     "name": "Heavy Armor",
+    "faction": "human",
     "cost": {
-      "ore": 200,
-      "metal": 80
+      "ore": 100,
+      "metal": 50
     },
-    "timeSec": 40,
-    "requires": [
-      "research.human.armor_plating",
-      "research.human.fortifications"
-    ],
+    "timeSec": 30,
+    "requires": [],
     "unlocks": [
       "unit.human.heavy_tank"
     ],
@@ -295,10 +215,10 @@
     "name": "Heavy Ordnance",
     "faction": "human",
     "cost": {
-      "ore": 200,
+      "ore": 150,
       "metal": 100
     },
-    "timeSec": 40,
+    "timeSec": 45,
     "requires": [
       "research.human.missiles"
     ],
@@ -309,22 +229,37 @@
     "placeholder": false
   },
   {
-    "id": "research.human.missiles",
+    "id": "research.human.hover_drive",
+    "name": "Hover Drive",
     "faction": "human",
-    "name": "Missiles",
     "cost": {
-      "ore": 120,
+      "ore": 100,
       "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.human.fire_control"
-    ],
+    "requires": [],
     "unlocks": [
-      "unit.human.missile_tank",
-      "structure.human.missile_battery"
+      "unit.human.hover_tank"
     ],
     "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.missiles",
+    "name": "Missiles",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.human.missile_tank"
+    ],
+    "upgrades": [
+      "fireRate"
+    ],
     "placeholder": false
   },
   {
@@ -332,13 +267,11 @@
     "name": "Sensors",
     "faction": "human",
     "cost": {
-      "ore": 120,
-      "metal": 40
+      "ore": 100,
+      "metal": 50
     },
     "timeSec": 30,
-    "requires": [
-      "research.human.fire_control"
-    ],
+    "requires": [],
     "unlocks": [
       "structure.human.radar",
       "unit.human.radar"

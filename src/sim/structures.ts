@@ -107,15 +107,6 @@ export function applyDismantleCommand(
     return;
   }
   own.structure.work = { kind: 'dismantle', left: own.type.dismantleSec };
-  const running = own.structure.research
-    ? world.researchTree.get(own.structure.research.nodeId)
-    : undefined;
-  if (running) {
-    const stats = ensureSideStats(world, command.issuer);
-    stats.ore += running.cost.ore;
-    stats.metal += running.cost.metal;
-  }
-  own.structure.research = null;
   setOutcome(world, command.tick, 'dismantle', true, 'ok');
 }
 
