@@ -834,7 +834,7 @@ class Space:
         # frigate: launches fighters at 0:11, then moves to the squid zone (unseen) for 0:26-0:35
         fz = SQUID_ZONE + Vector((-260, 60, 30))
         key_loc(o['frigate'], [(1, self.T_HOLD['frigate'] - Vector((8, 0, 0))), (fr(12.5), self.T_HOLD['frigate']),
-                               (fr(25.5), fz), (fr(32.8), fz + Vector((30, -10, 0)))], 'LINEAR')
+                               (fr(25.5), fz), (fr(31.0), fz + Vector((5, -2, 0)))], 'LINEAR')
         key_loc(o['missile_ship'], [(1, self.T_HOLD['missile_ship']), (fr(22.5), self.T_HOLD['missile_ship']),
                                     (fr(23.4), Vector((40, -150, -20))), (fr(26.0), Vector((52, -150, -20))),
                                     (NF, Vector((90, -140, -20)))], 'LINEAR')
@@ -1289,7 +1289,13 @@ class Space:
         pass
 
     def squid_hunt(self):
-        pass
+        import squid
+        squid.SquidHunt(self)
+
+    def camera_for(self, sid):
+        if sid.startswith('07'):
+            return self.squid.camera(sid)
+        return None
 
     def drop(self):
         pass
