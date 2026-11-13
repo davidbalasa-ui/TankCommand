@@ -1337,7 +1337,7 @@
     "upgrades": [],
     "deploysTo": "structure.human.radar",
     "deploySec": 4,
-    "modelAssetId": "unit.human.bastion_packed",
+    "modelAssetId": "unit.human.radar_tower_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1374,7 +1374,7 @@
     "upgrades": [],
     "deploysTo": "structure.human.metal_station",
     "deploySec": 6,
-    "modelAssetId": "unit.human.bastion_packed",
+    "modelAssetId": "unit.human.metal_station_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1411,7 +1411,7 @@
     "upgrades": [],
     "deploysTo": "structure.human.air_base",
     "deploySec": 6,
-    "modelAssetId": "unit.human.bastion_packed",
+    "modelAssetId": "unit.human.air_base_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1448,7 +1448,7 @@
     "upgrades": [],
     "deploysTo": "structure.alien.radar",
     "deploySec": 4,
-    "modelAssetId": "unit.alien.thornmound_packed",
+    "modelAssetId": "unit.alien.radar_tower_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1485,7 +1485,7 @@
     "upgrades": [],
     "deploysTo": "structure.alien.metal_station",
     "deploySec": 6,
-    "modelAssetId": "unit.alien.thornmound_packed",
+    "modelAssetId": "unit.alien.metal_station_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1522,7 +1522,7 @@
     "upgrades": [],
     "deploysTo": "structure.alien.air_base",
     "deploySec": 6,
-    "modelAssetId": "unit.alien.thornmound_packed",
+    "modelAssetId": "unit.alien.air_base_packed",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"

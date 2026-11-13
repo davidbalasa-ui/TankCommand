@@ -2363,10 +2363,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     type: SimStructureType,
     visual: StructureVisual,
   ): UnfoldStart | null {
-    if (!visual.model?.userData.unfold || !type.packedUnitId) {
+    // The packed vehicle it came from: its repack type, or (radar, airfield) the one that lands as it.
+    const packedId =
+      type.packedUnitId ?? [...this.world.unitTypes.values()].find((unit) => unit.deploysTo === type.id)?.id ?? null;
+    if (!visual.model?.userData.unfold || !packedId) {
       return null;
     }
-    const unitType = this.world.unitTypes.get(type.packedUnitId);
+    const unitType = this.world.unitTypes.get(packedId);
     const unitModel = unitType?.modelId ? this.templates.get(unitType.modelId)?.children[0] : undefined;
     if (!unitType || !unitModel || visual.modelScale <= 0) {
       return null;
