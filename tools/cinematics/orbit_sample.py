@@ -410,9 +410,16 @@ def load_glb(path, length):
     if len(meshes) > 1:
         bpy.ops.object.join()
     obj = bpy.context.view_layer.objects.active
+    keep = obj.name
+    names = []
     for o in new:
-        if o != obj and o.name in bpy.data.objects:
-            bpy.data.objects.remove(o)
+        try:
+            names.append(o.name)
+        except ReferenceError:
+            pass
+    for n in names:
+        if n != keep and n in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[n])
     xs = [v.co.x for v in obj.data.vertices]
     k = length / (max(xs) - min(xs))
     obj.data.transform(Matrix.Diagonal((k, k, k, 1)))
@@ -773,4 +780,5 @@ def main():
         bpy.ops.render.render(animation=True)
 
 
-main()
+if __name__ == "__main__":
+    main()
