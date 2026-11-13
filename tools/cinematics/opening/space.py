@@ -845,13 +845,14 @@ class Space:
             dims = Vector(ob.dimensions) / ob.scale.x
             size = (dims.x * 0.62, dims.y * 0.75 + 2.5, dims.z * 1.0 + 2.5)
             cen = sum((Vector(b) for b in ob.bound_box), Vector()) / 8
-            hit = self.dread_hit_u if k == 'dread' else None
+            hit = self.dread_hit_u if k == 'dread' else ((1.0, 0.0, 0.0) if k == 'bship' else None)
             sh = tshield(f'TShield_{k}', size, hit=hit)
             sh.parent = ob
             sh.scale = size
             sh.location = cen
             shield_on(sh, f_on)
             self.tsh[k] = sh
+        self.bship_guns()
         # twin-X squadron: launched from the frigate's bays at 0:11, streaking toward the gold
         core, wname = T.twin_x_fighter('TwinX', seed=4)
         self.twinx_src = core
@@ -1148,6 +1149,38 @@ class Space:
             fo.visible_shadow = False
         bpy.context.scene.frame_set(1)
 
+    def bship_guns(self):
+        """Cut the broadside's three cannons off its hull so they can ride retracted (a third of
+        their length, run in flat to the hull) until it rolls into position at 0:17, then extend."""
+        bs = self.obj['bship']
+        from terran_fleet import B_GUNS, B_ROOT_Y
+
+        def grp(c):
+            if c.y < -(B_ROOT_Y + 0.4) and abs(c.z) < 3.2:
+                for n_, gx in enumerate(B_GUNS):
+                    if abs(c.x - gx) < 2.9:
+                        return 1 + n_
+            return 0
+        parts = split_mesh(bs, grp, names=['BshipHull'] + [f'BshipGun{n_}' for n_ in range(len(B_GUNS))])
+        old = bs.data
+        bs.data = parts[0].data
+        bpy.data.objects.remove(parts[0])
+        bpy.data.meshes.remove(old)
+        self.bship_gun_objs = []
+        for n_, (g, gx) in enumerate(zip(parts[1:], B_GUNS)):
+            root = Vector((gx, -B_ROOT_Y, 0.0))
+            g.data.transform(Matrix.Translation(-root))
+            g.parent = bs
+            g.matrix_parent_inverse.identity()
+            g.location = root
+            g.rotation_euler = (0, 0, 0)
+            g.scale = (1, 1, 1)
+            F0, F1 = 409, 432
+            d = 2 * n_
+            key_scale(g, [(1, (0.82, 0.33, 0.82)), (F0 + 6 + d, (0.82, 0.33, 0.82)), (F1 - 6 + d, (1.0, 1.06, 1.0)),
+                          (F1 - 3 + d, (1.0, 1.0, 1.0))])
+            self.bship_gun_objs.append(g)
+
     def barrage(self):
         """0:17 battleship spins 1.25 turns and stops hard, cannons on the shell ship; 0:18 charge
         ribbons round cannons 1-2-3; 10 comets every 6 frames from frame 444, 12-frame flights:
@@ -1182,6 +1215,16 @@ class Space:
             c.scale = (FIGHTER_K,) * 3
             for ob in [c] + list(c.children_recursive):
                 ob.hide_render = False
+                for sl in getattr(ob, 'material_slots', []):   # this close their plasma arcs blew out to
+                    m = sl.material                             # white scribbles: dimmer, truly violet
+                    if m and m.name.startswith('twinx_arc'):
+                        m2 = bpy.data.materials.get('twinx_arc_close') or m.copy()
+                        m2.name = 'twinx_arc_close'
+                        for nd in m2.node_tree.nodes:
+                            if nd.type == 'EMISSION' and not nd.inputs['Strength'].is_linked:
+                                nd.inputs['Strength'].default_value = 3.0
+                        sl.link = 'OBJECT'
+                        sl.material = m2
             t0 = F0 + 2 + i * 5
             p0 = bw + Vector((-60, -48 + i * 4, 10 - i * 3))
             p1 = bw + Vector((90, -30 + i * 6, -4 + i * 2))
@@ -1203,6 +1246,10 @@ class Space:
             ro.parent = bs
             ro.visible_shadow = False
             show(ro, 433 + 4 * ci, 433 + 4 * ci + 5)
+        # its own shield drops in a wave, bow to stern, and the guns fire the instant it is gone
+        bsm = self.tsh['bship'].data.materials[0]
+        key_node(bsm, 'hole', [(1, 0.0), (435, 0.0), (436, 0.08), (443, 2.2)])
+        key_node(bsm, 'vis', [(436, 0.65), (443, 0.0)], 'CONSTANT')
         # comets
         sb = self.gsh['shell']
         sm = sb.data.materials[0]
@@ -1231,6 +1278,19 @@ class Space:
             cm.rotation_quaternion = aim_quat(tgt - src)
             key_loc(cm, [(ff, src + fire * 3), (fh, tgt)], 'LINEAR')
             show(cm, ff, fh)
+            for ch in cm.children_recursive:           # its crackling arcs carry their own flicker keys,
+                if 'Arc' not in ch.name:               # which overrode show(): keep them only in flight
+                    continue
+                for f_ in range(1, NF + 1):
+                    if f_ < ff or f_ > fh:
+                        try:
+                            ch.keyframe_delete('hide_render', frame=f_)
+                        except RuntimeError:
+                            pass
+                for f_ in (1, ff - 1, fh + 1):
+                    ch.hide_render = True
+                    ch.keyframe_insert('hide_render', frame=f_)
+                C.set_interp(ch, 'CONSTANT')
             fl = T.muzzle_flash(f'MFlash{k}', scale=2.2, bolt=False)
             fl.location = src
             fl.rotation_mode = 'QUATERNION'
