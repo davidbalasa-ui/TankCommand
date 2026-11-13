@@ -9,6 +9,7 @@ import { hasFreeAirSlot } from '../../src/sim/air';
 import { isItemUnlocked, researchDone, researchRejection } from '../../src/sim/research';
 import { PAD_RALLY_DISTANCE, padLayout } from '../../src/sim/pad';
 import { placementValidity } from '../../src/sim/spawn';
+import { isPackedOnTheWay } from '../../src/sim/unpack';
 import { missionAllows, missionMarkers } from '../../src/sim/triggers';
 import type { Command } from '../../src/sim/commands';
 import type { Condition } from '../../src/sim/missionSchema';
@@ -128,9 +129,12 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
       needs.push(`structure.${faction}.metal_station`);
     }
   }
+  // Structures now land packed and drive out to unpack (overhaul step 5): those count as coming.
+  const packedOnTheWay = own.filter((u) => isPackedOnTheWay(u));
   const kitsComing = new Set([
     ...w.pendingKits.filter((k) => k.owner === me).map((k) => k.structureTypeId),
     ...w.dropQueue.filter((o) => o.owner === me).map((o) => o.itemId),
+    ...packedOnTheWay.map((u) => w.unitTypes.get(u.typeId)?.deploysTo ?? ''),
   ]);
   const need = needs.find((id) => !kitsComing.has(id) && usable(id));
   if (pad && stats && !busy && !saving) {
@@ -149,7 +153,7 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
           usable(t.id),
       )
       .sort((a, b) => (enemyAir ? hitsAir(b) - hitsAir(a) : 0) || b.oreCost - a.oreCost);
-    const pendingKit = w.pendingKits.some((k) => k.owner === me);
+    const pendingKit = w.pendingKits.some((k) => k.owner === me) || packedOnTheWay.length > 0;
     const needType = need ? w.structureTypes.get(need) : undefined;
     // A second miner and a hauler for each miner, as soon as the mission sells them.
     const workerOf = (kind: string) =>
@@ -199,6 +203,24 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
       out.push({ kind: 'assign', unitIds: [tug.id], stationId: target.id });
     }
   });
+  // A packed building whose mission goal wants it somewhere else drives there instead.
+  for (const unit of packedOnTheWay) {
+    const typeId = w.unitTypes.get(unit.typeId)?.deploysTo;
+    const type = typeId ? w.structureTypes.get(typeId) : undefined;
+    const goal = wanted.find((c) => c.structureType === typeId && c.radius !== undefined);
+    const target = unit.deployTarget;
+    if (!type || !goal || !target || Math.hypot(target.x - (goal.x ?? 0), target.z - (goal.z ?? 0)) <= (goal.radius ?? 0)) {
+      continue;
+    }
+    const site = type.buildOnMetalDeposit
+      ? w.deposits
+          .filter((d) => d.kind === 'metal' && Math.hypot(d.x - (goal.x ?? 0), d.z - (goal.z ?? 0)) <= (goal.radius ?? 0))
+          .sort((a, b) => a.id - b.id)[0]
+      : { x: goal.x ?? 0, z: goal.z ?? 0 };
+    if (site) {
+      out.push({ kind: 'move', unitIds: [unit.id], x: site.x, z: site.z });
+    }
+  }
   for (const kit of w.pendingKits.filter((k) => k.owner === me)) {
     const type = w.structureTypes.get(kit.structureTypeId);
     if (!type || !pad) {

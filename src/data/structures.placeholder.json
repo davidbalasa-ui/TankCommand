@@ -44,7 +44,9 @@
     "containerSize": 10,
     "maxContainers": 5,
     "placeholder": false,
-    "roleLabel": "Metal station"
+    "roleLabel": "Metal station",
+    "packSec": 8,
+    "packedUnitId": "unit.human.metal_station_packed"
   },
   {
     "id": "structure.alien.landing_pad",
@@ -91,7 +93,9 @@
     "containerSize": 10,
     "maxContainers": 5,
     "placeholder": false,
-    "roleLabel": "Metal station"
+    "roleLabel": "Metal station",
+    "packSec": 8,
+    "packedUnitId": "unit.alien.metal_station_packed"
   },
   {
     "faction": "human",

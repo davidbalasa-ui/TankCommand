@@ -347,7 +347,8 @@ export function findNearestFreeSpot(
 export function unitCount(world: WorldState, player: PlayerId): number {
   let count = 0;
   for (const unit of world.units) {
-    if (unit.owner === player && unit.hp > 0) {
+    // Packed structure vehicles are buildings on their way, not army: they don't count.
+    if (unit.owner === player && unit.hp > 0 && !world.unitTypes.get(unit.typeId)?.deploysTo) {
       count += 1;
     }
   }

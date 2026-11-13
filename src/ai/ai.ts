@@ -6,6 +6,7 @@ import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
 import { placementValidity } from '../sim/spawn';
 import { perceivedUnits } from '../sim/vision';
+import { isPackedOnTheWay } from '../sim/unpack';
 import type {
   AiDifficulty,
   AiState,
@@ -97,8 +98,13 @@ class Planner {
     return this.ore - reserve >= ore && this.metal - (useMetalReserve ? this.metalReserve : 0) >= metal;
   }
 
+  /** Orders for the item still coming down, plus packed vehicles of it driving out to unpack. */
   queued(itemId: string): number {
-    return this.world.dropQueue.filter((o) => o.owner === this.player && o.itemId === itemId).length;
+    const ordered = this.world.dropQueue.filter((o) => o.owner === this.player && o.itemId === itemId).length;
+    const onTheWay = this.world.units.filter(
+      (u) => u.owner === this.player && u.hp > 0 && isPackedOnTheWay(u) && this.world.unitTypes.get(u.typeId)?.deploysTo === itemId,
+    ).length;
+    return ordered + onTheWay;
   }
 
   buy(itemId: string, ore: number, metal: number, reserve: number, useMetalReserve = true): boolean {
@@ -440,11 +446,12 @@ function strategic(planner: Planner): void {
     return deposit !== undefined && deposit.amount > 1;
   });
   // A station kit with nowhere left to go must not block every other purchase forever.
-  const hasKit = world.pendingKits.some(
-    (k) =>
-      k.owner === planner.player &&
-      !(world.structureTypes.get(k.structureTypeId)?.buildOnMetalDeposit === true && !freeMetal),
-  );
+  const hasKit =
+    world.pendingKits.some(
+      (k) =>
+        k.owner === planner.player &&
+        !(world.structureTypes.get(k.structureTypeId)?.buildOnMetalDeposit === true && !freeMetal),
+    ) || units.some((u) => isPackedOnTheWay(u));
   if (
     stationType &&
     stationCount < data.maxStations &&

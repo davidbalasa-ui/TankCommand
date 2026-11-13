@@ -82,6 +82,7 @@ import {
 import { updateWorkers } from './workers';
 import { updatePadClearing } from './pad';
 import { addStructure, addUnit } from './spawn';
+import { deployTypeOf, nearestFreeSpot, setDeployTarget, updateAutoDeploy } from './unpack';
 import type {
   CommandOutcome,
   DepositDef,
@@ -233,6 +234,7 @@ function cloneWorld(world: WorldState): WorldState {
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
+      deployTarget: unit.deployTarget ? { ...unit.deployTarget } : null,
       air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
@@ -473,6 +475,16 @@ function applyMoveCommand(
       clamped.z + offset.z,
       UNIT_RADIUS,
     );
+    const deployType = command.queue ? null : deployTypeOf(world, unit);
+    if (deployType) {
+      // A packed structure vehicle sent somewhere unpacks there (the nearest free spot to it).
+      const spot = nearestFreeSpot(world, unit, deployType, goal.x, goal.z);
+      if (spot) {
+        setDeployTarget(unit, spot.x, spot.z);
+        continue;
+      }
+    }
+    unit.deployTarget = null;
     planMove(world, unit, goal.x, goal.z, command.queue ?? false, 'move');
   }
 }
@@ -524,6 +536,7 @@ function applyHoldCommand(
 ): void {
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
     unit.stance = 'hold';
+    unit.deployTarget = null;
     unit.order = { kind: 'idle' };
     unit.path = [];
     unit.speed = 0;
@@ -538,6 +551,7 @@ function applyStopCommand(
 ): void {
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
     unit.stance = 'free';
+    unit.deployTarget = null;
     unit.order = { kind: 'idle' };
     unit.path = [];
     unit.speed = 0;
@@ -1284,6 +1298,7 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
     fireProjectile(next, shooter, x, z, weapon, shotRng, structureId);
   });
   updateStructureWork(next);
+  updateAutoDeploy(next);
   updateDeploys(next);
   updateDiplomacy(next);
   updateRepair(next);
@@ -1384,6 +1399,7 @@ export function hashWorld(world: WorldState): string {
         job: unit.job,
         upgrades: unit.upgrades,
         transform: unit.transform,
+        deployTarget: unit.deployTarget ?? null,
         air: unit.air,
       })),
       structures: world.structures,
@@ -1433,6 +1449,7 @@ export function worldToPayload(world: WorldState): unknown {
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
+      deployTarget: unit.deployTarget ? { ...unit.deployTarget } : null,
       air: unit.air ? { ...unit.air, patrol: unit.air.patrol ? { ...unit.air.patrol } : null } : null,
     })),
     structures: world.structures.map(cloneStructure),
@@ -1521,6 +1538,7 @@ export function payloadToWorld(input: unknown): WorldState | null {
         job: unit.job ?? null,
         upgrades: Array.isArray(unit.upgrades) ? [...unit.upgrades] : [],
         transform: unit.transform ?? null,
+        deployTarget: unit.deployTarget ?? null,
         air: unit.air ?? null,
       }))
     : [];

@@ -408,7 +408,7 @@
       "metal": 0
     },
     "deliverySec": 1,
-    "hp": 400,
+    "hp": 160,
     "armor": 4,
     "speed": {
       "top": 2.5,
@@ -489,7 +489,7 @@
       "metal": 0
     },
     "deliverySec": 1,
-    "hp": 400,
+    "hp": 160,
     "armor": 4,
     "speed": {
       "top": 2.5,
@@ -1085,7 +1085,7 @@
       "metal": 0
     },
     "deliverySec": 1,
-    "hp": 400,
+    "hp": 140,
     "armor": 4,
     "speed": {
       "top": 2.5,
@@ -1279,7 +1279,7 @@
       "metal": 0
     },
     "deliverySec": 1,
-    "hp": 400,
+    "hp": 140,
     "armor": 4,
     "speed": {
       "top": 2.5,
@@ -1307,5 +1307,227 @@
     },
     "visualScale": 0.85,
     "roleLabel": "Missile tower (packed)"
+  },
+  {
+    "id": "unit.human.radar_tower_packed",
+    "name": "Radar Tower (packed)",
+    "faction": "human",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 100,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.human.radar",
+    "deploySec": 4,
+    "modelAssetId": "unit.human.bastion_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Radar tower (packed)"
+  },
+  {
+    "id": "unit.human.metal_station_packed",
+    "name": "Metal Station (packed)",
+    "faction": "human",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 240,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.human.metal_station",
+    "deploySec": 6,
+    "modelAssetId": "unit.human.bastion_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Metal station (packed)"
+  },
+  {
+    "id": "unit.human.air_base_packed",
+    "name": "Airfield (packed)",
+    "faction": "human",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 200,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.human.air_base",
+    "deploySec": 6,
+    "modelAssetId": "unit.human.bastion_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Airfield (packed)"
+  },
+  {
+    "id": "unit.alien.radar_tower_packed",
+    "name": "Oracle (packed)",
+    "faction": "alien",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 100,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.alien.radar",
+    "deploySec": 4,
+    "modelAssetId": "unit.alien.thornmound_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Radar tower (packed)"
+  },
+  {
+    "id": "unit.alien.metal_station_packed",
+    "name": "Metal Siphon (packed)",
+    "faction": "alien",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 240,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.alien.metal_station",
+    "deploySec": 6,
+    "modelAssetId": "unit.alien.thornmound_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Metal station (packed)"
+  },
+  {
+    "id": "unit.alien.air_base_packed",
+    "name": "Aerie (packed)",
+    "faction": "alien",
+    "role": "structure",
+    "techLevel": 2,
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "hp": 200,
+    "armor": 4,
+    "speed": {
+      "top": 2.5,
+      "accel": 1.5,
+      "turnDegPerSec": 45
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [],
+    "fireOnMove": false,
+    "sightRange": 10,
+    "sensorRange": 10,
+    "abilities": [
+      "deploy"
+    ],
+    "upgrades": [],
+    "deploysTo": "structure.alien.air_base",
+    "deploySec": 6,
+    "modelAssetId": "unit.alien.thornmound_packed",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "visualScale": 0.85,
+    "roleLabel": "Airfield (packed)"
   }
 ]

@@ -5,6 +5,7 @@ import { SIM_TICK_HZ } from './constants';
 import { addStructure, addUnit, placementValidity, unitCount } from './spawn';
 import { addAlert, ensureSideStats } from './economy';
 import { isItemUnlocked } from './research';
+import { packedUnitFor, setDeployTarget, suggestDeploySpot } from './unpack';
 import {
   DROP_BEAM_TTL_SEC,
   UNIT_CAP,
@@ -313,6 +314,27 @@ function touchDown(
     pad.padClearLeft = PAD_CLEAR_TIMEOUT_SEC;
     const stats = ensureSideStats(world, player);
     stats.unitsBuilt += 1;
+    addBeam(world, player, pad.x, pad.z);
+    addAlert(world, 'dropArrived', player, pad.x, pad.z);
+    return true;
+  }
+  // Every structure but a landing pad comes down packed and drives out to unpack by itself.
+  const packedId = packedUnitFor(world, item.structure.id);
+  if (packedId) {
+    const layout = padLayout(world, pad);
+    const spawned = addUnit(world, { owner: player, typeId: packedId, x: pad.x, z: pad.z, heading: layout.facing });
+    if (!spawned) {
+      return false;
+    }
+    const spot = suggestDeploySpot(world, spawned, pad);
+    if (spot) {
+      setDeployTarget(spawned, spot.x, spot.z);
+    } else {
+      const rally = padRallySpot(world, pad, spawned.id);
+      spawned.order = { kind: 'move', x: rally.x, z: rally.z, queue: false };
+    }
+    pad.padUnitId = spawned.id;
+    pad.padClearLeft = PAD_CLEAR_TIMEOUT_SEC;
     addBeam(world, player, pad.x, pad.z);
     addAlert(world, 'dropArrived', player, pad.x, pad.z);
     return true;
