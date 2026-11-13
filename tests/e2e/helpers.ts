@@ -153,6 +153,7 @@ export interface RenderStats {
   units: number;
   triangles: number;
   lodUnits?: number;
+  movingParts?: string[];
 }
 
 export interface HudSnapshot {

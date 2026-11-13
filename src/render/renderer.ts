@@ -89,6 +89,8 @@ export interface RenderStats {
   /** Burning wrecks on the field, and live effect particles. */
   wrecks?: number;
   effects?: number;
+  /** Moving model parts in motion right now, by "<unit or structure type> <node name>". */
+  movingParts?: string[];
 }
 
 export interface ScreenBounds {
@@ -1204,7 +1206,28 @@ export class RenderView {
       lodUnits: this.lodUnits,
       wrecks: this.wreckField.count,
       effects: this.effects.count,
+      movingParts: this.movingParts(),
     };
+  }
+
+  private movingParts(): string[] {
+    const out: string[] = [];
+    for (const visual of this.unitRoots.values()) {
+      for (const part of visual.parts) {
+        if (part.blend > 0.5) {
+          out.push(`${visual.typeId} ${part.node.name}`);
+        }
+      }
+    }
+    for (const [id, visual] of this.structureVisuals) {
+      const typeId = this.world.structures.find((item) => item.id === id)?.typeId ?? '?';
+      for (const part of visual.parts) {
+        if (part.blend > 0.5) {
+          out.push(`${typeId} ${part.node.name}`);
+        }
+      }
+    }
+    return out.sort();
   }
 
   dispose(): void {
