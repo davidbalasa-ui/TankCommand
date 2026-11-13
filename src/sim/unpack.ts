@@ -14,8 +14,14 @@ import { isHostile } from './diplomacy';
 import { placementValidity, structureSize } from './spawn';
 import type { SimStructureType, StructureState, UnitState, WorldState } from './types';
 
-/** How close a packed vehicle has to get to its spot before it snaps there and unpacks. */
-const ARRIVE_DISTANCE = 2.5;
+/**
+ * How close a packed vehicle has to get to its spot before it settles onto it and unpacks: its
+ * own footprint plus a little. A metal site is solid ground to drive round, so a station can
+ * only ever get alongside it.
+ */
+const ARRIVE_MARGIN = 2;
+/** Once stopped, it settles from up to this far beyond its footprint (it slides on while unpacking). */
+const SETTLE_REACH = 6;
 /** How far round a taken spot it looks for another. */
 const SEARCH_RADIUS = 18;
 /** Gives up (stays packed) after this many failed tries to reach or use a spot. */
@@ -160,14 +166,15 @@ export function updateAutoDeploy(world: WorldState): void {
       continue;
     }
     const distance = Math.hypot(unit.x - target.x, unit.z - target.z);
-    if (distance <= ARRIVE_DISTANCE) {
+    const size = structureSize(world, type);
+    const stopped = unit.order.kind === 'idle';
+    if (distance <= ARRIVE_MARGIN || (stopped && distance <= Math.max(size.x, size.z) / 2 + SETTLE_REACH)) {
       if (placementValidity(world, unit.owner, type, target.x, target.z, unit.id).valid) {
-        unit.x = target.x;
-        unit.z = target.z;
+        // It slides the last few metres onto the spot while it unpacks (updateDeploys).
         unit.order = { kind: 'idle' };
         unit.path = [];
         unit.speed = 0;
-        unit.transform = { left: unitType.deploySec };
+        unit.transform = { left: unitType.deploySec, x: target.x, z: target.z };
         unit.deployTarget = null;
         continue;
       }

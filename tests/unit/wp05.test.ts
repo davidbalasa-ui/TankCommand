@@ -282,7 +282,7 @@ describe('structures, research, upgrades, repair', () => {
     expect(world.dropQueue).toHaveLength(0);
   });
 
-  it('[RES-02] research needs no building, starts from the item (parents first), pays each step as it starts, refunds on cancel, unlocks on completion', () => {
+  it('[RES-02] [RES-03] research needs no building, starts from the item (parents first), pays each step as it starts, refunds on cancel, unlocks on completion', () => {
     // No lab: research is ordered straight from the locked item (overhaul step 4).
     const structures: StartStructure[] = [
       { owner: 1, typeId: 'structure.test.pad', x: -50, z: -50 },

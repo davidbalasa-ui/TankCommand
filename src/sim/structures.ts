@@ -193,9 +193,20 @@ export function updateDeploys(world: WorldState): void {
       continue;
     }
     unit.speed = 0;
+    const settle = unit.transform;
+    if (settle.x !== undefined && settle.z !== undefined) {
+      // Slide onto the spot, arriving as the unpacking ends.
+      const share = settle.left > DT ? DT / settle.left : 1;
+      unit.x += (settle.x - unit.x) * share;
+      unit.z += (settle.z - unit.z) * share;
+    }
     unit.transform.left = Math.max(0, unit.transform.left - DT);
     if (unit.transform.left > 0) {
       continue;
+    }
+    if (settle.x !== undefined && settle.z !== undefined) {
+      unit.x = settle.x;
+      unit.z = settle.z;
     }
     const type = world.unitTypes.get(unit.typeId);
     const target = type?.deploysTo ? world.structureTypes.get(type.deploysTo) : undefined;

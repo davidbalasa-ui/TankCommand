@@ -74,7 +74,8 @@ export interface UnitState {
   job: WorkerJob | null;
   upgrades: string[];
   // A packed turret deploying back into a structure. Null otherwise.
-  transform: { left: number } | null;
+  // x/z: where it settles (it slides there while unpacking); absent = where it stands.
+  transform: { left: number; x?: number; z?: number } | null;
   /** A packed structure vehicle on its way to unpack here (overhaul step 5). */
   deployTarget?: { x: number; z: number; tries: number } | null;
   air: AirState | null;

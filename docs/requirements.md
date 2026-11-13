@@ -160,3 +160,6 @@
 | SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |
+| RES-03 | (Overhaul step 4) Research needs no building and runs one at a time per side; a locked card starts it, queueing a missing parent first; each step is paid as it starts and refunded on cancel; old saves convert to the new tree. |
+| PACK-01 | (Overhaul step 5) Every structure except the landing pad lands as a packed vehicle at about 40% health, drives by itself to a suggested spot (metal station: nearest free metal site; tower: beside the pad toward the enemy) and unpacks there. |
+| PACK-02 | (Overhaul step 5) A move order on a packed vehicle makes that spot (or the nearest free one) its unpack spot; stop keeps it packed; packed vehicles never count toward the unit cap. |

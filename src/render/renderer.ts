@@ -517,6 +517,8 @@ export class RenderView {
   private terrainDetail: { value: THREE.Texture | null } = { value: null };
   private readonly beamPool: THREE.Mesh[] = [];
   private readonly selectionRings = new Map<number, THREE.Mesh>();
+  /** Footprints where your packed buildings are heading to unpack (overhaul step 5). */
+  private readonly unpackSpots = new Map<number, THREE.Mesh>();
   private readonly flashes: Flash[] = [];
   private readonly projectileVisuals = new Map<
     number,
@@ -1051,6 +1053,7 @@ export class RenderView {
     this.syncContacts();
     this.syncObjectiveMarkers();
     this.syncSelection();
+    this.syncUnpackSpots();
     this.syncOrderLines();
     this.syncHealthBars();
     this.syncWorkerLabels();
@@ -2813,6 +2816,56 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         this.unitGroundAt(unit.x, unit.z) + 0.06,
         unit.z,
       );
+    }
+  }
+
+  /**
+   * A flat green footprint where each of your packed buildings will unpack, brighter while it is
+   * selected, so a redirect (tap the ground with it selected) shows where it will stand.
+   */
+  private syncUnpackSpots(): void {
+    const selected = new Set(this.selection);
+    const live = new Set<number>();
+    for (const unit of this.world.units) {
+      const target = unit.deployTarget;
+      const typeId = target && unit.owner === 1 ? this.world.unitTypes.get(unit.typeId)?.deploysTo : undefined;
+      const type = typeId ? this.world.structureTypes.get(typeId) : undefined;
+      if (!target || !type) {
+        continue;
+      }
+      live.add(unit.id);
+      let spot = this.unpackSpots.get(unit.id);
+      if (!spot) {
+        const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize;
+        const geometry = new THREE.PlaneGeometry(size, size);
+        const material = new THREE.MeshBasicMaterial({
+          color: PLACEMENT_VALID_COLOR,
+          transparent: true,
+          opacity: 0.3,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        spot = new THREE.Mesh(geometry, material);
+        spot.rotation.x = -Math.PI / 2;
+        this.scene.add(spot);
+        this.unpackSpots.set(unit.id, spot);
+      }
+      spot.position.set(target.x, heightAt(this.world.map, target.x, target.z) + 0.08, target.z);
+      const material = spot.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = selected.has(unit.id) ? 0.55 : 0.25;
+      }
+    }
+    for (const [id, spot] of this.unpackSpots) {
+      if (!live.has(id)) {
+        this.scene.remove(spot);
+        spot.geometry.dispose();
+        const material = spot.material;
+        if (material instanceof THREE.Material) {
+          material.dispose();
+        }
+        this.unpackSpots.delete(id);
+      }
     }
   }
 

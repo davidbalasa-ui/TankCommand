@@ -95,7 +95,7 @@ describe('enemy AI', () => {
     const files = readdirSync('src/ai').filter((f) => f.endsWith('.ts'));
     const allowed = [
       '../sim/types', '../sim/commands', '../sim/vision', '../sim/diplomacy', '../sim/spawn',
-      '../sim/rng', '../sim/economy', '../sim/research', '../sim/world', '../sim/air', './ai', './aiData', './driver',
+      '../sim/rng', '../sim/economy', '../sim/research', '../sim/world', '../sim/air', '../sim/unpack', './ai', './aiData', './driver',
     ];
     for (const file of files) {
       const text = readFileSync(`src/ai/${file}`, 'utf8');

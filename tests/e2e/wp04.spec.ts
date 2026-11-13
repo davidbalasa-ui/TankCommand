@@ -187,32 +187,8 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
     const hook = window.__TC_TEST__;
     return hook?.structures().find((item) => item.owner === 1 && item.kind === 'pad')?.id ?? null;
   });
-  // Pick a metal deposit that clears every unit: the start miner sits 2.83
-  // units from the first metal deposit and `placementValidity` correctly
-  // refuses the kit with `'overlap'`. The second metal deposit has no unit
-  // within 4.5 units, so the placement succeeds.
-  const deposit = await page.evaluate(() => {
-    const hook = window.__TC_TEST__;
-    if (!hook) {
-      return null;
-    }
-    const units = hook.units();
-    for (const item of hook.deposits()) {
-      if (item.kind !== 'metal') {
-        continue;
-      }
-      const clearOfUnits = units.every(
-        (unit) => Math.hypot(unit.x - item.x, unit.z - item.z) >= 4.5,
-      );
-      if (clearOfUnits) {
-        return { id: item.id, x: item.x, z: item.z };
-      }
-    }
-    return null;
-  });
   expect(padId).not.toBeNull();
-  expect(deposit).not.toBeNull();
-  if (padId === null || !deposit) {
+  if (padId === null) {
     return;
   }
   await page.evaluate((id) => {
@@ -227,32 +203,10 @@ test('[HUD-05] tug assign button works by touch after a station is placed', asyn
       });
     }
   }, padId);
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.dropState().kits.length ?? 0), {
-      timeout: 20_000,
-    })
-    .toBe(1);
-  const kitId = await page.evaluate(() => window.__TC_TEST__?.dropState().kits[0]?.id ?? null);
-  expect(kitId).not.toBeNull();
-  if (kitId === null) {
-    return;
-  }
-  await page.evaluate(({ id, x, z }) => {
-    const hook = window.__TC_TEST__;
-    if (hook) {
-      hook.sendCommand({
-        kind: 'placeKit',
-        kitId: id,
-        x,
-        z,
-        tick: hook.snapshot().tick + 1,
-        issuer: 1,
-      });
-    }
-  }, { id: kitId, x: deposit.x, z: deposit.z });
+  // The station lands packed and drives to the nearest free metal site to unpack by itself.
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.structures().some((s) => s.owner === 1 && s.kind === 'metalStation') ?? false), {
-      timeout: 10_000,
+      timeout: 60_000,
     })
     .toBe(true);
   const station = await page.evaluate(() => {
