@@ -268,9 +268,10 @@ def terran_air_base():
     tube((3.8, -3.6, z + 3.62), (3.8, -3.6, z + 3.98), [(0, 1.36), (1, 1.3)], 8, 'glass', sharp=30)
     cyl((3.8, -3.6, z + 4.2), (3.8, -3.6, z + 5.3), 0.05, 6, 'dark')
     K.beacon(3.8, -3.6, z + 5.3, 'red')
-    m = F.mark()
-    lathe([(0.05, 0), (0.35, 0.05), (0.6, 0.2), (0.64, 0.2), (0.36, 0.0), (0.05, -0.04)], 12, 'plate', center=(4.3, -3.1, z + 4.5))
-    F.rot_all(m, 'Y', 55, about=(4.3, -3.1, z + 4.5))
+    with F.group('TowerDish'):   # its own part so the game can turn it
+        m = F.mark()
+        lathe([(0.05, 0), (0.35, 0.05), (0.6, 0.2), (0.64, 0.2), (0.36, 0.0), (0.05, -0.04)], 12, 'plate', center=(4.3, -3.1, z + 4.5))
+        F.rot_all(m, 'Y', 55, about=(4.3, -3.1, z + 4.5))
     # Fuel farm and service gear.
     for k in range(3):
         m = F.mark()

@@ -29,6 +29,12 @@ for a in man['assets']:
     shutil.copyfile(s, dst)
     a['bytes'] = os.path.getsize(dst)
     done += 1
+import motion
+motion.apply(os.path.join(ROOT, 'public', 'assets', 'models'))
+for a in man['assets']:
+    p = os.path.join(ROOT, 'public', a['path'])
+    if os.path.exists(p):
+        a['bytes'] = os.path.getsize(p)
 with open(man_path, 'w') as f:
     json.dump(man, f, indent=2)
     f.write('\n')

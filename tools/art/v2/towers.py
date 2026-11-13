@@ -37,8 +37,9 @@ def register(key, faction, build, unit, structure):
         poses = {g: dict(packed=m) for g, m in info['packed'].items()}
         poses['Carrier'] = dict(deployed=HIDE)
         pivot = info['pivot'] if 'pivot' in info else (0, 0, info['tz'])
+        plist = ([('Turret', pivot, 'TurretPivot')] if pivot else []) + list(info.get('more', []))
         F.finish(structure[2], glb, render=render, report=report, label=structure[1], size=1024,
-                 pivot=('Turret', pivot) if pivot else None, poses=poses, bake_offset={'Carrier': (40.0, 0, 0)},
+                 pivot=plist or None, poses=poses, bake_offset={'Carrier': (40.0, 0, 0)},
                  clip=render[:-4] + '_unfold.mp4', **crev)
 
     ASSETS[key + '_packed'] = dict(fn=run_unit, path=unit[0], set=faction)
@@ -272,11 +273,13 @@ def terran_air_base():
         return 'Base'
     sort_rest(rule)
     zb = deck + 0.1
-    return dict(pivot=None, packed={
+    tower = stow((3.8, -3.6, z), (1.0, -0.6, zb + 0.56), 0.4, r=(0, -90, 0))
+    return dict(pivot=None, more=[('TowerDish', (4.3, -3.1, z + 4.5), 'DishPivot')], packed={
         'Base': trs(t=(-0.9, 0, deck), s=(0.34, 0.2, 0.3)),
         'Hangar': stow((-3.1, -3.4, z), (-2.0, 0, zb), 0.42),
         # The control tower is carried lying down, cab to the rear.
-        'Tower': stow((3.8, -3.6, z), (1.0, -0.6, zb + 0.56), 0.4, r=(0, -90, 0)),
+        'Tower': tower,
+        'TowerDish': tower,
         'Fuel': stow((1.4, -3.95, z), (-0.2, 0.62, zb), 0.5),
     })
 

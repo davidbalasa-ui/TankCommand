@@ -183,12 +183,13 @@ def gorger():
         K.blade((2.9, s * 0.1, 0.7), 1.1, s * -30, s * 95, 0.18, 0.07, sq=(1.15, 0.8))
     m = F.mark()
     tube((2.5, 0, 0.85), (3.5, 0, 0.85), [(0, 0.5), (0.5, 0.55), (1, 0.4)], 12, 'bronze')
-    cyl((3.48, 0, 0.85), (3.52, 0, 0.85), 0.34, 12, 'slat')
-    for k in range(8):
-        t = box((3.56, 0, 0.85 + 0.33), (0.12, 0.05, 0.06), 'barrel')
-        F.rot(t, 'X', 45 * k, about=(0, 0, 0.85))
+    with F.group('Grinder'):   # its own part so the game can spin it while mining
+        cyl((3.48, 0, 0.85), (3.52, 0, 0.85), 0.34, 12, 'slat')
+        for k in range(8):
+            t = box((3.56, 0, 0.85 + 0.33), (0.12, 0.05, 0.06), 'barrel')
+            F.rot(t, 'X', 45 * k, about=(0, 0, 0.85))
     K.core((1.3, 0, 1.5), 0.24)
-    return {}
+    return dict(pivot=[('Grinder', (3.5, 0, 0.85), 'GrinderPivot')])
 
 
 @asset('alien/ferrier.glb', 'Kesh Ferrier (cargo tug)')
@@ -314,11 +315,12 @@ def disc():
     lathe([(0.75, Z + 0.98), (0.95, Z + 1.2), (0.86, Z + 1.24), (0.62, Z + 1.05)], 18, 'bronze')
     K.core((0, 0, Z + 1.5), 0.46, cage=4, ring=False)
     # Six sickle blades held off the rim.
-    for k in range(3):
-        m = F.mark()
-        K.blade((0, 0, 0), R + 0.45, 150, 228, 0.42, 0.07, zone='bronze')
-        F.move_all(m, (0, 0, Z + 0.12))
-        F.rot_all(m, 'Z', 120 * k)
+    with F.group('Blades'):   # the sickle ring turns slowly in flight
+        for k in range(3):
+            m = F.mark()
+            K.blade((0, 0, 0), R + 0.45, 150, 228, 0.42, 0.07, zone='bronze')
+            F.move_all(m, (0, 0, Z + 0.12))
+            F.rot_all(m, 'Z', 120 * k)
     # Mandibles and lance: the direction of travel.
     for s in (1, -1):
         K.blade((2.6, s * 0.1, Z - 0.1), 1.5, s * -30, s * 105, 0.55, 0.11, sq=(1.25, 0.82), zone='shell')
@@ -327,7 +329,7 @@ def disc():
         lathe([(0.75, Z - 0.75), (0.62, Z - 0.98), (0.3, Z - 1.1), (0.02, Z - 1.12)], 14, 'bronze')
         cyl((0, 0, Z - 1.13), (0, 0, Z - 1.08), 0.28, 12, 'glow')
         tube((0.2, 0, Z - 0.98), (1.15, 0, Z - 1.06), [(0, 0.1), (0.8, 0.07), (1, 0.09)], 8, 'barrel')
-    return dict(name='KeshDisc', pivot=('TurretPod', (0, 0, Z - 0.75)))
+    return dict(name='KeshDisc', pivot=[('TurretPod', (0, 0, Z - 0.75)), ('Blades', (0, 0, Z + 0.12), 'BladesPivot')])
 
 
 @asset('alien/halo.glb', 'Kesh Halo (fighter)')
@@ -377,11 +379,13 @@ def dragonfly():
             tip = (x0 + sweep_, s * (0.35 + span), Z + 0.5 + rise)
             def at(t, dx=0.0, dz=0.0):
                 return (root[0] + (tip[0] - root[0]) * t + dx, root[1] + (tip[1] - root[1]) * t, root[2] + (tip[2] - root[2]) * t + dz)
-            sweep([at(0), at(0.3), at(0.7), at(1)], [(chord * 0.5, 0.03), (chord, 0.025), (chord * 0.9, 0.02), (chord * 0.2, 0.012)], 'wing', sides=6, power=0.7)
-            sweep([at(0, chord * 0.5, 0.02), at(0.3, chord, 0.02), at(0.7, chord * 0.9, 0.02), at(1, chord * 0.2, 0.01)],
-                  [(0.09, 0.07), (0.08, 0.06), (0.06, 0.05), (0.02, 0.02)], 'bronze', sides=6)
-            for off in (-0.45, 0.0, 0.42):   # straight veins
-                sweep([at(0.04, chord * off * 0.5, 0.03), at(0.95, chord * off * 0.25, 0.02)], [(0.018, 0.012), (0.01, 0.01)], 'glow', sides=4)
+            with F.group('WingL' if s > 0 else 'WingR'):   # each side is its own part so the wings can beat
+                sweep([at(0), at(0.3), at(0.7), at(1)], [(chord * 0.5, 0.03), (chord, 0.025), (chord * 0.9, 0.02), (chord * 0.2, 0.012)], 'wing', sides=6, power=0.7)
+                sweep([at(0, chord * 0.5, 0.02), at(0.3, chord, 0.02), at(0.7, chord * 0.9, 0.02), at(1, chord * 0.2, 0.01)],
+                      [(0.09, 0.07), (0.08, 0.06), (0.06, 0.05), (0.02, 0.02)], 'bronze', sides=6)
+                for off in (-0.45, 0.0, 0.42):   # straight veins
+                    sweep([at(0.04, chord * off * 0.5, 0.03), at(0.95, chord * off * 0.25, 0.02)], [(0.018, 0.012), (0.01, 0.01)], 'glow', sides=4)
         orb((0.25, s * 0.42, Z + 0.48), 0.3, 'bronze', seg=(10, 8), sq=(1.9, 0.8, 0.6))
     K.lifters([(0.6, 0, Z - 0.5)], 0.3)
-    return dict(name='KeshDragonfly', single=True, clear='wing')
+    return dict(name='KeshDragonfly', clear='wing',
+                pivot=[('WingL', (0.2, 0.35, Z + 0.5), 'WingLPivot'), ('WingR', (0.2, -0.35, Z + 0.5), 'WingRPivot')])

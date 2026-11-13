@@ -140,13 +140,14 @@ def kesh_gene_vault():
         shell(fn, 0.05, 0.4, 90 * k, 60, 'bronze', nu=6, nv=5, off=0.05, lift=0.03, shape=0.5, front=0.3, back=1.0)
     for k in range(4):
         horn((0, 0, z - 0.25), 3.2, 3.1, 'shell', 0.5, -8, 72, yaw=90 * k + 45, thick=0.09)
-    K.ring((0, 0, z + 3.45), 1.3, 0.09, 'bronze', sides=24)
-    K.ring((0, 0, z + 3.45), 1.05, 0.035, 'glow', sides=24)
-    K.core((0, 0, z + 3.5), 0.42, ring=False)
+    with F.group('Crown'):   # the hovering crown turns slowly
+        K.ring((0, 0, z + 3.45), 1.3, 0.09, 'bronze', sides=24)
+        K.ring((0, 0, z + 3.45), 1.05, 0.035, 'glow', sides=24)
+        K.core((0, 0, z + 3.5), 0.42, ring=False)
     for k in range(4):
         a = math.radians(90 * k)
         K.core((3.05 * math.cos(a), 3.05 * math.sin(a), z + 0.5), 0.32)
-    return dict(name='KeshGeneVault')
+    return dict(name='KeshGeneVault', pivot=[('Crown', (0, 0, z + 3.45), 'CrownPivot')])
 
 
 @asset('structures/kesh_metal_siphon.glb', 'Kesh Metal Siphon (refinery)')

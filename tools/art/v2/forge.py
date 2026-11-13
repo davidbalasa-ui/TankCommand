@@ -1112,8 +1112,9 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         for g, o in made.items():
             o.parent = root
         plist = [pivot] if pivot and isinstance(pivot[0], str) else (pivot or [])
-        for i, (g, loc) in enumerate(plist):
-            e = bpy.data.objects.new('TurretPivot' if i == 0 else f'Pivot{i}', None)
+        for i, pv in enumerate(plist):
+            g, loc = pv[0], pv[1]
+            e = bpy.data.objects.new(pv[2] if len(pv) > 2 else ('TurretPivot' if i == 0 else f'Pivot{i}'), None)
             scene.collection.objects.link(e)
             e.parent = root
             e.location = loc

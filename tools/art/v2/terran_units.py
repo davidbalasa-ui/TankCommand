@@ -323,22 +323,23 @@ def prospector():
         cyl((2.5, s * 0.8, 1.2), (3.6, s * 0.8, 1.1), 0.07, 8, 'barrel')
         F.rot_all(m, 'Y', 12, about=(2.4, 0, 1.0))
     dz = 0.66
-    cyl((4.25, -1.25, dz), (4.25, 1.25, dz), 0.52, 14, 'barrel')
-    for k in range(14):
-        for j in range(5):
-            a = 360.0 * k / 14 + j * 13
-            t = box((0.56, -1.0 + j * 0.5, 0), (0.1, 0.07, 0.05), 'plate')
-            t['uv'] = 0.4
-            F.rot(t, 'Y', a)
-            F.move(t, (4.25, 0, dz))
-    for s in (1, -1):
-        cyl((4.25, s * 1.25, dz), (4.25, s * 1.33, dz), 0.3, 10, 'hazard')
-        box((4.25, s * 1.34, dz), (0.1, 0.012, 0.1), 'amber')
+    with F.group('Drum'):   # its own part so the game can spin it while mining
+        cyl((4.25, -1.25, dz), (4.25, 1.25, dz), 0.52, 14, 'barrel')
+        for k in range(14):
+            for j in range(5):
+                a = 360.0 * k / 14 + j * 13
+                t = box((0.56, -1.0 + j * 0.5, 0), (0.1, 0.07, 0.05), 'plate')
+                t['uv'] = 0.4
+                F.rot(t, 'Y', a)
+                F.move(t, (4.25, 0, dz))
+        for s in (1, -1):
+            cyl((4.25, s * 1.25, dz), (4.25, s * 1.33, dz), 0.3, 10, 'hazard')
+            box((4.25, s * 1.34, dz), (0.1, 0.012, 0.1), 'amber')
     box((3.6, 0, 1.25), (0.25, 1.1, 0.06), 'hazard', bevel=0.02)
     # Conveyor from the drum up into the hopper.
     loft([[(3.5, -0.35, 0.85), (3.5, 0.35, 0.85), (0.7, 0.35, z1 + 0.1), (0.7, -0.35, z1 + 0.1)],
           [(3.5, -0.35, 1.0), (3.5, 0.35, 1.0), (0.7, 0.35, z1 + 0.25), (0.7, -0.35, z1 + 0.25)]], 'dark', bevel=0.02)
-    return {}
+    return dict(pivot=[('Drum', (4.25, 0, dz), 'DrumPivot')])
 
 
 @asset('human/hauler.glb', 'Terran Hauler (cargo tug)')
