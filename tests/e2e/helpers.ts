@@ -670,3 +670,42 @@ export async function openBuildMenu(page: Page): Promise<void> {
   expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBeLessThanOrEqual(queuedBefore);
   await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera), point.before);
 }
+
+/** Centres the camera on a unit and taps it. */
+export async function tapUnit(page: Page, id: number): Promise<void> {
+  await page.evaluate((unitId) => {
+    const hook = window.__TC_TEST__;
+    const unit = hook?.units().find((item) => item.id === unitId);
+    if (hook && unit) {
+      hook.setCamera({ targetX: unit.x, targetZ: unit.z, distance: 40, yaw: 0 });
+    }
+  }, id);
+  // Read the unit's screen point only after two animation frames with the new camera (the sim
+  // may be paused, so count browser frames rather than rendered game frames).
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  const point = await page.evaluate((unitId) => window.__TC_TEST__?.unitScreenCentre(unitId) ?? null, id);
+  expect(point).not.toBeNull();
+  if (!point) {
+    return;
+  }
+  await page.touchscreen.tap(point.x, point.y);
+}
+
+/** Centres the camera on a world point and taps the ground there. */
+export async function tapWorldPoint(page: Page, x: number, z: number): Promise<void> {
+  const point = await page.evaluate(({ wx, wz }) => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return null;
+    }
+    hook.setCamera({ targetX: wx, targetZ: wz, distance: 40, yaw: 0 });
+    return hook.worldToScreen(wx, wz);
+  }, { wx: x, wz: z });
+  expect(point).not.toBeNull();
+  if (!point) {
+    return;
+  }
+  await page.touchscreen.tap(point.x, point.y);
+}

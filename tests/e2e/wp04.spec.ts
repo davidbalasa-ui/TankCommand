@@ -1,44 +1,7 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { enterGame, openBuildMenu, winSkirmish } from './helpers';
+import { enterGame, openBuildMenu, tapUnit, tapWorldPoint, winSkirmish } from './helpers';
 
 const PHONE_ONLY = 'phone-only touch flow';
-
-async function tapUnit(page: Page, id: number): Promise<void> {
-  await page.evaluate((unitId) => {
-    const hook = window.__TC_TEST__;
-    const unit = hook?.units().find((item) => item.id === unitId);
-    if (hook && unit) {
-      hook.setCamera({ targetX: unit.x, targetZ: unit.z, distance: 40, yaw: 0 });
-    }
-  }, id);
-  // Read the unit's screen point only after two animation frames with the new camera (the sim
-  // may be paused, so count browser frames rather than rendered game frames).
-  await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-  );
-  const point = await page.evaluate((unitId) => window.__TC_TEST__?.unitScreenCentre(unitId) ?? null, id);
-  expect(point).not.toBeNull();
-  if (!point) {
-    return;
-  }
-  await page.touchscreen.tap(point.x, point.y);
-}
-
-async function tapWorldPoint(page: Page, x: number, z: number): Promise<void> {
-  const point = await page.evaluate(({ wx, wz }) => {
-    const hook = window.__TC_TEST__;
-    if (!hook) {
-      return null;
-    }
-    hook.setCamera({ targetX: wx, targetZ: wz, distance: 40, yaw: 0 });
-    return hook.worldToScreen(wx, wz);
-  }, { wx: x, wz: z });
-  expect(point).not.toBeNull();
-  if (!point) {
-    return;
-  }
-  await page.touchscreen.tap(point.x, point.y);
-}
 
 test('[HUD-05] build menu, live resources, queue and cancel work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);

@@ -632,7 +632,8 @@ export class Hud implements HudHandle {
       }
       kinds.any = true;
       const type = world.unitTypes.get(unit.typeId);
-      if (!type?.workerKind) {
+      // Packed buildings carry no weapon: they only move, stop and unpack.
+      if (!type?.workerKind && !type?.deploysTo) {
         kinds.combat = true;
       }
       if (unit.air) {
@@ -702,7 +703,9 @@ export class Hud implements HudHandle {
     this.oreValue.textContent = String(stats?.ore ?? 0);
     this.metalValue.textContent = String(stats?.metal ?? 0);
     this.workersValue.textContent = String(workers);
-    this.unitsValue.replaceChildren(String(ownUnits.length), el('small', 'hud-res-cap', `/${UNIT_CAP}`));
+    // Packed buildings on their way don't count toward the unit cap, so they aren't shown here.
+    const army = ownUnits.filter((unit) => !world.unitTypes.get(unit.typeId)?.deploysTo).length;
+    this.unitsValue.replaceChildren(String(army), el('small', 'hud-res-cap', `/${UNIT_CAP}`));
     this.refresh();
     this.renderSelection(world, selection);
     this.drawMinimap(world);
