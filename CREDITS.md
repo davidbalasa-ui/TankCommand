@@ -31,6 +31,8 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | structure.shard.core | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Core (structure) |
 | structure.shard.spire | TankCommand project (scripted Blender) | ORIGINAL | - | Shard Spire (structure) |
 | texture.terrain.detail | TankCommand project (scripted numpy) | ORIGINAL | - | Terrain surface |
+| unit.alien.air_base_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Hive Roost packed for transport |
+| unit.alien.air_base_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.carapace | TankCommand project (scripted Blender) | ORIGINAL | - | Aegis (heavy tank) |
 | unit.alien.carapace.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.darter | TankCommand project (scripted Blender) | ORIGINAL | - | Darter (light skimmer) |
@@ -47,8 +49,12 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.alien.gorger.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.halo | TankCommand project (scripted Blender) | ORIGINAL | - | Halo (fighter) |
 | unit.alien.halo.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.alien.metal_station_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Siphon packed for transport |
+| unit.alien.metal_station_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.mortar_beast | TankCommand project (scripted Blender) | ORIGINAL | - | Sunfall (artillery) |
 | unit.alien.mortar_beast.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.alien.radar_tower_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Seer Spire packed for transport |
+| unit.alien.radar_tower_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.seer | TankCommand project (scripted Blender) | ORIGINAL | - | Seer (radar) |
 | unit.alien.seer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.spitter | TankCommand project (scripted Blender) | ORIGINAL | - | Flare (missile tank) |
@@ -61,6 +67,8 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.alien.thornmound_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.alien.weaver | TankCommand project (scripted Blender) | ORIGINAL | - | Weaver (repair) |
 | unit.alien.weaver.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.human.air_base_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Airfield packed for transport |
+| unit.human.air_base_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.bastion_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Bastion (packed) (turret packed) |
 | unit.human.bastion_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.bulwark | TankCommand project (scripted Blender) | ORIGINAL | - | Bulwark (heavy tank) |
@@ -79,11 +87,15 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | unit.human.longbow.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.mender | TankCommand project (scripted Blender) | ORIGINAL | - | Mender (repair) |
 | unit.human.mender.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.human.metal_station_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Metal Station packed for transport |
+| unit.human.metal_station_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.outrider | TankCommand project (scripted Blender) | ORIGINAL | - | Outrider (scout) |
 | unit.human.outrider.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.poc_tank | TankCommand project (scripted Blender) | ORIGINAL | - | Placeholder human tank |
 | unit.human.prospector | TankCommand project (scripted Blender) | ORIGINAL | - | Prospector (ore miner) |
 | unit.human.prospector.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
+| unit.human.radar_tower_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Radar Tower packed for transport |
+| unit.human.radar_tower_packed.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.skimmer | TankCommand project (scripted Blender) | ORIGINAL | - | Skimmer (hover tank) |
 | unit.human.skimmer.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for the low quality tier and far zoom |
 | unit.human.spire_packed | TankCommand project (scripted Blender) | ORIGINAL | - | Spire (packed) (missile battery packed) |
