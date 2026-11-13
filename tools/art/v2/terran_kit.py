@@ -47,10 +47,16 @@ def track_unit(x0, x1, y, w=0.42, side=1, nwheels=5, skirt=True, zs=0.68, cleat=
         for k in range(n):
             m = (k + 1) % n
             faces.append([i * n + k, i * n + m, j * n + m, j * n + k])
-    F._new(verts, faces, 'track', sharp=40)
+    scroll = F.ST.get('tread')
+    if scroll:   # units: a plain band with its own scrolling cleat texture (see forge._tread_surface)
+        with F.group('Tread'):
+            F._new(verts, faces, 'track', sharp=40)
+        F.ST['tread_paths'].append(dict(path=list(path), y=y, w=w))
+    else:
+        F._new(verts, faces, 'track', sharp=40)
     # Cleats along the outer run.
     acc = 0.0
-    for k in range(n):
+    for k in range(0 if scroll else n):
         ax, az = path[k]
         bx, bz = path[(k + 1) % n]
         seg = math.hypot(bx - ax, bz - az)

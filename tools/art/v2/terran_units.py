@@ -12,6 +12,7 @@ def asset(path, label, size=512):
     def deco(fn):
         def run(glb, render, report):
             F.begin('terran')
+            F.ST['tread'] = True
             kw = fn() or {}
             F.finish(kw.pop('name', fn.__name__.title().replace('_', '')), glb, render=render, report=report,
                      label=label, size=kw.pop('size', size), **kw)
@@ -103,7 +104,8 @@ def outrider():
     box((-0.2, 0, 0.55), (2.3, 0.8, 0.1), 'dark', bevel=0.03)
     for s in (1, -1):
         for i, x in enumerate((-1.9, 0.0, 1.9)):
-            K.tire((x, s * 1.42, 0.6), 0.6, 0.46, s)
+            with F.group(f"Wheel{i}{'L' if s > 0 else 'R'}"):   # each wheel turns
+                K.tire((x, s * 1.42, 0.6), 0.6, 0.46, s)
             cyl((x, s * 0.9, 0.6), (x, s * 1.3, 0.6), 0.1, 6, 'dark')
             # Angular wheel arch.
             prism([(x - 0.85, 1.0), (x - 0.5, 1.32), (x + 0.5, 1.32), (x + 0.85, 1.0), (x + 0.8, 0.94), (x + 0.46, 1.24),
@@ -127,7 +129,9 @@ def outrider():
         box((-0.8, -0.3, tz + 1.28), (0.012, 0.14, 0.06), 'glow')
         box((-0.4, 0.3, tz + 0.52), (0.16, 0.12, 0.05), 'plate', bevel=0.02)
         box((-0.5, 0, tz + 0.27), (0.4, 0.69, 0.02), 'glow')
-    return dict(pivot=('Turret', (-0.5, 0, tz)))
+    wheels = [(f"Wheel{i}{'L' if sd > 0 else 'R'}", (x, sd * 1.42, 0.6), f"Wheel{i}{'L' if sd > 0 else 'R'}Pivot")
+              for sd in (1, -1) for i, x in enumerate((-1.9, 0.0, 1.9))]
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels)
 
 
 @asset('human/skimmer.glb', 'Terran Skimmer (hover tank)')
@@ -147,8 +151,12 @@ def skimmer():
             # Lift fan: shrouded ring with a grille on top and a glowing disc underneath.
             y = s * 1.75
             tube((x, y, 0.42), (x, y, 1.0), [(0, r * 0.92), (0.15, r * 1.08), (0.85, r * 1.08), (1, r * 0.95), (1, r * 0.78), (0.8, r * 0.76)], 8, 'armor', sharp=30, bevel=0.02)
-            cyl((x, y, 0.8), (x, y, 0.84), r * 0.78, 14, 'vent')
-            cyl((x, y, 0.84), (x, y, 0.9), r * 0.22, 8, 'dark')
+            with F.group(f"Fan{'F' if x > 0 else 'B'}{'L' if s > 0 else 'R'}"):   # the fan disc spins
+                cyl((x, y, 0.8), (x, y, 0.84), r * 0.78, 14, 'vent')
+                cyl((x, y, 0.84), (x, y, 0.9), r * 0.22, 8, 'dark')
+                for k in range(3):
+                    b = box((x, y, 0.85), (r * 0.74, 0.05, 0.012), 'plate')
+                    F.rot(b, 'Z', 60 * k, about=(x, y, 0))
             cyl((x, y, 0.4), (x, y, 0.44), r * 0.82, 14, 'glow')
             box((x, s * 1.3, 0.75), (0.3, 0.25, 0.14), 'dark', bevel=0.03)
         box((0.0, s * 1.83, 0.86), (1.0, 0.012, 0.02), 'glow')
@@ -174,7 +182,9 @@ def skimmer():
         box((-0.6, -0.3, tz + 0.66), (0.16, 0.13, 0.08), 'dark', bevel=0.03)
         box((-0.44, -0.3, tz + 0.67), (0.012, 0.09, 0.045), 'glass')
         K.antenna(-1.1, 0.4, tz + 0.5, 1.0)
-    return dict(pivot=('Turret', (-0.4, 0, tz)))
+    fans = [(f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}", (x, sd * 1.75, 0.84),
+             f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}Pivot") for sd in (1, -1) for x in (1.55, -1.75)]
+    return dict(pivot=[('Turret', (-0.4, 0, tz))] + fans)
 
 
 @asset('human/bulwark.glb', 'Terran Bulwark (heavy tank)', size=1024)
@@ -362,13 +372,14 @@ def hauler():
     box((x1 - 0.04, 0, z0 + 0.5), (0.06, wy - 0.05, 0.5), 'armor', bevel=0.02)
     box((x1 - 0.11, 0, z0 + 0.6), (0.012, wy * 0.6, 0.2), 'vent')
     # Loading crane stub at the front of the bed.
-    cyl((x1 - 0.3, -1.3, z0), (x1 - 0.3, -1.3, z0 + 1.2), 0.1, 8, 'dark')
-    m = F.mark()
-    box((x1 - 1.0, -1.3, z0 + 1.2), (0.8, 0.07, 0.07), 'plate', bevel=0.02)
-    cyl((x1 - 1.7, -1.3, z0 + 1.15), (x1 - 1.7, -1.3, z0 + 0.85), 0.03, 6, 'dark')
-    box((x1 - 1.7, -1.3, z0 + 0.8), (0.07, 0.07, 0.05), 'amber')
-    F.rot_all(m, 'Y', 12, about=(x1 - 0.3, 0, z0 + 1.2))
-    return {}
+    with F.group('Crane'):   # swings over the bed while loading
+        cyl((x1 - 0.3, -1.3, z0), (x1 - 0.3, -1.3, z0 + 1.2), 0.1, 8, 'dark')
+        m = F.mark()
+        box((x1 - 1.0, -1.3, z0 + 1.2), (0.8, 0.07, 0.07), 'plate', bevel=0.02)
+        cyl((x1 - 1.7, -1.3, z0 + 1.15), (x1 - 1.7, -1.3, z0 + 0.85), 0.03, 6, 'dark')
+        box((x1 - 1.7, -1.3, z0 + 0.8), (0.07, 0.07, 0.05), 'amber')
+        F.rot_all(m, 'Y', 12, about=(x1 - 0.3, 0, z0 + 1.2))
+    return dict(pivot=[('Crane', (x1 - 0.3, -1.3, z0), 'CranePivot')])
 
 
 @asset('human/mender.glb', 'Terran Mender (repair vehicle)')

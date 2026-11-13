@@ -214,6 +214,17 @@ def terran_metal_station():
         box((-1.9 + k * 0.85, -0.53, z + 0.75), (0.3, 0.02, 0.05), 'dark')
     box((-0.6, 1.0, z + 2.25), (1.5, 1.1, 0.08), 'plate', bevel=0.03)
     K.vent((-1.2, 1.0, z + 2.36), (0.5, 0.8, 0.05))
+    # Roof extractor: a shrouded fan that the game keeps turning.
+    fc = (-0.1, 0.45, z + 2.33)
+    tube(fc, (fc[0], fc[1], fc[2] + 0.22), [(0, 0.5), (0.3, 0.52), (1, 0.48), (1, 0.42), (0.1, 0.42)], 12, 'plate')
+    with F.group('Fan'):
+        cyl((fc[0], fc[1], fc[2] + 0.1), (fc[0], fc[1], fc[2] + 0.2), 0.11, 8, 'dark')
+        for k in range(4):
+            b = box((0.22, 0, 0), (0.19, 0.075, 0.012), 'armor')
+            F.rot(b, 'X', 18)
+            F.rot(b, 'Z', 90 * k)
+            F.move(b, (fc[0], fc[1], fc[2] + 0.14))
+        box((fc[0] + 0.3, fc[1], fc[2] + 0.16), (0.06, 0.03, 0.008), 'amber')
     # Chimney stack with a hot throat.
     tube((0.6, 1.3, z + 2.2), (0.6, 1.3, z + 4.4), [(0, 0.55), (0.1, 0.5), (0.8, 0.4), (0.86, 0.48), (1, 0.46)], 12, 'plate')
     cyl((0.6, 1.3, z + 4.36), (0.6, 1.3, z + 4.4), 0.36, 12, 'amber')
@@ -294,4 +305,10 @@ def terran_landing_pad():
     compat.install()
     import pads_hero
     pads_hero.terran_pad()
-    return dict(name='TerranLandingPad', single=True)
+    # Approach scanner turning on the control tower roof.
+    with F.group('Scanner'):
+        cyl((-4.55, 4.3, 3.22), (-4.55, 4.3, 3.5), 0.14, 8, 'dark')
+        box((-4.55, 4.3, 3.62), (0.07, 0.75, 0.14), 'plate', bevel=0.02)
+        box((-4.47, 4.3, 3.62), (0.012, 0.68, 0.09), 'dark')
+        box((-4.62, 4.3, 3.62), (0.012, 0.5, 0.02), 'glow')
+    return dict(name='TerranLandingPad', pivot=[('Scanner', (-4.55, 4.3, 3.22), 'ScannerPivot')])

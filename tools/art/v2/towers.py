@@ -24,6 +24,7 @@ def register(key, faction, build, unit, structure):
 
     def run_unit(glb, render, report):
         F.begin(faction)
+        F.ST['tread'] = True
         info = build()
         F.apply_poses(info['packed'])
         F.finish(unit[2], glb, render=render, report=report, label=unit[1], size=512, **crev)
@@ -247,9 +248,11 @@ def terran_metal_station():
         return 'Smelter'
     sort_rest(rule)
     zb = deck + 0.1
-    return dict(pivot=None, packed={
+    smelter = stow((-0.6, 1.0, z), (-2.0, 0.1, zb), 0.45)
+    return dict(pivot=None, more=[('Fan', (-0.1, 0.45, z + 2.47), 'FanPivot')], packed={
         'Base': trs(t=(-0.9, 0, deck), s=(0.5, 0.3, 0.3)),
-        'Smelter': stow((-0.6, 1.0, z), (-2.0, 0.1, zb), 0.45),
+        'Smelter': smelter,
+        'Fan': smelter,
         'Hopper': stow((0, -2.3, z), (0.5, 0.2, zb), 0.42),
         'Tanks': stow((2.6, 0.75, z), (-0.7, 0.75, zb), 0.45),
         # The chimney is carried lying down along the deck.

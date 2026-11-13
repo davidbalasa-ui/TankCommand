@@ -28,7 +28,7 @@ EMIT_SCALE = 4.0
 
 def begin(faction):
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    ST.update(parts=[], faction=faction, mats={}, group='Hull', seq=0)
+    ST.update(parts=[], faction=faction, mats={}, group='Hull', seq=0, tread=False, tread_paths=[])
 
 
 @contextlib.contextmanager
@@ -56,7 +56,8 @@ def apply_poses(poses, into='Hull'):
         m = poses.get(o['group'])
         if m is not None:
             xf(o, m)
-        o['group'] = into
+        if o['group'] != 'Tread':
+            o['group'] = into
 
 
 def _gltf_trs(m):
@@ -929,6 +930,66 @@ def tri_count(obj):
     return sum(len(p.vertices) - 2 for p in obj.data.polygons)
 
 
+TREAD_PITCH = 0.3
+
+
+def _tread_surface(obj, bake_dir):
+    """Give the track band its own small tiling texture, mapped along the run, so the game can
+    scroll it while the vehicle moves. U counts cleats round the loop, V runs across the band."""
+    me = obj.data
+    paths = []
+    for tp in ST['tread_paths']:
+        pts = np.array(tp['path'] + [tp['path'][0]], dtype=np.float64)
+        seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        paths.append(dict(pts=pts, seg=seg, cum=np.concatenate([[0], np.cumsum(seg)]), y=tp['y'], w=tp['w']))
+
+    def along(co):
+        tp = min(paths, key=lambda p: abs(p['y'] - co.y))
+        q = np.array([co.x, co.z])
+        a, b = tp['pts'][:-1], tp['pts'][1:]
+        d = b - a
+        t = np.clip(((q - a) * d).sum(1) / np.maximum((d * d).sum(1), 1e-9), 0, 1)
+        k = int(np.argmin(np.linalg.norm(a + d * t[:, None] - q, axis=1)))
+        total = tp['cum'][-1]
+        return tp['cum'][k] + tp['seg'][k] * t[k], total, (co.y - tp['y']) / (2 * tp['w']) + 0.5
+    uvl = me.uv_layers.active.data
+    for poly in me.polygons:
+        vals = [along(me.vertices[me.loops[li].vertex_index].co) for li in poly.loop_indices]
+        total = vals[0][1]
+        n = max(1, round(total / TREAD_PITCH))
+        ss = [v[0] for v in vals]
+        if max(ss) - min(ss) > total / 2:   # the face straddles the seam of the loop
+            ss = [s + total if s < total / 2 else s for s in ss]
+        for li, s, v in zip(poly.loop_indices, ss, vals):
+            uvl[li].uv = (s / total * n, v[2])
+    # 64 x 64 tile: one raised cleat bar across the band, with a centre guide and worn edges.
+    px = np.zeros((64, 64, 3), np.float32)
+    u = (np.arange(64) + 0.5) / 64
+    v = (np.arange(64) + 0.5) / 64
+    bar = ((u > 0.18) & (u < 0.62)).astype(np.float32)[None, :]
+    lip = ((u > 0.18) & (u < 0.26)).astype(np.float32)[None, :]
+    across = ((np.abs(v - 0.5) < 0.44) & (np.abs(v - 0.5) > 0.05)).astype(np.float32)[:, None]
+    shade = 0.035 + 0.075 * bar * across + 0.07 * lip * across
+    px[...] = shade[..., None] * np.array([1.0, 1.0, 1.08], np.float32)
+    os.makedirs(bake_dir, exist_ok=True)
+    path = os.path.join(bake_dir, 'terran_tread.png')
+    _png(path, _srgb(px))
+    im = bpy.data.images.load(path)
+    mat = bpy.data.materials.new('TerranTread')
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = im
+    tex.extension = 'REPEAT'
+    nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    bsdf.inputs['Roughness'].default_value = 0.7
+    bsdf.inputs['Metallic'].default_value = 0.5
+    me.materials.clear()
+    me.materials.append(mat)
+    me.polygons.foreach_set('material_index', np.zeros(len(me.polygons), dtype=np.int32))
+
+
 def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=None, label=None,
            ao_floor=0.35, views=None, report=None, crevice=None, supersample=2, edge_color=None,
            poses=None, bake_offset=None, clip=None, clear=None, clear_alpha=0.42):
@@ -1098,6 +1159,8 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
             o.data.name = g
             made[g] = o
         bpy.data.objects.remove(obj)
+    if 'Tread' in made and ST.get('tread_paths'):
+        _tread_surface(made['Tread'], os.path.join(os.path.dirname(out_glb), '_bake'))
     for g, d in (bake_offset or {}).items():
         if g in made:
             made[g].data.transform(Matrix.Translation(-Vector(d)))

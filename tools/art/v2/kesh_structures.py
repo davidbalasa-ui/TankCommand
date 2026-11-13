@@ -203,4 +203,12 @@ def kesh_landing_nest():
     compat.install()
     import pads_hero
     pads_hero.kesh_nest()
-    return dict(name='KeshLandingNest', single=True)
+    # The crown over the heart and the high halo are their own parts so they can turn.
+    import towers
+    for o in F.ST['parts']:
+        x, y, zz = towers.centre(o)
+        if zz > 4.0:
+            o['group'] = 'Halo'
+        elif zz > 1.3 and x * x + y * y < 1.0:
+            o['group'] = 'Crown'
+    return dict(name='KeshLandingNest', pivot=[('Crown', (0, 0, 1.45), 'CrownPivot'), ('Halo', (0, 0, 4.2), 'HaloPivot')])

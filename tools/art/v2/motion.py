@@ -7,6 +7,8 @@ model's _lod file). The game reads it from node.userData.anim:
 
     type   'spin'   turn about `axis` at `speed` rad/s
            'swing'  rock about `axis`: angle = amp * sin(2 pi * speed * t), speed in Hz
+           'scroll' on the mesh node 'Tread': slide its material's texture along U
+                    (map.offset.x) by `speed` tiles per second while moving
     axis   in the node's own glTF space (Y up, model front +X)
     when   'always' | 'mining' | 'working' (repairing or building) | 'moving'
     busySpeed  optional: speed to use instead while the unit is working
@@ -44,7 +46,19 @@ SPEC = {
     'structures/kesh_metal_siphon': {'TurretPivot': spin(UP, 0.5)},
     'structures/kesh_hive_roost': {'TurretPivot': spin(UP, 0.3)},
     'structures/kesh_gene_vault': {'CrownPivot': spin(UP, 0.5)},
+    'structures/terran_metal_station': {'FanPivot': spin(UP, 9.0)},
+    'structures/terran_landing_pad': {'ScannerPivot': spin(UP, 1.6)},
+    'structures/kesh_landing_nest': {'CrownPivot': spin(UP, 0.7), 'HaloPivot': spin(UP, -0.25)},
 }
+
+WHEELS = {f'Wheel{i}{s}Pivot': spin(LEFT, 7.0, 'moving') for i in range(3) for s in 'LR'}
+FANS = {f'Fan{a}{s}Pivot': spin(UP, 14.0) for a in 'FB' for s in 'LR'}
+TREAD = dict(type='scroll', speed=3.0, when='moving')
+for _n in ['lancer', 'bulwark', 'javelin', 'longbow', 'prospector', 'hauler', 'mender', 'watchman', 'bastion_packed', 'spire_packed', 'radar_tower_packed', 'metal_station_packed', 'air_base_packed']:
+    SPEC.setdefault('human/' + _n, {})['Tread'] = TREAD
+SPEC.setdefault('human/outrider', {}).update(WHEELS)
+SPEC.setdefault('human/skimmer', {}).update(FANS)
+SPEC.setdefault('human/hauler', {})['CranePivot'] = swing(UP, 0.5, 0.3, 'working')
 
 
 def patch(path, anims):
