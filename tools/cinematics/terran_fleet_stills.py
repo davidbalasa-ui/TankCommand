@@ -187,6 +187,8 @@ def build(key):
         ship = T.BUILDERS[key]()
     for p in ship.data.polygons:
         p.use_smooth = True
+    if key != 'fighter' and args.get('neon', '1') != '0':
+        T.neon_lines(ship)
     tris = tris_of(ship) + sum(tris_of(o) for o in extra if key == 'fighter')
     return ship, extra, tris
 

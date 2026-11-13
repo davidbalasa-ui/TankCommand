@@ -797,3 +797,70 @@ BUILDERS = {
     'fighter': twin_x_fighter,
     'missile_ship': missile_ship,
 }
+
+
+# ------------------------------------------------------------------ neon hull lines (cinematic only)
+NEON = (0.18, 0.62, 1.0)
+NEON_ZONES = ('zone_hull', 'zone_armor', 'zone_plate', 'zone_dark')
+
+
+def neon_lines(obj, col=NEON, strength=9.0, rows=5.0, segs=7.0, pick=0.45, width=0.06, seed=3.0):
+    """Make ships read in space: a few long horizontal neon strips running bow to stern, broken
+    into segments (about `pick` of them lit). Works on copies of the panel zone materials, so game
+    assets are untouched. rows = strips over the ship's height, segs = segments along its length."""
+    dx, dy, dz = obj.dimensions
+    kz = rows / max(dz, 1e-3)
+    kx = segs / max(dx, 1e-3)
+    done = {}
+    for slot in obj.material_slots:
+        m = slot.material
+        if m is None or not m.name.startswith(NEON_ZONES):
+            continue
+        if m.name not in done:
+            c = m.copy()
+            c.name = m.name + '_neon'
+            nt = c.node_tree
+            out = next(n for n in nt.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output)
+            surf = out.inputs['Surface'].links[0].from_socket
+
+            def math(op, a, b=None):
+                n = nt.nodes.new('ShaderNodeMath')
+                n.operation = op
+                for j, v in enumerate((a, b)):
+                    if v is None:
+                        continue
+                    if isinstance(v, (int, float)):
+                        n.inputs[j].default_value = v
+                    else:
+                        nt.links.new(v, n.inputs[j])
+                return n.outputs[0]
+            tc = nt.nodes.new('ShaderNodeTexCoord')
+            sp = nt.nodes.new('ShaderNodeSeparateXYZ')
+            nt.links.new(tc.outputs['Object'], sp.inputs[0])
+            u = math('MULTIPLY_ADD', sp.outputs[2], kz)
+            u.node.inputs[2].default_value = 0.37
+            line = math('LESS_THAN', math('FRACT', u), width)
+            row = math('FLOOR', u)
+            seg = math('FLOOR', math('ADD', math('MULTIPLY', sp.outputs[0], kx), math('MULTIPLY', row, 0.5)))
+            cmb = nt.nodes.new('ShaderNodeCombineXYZ')
+            nt.links.new(seg, cmb.inputs[0])
+            nt.links.new(row, cmb.inputs[1])
+            cmb.inputs[2].default_value = seed
+            wn = nt.nodes.new('ShaderNodeTexWhiteNoise')
+            wn.noise_dimensions = '3D'
+            nt.links.new(cmb.outputs[0], wn.inputs['Vector'])
+            sel = math('GREATER_THAN', wn.outputs['Value'], 1.0 - pick)
+            sn = nt.nodes.new('ShaderNodeSeparateXYZ')     # strips on the sides only, not flat decks
+            nt.links.new(tc.outputs['Normal'], sn.inputs[0])
+            side = math('LESS_THAN', math('ABSOLUTE', sn.outputs[2]), 0.6)
+            k = math('MULTIPLY', math('MULTIPLY', math('MULTIPLY', line, sel), side), strength)
+            em = nt.nodes.new('ShaderNodeEmission')
+            em.inputs['Color'].default_value = (*col, 1)
+            nt.links.new(k, em.inputs['Strength'])
+            add = nt.nodes.new('ShaderNodeAddShader')
+            nt.links.new(surf, add.inputs[0])
+            nt.links.new(em.outputs[0], add.inputs[1])
+            nt.links.new(add.outputs[0], out.inputs['Surface'])
+            done[m.name] = c
+        slot.material = done[m.name]
+    return obj
