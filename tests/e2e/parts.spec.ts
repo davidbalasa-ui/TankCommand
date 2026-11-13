@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { enterGame } from './helpers';
 
-test('[PART-01] the miner drum spins only while digging,', async ({ page }, testInfo) => {
+test('[PART-01] the miner drum spins only while digging', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone-only');
   test.setTimeout(120_000);
   await enterGame(page);
