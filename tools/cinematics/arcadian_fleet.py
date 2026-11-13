@@ -273,30 +273,14 @@ def crescent_mothership_v2(name='CrescentMothershipV2'):
         F.orb((c.x + ca * 7.4, c.y + sa * 7.4, c.z + math.sin(math.radians(a * 3)) * 1.2), 0.5, 'pale',
               seg=(10, 6), sq=(1.3, 1.0, 0.35))
 
-    # --- forward of the core: twin floating prongs, focusing rings and the energy lance between them
-    tip = Vector((43, 0, 0))
-    for s in (-1, 1):
-        pr = F.lensfn(c.x + 5.5, 41, 0.55, 1.5, -1.5, 0.0, nose=1.5, tail=0.9)
-        o = F.body(pr, 'shell', nu=18, nv=10)
-        F.move(o, (0, s * 1.5, 0))
-        o = F.body(F.lensfn(c.x + 6.5, 39, 0.3, 0.5, -0.5, 0.0, nose=1.5, tail=0.9), 'slat', nu=14, nv=8)
-        F.move(o, (0, s * 1.95, 0))
-    thread([c + Vector((3.6, 0, 0)), Vector((30, 0, 0)), tip], 0.22, 'bolt', n=6)
-    for k, x in enumerate((c.x + 8.5, c.x + 13.5, c.x + 18.5, c.x + 23)):
-        oriented_ring((x, 0, 0), (1, 0, 0), 3.4 - 0.55 * k, 0.4, 0.28, 'pale' if k % 2 else 'bronze', gaps=3 + k % 2)
-    for k in range(4):
-        x = c.x + 8 + k * 6.0
-        bolt((x, 1.2, rnd.uniform(-1, 1)), (x + rnd.uniform(1.5, 3), -1.2, rnd.uniform(-1, 1)), rnd,
-             width=0.05, jag=0.25, depth=3, branches=0)
-    F.orb(tuple(tip), 0.7, 'bolt', seg=(12, 8))
+    # (David 2026-11-13: no long pointed lance ahead of the core; the core is the bow weapon)
+    tip = c + Vector((4.2, 0, 0))
 
     # --- the bowstring: energy threads + lightning from each horn tip to the lance tip, and
     #     heavy arcs from the horn tips into the core
     for s, u in ((1, 0.0), (-1, 1.0)):
         horn = path(u) + (path(u) - path(abs(u - 0.02))).normalized() * 0.4
         F.orb(tuple(horn), 0.55, 'bolt', seg=(10, 6))
-        thread([horn, (horn + tip) / 2 + Vector((0, s * 0.8, 0)), tip], 0.1, 'arc', n=10)
-        bolt(horn, tip, rnd, width=0.2, jag=0.07, depth=6, branches=3)
         ring_pt = c + Vector((0.6, s * 4.9, 0.4))
         bolt(horn, ring_pt, rnd, width=0.26, jag=0.2, depth=5, branches=3)
         bolt(fn(abs(u - 0.2), 180, 0.3), c + Vector((-4.6, s * 1.5, 0.5)), rnd, width=0.12, jag=0.2, depth=5,
