@@ -725,13 +725,11 @@ class Space:
         for f, v in [(1, 0.0), (fr(0.9), 1.0)]:          # 0:00 black, stars fade in
             self.bg.inputs['Strength'].default_value = v
             self.bg.inputs['Strength'].keyframe_insert('default_value', frame=f)
-        p = OS.planet()
-        a = bpy.data.objects['Atmosphere']
-        for o in (p, a):
-            o.location = PLANET_C
-        self.planet = p
         sun = self.sh.sun(rot=(70, 0, -140), energy=4.0)
         self.sun_obj = sun
+        bpy.context.view_layer.update()
+        import planet
+        self.planet = planet.build(PLANET_C, sun, draft=self.draft)
         # the sun's disc, seen once in shot 1: its edge clears Vesper's limb at 0:02
         c = SHOT1_CAM
         to_p = PLANET_C - c
@@ -1294,6 +1292,8 @@ class Space:
         squid.SquidHunt(self)
 
     def camera_for(self, sid):
+        if sid == '08a':
+            return self.drop_data.camera(sid)
         if sid.startswith('07'):
             return self.squid.camera(sid)
         if sid == '06':
@@ -1301,7 +1301,8 @@ class Space:
         return None
 
     def drop(self):
-        pass
+        import drop
+        drop.Drop(self)
 
     def ending(self):
         pass
