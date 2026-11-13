@@ -314,7 +314,7 @@ def shards(p, f0, n, col, size, speed, seed, life=1.5, kind='tri', strength=8.0,
         f1 = int(f0 + life * FPS)
         key_loc(o, [(f0, p), (f1, Vector(p) + d * v * life)], 'LINEAR')
         key_rot(o, [(f0, (rnd.uniform(0, 360), rnd.uniform(0, 360), 0)),
-                    (f1, (rnd.uniform(0, 900), rnd.uniform(0, 900), rnd.uniform(0, 400)))], 'LINEAR')
+                    (f1, (rnd.uniform(0, 220), rnd.uniform(0, 220), rnd.uniform(0, 100)))], 'LINEAR')
         show(o, f0, f1)
         o.visible_shadow = False
         objs.append(o)
@@ -452,9 +452,27 @@ def beam_twist(src, d, name, col, len_keys, f0, f1, radius=2.2, pitch=14.0, stra
 
 
 def spark_stream(p, f0, f1, col, drift, seed, every=2, n=7, size=0.35, speed=60, life=0.7, strength=16.0):
-    """Continuous spray: a small burst of shards every `every` frames from f0 to f1."""
-    for i, f in enumerate(range(f0, f1, every)):
-        shards(p, f, n, col, size, speed, seed=seed * 100 + i, life=life, strength=strength, drift=drift)
+    """Continuous spray of thin glowing sparks (streaks aimed along their flight, no spin), a few
+    launched every `every` frames from f0 to f1, fading as they cool."""
+    rnd = random.Random(seed)
+    m = emit(_uid('SparkM'), col, strength)
+    src = C.uv_sphere(_uid('SparkSrc'), 1.0, seg=(6, 4), mat=m)
+    src.hide_render = True
+    for f in range(f0, f1, every):
+        for i in range(n):
+            d = (Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized() * 0.8 + Vector(drift))
+            d = d.normalized()
+            v = speed * rnd.uniform(0.4, 1.0)
+            L = size * rnd.uniform(2.0, 4.5)
+            o = bpy.data.objects.new(_uid('Spark'), src.data)
+            link(o)
+            o.scale = (L, size * 0.12, size * 0.12)
+            o.rotation_mode = 'QUATERNION'
+            o.rotation_quaternion = aim_quat(d)
+            f1_ = int(f + life * FPS * rnd.uniform(0.6, 1.0))
+            key_loc(o, [(f, Vector(p)), (f1_, Vector(p) + d * v * life)], 'LINEAR')
+            show(o, f, f1_)
+            o.visible_shadow = False
 
 
 def impact_flare(p, d, f0, f1, col, size, name):
@@ -1029,8 +1047,8 @@ class Space:
             em.inputs[1].keyframe_insert('default_value', frame=f)
         hot.visible_shadow = False
         boom(b['exit_w'] + d * 3, self.F_EXIT, 6.0, life=0.9, light=3e5, follow=d * 10)
-        shards(b['exit_w'] + d * 2, self.F_EXIT, 50, (1.0, 0.55, 0.15), 0.5, 90, seed=61, life=1.2, drift=d * 1.4,
-               strength=14.0)
+        spark_stream(b['exit_w'] + d * 2, self.F_EXIT, self.F_EXIT + 1, (1.0, 0.55, 0.15), d * 1.4, 61,
+                     n=50, size=0.5, speed=90, life=1.2, strength=14.0)
         # lights go out section by section (each neon material), then it rolls over, burning
         neon = [sl.material for sl in dread.material_slots if sl.material and sl.material.name.endswith('_neon')]
         for i, m in enumerate(neon):
