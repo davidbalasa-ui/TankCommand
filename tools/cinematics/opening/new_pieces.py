@@ -94,7 +94,7 @@ def drop_ship(name='DropShip', cargo=True, hot=False):
         ob.rotation_euler = (0, math.radians(90), 0)
         ob.location = (6.4, 0, -0.4)
         ob.scale = (1.0, 0.9, 1.0)
-        _assign(ob, _sheath_mat((1.0, 0.35, 0.05)))
+        _assign(ob, _sheath_mat((1.0, 0.35, 0.05), 9.0))
         ob.parent = ship
         ob.visible_shadow = False
     return ship
@@ -192,7 +192,7 @@ def seed_pod(name='SeedPod', hot=False):
         ob = base._join([sheath], name + '_Sheath')
         ob.rotation_euler = (0, math.radians(90), 0)
         ob.location = (4.8, 0, 0)
-        _assign(ob, _sheath_mat((1.0, 0.55, 0.12), 5.0))
+        _assign(ob, _sheath_mat((1.0, 0.55, 0.12), 10.0))
         ob.parent = pod
         ob.visible_shadow = False
     return pod

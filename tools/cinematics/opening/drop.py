@@ -59,6 +59,58 @@ def cloud_mat(name):
     return m
 
 
+def fire_tail(parent, name, L, R, x0, seed, hot=(1.0, 0.78, 0.4), mid=(1.0, 0.32, 0.03),
+              cool=(0.22, 0.03, 0.005)):
+    """Re-entry wake streaming back (-X, parent-local) from x0: a few ragged strands of plasma,
+    white-gold at the hull, orange, then dull red as they tear into wisps. Returns the strands
+    (scale z = how far grown, 0..1)."""
+    import ships as base
+    import forge as F
+    rnd = random.Random(seed)
+    out = []
+    base._faction('terran')
+    for j, (lk, rk, ang, sp) in enumerate([(1.0, 1.0, 0, 0), (0.75, 0.8, 6, 70), (0.6, 0.7, 8, 200),
+                                            (0.85, 0.6, 5, 300)]):
+        Lj = L * lk
+        prof = [(0.0, 0.3), (R * rk, 0.0), (R * rk * 1.15, -0.15 * Lj), (R * rk * 0.8, -0.6 * Lj), (0.0, -Lj)]
+        tl = base._join([F.lathe(prof, 24, 'glow')], f'{name}Tail{j}')
+        tl.rotation_euler = (math.radians(sp), math.radians(90 + ang * math.cos(math.radians(sp))),
+                             math.radians(ang * math.sin(math.radians(sp))))
+        tl.parent = parent
+        tl.location = (x0, 0, 0)
+        m, n = BP._new_mat(f'{name}TailM{j}')
+        tc = n.node('ShaderNodeTexCoord')
+        sep = n.node('ShaderNodeSeparateXYZ')
+        n.set(sep.inputs[0], tc.outputs['Object'])
+        along = n.maprange(sep.outputs[2], -Lj, 0.0, 0.0, 1.0)
+        tt = BP.time_value(m, 'time', 3.0)
+        st = n.node('ShaderNodeVectorMath', operation='MULTIPLY')
+        n.set(st.inputs[0], tc.outputs['Object'])
+        st.inputs[1].default_value = (1.4 / R, 1.4 / R, 0.06 * 18.0 / Lj)
+        nz = n.node('ShaderNodeTexNoise', Scale=1.0, Detail=6.0)
+        nz.noise_dimensions = '4D'
+        n.set(nz.inputs['Vector'], st.outputs[0])
+        n.set(nz.inputs['W'], n.math('ADD', tt, seed + j * 1.3))
+        thr = n.math('MULTIPLY_ADD', n.math('SUBTRACT', 1.0, along), 0.25, 0.4)
+        streak = n.maprange(n.math('SUBTRACT', nz.outputs['Fac'], thr), 0.0, 0.2, 0.0, 1.0)
+        lw = n.node('ShaderNodeLayerWeight', Blend=0.4)
+        soft = n.math('POWER', n.math('SUBTRACT', 1.0, lw.outputs['Facing']), 2.0)
+        sval = n.math('MULTIPLY', n.math('MULTIPLY', n.math('POWER', along, 1.6), streak), soft)
+        sval = n.math("MULTIPLY", sval, 2.6 if j == 0 else 1.8)
+        ramp_ = n.node('ShaderNodeValToRGB')
+        n.set(ramp_.inputs[0], along)
+        ramp_.color_ramp.elements[0].color = (*cool, 1)
+        ramp_.color_ramp.elements[1].color = (*hot, 1)
+        e = ramp_.color_ramp.elements.new(0.6)
+        e.color = (*mid, 1)
+        BP._add_out(n, sval, ramp_.outputs[0])
+        tl.data.materials.clear()
+        tl.data.materials.append(m)
+        tl.visible_shadow = False
+        out.append(tl)
+    return out
+
+
 class Drop:
     def __init__(self, S):
         self.S = S
@@ -70,6 +122,8 @@ class Drop:
         self.e1 = D.cross(Vector((0, 0, 1))).normalized()
         self.e2 = self.e1.cross(D).normalized()
         self.h0 = h0
+        import planet as PL
+        self.s_cloud = (h0 - SP.PLANET_C).length - (PL.R + PL.CLOUD_H)   # fall distance to the cloud tops
         self.frames = list(range(T0 - 2, T1 + 3))
         self.hero_path = {f: self.fall(h0, f, 1.0) for f in self.frames}
         self.build()
@@ -77,6 +131,10 @@ class Drop:
     def fall(self, p0, f, k, lag=0.0):
         t = max(0.0, (f - T0) / FPS + lag)
         s = (70 * t + 118 * t * t) * k
+        cap = self.s_cloud + 40.0                      # air braking: they slow inside the cloud deck
+        if s > cap - 60:
+            x = s - (cap - 60)
+            s = cap - 60 + 60 * (1 - math.exp(-x / 60.0))
         return p0 + self.D * s
 
     def build(self):
@@ -91,7 +149,7 @@ class Drop:
                 o.hide_render = True
         self.ships = []
         # (kind, lateral e1, lateral e2, lag s, speed k)
-        plan = [('ship', 0, 0, 0.0, 1.0), ('pod', 30, 4, 0.0, 1.0),
+        plan = [('ship', 0, 0, 0.0, 1.0), ('pod', 48, -26, 0.0, 1.0),
                 ('ship', -70, 25, 0.25, 0.98), ('pod', 95, -30, 0.15, 1.02), ('ship', -150, -40, 0.4, 0.97),
                 ('pod', 170, 50, 0.3, 1.0), ('ship', 60, 90, 0.5, 0.99), ('pod', -110, -95, 0.55, 1.01),
                 ('ship', 210, -80, 0.65, 0.98), ('pod', -230, 60, 0.7, 1.0), ('ship', -40, -160, 0.8, 1.0),
@@ -101,6 +159,7 @@ class Drop:
             o = SP.copy_tree(src, f'Fall{i}')
             for c in [o] + list(o.children_recursive):
                 c.hide_render = False
+                c.visible_shadow = False             # their shadows smeared long dark shapes over the clouds
             o.scale = (DS_K if kind == 'ship' else POD_K,) * 3
             p0 = self.h0 + e1 * a + e2 * b - D * 0.0
             locs, quats = [], []
@@ -123,17 +182,12 @@ class Drop:
                 SP.key_scale(sh, [(T0, (s0.x * 0.3, s0.y * 0.3, 0.01)), (fi, (s0.x * 0.3, s0.y * 0.3, 0.01)),
                                   (fi + 8, tuple(s0))], 'BEZIER')
                 SP.show(sh, fi, T1 + 2, tree=False)
-                tr = bpy.data.objects.new(o.name + '_Trail', sh.data)
-                SP.link(tr)
-                tr.parent = o
-                tr.location = sh.location - Vector((2.0, 0, 0))
-                tr.rotation_euler = sh.rotation_euler
-                tl = 14.0 if kind == 'ship' else 18.0
-                SP.key_scale(tr, [(fi + 2, (0.6, 0.55, 0.01)), (fi + 10, (0.85, 0.8, tl * 0.5)), (fi + 24, (0.9, 0.85, tl))],
-                             'BEZIER')
-                tr.data.materials[0]  # same sheath material (hot nose -> red open end)
-                tr.visible_shadow = False
-                SP.show(tr, fi + 2, T1 + 2, tree=False)
+                for tl in fire_tail(o, o.name, 26.0 if kind == 'ship' else 30.0, 2.8 if kind == 'ship' else 2.2,
+                                    sh.location.x - 13.0, 3600 + i,
+                                    hot=(1.0, 0.55, 0.18) if kind == "ship" else (1.0, 0.75, 0.35),
+                                    mid=ORANGE if kind == 'ship' else (1.0, 0.6, 0.15)):
+                    SP.key_scale(tl, [(fi + 1, (1, 1, 0.02)), (fi + 14, (1, 1, 0.6)), (fi + 30, (1, 1, 1))], 'BEZIER')
+                    SP.show(tl, fi + 1, T1 + 2, tree=False)
             # fire light on the hull, blue engine dots / gold glow before the fire
             L = bpy.data.objects.new(o.name + '_FireL', bpy.data.lights.new(o.name + '_FireL', 'POINT'))
             SP.link(L)
@@ -147,26 +201,13 @@ class Drop:
             if kind == 'ship':
                 hm = BP._halo_mat(SP._uid('EngDot'), BLUE, 4.0)
                 for (lx, ly) in ((-3.1, 3.2), (-3.1, -3.2), (1.5, 3.2), (1.5, -3.2)):
-                    g = C.uv_sphere(SP._uid('EngDot'), 0.9, seg=(12, 6), mat=hm)
+                    g = C.uv_sphere(SP._uid('EngDot'), 0.32, seg=(12, 6), mat=hm)
                     g.parent = o
                     g.location = (lx - 1.4, ly, 0)
                     g.visible_shadow = False
                     SP.show(g, T0 - 2, T1 + 2)
             self.ships.append(o)
-        # cloud tops: two decks across the fall line; the hero ship punches through at ~0:36.9
-        hc = self.hero_path[T_CLOUD]
-        cm = cloud_mat('DropCloudM')
-        for j, ds in enumerate((6.0, 40.0, 90.0)):
-            bpy.ops.mesh.primitive_plane_add(size=1)
-            pl = bpy.context.active_object
-            pl.name = f'DropCloud{j}'
-            pl.scale = (5000, 5000, 1)
-            pl.location = hc + D * ds
-            pl.rotation_mode = 'QUATERNION'
-            pl.rotation_quaternion = (-D).to_track_quat('Z', 'Y')
-            pl.data.materials.append(cm)
-            pl.visible_shadow = False
-            SP.show(pl, T0 - 2, T1 + 2)
+        # the cloud tops are the planet's own cloud shell (planet.py), no stand-in planes
 
     def camera(self, sid):
         D, e1, e2 = self.D, self.e1, self.e2
@@ -179,8 +220,8 @@ class Drop:
             # phase 1: carry on 07d's tilt while falling slowly; phase 2: behind our drop ship
             p1 = CAM0 + D * (25 * (f - T0) / FPS)
             l1 = LOOK0.lerp(H[f] + D * 40, ramp(f, fr(35.0), fr(35.6)))
-            p2 = H[f] - D * 34 + e2 * 9 + e1 * 5
-            l2 = H[f] + D * 70 + e2 * 2
+            p2 = H[f] - D * 30 + e2 * 78 + e1 * 50
+            l2 = H[f] + D * 10 - e2 * 2
             p = p1.lerp(p2, sm)
             l_ = l1.lerp(l2, sm)
             sk = ramp(f, T_FIRE, T_FIRE + 6) * 0.7
