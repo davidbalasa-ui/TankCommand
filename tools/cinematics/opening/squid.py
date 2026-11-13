@@ -27,13 +27,13 @@ import terran_fleet as T
 fr = SP.fr
 FPS = SP.FPS
 K = 3.0                      # squid drawn 3x (body ~60 long, arms ~55 more)
-FX_K = 4.5                   # the three fighters in this shot are drawn a bit larger so they read
+FX_K = 11.0                  # the three fighters in this shot are drawn larger so the grip reads
 SEG_L = 1.45                 # tentacle segment length (squid-local)
 NSEG = 12                    # normal arm segments
 NSEG_FEED = 15               # the two feeder arms
 NARM = 10
 FEEDERS = (0, 5)
-GROUP_A = (0, 1, 9, 2)       # arms on the first fighter (body, three wing groups)
+GROUP_A = (1, 9, 0)          # arms that each coil one wing of the first fighter: up, down, far side
 GROUP_B = (5, 4, 6)          # arms on the second fighter (body, front half, back half)
 SPREAD = (3, 7, 8)           # arms spread wide and crackling so the shape stays readable
 FLICKER = 2                  # the arm that flicks at the passing fighters
@@ -47,6 +47,21 @@ T_PULL_A, T_BURST_A = fr(32.0), fr(32.5)
 T_RIP_B, T_LOOK = fr(33.0), fr(33.5)
 T_BEAM, T_BLOW, T_PASS = fr(34.0), fr(34.25), fr(34.5)
 END = fr(36.5)
+# swimming: three power strokes in the chase (arms snap shut, thrusters flare, the body surges)
+STROKE_A, STROKE_P, STROKE_N = T_LUNGE + 2, 11, 3       # 687, every 11 frames
+# fighter A: coiled at 0:30, twisted from 0:31.4, wings wrenched off 0:31.85-0:32.45, core flung away
+T_TW0 = fr(31.4)
+T_RIP0 = fr(31.85)
+T_REL_A = fr(31.85) + 17      # the last wing comes away, the stripped body is let go
+RIP_GAP = 5                  # frames between the three wing rips
+RIP_PULL = 7                 # frames a wing takes to come away once it tears
+DEBUG_WINGS = False
+WING_D0 = 0.40               # wing coil starts this far out (fighter units)
+T_POP_A = fr(32.85)
+# fighter B: coiled at 0:31.6, feeder claw in at 0:32.75, core pulled out 0:33, crushed 0:33.55
+T_IN_B = fr(32.75)
+T_CRUSH_B = fr(33.55)
+WRAP_M = 4                   # segments of each gripping arm coiled round the fighter
 
 
 # ================================================================== small maths
@@ -131,6 +146,23 @@ def bake(obj, frames, locs=None, quats=None, scales=None):
 
 
 # ================================================================== tentacle segments
+_ARM_DIM = {'zone_bolt': 3.0, 'zone_arc': 3.0, 'zone_glow': 2.0}
+
+
+def _arm_dim_mat(m):
+    key = m.name.split('.')[0]
+    nm = key + '_arm'
+    if nm in bpy.data.materials:
+        return bpy.data.materials[nm]
+    c = m.copy()
+    c.name = nm
+    for n in c.node_tree.nodes:
+        if n.type == 'BSDF_PRINCIPLED':
+            n.inputs['Emission Strength'].default_value = _ARM_DIM[key]
+            n.inputs['Emission Color'].default_value = (1.0, 0.42, 0.08, 1.0)
+    return c
+
+
 def _segment_meshes(nseg, r0, r1, claw, tag):
     """Build one straight tentacle along +X and cut it into nseg rigid segment meshes, each with its
     origin at the segment's root joint. Returns [mesh] (claw joined into the last one)."""
@@ -168,6 +200,9 @@ def _segment_meshes(nseg, r0, r1, claw, tag):
         ob.data.transform(Matrix.Translation((-k * SEG_L, 0, 0)))
         me = ob.data
         me.name = f'TentSeg_{tag}_{k:02d}'
+        for si, m in enumerate(me.materials):      # joint beads were saturating to white blobs that
+            if m and m.name.split('.')[0] in _ARM_DIM:   # buried the fighters: dim them to warm amber
+                me.materials[si] = _arm_dim_mat(m)
         bpy.data.objects.remove(ob)
         meshes.append(me)
     return meshes
@@ -313,7 +348,7 @@ class SquidHunt:
         keys += [(T_LOOK, last + Vector((-2, 52, 0))), (T_BEAM, last + Vector((-6, 64, 0))),
                  (END, last + Vector((-14, 80, 0)))]
         self.sq_keys = keys
-        self.sq_pos = {f: catmull(keys, f) for f in self.frames}
+        self.sq_pos = {f: catmull(keys, self.warp(f)) for f in self.frames}
         # heading: yaw 180 (-X) drifting, snap round to +Y, follow travel, turn to look at the frigate
         yaws = {}
         for f in self.frames:
@@ -332,6 +367,31 @@ class SquidHunt:
             q = yaw_quat(self.yaw[f], self.pitch[f], self.roll[f])
             self.M[f] = Matrix.Translation(self.sq_pos[f]) @ q.to_matrix().to_4x4() @ Matrix.Scale(K, 4)
         self.Minv = {f: m.inverted() for f, m in self.M.items()}
+
+    def warp(self, f):
+        """Swim strokes: inside the chase the squid surges at each stroke and glides between them
+        (a monotonic time warp that leaves the key frames, so the grabs still line up)."""
+        a, b = STROKE_A, STROKE_A + STROKE_P * STROKE_N
+        if not (a < f < b):
+            return f
+        u = (f - a) / float(b - a)
+        w = 2 * math.pi * STROKE_N
+        return a + (b - a) * (u + 0.6 * math.sin(w * u) / w)
+
+    def thrust(self, f, delay=0):
+        """0..1 thruster flare: a burst at each power stroke, a low idle burn otherwise."""
+        v = 0.12
+        for k in range(STROKE_N):
+            c = STROKE_A + k * STROKE_P + delay
+            if c - 1 <= f <= c + 7:
+                v = max(v, math.sin(math.pi * (f - c + 1) / 8.0))
+        if T_LUNGE - 1 <= f <= T_LUNGE + 6:                     # the first lunge
+            v = max(v, math.sin(math.pi * (f - T_LUNGE + 1) / 7.0))
+        if T_TURN <= f <= T_TURN + 10:                          # snapping round
+            v = max(v, 0.6 * math.sin(math.pi * (f - T_TURN) / 10.0))
+        if f >= T_BLOW:
+            v = 0.0
+        return v
 
     def local(self, f, p):
         return self.Minv[f] @ Vector(p)
@@ -380,9 +440,37 @@ class SquidHunt:
         drive = C.uv_sphere('SquidDrive', 1.0, seg=(20, 10), mat=SP.BP._halo_mat('SquidDriveM', (1.0, 0.5, 0.1), 4.0))
         drive.parent = ship
         drive.location = (-18.5, 0, 0)
-        SP.key_scale(drive, [(F0 - 24, (0.9, 0.7, 0.7)), (T_LUNGE - 1, (0.9, 0.7, 0.7)), (T_LUNGE + 2, (4.5, 1.3, 1.3)),
-                             (T_LUNGE + 18, (3.0, 1.0, 1.0)), (T_GRAB_A + 6, (1.1, 0.8, 0.8))], 'LINEAR')
         drive.visible_shadow = False
+        fr_ = list(range(F0 - 24, END + 1))
+        bake(drive, fr_, scales=[(0.8 + 3.2 * self.thrust(f), 0.65 + 0.6 * self.thrust(f), 0.65 + 0.6 * self.thrust(f))
+                                 for f in fr_])
+        # thruster nodes along every arm: gold-white jets that flare on each power stroke, rippling
+        # from the roots out to the tips, so the arms read as what drives it
+        jet_m = SP.BP._halo_mat('SquidJetM', (1.0, 0.72, 0.35), 3.0)
+        flame_m = SP.emit('SquidFlameM', (1.0, 0.6, 0.2), 9.0)
+        self.jets = []
+        for a in self.arms:
+            n = len(a['segs'])
+            for k in (n // 2, n - 3):
+                seg = a['segs'][k]
+                for side in (1,):
+                    g = C.uv_sphere(f'SquidJet{a["i"]}_{k}_{side}', 1.0, seg=(10, 6), mat=jet_m)
+                    g.parent = seg
+                    g.location = (0.55, 0.0, 0.42)
+                    g.visible_shadow = False
+                    fl = C.uv_sphere(f'SquidFlame{a["i"]}_{k}_{side}', 1.0, seg=(8, 5), mat=flame_m)
+                    fl.parent = seg
+                    fl.visible_shadow = False
+                    delay = int(k / 4) + (a['i'] % 3)
+                    sc_g, sc_f, lo_f = [], [], []
+                    for f in fr_:
+                        t = self.thrust(f, delay)
+                        sc_g.append((0.07 + 0.3 * t,) * 3)
+                        sc_f.append((0.02 + 1.5 * t, 0.03 + 0.07 * t, 0.03 + 0.07 * t))
+                        lo_f.append(Vector((0.55 - (0.1 + 1.6 * t), 0.0, 0.42)))
+                    bake(g, fr_, scales=sc_g)
+                    bake(fl, fr_, locs=lo_f, scales=sc_f)
+                    self.jets += [g, fl]
 
     # ------------------------------------------------------------ fighters
     def build_fighters(self):
@@ -395,15 +483,28 @@ class SquidHunt:
             for ob in [c] + list(c.children_recursive):
                 ob.hide_render = False
             wings = next(ch for ch in c.children if ch.name.startswith(wname))
-            trail = C.uv_sphere(f'SqX{i}Trail', 1.0, seg=(12, 6), mat=SP.emit(f'SqX{i}TrailM', (0.3, 0.65, 1.0), 14.0),
-                                scale=(2.2, 0.07, 0.07))
+            trail = C.uv_sphere(f'SqX{i}Trail', 1.0, seg=(12, 6), mat=SP.emit(f'SqX{i}TrailM', (0.3, 0.65, 1.0), 6.0),
+                                scale=(1.5, 0.05, 0.05))
             trail.parent = c
             trail.location = (-2.9, 0, 0)
             trail.visible_shadow = False
+            hold_f = {2: T_GRAB_A, 1: T_GRAB_B}.get(i)
+            if hold_f:
+                SP.show(trail, F0 - 24, hold_f)
             self.fx.append(dict(obj=c, wings=wings))
+            # a cool fill light riding with each fighter, so its dark wings read against the gold
+            fl = bpy.data.objects.new(f'SqX{i}Fill', bpy.data.lights.new(f'SqX{i}Fill', 'POINT'))
+            SP.link(fl)
+            fl.parent = c
+            fl.location = (0.6, -1.6, 1.2)
+            fl.data.color = (0.6, 0.75, 1.0)
+            fl.data.energy = 9000.0
+            fl.data.shadow_soft_size = 3.0
+            fl.data.use_shadow = False
         # fighter world transforms: free flight, then held in a claw
-        held = {2: (T_GRAB_A, Vector((AF.SQUID_BASE_X + 9.0, 0.0, 5.0)), T_GRAB_A + 26),
-                1: (T_GRAB_B, Vector((AF.SQUID_BASE_X + 9.5, 0.0, -5.0)), T_GRAB_B + 22)}
+        held = {2: (T_GRAB_A, Vector((AF.SQUID_BASE_X + 9.5, 2.0, 8.6)), T_GRAB_A + 20),
+                1: (T_GRAB_B, Vector((AF.SQUID_BASE_X + 10.0, -2.0, -8.8)), T_GRAB_B + 18)}
+        q_end = Vector((0, -1, 0)).to_track_quat('X', 'Z')          # nose toward the side camera
         for i, fd in enumerate(self.fx):
             path = self.fb[i]
             locs, quats = [], []
@@ -416,12 +517,35 @@ class SquidHunt:
                         fd['grab_local'] = self.local(g, path[g])
                         fd['grab_q'] = (yaw_quat(self.yaw[g], self.pitch[g], self.roll[g]).inverted() @ qprev)
                     pl = fd['grab_local'].lerp(H, ramp(f, g, g2))
-                    # wrenched sideways and shaken, engines still burning
-                    twist = Quaternion((0, 0, 1), math.radians(75) * ramp(f, g, g + 6)) @ \
-                        Quaternion((1, 0, 0), math.radians(10) * math.sin(f * 1.7))
+                    # wrenched round end-on, struggling, then (A) twisted round and round
+                    shake = math.radians(9) * math.sin(f * 1.7) * (1 - ramp(f, T_TW0, T_TW0 + 6))
+                    qe = Quaternion() if i == 2 else q_end
+                    ql = fd['grab_q'].slerp(qe, ramp(f, g, g + 10)) @ Quaternion((1, 0, 0), shake + self.twist(i, f))
+                    pl = pl + Vector((0.25 * math.sin(f * 2.3), 0, 0.2 * math.sin(f * 1.9))) * (1 - ramp(f, g2, g2 + 30))
                     qs = yaw_quat(self.yaw[f], self.pitch[f], self.roll[f])
-                    locs.append(self.world(f, pl))
-                    q = qs @ twist @ fd['grab_q']
+                    fd.setdefault('ql', {})[f] = ql
+                    if i == 1 and f > T_RIP_B + 6:          # the dead cage, let go, drifts and sags
+                        if 'rel' not in fd:
+                            p1 = self.world(T_RIP_B + 6, fd['pl_last'])
+                            p0 = self.world(T_RIP_B + 5, fd['pl_prev'])
+                            fd['rel'] = (p1, (p1 - p0) * 0.6)
+                        p1, v = fd['rel']
+                        t = f - T_RIP_B - 6
+                        locs.append(p1 + v * t + Vector((0, 0, -0.004 * t * t)))
+                        q = qs @ ql @ Quaternion((0, 1, 0), 0.03 * t)
+                    elif i == 2 and f > T_REL_A:              # the bare core is flung clear, still spinning
+                        if 'rel' not in fd:
+                            p1 = self.world(T_REL_A, fd['pl_last'])
+                            p0 = self.world(T_REL_A - 1, fd['pl_prev'])
+                            fd['rel'] = (p1, (p1 - p0) + (p1 - self.sq_pos[T_REL_A]).normalized() * 0.9)
+                        p1, v = fd['rel']
+                        locs.append(p1 + v * (f - T_REL_A))
+                        q = qs @ ql
+                    else:
+                        fd['pl_prev'] = fd.get('pl_last', pl)
+                        fd['pl_last'] = pl
+                        locs.append(self.world(f, pl))
+                        q = qs @ ql
                 else:
                     p = path[f]
                     v = path[min(f + 1, END)] - path[max(f - 1, F0 - 24)]
@@ -437,6 +561,62 @@ class SquidHunt:
             fd['quats'] = dict(zip(self.frames, quats))
             fd['hold'] = hold
 
+    def twist(self, i, f):
+        """Roll (radians) the squid's grip puts into held fighter i: A is wound round and round."""
+        if i != 2:
+            return 0.0
+        u = max(0.0, (f - T_TW0) / float(T_REL_A - T_TW0))
+        return -2 * math.pi * 0.3 * smooth(u) if u <= 1 else -2 * math.pi * (0.3 + 1.4 * (u - 1) * 3.0)
+
+    def rip_t(self, j):
+        return T_RIP0 + j * RIP_GAP
+
+    def wing_dir(self, k):
+        """Fighter-local direction of wing sector k (the wings stop spinning when it is caught)."""
+        a = math.radians(45 * k + 360 * 5 * (T_GRAB_A - F0 + 24) / 216.0)
+        return Vector((0, math.cos(a), math.sin(a)))
+
+    def wing_state(self, j, f):
+        """(pull out along the wing, fighter units; twist round the wing, radians) for gripped wing j:
+        straining and wrenched to and fro, then it tears and is corkscrewed off."""
+        td = self.rip_t(j)
+        s0 = T_TW0 + j * 2
+        strain = ramp(f, s0, td)
+        tw = 0.75 * smooth(strain) + 0.12 * math.sin(f * 1.9 + j) * strain * (1 - ramp(f, td - 1, td))
+        st = 0.12 * smooth(strain)
+        if f > td:
+            k = smooth(ramp(f, td, td + RIP_PULL))
+            st += 1.2 * k
+            tw += 2 * math.pi * 1.1 * k
+        return st, tw
+
+    def ka_sectors(self):
+        """Which wing each gripping arm takes: up, down, and the far side."""
+        if not hasattr(self, '_ka'):
+            ql = self.fx[2]['ql'][T_GRAB_A + 12]
+            want = [Vector((0, 0, 1)), Vector((0, 0, -1)), Vector((0, 1, 0))]
+            used, out = set(), []
+            for w in want:
+                k = max((k for k in range(8) if k not in used), key=lambda k: (ql @ self.wing_dir(k)).dot(w))
+                used.add(k)
+                out.append(k)
+            self._ka = out
+        return self._ka
+
+    def wing_coil(self, j, f):
+        """(coil start point, wing axis, fighter axis, twist) for gripped wing j, squid-local."""
+        fd = self.fx[2]
+        ql = fd['ql'][min(max(f, min(fd['ql'])), max(fd['ql']))]
+        k = self.ka_sectors()[j]
+        u = (ql @ self.wing_dir(k)).normalized()
+        e1 = (ql @ Vector((1, 0, 0))).normalized()
+        st, tw = self.wing_state(j, f)
+        c = self.held_centre(2, min(f, T_REL_A)) + u * ((WING_D0 + st) * FX_K / K)
+        return c, u, e1, tw
+
+    def held_centre(self, i, f):
+        return self.local(f, self.fx[i]['locs'][f])
+
     # ------------------------------------------------------------ arm poses
     def tip_pose(self, a, f, name, **kw):
         """(tip, t0, t1, wave) of a named pose, squid-local."""
@@ -445,6 +625,9 @@ class SquidHunt:
         if name == 'idle':
             tip = b + X * L * 0.9 * a['len'] + o * L * 0.16
             return tip, (X * 0.8 + o * 0.6).normalized(), (X + o * 0.3).normalized(), 1.6
+        if name == 'wide':
+            tip = b + X * L * 0.72 + o * L * 0.38
+            return tip, (X * 0.6 + o * 0.7).normalized(), (X * 0.7 + o * 0.6).normalized(), 1.9
         if name == 'bundle':
             tip = Vector((AF.SQUID_BASE_X + L * 0.93, 0, 0)) + o * 0.9
             return tip, (X * 0.9 + o * 0.25).normalized(), X, 0.35
@@ -454,6 +637,9 @@ class SquidHunt:
         if name == 'spread':
             tip = b + X * L * 0.3 + o * L * 0.82
             return tip, (X * 0.4 + o).normalized(), (o - X * 0.2).normalized(), 1.4
+        if name == 'pull':                             # drawn back toward the body, held up to look at
+            tip = b + X * L * 0.42 + o * L * 0.12 + Vector((0, -L * 0.18, 0))
+            return tip, (X * 0.8 + o * 0.4).normalized(), (X * 0.2 - o * 0.4 + Vector((0, -1, 0))).normalized(), 0.4
         if name == 'target':
             tip = kw['tip_fn'](f)
             to = (tip - b)
@@ -462,24 +648,40 @@ class SquidHunt:
 
     def arm_schedule(self, i):
         """[(frame, pose, kwargs)] key poses; between keys the poses blend smoothly."""
-        sch = [(F0 - 24, 'idle', {}), (T_TURN, 'idle', {}), (T_TURN + 12, 'bundle', {}), (T_LUNGE + 18, 'bundle', {}),
-               (T_GRAB_A - 10, 'fan', {})]
+        d = i % 3                                       # strokes ripple round the ring of arms
+        strokes = []
+        for k in range(STROKE_N):
+            c = STROKE_A + k * STROKE_P
+            strokes += [(c - 2 + d, 'fan', {}), (c + 3 + d, 'bundle', {})]
+        tail = [(T_GRAB_A - 5, 'fan', {})]
+        # drifting before the hunt: slow breathing strokes
+        breathe = [(F0 - 24, 'idle', {}), (F0 + 6 + d, 'wide', {}), (F0 + 22 + d, 'idle', {}), (F0 + 38 + d, 'wide', {}),
+                   (T_TURN - 4, 'idle', {}), (T_TURN + 10, 'bundle', {}), (T_LUNGE - 2, 'bundle', {})]
+        sch = breathe + strokes + tail
         if i == FLICKER:
             sch = [(F0 - 24, 'idle', {}), (T_CROSS + 3, 'idle', {}),
                    (T_CROSS + 8, 'target', dict(tip_fn=lambda f: self._clamp(i, self.local(f, self.fb[1][f]), 0.8))),
-                   (T_CROSS + 18, 'idle', {}), (T_TURN, 'idle', {}), (T_TURN + 12, 'bundle', {}),
-                   (T_LUNGE + 18, 'bundle', {}), (T_GRAB_A - 10, 'fan', {})]
+                   (T_CROSS + 18, 'idle', {}), (T_TURN, 'idle', {}), (T_TURN + 10, 'bundle', {}),
+                   (T_LUNGE - 2, 'bundle', {})] + strokes + tail
         if i in GROUP_A:
             j = GROUP_A.index(i)
-            sch += [(T_GRAB_A, 'target', dict(tip_fn=lambda f, j=j: self.part_local('A', j, f))),
-                    (T_BURST_A + 2, 'target', dict(tip_fn=lambda f, j=j: self.part_local('A', j, f))),
-                    (T_BURST_A + 14, 'spread', {}), (END, 'spread', {})]
-        elif i in GROUP_B:
-            j = GROUP_B.index(i)
+            tr = self.rip_t(j) + RIP_PULL
+            sch += [(T_GRAB_A, 'target', dict(tip_fn=lambda f, j=j: self.wing_coil(j, f)[0])),
+                    (tr, 'target', dict(tip_fn=lambda f, j=j: self.wing_coil(j, f)[0])),
+                    (tr + 12, 'spread', {}), (END, 'spread', {})]
+        elif i in (4, 6):
             sch += [(T_GRAB_A + 8, 'spread', {}), (T_BREAK + 2, 'fan', {}),
-                    (T_GRAB_B, 'target', dict(tip_fn=lambda f, j=j: self.part_local('B', j, f))),
-                    (T_RIP_B + 6, 'target', dict(tip_fn=lambda f, j=j: self.part_local('B', j, f))),
-                    (T_RIP_B + 18, 'spread', {}), (END, 'spread', {})]
+                    (T_GRAB_B, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-1.2, 0, 0)))),
+                    (T_RIP_B + 2, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-1.2, 0, 0)))),
+                    (T_RIP_B + 14, 'spread', {}), (END, 'spread', {})]
+        elif i == 5:                                    # the feeder: grips, reaches into the middle, pulls the core
+            sch += [(T_GRAB_A + 8, 'spread', {}), (T_BREAK + 2, 'fan', {}),
+                    (T_GRAB_B, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-2.4, 0, -1.6)))),
+                    (T_IN_B - 6, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-2.6, 0, -1.4)))),
+                    (T_IN_B, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-0.15, 0, 0)))),
+                    (T_RIP_B, 'target', dict(tip_fn=lambda f: self.held_centre(1, f) + Vector((-0.15, 0, 0)))),
+                    (T_RIP_B + 9, 'pull', {}), (T_CRUSH_B + 2, 'pull', {}), (T_CRUSH_B + 16, 'spread', {}),
+                    (END, 'spread', {})]
         else:
             sch += [(T_GRAB_A + 4, 'spread', {}), (END, 'spread', {})]
         return sch
@@ -535,7 +737,49 @@ class SquidHunt:
                 t1 = pa[2].lerp(pb[2], w).normalized()
                 wa = pa[3] + (pb[3] - pa[3]) * w
                 ph = a['ph'] + 2 * math.pi * f / (26.0 if i not in SPREAD else 18.0)
-                self.J[(i, f)] = chain(a['b'], t0, tip, t1, a['L'], nseg, wa, ph, a['side'], a['o'])
+                J = chain(a['b'], t0, tip, t1, a['L'], nseg, wa, ph, a['side'], a['o'])
+                wr = self.wrap_spec(i, f)
+                if wr is not None:
+                    w_, Jw = wr[0], self.wrap_joints(a, f, *wr[1:], wa=wa, ph=ph)
+                    J = [p.lerp(q, w_) for p, q in zip(J, Jw)]
+                self.J[(i, f)] = J
+
+    def wrap_spec(self, i, f):
+        """(weight, fighter index, coil radius, entry phase, offset along the axis, coil spin) or None."""
+        if i in GROUP_A:
+            j = GROUP_A.index(i)
+            tr = self.rip_t(j) + RIP_PULL
+            w = ramp(f, T_GRAB_A - 2, T_GRAB_A + 7) * (1 - ramp(f, tr, tr + 6))
+            if w <= 0:
+                return None
+            c, u, e1, tw = self.wing_coil(j, min(f, tr))
+            r = 1.15 - 0.2 * ramp(f, T_TW0, self.rip_t(j))       # tightening as it twists
+            return (w, c, u, e1, u.cross(e1), r, tw, 0.0, 0.4, 4)
+        if i in (4, 6):
+            j = 0 if i == 4 else 1
+            w = ramp(f, T_GRAB_B - 2, T_GRAB_B + 7) * (1 - ramp(f, T_RIP_B - 1, T_RIP_B + 6))
+            if w <= 0:
+                return None
+            r = 1.95 - 0.25 * ramp(f, T_GRAB_B, T_RIP_B)
+            return (w, self.held_centre(1, f), Vector((0, -1, 0)), Vector((1, 0, 0)), Vector((0, 0, 1)), r,
+                    math.pi + (0.6 if j else -0.6), (0.55 if j else -0.55), 0.14, WRAP_M)
+        return None
+
+    def wrap_joints(self, a, f, c, ax, e1, e2, r, phi0, along0, pitch, M, wa=0.4, ph=0.0):
+        """Joints of an arm that reaches in and coils its last M segments in a helix round axis ax
+        through c (squid-local): round the fighter's body (B) or along one wing (A)."""
+        nseg = len(a['segs'])
+        dphi = math.sqrt(max(1e-4, (SEG_L * 0.97) ** 2 - pitch ** 2)) / r
+        sgn = -1.0
+
+        def hp(q):
+            ph_ = phi0 + sgn * dphi * q
+            return c + ax * (along0 + pitch * q) + (e1 * math.cos(ph_) + e2 * math.sin(ph_)) * r
+        P0 = hp(0)
+        t1 = (hp(0.05) - P0).normalized()
+        Ja = chain(a['b'], (Vector((1, 0, 0)) * 0.7 + a['o'] * 0.45).normalized(), P0, t1,
+                   (nseg - M) * SEG_L, nseg - M, wa * 0.5, ph, a['side'], a['o'])
+        return Ja[:-1] + [hp(q) for q in range(M + 1)]
 
     # ------------------------------------------------------------ bake
     def bake_all(self):
@@ -569,104 +813,258 @@ class SquidHunt:
         bpy.context.scene.frame_set(F0)
 
     # ------------------------------------------------------------ tearing the fighters apart
-    def split_fighter_A(self):
-        """At 0:32 the first fighter's wings come off in three directions; its core bursts at 0:32.5."""
-        fd = self.fx[2]
-        wings = fd['wings']
-        bpy.context.scene.frame_set(T_PULL_A)
-        pieces = SP.split_mesh(wings, lambda c: int(((math.atan2(c.z, c.y) - 0.4) % (2 * math.pi)) // (2 * math.pi / 3)),
-                               [f'SqXA_Wing{j}' for j in range(3)])
-        SP.show(wings, F0 - 24, T_PULL_A - 1)
-        for j, p in enumerate(pieces):
-            p.parent = None
-            locs, quats = [], []
-            q0 = wings.matrix_world.to_quaternion()
-            spin = Vector((self.rnd.uniform(-1, 1), self.rnd.uniform(-1, 1), self.rnd.uniform(-1, 1))).normalized()
-            frames = list(range(T_PULL_A, END + 1))
-            vel = None
+    def fighter_matrix(self, i, f):
+        fd = self.fx[i]
+        return Matrix.Translation(fd['locs'][f]) @ fd['quats'][f].to_matrix().to_4x4() @ Matrix.Scale(FX_K, 4)
 
-            def held(f):
-                return self.world(f, self.local(f, fd['locs'][f]) + self.part_offsets('A', j + 1, f))
-            for f in frames:
-                if f <= T_BURST_A + 2:
-                    pw = held(f)
-                    q = Quaternion(spin, 0.05 * (f - T_PULL_A)) @ q0
-                    last, lastf, lastq = pw, f, q
-                else:
-                    if vel is None:
-                        vel = (last - held(lastf - 1)) + (last - fd['locs'][lastf]).normalized() * 1.4
-                    pw = last + vel * (f - lastf)
-                    q = Quaternion(spin, 0.3 * (f - lastf)) @ lastq
-                locs.append(pw)
-                quats.append(q)
-            p.scale = (FX_K,) * 3
-            bake(p, frames, locs, quats)
-            p.scale = (FX_K,) * 3
-            SP.show(p, T_PULL_A, END)
-        # core bursts violet, body gone
-        pb = fd['locs'][T_BURST_A]
-        SP.violet_boom(pb, T_BURST_A, 7.0, life=0.8, light=1.5e5)
-        SP.spark_stream(pb, T_BURST_A, T_BURST_A + 1, (0.75, 0.45, 1.0), Vector((0, 0, 0)), 711, n=40, size=0.4,
+    def wing_pieces(self, i, fs, tag):
+        """Split fighter i's eight wings (and the plasma arcs and haze that hold each one) into eight
+        sectors round the spin axis. Returns {sector: [(piece, R, is_wing)]}, R = piece relative to
+        the fighter at frame fs."""
+        fd = self.fx[i]
+        wings = fd['wings']
+        bpy.context.scene.frame_set(fs)
+        Finv = self.fighter_matrix(i, fs).inverted()
+        Winv = wings.matrix_world.inverted()
+        out = {k: [] for k in range(8)}
+        for o in [wings] + [ch for ch in wings.children_recursive if ch.type == 'MESH']:
+            Mo = Winv @ o.matrix_world
+
+            def sector(cc, Mo=Mo):
+                p = Mo @ cc
+                return int(round(math.degrees(math.atan2(p.z, p.y)) / 45.0)) % 8
+            ids = {sector(pp.center) for pp in o.data.polygons}
+            if not ids:
+                continue
+            pieces = SP.split_mesh(o, sector, [f'{tag}_{o.name}_{k}' for k in range(8)])
+            for k, pc in enumerate(pieces):
+                if not len(pc.data.polygons):
+                    bpy.data.objects.remove(pc)
+                    continue
+                out[k].append((pc, Finv @ pc.matrix_world, o is wings))
+        SP.show(wings, F0 - 24, fs)
+        return out
+
+    def _bake_piece(self, pc, frames, mats):
+        locs, quats = [], []
+        qprev = None
+        for m in mats:
+            l_, q, _ = m.decompose()
+            if qprev is not None and q.dot(qprev) < 0:
+                q = -q
+            locs.append(l_)
+            quats.append(q)
+            qprev = q
+        bake(pc, frames, locs, quats)
+        pc.scale = (FX_K,) * 3
+
+    def _die_glow(self, objs, f, name):
+        """Give these pieces their own copies of any glowing material and key the glow out at f."""
+        done = {}
+        for o in objs:
+            for sl in o.material_slots:
+                m = sl.material
+                if m is None or not m.node_tree:
+                    continue
+                em = [n for n in m.node_tree.nodes if n.type == 'EMISSION' or
+                      (n.type == 'BSDF_PRINCIPLED' and n.inputs['Emission Strength'].default_value > 0)]
+                if not em:
+                    continue
+                if m.name not in done:
+                    m2 = m.copy()
+                    m2.name = f'{name}_{m.name}'
+                    for n in m2.node_tree.nodes:
+                        sock = n.inputs['Strength'] if n.type == 'EMISSION' else (
+                            n.inputs['Emission Strength'] if n.type == 'BSDF_PRINCIPLED' else None)
+                        if sock is None or sock.is_linked:
+                            continue
+                        v = sock.default_value
+                        for ff, k in ((1, 1.0), (f, 1.0), (f + 3, 0.25), (f + 8, 0.0)):
+                            sock.default_value = v * k
+                            sock.keyframe_insert('default_value', frame=ff)
+                    done[m.name] = m2
+                if o.data.users > 1:
+                    o.data = o.data.copy()
+                sl.link = 'OBJECT'
+                sl.material = done[m.name]
+
+    def split_fighter_A(self):
+        """0:31.4-0:32.6: three arms each coil one wing of the first fighter, wrench it to and fro,
+        then corkscrew it off and fling it away, one after another. The stripped body is let go
+        spinning, and its core bursts at 0:32.85, blowing the last five wings outward."""
+        i = 2
+        fd = self.fx[i]
+        fs = T_TW0 - 1
+        parts = self.wing_pieces(i, fs, 'SqXA')
+        ka = self.ka_sectors()
+        rnd = random.Random(760)
+        frames = list(range(fs, END + 1))
+        for k in range(8):
+            rad = self.wing_dir(k)
+            if DEBUG_WINGS:
+                for pc, R_, isw in parts[k]:
+                    if isw:
+                        vs = [R_ @ v.co for v in pc.data.vertices]
+                        cc = sum(vs, Vector()) / max(1, len(vs))
+                        print('WINGDBG', k, tuple(round(x, 2) for x in rad), tuple(round(x, 2) for x in cc))
+            if k in ka:
+                j = ka.index(k)
+                td = self.rip_t(j)
+                tr = td + RIP_PULL
+
+                def M(f, R, j=j, rad=rad):
+                    st, tw = self.wing_state(j, f)
+                    return (self.fighter_matrix(i, min(f, T_REL_A)) @ Matrix.Translation(rad * st)
+                            @ Matrix.Rotation(tw, 4, rad) @ R)
+                spin = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized()
+                for pc, R, is_wing in parts[k]:
+                    if not is_wing:                   # its plasma arcs snap as it tears
+                        self._bake_piece(pc, frames, [self.fighter_matrix(i, min(f, td)) @ R for f in frames])
+                        SP.show(pc, fs + 1, td)
+                        continue
+                    m1, m0 = M(tr, R), M(tr - 1, R)
+                    p1 = m1.to_translation()
+                    vel = (p1 - m0.to_translation()) * 0.8
+                    q1 = m1.to_quaternion()
+                    mats = []
+                    for f in frames:
+                        if f <= tr:
+                            mats.append(M(f, R))
+                        else:
+                            t = f - tr
+                            q = Quaternion(spin, 0.25 * t) @ q1
+                            mats.append(Matrix.Translation(p1 + vel * t) @ q.to_matrix().to_4x4() @ Matrix.Scale(FX_K, 4))
+                    self._bake_piece(pc, frames, mats)
+                    SP.show(pc, fs + 1, END)
+                root = (self.fighter_matrix(i, td) @ Matrix.Translation(rad * 0.35)).to_translation()
+                out_w = (self.fighter_matrix(i, td).to_3x3() @ rad).normalized()
+                SP.spark_stream(root, td, td + 2, (0.75, 0.45, 1.0), out_w, 761 + j, n=16, size=0.3, speed=30, life=0.5)
+                # violet plasma tethers stretch across the widening gap, then snap
+                for n_, f in enumerate(range(td - 6, td + 3)):
+                    a_ = (self.fighter_matrix(i, f) @ Matrix.Translation(rad * 0.33)).to_translation()
+                    st_, tw_ = self.wing_state(j, f)
+                    b_ = (self.fighter_matrix(i, f) @ Matrix.Translation(rad * (0.4 + st_))).to_translation()
+                    for m_ in range(2 if f <= td else 1):
+                        self.bolt_between(a_, b_, f, f + 1, 7700 + j * 100 + n_ * 3 + m_, width=0.09,
+                                          col=(0.65, 0.3, 1.0), strength=16.0)
+                continue
+            # the five wings it keeps: still held by the plasma until the core bursts, then blown out
+            tb = T_POP_A
+            spin = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized()
+            for pc, R, is_wing in parts[k]:
+                if not is_wing:
+                    self._bake_piece(pc, frames, [self.fighter_matrix(i, min(f, tb)) @ R for f in frames])
+                    SP.show(pc, fs + 1, tb)
+                    continue
+                m1 = self.fighter_matrix(i, tb) @ R
+                p1, q1 = m1.to_translation(), m1.to_quaternion()
+                out_w = (self.fighter_matrix(i, tb).to_3x3() @ rad).normalized()
+                vel = (fd['locs'][tb] - fd['locs'][tb - 1]) + out_w * rnd.uniform(1.2, 1.8)
+                mats = []
+                for f in frames:
+                    if f <= tb:
+                        mats.append(self.fighter_matrix(i, f) @ R)
+                    else:
+                        t = f - tb
+                        q = Quaternion(spin, 0.3 * t) @ q1
+                        mats.append(Matrix.Translation(p1 + vel * t) @ q.to_matrix().to_4x4() @ Matrix.Scale(FX_K, 4))
+                self._bake_piece(pc, frames, mats)
+                SP.show(pc, fs + 1, END)
+        # the bare core bursts
+        pb = fd['locs'][T_POP_A]
+        SP.violet_boom(pb, T_POP_A, 6.0, life=0.8, light=1.5e5)
+        SP.spark_stream(pb, T_POP_A, T_POP_A + 1, (0.75, 0.45, 1.0), Vector((0, 0, 0)), 711, n=40, size=0.4,
                         speed=60, life=0.8)
-        SP.show(fd['obj'], F0 - 24, T_BURST_A, tree=False)
-        for ch in fd['obj'].children_recursive:
-            if ch is not wings and wings not in ch.children_recursive and ch not in wings.children_recursive:
-                SP.show(ch, F0 - 24, T_BURST_A, tree=False)
+        wings = fd['wings']
+        for ch in [fd['obj']] + list(fd['obj'].children_recursive):
+            if ch is wings or ch in wings.children_recursive:
+                continue
+            SP.show(ch, F0 - 24, T_POP_A, tree=False)
 
     def split_fighter_B(self):
-        """At 0:33 the second fighter is ripped in two; its core bursts."""
-        fd = self.fx[1]
+        """0:32.75-0:33.55: the feeder claw reaches into the second fighter, pulls the violet core out
+        and crushes it; the plasma holding the wings dies and the wings fall away to the sides."""
+        i = 1
+        fd = self.fx[i]
         c = fd['obj']
-        g = T_RIP_B - 4
-        bpy.context.scene.frame_set(g)
-        cm = c.matrix_world.copy()
-        meshes = [o for o in [c] + list(c.children_recursive) if o.type == 'MESH']
-        for s, nm in ((1, 'Front'), (-1, 'Back')):
-            root = bpy.data.objects.new(f'SqXB_{nm}', None)
-            SP.link(root)
-            parts = []
-            for o in meshes:
-                ow = o.matrix_world.copy()
-                ps = SP.split_mesh(o, lambda cc, s=s: 0 if (cc.x * s) >= 0 else 1, [f'SqXB_{nm}_{o.name}', f'_x{nm}{o.name}'])
-                for extra in ps[1:]:
-                    bpy.data.objects.remove(extra)
-                p = ps[0]
-                p.parent = root
-                p.matrix_parent_inverse = Matrix.Identity(4)
-                p.matrix_basis = cm.inverted() @ ow
-                parts.append(p)
-            frames = list(range(g, END + 1))
-            locs, quats = [], []
-            spin = Vector((0, 1, s * 0.3)).normalized()
-            qg = yaw_quat(self.yaw[g], self.pitch[g], self.roll[g])
-            q0 = cm.to_quaternion()
-            jj = 1 if s > 0 else 2
-
-            def held(f):
-                return self.world(f, self.local(f, fd['locs'][f]) + self.part_offsets('B', jj, f))
-            vel = None
-            for f in frames:
-                if f <= T_RIP_B + 6:
-                    pw = held(f)
-                    q = yaw_quat(self.yaw[f], self.pitch[f], self.roll[f]) @ qg.inverted() @ \
-                        Quaternion(spin, s * 0.04 * (f - g)) @ q0
-                    last, lastf, lastq = pw, f, q
-                else:
-                    if vel is None:
-                        vel = (last - held(lastf - 1)) * 1.6
-                    pw = last + vel * (f - lastf)
-                    q = Quaternion(spin, s * 0.3 * (f - lastf)) @ lastq
-                locs.append(pw)
-                quats.append(q)
-            bake(root, frames, locs, quats)
-            root.scale = (FX_K,) * 3
-            # the split moment shows the fighter's centre at its held spot; the halves start there
-            SP.show(root, g + 1, END)
-        SP.show(c, F0 - 24, g)
-        pb = fd['locs'][T_RIP_B]
-        SP.violet_boom(pb, T_RIP_B, 6.0, life=0.8, light=1.2e5)
-        SP.spark_stream(pb, T_RIP_B, T_RIP_B + 1, (0.75, 0.45, 1.0), Vector((0, 0, 0)), 712, n=34, size=0.4,
+        fs = T_RIP_B - 1
+        parts = self.wing_pieces(i, fs, 'SqXB')
+        rnd = random.Random(790)
+        frames = list(range(fs, END + 1))
+        dead = []
+        for k in range(8):
+            ang = math.radians(45 * k)
+            rad = Vector((0, math.cos(ang), math.sin(ang)))
+            spin = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized()
+            w_spin = rnd.uniform(0.03, 0.07)
+            t0 = T_RIP_B + rnd.randint(1, 4)
+            for pc, R, is_wing in parts[k]:
+                if not is_wing:
+                    self._bake_piece(pc, frames, [self.fighter_matrix(i, min(f, T_RIP_B)) @ R for f in frames])
+                    SP.show(pc, fs + 1, T_RIP_B + (k % 2))
+                    continue
+                m_t0 = self.fighter_matrix(i, t0) @ R
+                p0 = m_t0.to_translation()
+                q0 = m_t0.to_quaternion()
+                out_w = (self.fighter_matrix(i, t0).to_3x3() @ rad).normalized()
+                v = out_w * rnd.uniform(0.3, 0.42) + (fd['locs'][t0] - fd['locs'][t0 - 1])
+                mats = []
+                for f in frames:
+                    if f <= t0:
+                        mats.append(self.fighter_matrix(i, f) @ R)
+                    else:
+                        t = f - t0
+                        p = p0 + v * t + Vector((0, 0, -0.012 * t * t))       # sagging away, lifeless
+                        q = Quaternion(spin, w_spin * t) @ q0
+                        mats.append(Matrix.Translation(p) @ q.to_matrix().to_4x4() @ Matrix.Scale(FX_K, 4))
+                self._bake_piece(pc, frames, mats)
+                SP.show(pc, fs + 1, END)
+                dead.append(pc)
+        self._die_glow(dead, T_RIP_B, 'SqXBDead')
+        # the core: follows the fighter, then the claw that pulls it out, then crushed
+        orb = next(ch for ch in c.children_recursive if ch.name.split('.')[0].endswith('_Orb') or '_Orb' in ch.name)
+        bpy.context.scene.frame_set(fs)
+        R = self.fighter_matrix(i, fs).inverted() @ orb.matrix_world
+        orb.parent = None
+        mats = []
+        frames_o = list(range(F0 - 24, T_CRUSH_B + 1))
+        for f in frames_o:
+            if f < T_RIP_B:
+                mats.append(self.fighter_matrix(i, f) @ R)
+            else:
+                tipw = self.claw_tip_world(5, f)
+                base_m = self.fighter_matrix(i, f) @ R
+                k_ = ramp(f, T_RIP_B, T_RIP_B + 3)
+                pos = base_m.to_translation().lerp(tipw, k_)
+                mats.append(Matrix.Translation(pos) @ base_m.to_quaternion().to_matrix().to_4x4()
+                            @ Matrix.Scale(FX_K * (1 + 0.35 * k_), 4))
+        self._bake_piece(orb, frames_o, mats)
+        halo = C.uv_sphere('SqXBOrbHalo', 1.0, seg=(16, 8), mat=SP.BP._halo_mat('SqXBOrbHaloM', (0.5, 0.12, 1.0), 2.2))
+        halo.visible_shadow = False
+        bake(halo, frames_o, [m.to_translation() for m in mats],
+             scales=[(0.9 + 1.4 * ramp(f, T_RIP_B, T_RIP_B + 3),) * 3 for f in frames_o])
+        SP.show(halo, T_RIP_B - 2, T_CRUSH_B)
+        SP.show(orb, F0 - 24, T_CRUSH_B)
+        L = bpy.data.objects.new('SqXBCoreLight', bpy.data.lights.new('SqXBCoreLight', 'POINT'))
+        SP.link(L)
+        L.data.color = (0.55, 0.2, 1.0)
+        L.data.shadow_soft_size = 1.0
+        bake(L, frames_o, [m.to_translation() for m in mats])
+        for f_, e in ((1, 0), (T_RIP_B - 1, 0), (T_RIP_B + 1, 6e3), (T_CRUSH_B, 9e3), (T_CRUSH_B + 1, 0)):
+            L.data.energy = e
+            L.data.keyframe_insert('energy', frame=f_)
+        # plasma tearing between the core and the cage as it comes out
+        for n_, f in enumerate(range(T_RIP_B, T_RIP_B + 6)):
+            self.bolt_between(mats[frames_o.index(f)].to_translation(), fd['locs'][f], f, f + 1, 795 + n_,
+                              width=0.1, col=(0.65, 0.3, 1.0), strength=18.0)
+        pc_ = mats[-1].to_translation()
+        SP.violet_boom(pc_, T_CRUSH_B, 5.0, life=0.7, light=1.2e5)
+        SP.spark_stream(pc_, T_CRUSH_B, T_CRUSH_B + 1, (0.75, 0.45, 1.0), Vector((0, 0, 0)), 712, n=34, size=0.4,
                         speed=55, life=0.8)
+        # the dead cage drifts off
+        cage = [ch for ch in [c] + list(c.children_recursive)
+                if ch is not fd['wings'] and ch not in fd['wings'].children_recursive and ch is not orb]
+        self._die_glow([o for o in cage if o.type == 'MESH'], T_RIP_B, 'SqXBCage')
 
     # ------------------------------------------------------------ effects
     def claw_tip_world(self, i, f):
@@ -692,12 +1090,6 @@ class SquidHunt:
         # gold lightning between the feeder claws while the arms fan open (0:29)
         for n_, f in enumerate(range(T_LUNGE + 14, T_GRAB_A, 2)):
             self.bolt_between(self.claw_tip_world(0, f), self.claw_tip_world(5, f), f, f + 1, 900 + n_, width=0.3)
-        # crackling between the spread arms (0:31 - 0:34)
-        for n_, f in enumerate(range(T_GRAB_A + 6, T_BLOW, 3)):
-            for a_, b_ in ((3, 7), (7, 8)):
-                if (n_ + a_) % 2 == 0:
-                    self.bolt_between(self.claw_tip_world(a_, f), self.claw_tip_world(b_, f), f, f + 2,
-                                      1000 + n_ * 10 + a_, width=0.22)
         # blue bolts fired backward by the fleeing fighters glance off the squid (0:29)
         for n_ in range(7):
             f = T_LUNGE + 10 + n_ * 4
