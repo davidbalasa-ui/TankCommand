@@ -204,16 +204,16 @@ def render_settings(q):
     sc.render.use_persistent_data = True
 
 
-def render_shot(sid, out, quality='draft', frames=None, step=1):
+def render_shot(sid, out, quality='draft', frames=None, step=1, S=None, pick=0):
     import bpy
     f0, f1, scene, need = SHOTS[sid]
     if frames:
         a, b = frames
         f0, f1 = max(f0, a), min(f1, b)
-    if scene == 'space':
+    if S is None and scene == 'space':
         import space
         S = space.Space(need=set(need) | {'_shot_' + sid}, draft=quality == 'draft')
-    else:
+    elif S is None:
         import ground
         S = ground.Ground(need=set(need), draft=quality == 'draft')
     keys = cam_keys(sid, S)
@@ -222,7 +222,10 @@ def render_shot(sid, out, quality='draft', frames=None, step=1):
     sc = bpy.context.scene
     d = os.path.join(out, quality, sid)
     os.makedirs(d, exist_ok=True)
-    for f in range(f0, f1 + 1, step):
+    todo = list(range(f0, f1 + 1, step))
+    if pick:
+        todo = sorted({f0 + round(i * (f1 - f0) / max(1, pick - 1)) for i in range(pick)})
+    for f in todo:
         final = os.path.join(d, f'f_{f:04d}.png')
         if os.path.exists(final) and os.path.getsize(final) > 0:
             print('SKIP', sid, f, flush=True)       # resumable: finished frames are never redone
@@ -277,4 +280,12 @@ if __name__ == '__main__':
         stitch(out, q)
     else:
         fr_ = tuple(int(x) for x in args['frames'].split('-')) if 'frames' in args else None
-        render_shot(args['shot'], out, q, fr_, int(args.get('step', 1)))
+        sids = args['shot'].split(',')
+        S = None
+        if len(sids) > 1:                  # several shots of one scene from a single build (previews)
+            assert len({SHOTS[x][2] for x in sids}) == 1
+            if SHOTS[sids[0]][2] == 'ground':
+                import ground
+                S = ground.Ground(need=set().union(*(SHOTS[x][3] for x in sids)), draft=q == 'draft')
+        for sid in sids:
+            render_shot(sid, out, q, fr_, int(args.get('step', 1)), S=S, pick=int(args.get('pick', 0)))

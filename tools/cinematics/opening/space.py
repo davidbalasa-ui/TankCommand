@@ -319,7 +319,7 @@ def boom(p, f0, size, hot=(1.0, 0.45, 0.06), cool=(0.35, 0.03, 0.005), life=1.2,
         L.location = p
         L.data.color = hot
         L.data.shadow_soft_size = size * 0.5
-        for f, e in [(1, 0), (f0, 0), (f0 + 1, light), (f0 + 3 * step, light * 0.25), (f1, 0)]:
+        for f, e in [(1, 0), (f0, 0), (f0 + 1, light), (min(f0 + 3 * step, (f0 + 1 + f1) / 2), light * 0.25), (f1, 0)]:
             L.data.energy = e
             L.data.keyframe_insert('energy', frame=f)
         lin(L.data)
