@@ -13,7 +13,7 @@ export function updateRepair(world: WorldState): void {
     if (medic.hp <= 0 || !type?.repair || medic.transform) {
       continue;
     }
-    const { radius, ratePerSec } = type.repair;
+    const { radius, ratePerSec, unitsOnly } = type.repair;
     const amount = ratePerSec * DT;
     for (const unit of world.units) {
       if (unit.id === medic.id || !isAllied(world, medic.owner, unit.owner) || unit.hp <= 0) {
@@ -24,7 +24,7 @@ export function updateRepair(world: WorldState): void {
         unit.hp = Math.min(max, unit.hp + amount);
       }
     }
-    for (const structure of world.structures) {
+    for (const structure of unitsOnly ? [] : world.structures) {
       if (!isAllied(world, medic.owner, structure.owner) || structure.hp <= 0) {
         continue;
       }

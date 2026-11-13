@@ -2,8 +2,8 @@
   "id": "mission.alien.15_hive_roost",
   "campaign": "alien",
   "order": 15,
-  "title": "Hive Roost",
-  "briefing": "Terran fighters keep stinging the brood. Grow a Hive Roost, raise Halos and bring down the four raiders. Spitters can hit aircraft too.",
+  "title": "Aerie",
+  "briefing": "Terran fighters keep stinging the brood. Grow an Aerie, raise Halos and bring down the four raiders. Flares can hit aircraft too.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -140,7 +140,7 @@
   "objectives": [
     {
       "id": "roost",
-      "text": "Grow a Hive Roost",
+      "text": "Grow a Aerie",
       "kind": "primary"
     },
     {
@@ -160,7 +160,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "Grow a Hive Roost first: fliers need it to land and feed."
+          "text": "Grow an Aerie first: fliers need it to land and feed."
         }
       ]
     },

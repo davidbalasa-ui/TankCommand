@@ -35,7 +35,7 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
   },
   normal: {
     strategicEveryTicks: 40,
-    attackThresholdValue: 900,
+    attackThresholdValue: 700,
     reserveOre: 40,
     minersWanted: 2,
     focusFire: true,

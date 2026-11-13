@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 2,
   "title": "Feeding Ground",
-  "briefing": "The brood is hungry. Set the Gorger on the ore field and gather 400 ore. Terran scouts may come sniffing.",
+  "briefing": "The brood is hungry. Set the Sifter on the ore field and gather 400 ore. Terran scouts may come sniffing.",
   "mapId": "map.c_halden",
   "sides": [
     {

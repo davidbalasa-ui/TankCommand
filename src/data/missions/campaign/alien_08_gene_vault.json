@@ -2,8 +2,8 @@
   "id": "mission.alien.08_gene_vault",
   "campaign": "alien",
   "order": 8,
-  "title": "The Gene Vault",
-  "briefing": "The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry the metal home, then grow a Gene Vault and finish one research.",
+  "title": "The Star Vault",
+  "briefing": "The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry the metal home, then grow a Star Vault and finish one research.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -115,7 +115,7 @@
     },
     {
       "id": "lab",
-      "text": "Build a Gene Vault",
+      "text": "Build a Star Vault",
       "kind": "primary"
     },
     {
@@ -161,7 +161,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "The siphon drinks. Send the spare Ferrier to it to carry the metal. Now the Gene Vault."
+          "text": "The siphon drinks. Send the spare Ferrier to it to carry the metal. Now the Star Vault."
         }
       ]
     },
@@ -182,7 +182,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "Tap the Gene Vault to pick a research."
+          "text": "Tap the Star Vault to pick a research."
         }
       ]
     },

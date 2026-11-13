@@ -752,6 +752,7 @@ export class App {
       items.push({
         id: row.id,
         name: row.name,
+        roleLabel: row.roleLabel,
         kind: 'unit',
         ore: row.cost.ore,
         metal: row.cost.metal,
@@ -767,6 +768,7 @@ export class App {
       items.push({
         id: row.id,
         name: row.name,
+        roleLabel: row.roleLabel,
         kind: 'structure',
         ore: row.cost.ore,
         metal: row.cost.metal,

@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 16,
   "title": "Bombing Run",
-  "briefing": "Four Arcadian Thornmounds guard the eastern plain, covered by two missile batteries. Condor bombers can level them from above; Falcons keep the sky clear. Destroy all four Thornmounds.",
+  "briefing": "Four Arcadian Sentinels guard the eastern plain, covered by two missile batteries. Condor bombers can level them from above; Falcons keep the sky clear. Destroy all four Sentinels.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -184,7 +184,7 @@
   "objectives": [
     {
       "id": "towers",
-      "text": "Destroy the four Thornmounds",
+      "text": "Destroy the four Sentinels",
       "kind": "primary"
     },
     {
@@ -204,7 +204,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Select the Condors and tap a Thornmound to bomb it. Stay away from the batteries."
+          "text": "Select the Condors and tap a Sentinel to bomb it. Stay away from the batteries."
         }
       ]
     },

@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 20,
   "title": "Brood War",
-  "briefing": "Two Arcadian broods have dug in on either side of the rift. Destroy both of their landing nests.",
+  "briefing": "Two Arcadian broods have dug in on either side of the rift. Destroy both of their landing rings.",
   "mapId": "map.c_rift",
   "sides": [
     {
@@ -48,7 +48,7 @@
       "player": 2,
       "faction": "alien",
       "controller": "ai",
-      "ore": 600,
+      "ore": 300,
       "metal": 100,
       "difficulty": "normal",
       "team": 2
@@ -57,7 +57,7 @@
       "player": 3,
       "faction": "alien",
       "controller": "ai",
-      "ore": 400,
+      "ore": 200,
       "metal": 100,
       "difficulty": "easy",
       "team": 2

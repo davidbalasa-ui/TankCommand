@@ -48,7 +48,7 @@
       "player": 2,
       "faction": "alien",
       "controller": "ai",
-      "ore": 800,
+      "ore": 500,
       "metal": 200,
       "difficulty": "easy"
     },

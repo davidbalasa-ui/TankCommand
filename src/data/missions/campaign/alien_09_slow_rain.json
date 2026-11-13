@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 9,
   "title": "Slow Rain",
-  "briefing": "The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Stingers, but not the Mortar Beasts. Rain on the hill until every gun is gone.",
+  "briefing": "The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Lumens, but not the Sunfalls. Rain on the hill until every gun is gone.",
   "mapId": "map.c_long_reach",
   "sides": [
     {
@@ -218,7 +218,7 @@
         {
           "t": "message",
           "speaker": "Brood-mind",
-          "text": "Mortar Beasts strike from beyond the guns. Keep Stingers ahead of them to spot."
+          "text": "Sunfalls strike from beyond the guns. Keep Lumens ahead of them to spot."
         }
       ]
     },
