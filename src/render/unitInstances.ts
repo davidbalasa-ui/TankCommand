@@ -9,6 +9,36 @@ import * as THREE from 'three';
 
 const INSTANCED = 'tcInstanced';
 const MIN_CAPACITY = 16;
+/** Per-mesh texture scroll (tank treads), set by partMotion.ts as userData.uvScroll. */
+const UV_SCROLL = 'uvScroll';
+const SCROLL_ATTRIBUTE = 'instanceUvScroll';
+
+const scrollMaterials = new WeakMap<THREE.Material, THREE.Material>();
+
+/**
+ * A copy of the material that adds a per-instance offset along U to its texture, so every unit's
+ * treads run at their own pace while they are all drawn in one call.
+ */
+function scrollMaterial(source: THREE.Material): THREE.Material {
+  const known = scrollMaterials.get(source);
+  if (known) {
+    return known;
+  }
+  const material = source.clone();
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\nattribute float ${SCROLL_ATTRIBUTE};`)
+      .replace('#include <uv_vertex>', `#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv.x += ${SCROLL_ATTRIBUTE};\n#endif`);
+  };
+  material.customProgramCacheKey = () => 'tc-uv-scroll';
+  scrollMaterials.set(source, material);
+  return material;
+}
+
+function scrollAttribute(mesh: THREE.InstancedMesh): THREE.InstancedBufferAttribute | null {
+  const attribute = mesh.geometry.getAttribute(SCROLL_ATTRIBUTE);
+  return attribute instanceof THREE.InstancedBufferAttribute ? attribute : null;
+}
 
 interface Batch {
   meshes: THREE.InstancedMesh[];
@@ -76,7 +106,12 @@ export class UnitInstances {
     }
     const slot = batch.count;
     parts.forEach((part, index) => {
-      batch.meshes[index]?.setMatrixAt(slot, part.matrixWorld);
+      const mesh = batch.meshes[index];
+      mesh?.setMatrixAt(slot, part.matrixWorld);
+      const scroll = mesh ? scrollAttribute(mesh) : null;
+      if (scroll) {
+        scroll.setX(slot, typeof part.userData[UV_SCROLL] === 'number' ? part.userData[UV_SCROLL] : 0);
+      }
     });
     batch.count += 1;
   }
@@ -89,6 +124,10 @@ export class UnitInstances {
         mesh.visible = batch.count > 0;
         mesh.castShadow = castShadow;
         mesh.instanceMatrix.needsUpdate = true;
+        const scroll = scrollAttribute(mesh);
+        if (scroll) {
+          scroll.needsUpdate = true;
+        }
       }
     }
   }
@@ -109,7 +148,21 @@ export class UnitInstances {
   ): void {
     const old = batch.meshes;
     batch.meshes = parts.map((part, index) => {
-      const mesh = new THREE.InstancedMesh(geometries?.[index] ?? part.geometry, part.material, capacity);
+      const source = geometries?.[index] ?? part.geometry;
+      const scrolls = typeof part.userData[UV_SCROLL] === 'number' && !Array.isArray(part.material);
+      // A scrolling part gets its own geometry copy to hold the per-instance offset.
+      const geometry = scrolls ? source.clone() : source;
+      if (scrolls) {
+        const values = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
+        values.setUsage(THREE.DynamicDrawUsage);
+        const before = old[index] ? scrollAttribute(old[index]) : null;
+        for (let i = 0; before && i < batch.count; i += 1) {
+          values.setX(i, before.getX(i));
+        }
+        geometry.setAttribute(SCROLL_ATTRIBUTE, values);
+      }
+      const material = scrolls ? scrollMaterial(part.material as THREE.Material) : part.material;
+      const mesh = new THREE.InstancedMesh(geometry, material, capacity);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       // Instances spread over the whole map; per-instance culling is not worth it at this count.
       mesh.frustumCulled = false;
@@ -127,16 +180,23 @@ export class UnitInstances {
       return mesh;
     });
     for (const mesh of old) {
-      this.scene.remove(mesh);
-      mesh.dispose();
+      this.release(mesh);
     }
     batch.capacity = capacity;
   }
 
+  private release(mesh: THREE.InstancedMesh): void {
+    this.scene.remove(mesh);
+    if (scrollAttribute(mesh)) {
+      // Only the scrolling parts own their geometry copy; the rest share the model's.
+      mesh.geometry.dispose();
+    }
+    mesh.dispose();
+  }
+
   private drop(batch: Batch): void {
     for (const mesh of batch.meshes) {
-      this.scene.remove(mesh);
-      mesh.dispose();
+      this.release(mesh);
     }
     batch.meshes = [];
     batch.capacity = 0;

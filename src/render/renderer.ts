@@ -2241,7 +2241,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         return other.hp < max && Math.hypot(other.x - unit.x, other.z - unit.z) <= repair.radius;
       });
     }
-    return { mining, working, moving };
+    const top = this.world.unitTypes.get(unit.typeId)?.topSpeed ?? 0;
+    const pace = top > 0 ? Math.min(1.2, Math.abs(unit.speed) / top) : moving ? 1 : 0;
+    return { mining, working, moving, pace };
   }
 
   private syncStructures(world: WorldState): void {

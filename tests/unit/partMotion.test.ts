@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { collectPartMotions, pivotIsSpinner, readPartMotion, updatePartMotions } from '../../src/render/partMotion';
+import { UnitInstances, markInstanced } from '../../src/render/unitInstances';
 
 const idle = { mining: false, working: false, moving: false };
 
@@ -73,5 +74,52 @@ describe('moving model parts', () => {
     }
     expect(most).toBeGreaterThan(0.25);
     expect(most).toBeLessThanOrEqual(0.3 + 1e-6);
+  });
+
+  it('[PART-01] treads scroll their texture per unit while moving, drawn in one instanced batch', () => {
+    const make = (): { root: THREE.Object3D; parts: ReturnType<typeof collectPartMotions> } => {
+      const root = new THREE.Object3D();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+      const tread = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ map: new THREE.Texture() }));
+      tread.name = 'Tread';
+      tread.userData.anim = { type: 'scroll', speed: 3, when: 'moving' };
+      root.add(hull, tread);
+      const clone = root.clone();
+      markInstanced(clone);
+      return { root: clone, parts: collectPartMotions(clone) };
+    };
+    const a = make();
+    const b = make();
+    expect(a.parts).toHaveLength(1);
+    expect(pivotIsSpinner(a.parts)).toBe(false);
+    const tread = a.root.getObjectByName('Tread') as THREE.Mesh;
+    const rest = tread.quaternion.clone();
+    for (let i = 0; i < 20; i += 1) {
+      updatePartMotions(a.parts, { ...idle, moving: true, pace: 1 }, 1 / 60);
+      updatePartMotions(b.parts, idle, 1 / 60);
+    }
+    // The node itself never turns; only the texture offset moves.
+    expect(tread.quaternion.angleTo(rest)).toBeLessThan(1e-9);
+    expect(tread.userData.uvScroll).toBeGreaterThan(0);
+    expect((b.root.getObjectByName('Tread') as THREE.Mesh).userData.uvScroll).toBe(0);
+
+    const scene = new THREE.Scene();
+    const instances = new UnitInstances(scene);
+    instances.begin();
+    a.root.updateMatrixWorld(true);
+    b.root.updateMatrixWorld(true);
+    instances.add('tank', a.root);
+    instances.add('tank', b.root);
+    instances.end(false);
+    const meshes = scene.children.filter((item): item is THREE.InstancedMesh => item instanceof THREE.InstancedMesh);
+    expect(meshes).toHaveLength(2);
+    const scrolled = meshes.find((mesh) => mesh.geometry.getAttribute('instanceUvScroll'));
+    expect(scrolled).toBeDefined();
+    const values = scrolled?.geometry.getAttribute('instanceUvScroll');
+    expect(values?.getX(0)).toBeCloseTo(tread.userData.uvScroll as number, 6);
+    expect(values?.getX(1)).toBe(0);
+    // The hull keeps the model's own geometry; only the tread gets a copy.
+    const hull = meshes.find((mesh) => mesh !== scrolled);
+    expect(hull?.geometry.getAttribute('instanceUvScroll')).toBeUndefined();
   });
 });
