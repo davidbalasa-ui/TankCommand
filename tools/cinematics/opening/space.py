@@ -697,6 +697,8 @@ def shield_on(o, f_on, flicker=True):
 class Space:
     def __init__(self, need=(), draft=True):
         self.need = set(need)
+        if 'ending' in self.need:        # the end shows what the beam and barrage left behind
+            self.need |= {'beam', 'barrage'}
         self.draft = draft
         self.sh = C.Shot(NF / FPS, FPS, draft)    # F.begin, fps, OS.NF/FPS
         OS.NF = NF
@@ -1383,6 +1385,8 @@ class Space:
             return self.squid.camera(sid)
         if sid == '06':
             return self.dogfight_data.camera(sid)
+        if sid == '11':
+            return self.ending_data.camera(sid)
         return None
 
     def drop(self):
@@ -1390,4 +1394,5 @@ class Space:
         drop.Drop(self)
 
     def ending(self):
-        pass
+        import ending
+        self.ending_data = ending.Ending(self)
