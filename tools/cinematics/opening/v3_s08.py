@@ -130,11 +130,8 @@ def build(draft=True):
     # ---------------------------------------------------------------- the Orb (pose objects on one rig)
     rig = bpy.data.objects.new('OrbRig', None)
     V.link(rig)
-    poses = {}
-    for p in ('sprint', 'grab', 'turn', 'spread'):
-        ob = OF.orb_fighter(p, name=f'Orb_{p}')
-        ob.parent = rig
-        poses[p] = ob
+    orb, legs = OF.orb_rig('Orb')
+    orb.parent = rig
     ORB_K = 1.5
     rig.scale = (ORB_K,) * 3
     # timing (seconds)
@@ -160,22 +157,10 @@ def build(draft=True):
           (fr(T_HIT), TF_AT + Vector((95, -60, -12))), (fr(T_DIE), TF_AT + Vector((60, -36, -6)))]
     key_loc(rig, rk, 'BEZIER')
     bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2)
-    # pose windows
-    win = {'sprint': [(1, fr(T_REACH1) - 4), (fr(T_DASH) - 2, fr(T_DIE))],
-           'grab': [(fr(T_REACH1) - 3, fr(T_TEAR1)), (fr(T_REACH2) - 3, fr(T_TEAR2))],
-           'turn': [(fr(T_TEAR1) + 1, fr(T_REACH2) - 4), (fr(T_TEAR2) + 1, fr(T_DASH) - 3)],
-           'spread': []}
-    for p, ob in poses.items():
-        objs = [ob] + list(ob.children_recursive)
-        for o in objs:
-            o.hide_render = True
-            o.keyframe_insert('hide_render', frame=1)
-            for a, b in win[p]:
-                o.hide_render = False
-                o.keyframe_insert('hide_render', frame=a)
-                o.hide_render = True
-                o.keyframe_insert('hide_render', frame=b + 1)
-            SP._interp_where(o, 'hide_render', 'CONSTANT')
+    # leg motion: every leg on its own clock (stroke, reach, clutch, swirl), see orb_fighter.animate_orb
+    OF.animate_orb(orb, legs, [(1, 'sprint'), (fr(T_REACH1) - 8, 'grab'), (fr(T_TEAR1), 'turn'),
+                               (fr(T_REACH2) - 8, 'grab'), (fr(T_TEAR2), 'turn'), (fr(T_DASH) - 6, 'sprint'),
+                               (fr(T_DIE) - 4, 'spread')], 1, fr(T_DIE) + 31, seed=8)
     # ---------------------------------------------------------------- attack run: bolts on the shield
     hits = []
     for k in range(14):
@@ -270,24 +255,23 @@ def build(draft=True):
     SP.shards(pd, fr(T_DIE), 90, (1.0, 0.7, 0.3), 0.9, 45, seed=77, life=2.2, kind='hex', strength=10.0)
     SP.spark_stream(pd, fr(T_DIE), fr(T_DIE) + 10, (1.0, 0.6, 0.2), Vector((0, 0, 0)), 78, n=14, size=0.8, speed=60,
                     life=1.2)
-    # the Orb breaks: hide the pose objects, scatter leg pieces (the 'spread' pose) outward
-    sp_ = poses['spread']
-    for o in [sp_] + list(sp_.children_recursive):
+    # the Orb breaks: core and thrusters die, legs fling out as it swells apart, then it is gone
+    for o in orb.children_recursive:
         if 'Plume' in o.name or 'Core' in o.name:
-            continue
-        o.hide_render = False
-        o.keyframe_insert('hide_render', frame=fr(T_DIE))
-        o.hide_render = True
-        o.keyframe_insert('hide_render', frame=fr(T_DIE) + 30)
-        SP._interp_where(o, 'hide_render', 'CONSTANT')
+            o.hide_render = False
+            o.keyframe_insert('hide_render', frame=1)
+            o.hide_render = True
+            o.keyframe_insert('hide_render', frame=fr(T_DIE))
+            SP._interp_where(o, 'hide_render', 'CONSTANT')
     rig.keyframe_insert('scale', frame=fr(T_DIE))
     rig.scale = (ORB_K * 1.8, ORB_K * 1.8, ORB_K * 1.8)
     rig.keyframe_insert('scale', frame=fr(T_DIE) + 30)
-    for o in poses.values():
-        for x in [o] + list(o.children_recursive):
-            x.hide_render = True
-            x.keyframe_insert('hide_render', frame=fr(T_DIE) + 31)
-            SP._interp_where(x, 'hide_render', 'CONSTANT')
+    for x in [orb] + list(orb.children_recursive):
+        x.hide_render = False
+        x.keyframe_insert('hide_render', frame=1) if 'Plume' not in x.name and 'Core' not in x.name else None
+        x.hide_render = True
+        x.keyframe_insert('hide_render', frame=fr(T_DIE) + 31)
+        SP._interp_where(x, 'hide_render', 'CONSTANT')
     # ---------------------------------------------------------------- cameras
     def cam_follow(ob, t, off, look_off=Vector((0, 0, 0))):
         p = at(ob, t)

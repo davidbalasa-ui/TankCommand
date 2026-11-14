@@ -285,3 +285,179 @@ def orb_fighter(pose='sprint', name=None, thrust=1.0):
                         f'{name}PlumeMain'):
             o.parent = ob
     return ob
+
+
+# ------------------------------------------------------------------ rigged Orb: every leg moves on its own
+POSE_THRUST = {'sprint': 1.0, 'turn': 0.75, 'grab': 0.5, 'spread': 0.0}
+
+
+def _part(build, name):
+    """Run build() (forge calls at the origin) and join the result into one object with its origin at 0."""
+    m = F.mark()
+    build()
+    ob = base._join(F.since(m), name)
+    bpy.ops.object.select_all(action='DESELECT')
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    ob.location = (0, 0, 0)
+    ob.rotation_mode = 'QUATERNION'
+    return ob
+
+
+def _frame_q(x, ref, alt):
+    """Rotation whose +X is x and whose +Z leans toward ref (root space)."""
+    x = x.normalized()
+    z = ref - x * x.dot(ref)
+    if z.length < 1e-3:
+        z = alt - x * x.dot(alt)
+    z.normalize()
+    y = z.cross(x)
+    from mathutils import Matrix
+    return Matrix((x, y, z)).transposed().to_quaternion()
+
+
+def orb_rig(name='Orb', thrust=1.0):
+    """The Orb built as a rig: body + 8 legs of 3 jointed segments, a swivelling nacelle and plume per leg.
+    Returns (root, legs). legs[k] = dict(seg=[s0, s1, s2], nac=nacelle, plume=plume empty, rad, tan).
+    Animate with animate_orb()."""
+    ax = Vector((1, 0, 0))
+    up = Vector((0, 0, 1))
+    with AF.gold_palette():
+        base._faction('kesh')
+
+        def body():
+            _body()
+            for k in range(8):
+                a = 2 * math.pi * k / 8 + math.pi / 8
+                rad = Vector((0, math.cos(a), math.sin(a)))
+                F.tube(tuple(rad * RING * 0.9), tuple(rad * RING * 1.2), [(0, 0.34), (1, 0.28)], 8, 'bronze')
+        root = _part(body, name)
+        segs_mesh = []
+        for j in range(3):
+            def seg(j=j):
+                _segment(Vector((0, 0, 0)), Vector((SEG[j], 0, 0)), j, up)
+                if j == 2:
+                    _harpoon(Vector((SEG[2], 0, 0)), ax, up)
+            segs_mesh.append(_part(seg, f'{name}SegMesh{j}').data)
+        nac_mesh = _part(lambda: _nacelle(Vector((0, 0, 0)), ax, up), f'{name}NacMesh').data
+    for o in [o for o in bpy.data.objects if o.name.startswith(f'{name}SegMesh') or o.name == f'{name}NacMesh']:
+        bpy.data.objects.remove(o)
+    # core
+    cx = X0 - R_ * 0.45
+    pl = SFX.C.uv_sphere(name + 'CorePlasma', R_ * 0.57, seg=(32, 16), mat=SFX._plasma('OrbCorePlasmaM', GOLD, 6.0, 3.0))
+    pl.location = (cx, 0, 0)
+    pl.parent = root
+    gl = SFX.C.uv_sphere(name + 'CoreGlow', R_ * 0.72, seg=(32, 16), mat=SFX._halo('OrbCoreGlowM', GOLD, 0.6, 4.0))
+    gl.location = (cx + 0.15, 0, 0)
+    gl.visible_shadow = False
+    gl.parent = root
+    lt = SFX._link(bpy.data.objects.new(name + 'CoreLight', bpy.data.lights.new(name + 'CoreLight', 'POINT')))
+    lt.location = (X0 + 0.6, 0, 0)
+    lt.data.color = GOLD
+    lt.data.energy = 600
+    lt.parent = root
+    main = SFX._link(bpy.data.objects.new(name + 'PlumeMain', None))
+    for o in _plume(Vector((0, 0, 0)), (-1, 0, 0), 8.0 * thrust, R_ * 0.32, f'{name}PlumeMainF'):
+        o.parent = main
+    main.parent = root
+    main.location = (X1 - 0.8, 0, 0)
+    legs = []
+    for k in range(8):
+        a = 2 * math.pi * k / 8 + math.pi / 8
+        rad = Vector((0, math.cos(a), math.sin(a)))
+        tan = Vector((0, -math.sin(a), math.cos(a)))
+        segs = []
+        parent = root
+        for j in range(3):
+            s = bpy.data.objects.new(f'{name}Leg{k}Seg{j}', segs_mesh[j])
+            SFX._link(s)
+            s.rotation_mode = 'QUATERNION'
+            s.parent = parent
+            s.location = rad * RING if j == 0 else Vector((SEG[j - 1], 0, 0))
+            segs.append(s)
+            parent = s
+        nac = bpy.data.objects.new(f'{name}Leg{k}Nacelle', nac_mesh)
+        SFX._link(nac)
+        nac.rotation_mode = 'QUATERNION'
+        pe = SFX._link(bpy.data.objects.new(f'{name}Leg{k}Plume', None))
+        for o in _plume(Vector((0, 0, 0)), (-1, 0, 0), 5.0 * thrust, 0.24, f'{name}Leg{k}PlumeF'):
+            o.parent = pe
+        pe.parent = nac
+        pe.location = (-1.4, 0, 0)
+        nac.parent = segs[0]
+        nac.location = (SEG[0] - 0.55, 0, 0.55)      # elbow, on the outer (+Z) side
+        legs.append(dict(seg=segs, nac=nac, plume=pe, rad=rad, tan=tan, k=k))
+    return root, legs
+
+
+def _smooth(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
+def _pose_fd(pose, ax, rad, tan, d0):
+    if pose == 'sprint':
+        return -ax
+    if pose == 'grab':
+        return (-ax * 0.6 - rad * 0.4).normalized()
+    if pose == 'spread':
+        return -d0
+    return -tan
+
+
+def animate_orb(root, legs, keys, f0, f1, seed=3, fps=24):
+    """Bake per-frame leg motion. keys = [(frame, pose)], sorted. Every leg runs its own clock: it starts each
+    pose change at its own moment and speed, and keeps its own stroke (sprint), swirl (turn), clutch (grab)
+    and twitch on top, rippling from hip to harpoon tip."""
+    import random
+    rnd = random.Random(seed)
+    ax = Vector((1, 0, 0))
+    per = []
+    for L in legs:
+        per.append(dict(delay=[rnd.uniform(-3, 7) for _ in keys], dur=[rnd.uniform(5, 12) for _ in keys],
+                        ph=rnd.uniform(0, 2 * math.pi), fq=rnd.uniform(0.7, 1.35), ph2=rnd.uniform(0, 2 * math.pi),
+                        fq2=rnd.uniform(1.6, 2.6), amp=rnd.uniform(0.7, 1.3)))
+    WOB = {'sprint': 0.32, 'turn': 0.42, 'grab': 0.14, 'spread': 0.5}
+    for f in range(f0, f1 + 1):
+        t = f / fps
+        for L, P in zip(legs, per):
+            k, rad, tan = L['k'], L['rad'], L['tan']
+            # which two poses this leg is between, on its own clock
+            cur, w, prev = keys[0][1], 1.0, keys[0][1]
+            for i in range(1, len(keys)):
+                start = keys[i][0] + P['delay'][i]
+                if f >= start:
+                    prev, cur = keys[i - 1][1], keys[i][1]
+                    w = _smooth((f - start) / P['dur'][i])
+            dA = [(ax * da + rad * dr + tan * dt).normalized() for da, dr, dt in _leg_dirs(prev, k)]
+            dB = [(ax * da + rad * dr + tan * dt).normalized() for da, dr, dt in _leg_dirs(cur, k)]
+            wob = WOB[prev] * (1 - w) + WOB[cur] * w
+            dirs = []
+            for j in range(3):
+                d = dA[j].lerp(dB[j], w).normalized()
+                lag = j * 0.9                         # the wave runs out to the tip
+                s1 = math.sin(2 * math.pi * P['fq'] * t + P['ph'] - lag)
+                s2 = math.sin(2 * math.pi * P['fq2'] * t + P['ph2'] - lag * 1.3)
+                a = wob * P['amp'] * (0.5 + 0.35 * j)
+                d = (d + rad * (a * s1) + tan * (a * 0.6 * s2)).normalized()
+                dirs.append(d)
+            qs = [_frame_q(d, rad, ax) for d in dirs]
+            for j, s in enumerate(L['seg']):
+                s.rotation_quaternion = qs[0] if j == 0 else qs[j - 1].inverted() @ qs[j]
+                s.keyframe_insert('rotation_quaternion', frame=f)
+            fA = _pose_fd(prev, ax, rad, tan, dirs[0])
+            fB = _pose_fd(cur, ax, rad, tan, dirs[0])
+            fd = fA.lerp(fB, w)
+            if fd.length < 1e-3:
+                fd = -dirs[0]
+            # nacelle swivels on its own gimbal to point its thrust; keeps twitching a little
+            fd = (fd.normalized() + tan * 0.12 * math.sin(2 * math.pi * 3.1 * t + P['ph'])).normalized()
+            qn = _frame_q(-fd, rad, ax)
+            L['nac'].rotation_quaternion = qs[0].inverted() @ qn
+            L['nac'].keyframe_insert('rotation_quaternion', frame=f)
+            th = POSE_THRUST[prev] * (1 - w) + POSE_THRUST[cur] * w
+            th *= 0.85 + 0.15 * math.sin(2 * math.pi * 5.3 * t + P['ph2'])
+            L['plume'].scale = (max(0.001, th), max(0.001, min(1.0, th * 1.4)), max(0.001, min(1.0, th * 1.4)))
+            L['plume'].keyframe_insert('scale', frame=f)
+    return root
