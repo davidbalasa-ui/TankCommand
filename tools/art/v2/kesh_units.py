@@ -387,29 +387,54 @@ def dragonfly():
         tube((x + 0.05, 0, zc), (x - 1.1, 0, zc + 0.12), [(0, r * 0.7), (0.3, r * 0.45), (1, 0.02)], 8, 'barrel')
         orb((x - 0.22, 0, zc + 0.03), r * 0.62, 'core', seg=(10, 8))
 
-    # Four very long, thin wings. Each is its own part so the pairs can beat out of step.
+    # Four very long scythe wings: swept, hooked tip, barbed trailing edge, gold spar and fine gold line work.
+    # Each is its own part so the pairs can beat out of step.
     def wing(group, root, L, c, dihedral, back, s):
         with F.group(group):
             m = F.mark()
-            lead = [(0.08, 0.0), (0.13, 0.12), (0.16, 0.3), (0.16, 0.5), (0.13, 0.7), (0.07, 0.86), (-0.03, 0.95), (-0.16, 0.99)]
-            trail = [(-0.32, 1.0), (-0.5, 0.985), (-0.68, 0.94), (-0.85, 0.85), (-0.96, 0.7), (-1.0, 0.52), (-0.97, 0.34),
-                     (-0.86, 0.18), (-0.66, 0.07), (-0.4, 0.015)]
+            P = lambda a, b, z=0.014: (a * c, s * b * L, z)
+            lead = [(0.08, 0.0), (0.14, 0.08), (0.17, 0.28), (0.17, 0.52), (0.13, 0.7), (0.06, 0.84), (-0.08, 0.93), (-0.34, 1.0)]
+            barbs = [(-0.8, 0.868), (-1.04, 0.715), (-1.14, 0.515), (-1.04, 0.305)]
+            notches = [(-0.3, 0.9), (-0.42, 0.765), (-0.52, 0.575), (-0.58, 0.365), (-0.56, 0.15)]
+            trail = [notches[0]]
+            for bb, nn in zip(barbs, notches[1:]):
+                trail += [bb, nn]
+            trail.append((-0.42, 0.02))
             F.plate([(a * c, s * b * L) for a, b in lead + trail], -0.01, 0.01, 'wing')
-            sweep([(a * c, s * b * L, 0.012) for a, b in lead], [(0.07, 0.06), (0.065, 0.055), (0.06, 0.05), (0.052, 0.044), (0.044, 0.036), (0.034, 0.028), (0.024, 0.02), (0.014, 0.012)],
-                  'bronze', sides=6)
-            for a0, a1, b1 in ((-0.02, -0.2, 0.985), (-0.12, -0.6, 0.93), (-0.2, -0.92, 0.72), (-0.28, -0.97, 0.45)):   # straight veins
-                sweep([(a0 * c, s * 0.02 * L, 0.014), (a1 * c, s * b1 * L, 0.014)], [(0.02, 0.012), (0.009, 0.008)], 'glow', sides=4)
-            for b in (0.3, 0.55, 0.78):   # cross struts
-                sweep([(0.14 * c, s * b * L, 0.013), (-0.93 * c * (1.0 if b < 0.7 else 0.9), s * (b + 0.03) * L, 0.013)],
-                      [(0.012, 0.008), (0.008, 0.006)], 'bronze', sides=4)
-            F.plate([(0.05 * c, s * 0.84 * L), (0.03 * c, s * 0.9 * L), (-0.12 * c, s * 0.905 * L), (-0.1 * c, s * 0.845 * L)], 0.011, 0.016, 'copper')
-            orb((0, s * 0.05, 0.02), 0.1, 'glow', seg=(8, 6))
+            # Heavy gold leading spar that ends in the hooked tip, with thorns along it.
+            sweep([P(a, b, 0.012) for a, b in lead], [(0.1, 0.08), (0.095, 0.075), (0.085, 0.066), (0.072, 0.056), (0.06, 0.046), (0.046, 0.036), (0.034, 0.026), (0.008, 0.008)],
+                  'gold', sides=6)
+            sweep([P(a - 0.04, b, 0.06) for a, b in lead[:-1]], [(0.014, 0.014)] * 6 + [(0.008, 0.008)], 'glow', sides=4)
+            for b in (0.2, 0.36, 0.52, 0.67, 0.8):
+                a = 0.17 if b < 0.6 else (0.13 if b < 0.75 else 0.08)
+                sweep([P(a - 0.02, b - 0.012), P(a + 0.3 / c * (1 - b * 0.5), b + 0.03)], [(0.05, 0.04), (0.004, 0.004)], 'gold', sides=5)
+            # Gold rim tracing the barbed trailing edge.
+            edge = [(-0.34, 1.0)] + trail
+            for q0, q1 in zip(edge[:-1], edge[1:]):
+                sweep([P(*q0), P(*q1)], [(0.02, 0.014), (0.02, 0.014)], 'glow', sides=4)
+            # Main veins from the root to the tip and to every barb, finer veins to the notches.
+            sweep([P(-0.05, 0.015), P(-0.3, 0.985)], [(0.022, 0.014), (0.01, 0.008)], 'glow', sides=4)
+            for (a1, b1), (na, nb) in zip(barbs, notches[1:]):   # bend inside the membrane, then out along the barb
+                wp = P(-0.22, nb + 0.03)
+                sweep([P(-0.05, 0.015), wp], [(0.02, 0.013), (0.014, 0.01)], 'glow', sides=4)
+                sweep([wp, P(a1, b1)], [(0.014, 0.01), (0.008, 0.007)], 'glow', sides=4)
+            for a1, b1 in notches:
+                sweep([P(-0.1, 0.02), P(a1, b1)], [(0.011, 0.008), (0.006, 0.005)], 'glow', sides=4)
+            # Fine cross lines, a dense ladder all the way out.
+            n = 22
+            for i in range(1, n):
+                b = 0.05 + 0.88 * i / n
+                back_a = -0.5 if b < 0.86 else -0.25
+                la = 0.15 if b < 0.6 else 0.15 - (b - 0.6) * 0.5
+                sweep([P(la, b), P(back_a, b + 0.015)], [(0.0075, 0.006), (0.005, 0.004)], 'glow', sides=4)
+            # Bright root orb.
+            orb((0, s * 0.05, 0.03), 0.14, 'glow', seg=(8, 6))
             F.rot_all(m, 'X', s * dihedral)
             F.rot_all(m, 'Z', s * back)
             F.move_all(m, root)
     pivots = []
     for s, side in ((1, 'L'), (-1, 'R')):
-        for name, rx, rz, L, c, dih, back in (('F', 0.78, 0.52, 9.4, 0.82, 7, -4), ('H', -0.22, 0.47, 8.2, 0.98, 4, 15)):
+        for name, rx, rz, L, c, dih, back in (('F', 0.78, 0.52, 13.0, 1.5, 8, 6), ('H', -0.22, 0.47, 11.0, 1.7, 4, 24)):
             root = (rx, s * 0.36, Z + rz)
             wing(f'Wing{name}{side}', root, L, c, dih, back, s)
             pivots.append((f'Wing{name}{side}', root, f'Wing{name}{side}Pivot'))
@@ -430,7 +455,7 @@ def dragonfly():
         rnd = random.Random(70 + gi)
         with F.group(gname):
             for s in (1, -1):
-                reach = rnd.uniform(2.4, 4.2)
+                reach = rnd.uniform(3.2, 6.0)
                 pts = bolt(heart, (0.75 + rnd.uniform(-0.3, 0.3), s * reach, Z + 0.95 + rnd.uniform(0.0, 0.35)), rnd)
                 k = rnd.randint(2, 4)
                 bolt(pts[k], (pts[k][0] + rnd.uniform(-0.7, 0.7), pts[k][1] + s * 0.5, pts[k][2] + rnd.uniform(0.2, 0.6)), rnd, kinks=3, jit=0.14, r=0.05)

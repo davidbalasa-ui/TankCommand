@@ -638,8 +638,9 @@ ZONES = {
         'core': dict(kind='orb', emit=GOLD, strength=1.1),
         'violet': dict(kind='glow', emit=(0.35, 0.08, 1.0), strength=2.0),
         'copper': dict(kind='etched', base=(0.3, 0.13, 0.06), base2=(0.16, 0.07, 0.035), rough=0.36, veins=0.25),
-        'wing': dict(kind='membrane', base=(0.9, 0.87, 0.72), emit=GOLD, strength=0.1),
-        'bolt': dict(kind='glow', emit=(1.0, 0.86, 0.5), strength=3.4),
+        'wing': dict(kind='membrane', base=(0.86, 0.74, 0.46), emit=GOLD, strength=0.12),
+        'gold': dict(kind='etched', base=(0.95, 0.68, 0.22), base2=(0.7, 0.42, 0.1), rough=0.2, veins=0.0, fine=True),
+        'bolt': dict(kind='glow', emit=(1.0, 0.8, 0.36), strength=1.35),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
