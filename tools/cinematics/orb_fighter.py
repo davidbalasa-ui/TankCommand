@@ -297,7 +297,11 @@ def orb_fighter(pose='sprint', name=None, thrust=1.0):
 
 
 # ------------------------------------------------------------------ rigged Orb: every leg moves on its own
-POSE_THRUST = {'sprint': 1.0, 'turn': 0.75, 'grab': 0.5, 'spread': 0.0}
+# David 2026-11-14: thrusters ONLY on the tentacles; Arcadian thrusters are LIGHTNING; every arm moves completely
+# independently with its own calculations, graceful and hyper-dextrous.
+import random  # noqa: E402
+
+N_VAR = 4                     # lightning variants per thruster, flickered between
 
 
 def _part(build, name):
@@ -315,21 +319,62 @@ def _part(build, name):
 
 
 def _frame_q(x, ref, alt):
-    """Rotation whose +X is x and whose +Z leans toward ref (root space)."""
+    """Rotation whose +X is x and whose +Z leans toward ref."""
+    from mathutils import Matrix
     x = x.normalized()
     z = ref - x * x.dot(ref)
     if z.length < 1e-3:
         z = alt - x * x.dot(alt)
     z.normalize()
     y = z.cross(x)
-    from mathutils import Matrix
     return Matrix((x, y, z)).transposed().to_quaternion()
 
 
-def orb_rig(name='Orb', thrust=1.0):
-    """The Orb built as a rig: body + 8 legs of 3 jointed segments, a swivelling nacelle and plume per leg.
-    Returns (root, legs). legs[k] = dict(seg=[s0, s1, s2], nac=nacelle, plume=plume empty, rad, tan).
-    Animate with animate_orb()."""
+def _bolt_thruster(name, length, seed):
+    """Gold lightning out of a nozzle at the origin, firing along -X. Returns (empty, [variant lists]).
+    Each variant is 3 jagged bolts fanning back with forks; the shot flickers between variants."""
+    from mathutils import Quaternion
+    core_m = SFX._emit('OrbBoltCoreM', HOTG, 12.0)
+    sleeve_m = SFX._halo('OrbBoltSleeveM', (1.0, 0.55, 0.12), 4.0, 1.5)
+    halo_m = SFX._halo('OrbBoltHaloM', (1.0, 0.55, 0.15), 0.5, 3.0)
+    root = SFX._link(bpy.data.objects.new(name, None))
+    rnd = random.Random(seed)
+    variants = []
+    for v in range(N_VAR):
+        objs = []
+        for b in range(3):
+            d = Vector((-1, 0, 0))
+            d.rotate(Quaternion(Vector((0, rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized(),
+                                math.radians(rnd.uniform(3, 16))))
+            ln = length * rnd.uniform(0.6, 1.0)
+            pts = SFX._jag(Vector((0, 0, 0)), d * ln, rnd, 4, 0.16)
+            n = len(pts)
+            w = 0.16 if b == 0 else 0.1
+            tp = [w * (1 - 0.85 * i / (n - 1)) for i in range(n)]
+            objs.append(SFX._tube_path(f'{name}V{v}B{b}C', pts, [t * 0.35 for t in tp], core_m))
+            objs.append(SFX._tube_path(f'{name}V{v}B{b}S', pts, [t * 1.3 for t in tp], sleeve_m, sides=8))
+            if b == 0:
+                objs.append(SFX._tube_path(f'{name}V{v}B{b}H', pts, [t * 6.0 for t in tp], halo_m, sides=10))
+            for fk in range(2):
+                j = rnd.randint(2, n - 3)
+                side = d.orthogonal().normalized()
+                side.rotate(Quaternion(d, rnd.uniform(0, 6.283)))
+                e = pts[j] + (d * 0.5 + side).normalized() * ln * rnd.uniform(0.12, 0.25)
+                br = SFX._jag(pts[j], e, rnd, 3, 0.22)
+                objs.append(SFX._tube_path(f'{name}V{v}B{b}F{fk}', br,
+                                           [tp[j] * 0.5 * (1 - k / len(br)) + 0.01 for k in range(len(br))], sleeve_m))
+        for o in objs:
+            o.parent = root
+        variants.append(objs)
+    glow = SFX.C.uv_sphere(name + 'Glow', 0.45, seg=(16, 8), mat=SFX._halo('OrbNozzleGlowM', GOLD, 1.2, 3.0))
+    glow.visible_shadow = False
+    glow.parent = root
+    return root, variants
+
+
+def orb_rig(name='Orb'):
+    """The Orb built as a rig: body + 8 legs of 3 jointed segments, a swivelling nacelle per leg firing gold
+    lightning. Returns (root, legs). Animate with animate_orb()."""
     ax = Vector((1, 0, 0))
     up = Vector((0, 0, 1))
     with AF.gold_palette():
@@ -352,7 +397,6 @@ def orb_rig(name='Orb', thrust=1.0):
         nac_mesh = _part(lambda: _nacelle(Vector((0, 0, 0)), ax, up), f'{name}NacMesh').data
     for o in [o for o in bpy.data.objects if o.name.startswith(f'{name}SegMesh') or o.name == f'{name}NacMesh']:
         bpy.data.objects.remove(o)
-    # core
     cx = X0 - R_ * 0.45
     pl = SFX.C.uv_sphere(name + 'CorePlasma', R_ * 0.57, seg=(32, 16), mat=SFX._plasma('OrbCorePlasmaM', GOLD, 6.0, 3.0))
     pl.location = (cx, 0, 0)
@@ -366,11 +410,6 @@ def orb_rig(name='Orb', thrust=1.0):
     lt.data.color = GOLD
     lt.data.energy = 600
     lt.parent = root
-    main = SFX._link(bpy.data.objects.new(name + 'PlumeMain', None))
-    for o in _plume(Vector((0, 0, 0)), (-1, 0, 0), 8.0 * thrust, R_ * 0.32, f'{name}PlumeMainF'):
-        o.parent = main
-    main.parent = root
-    main.location = (X1 - 0.8, 0, 0)
     legs = []
     for k in range(8):
         a = 2 * math.pi * k / 8 + math.pi / 8
@@ -379,94 +418,218 @@ def orb_rig(name='Orb', thrust=1.0):
         segs = []
         parent = root
         for j in range(3):
-            s = bpy.data.objects.new(f'{name}Leg{k}Seg{j}', segs_mesh[j])
-            SFX._link(s)
-            s.rotation_mode = 'QUATERNION'
-            s.parent = parent
-            s.location = rad * RING if j == 0 else Vector((SEG[j - 1], 0, 0))
-            segs.append(s)
-            parent = s
+            s_ = bpy.data.objects.new(f'{name}Leg{k}Seg{j}', segs_mesh[j])
+            SFX._link(s_)
+            s_.rotation_mode = 'QUATERNION'
+            s_.parent = parent
+            s_.location = rad * RING if j == 0 else Vector((SEG[j - 1], 0, 0))
+            segs.append(s_)
+            parent = s_
         nac = bpy.data.objects.new(f'{name}Leg{k}Nacelle', nac_mesh)
         SFX._link(nac)
         nac.rotation_mode = 'QUATERNION'
-        pe = SFX._link(bpy.data.objects.new(f'{name}Leg{k}Plume', None))
-        for o in _plume(Vector((0, 0, 0)), (-1, 0, 0), 5.0 * thrust, 0.24, f'{name}Leg{k}PlumeF'):
-            o.parent = pe
+        pe, variants = _bolt_thruster(f'{name}Leg{k}Plume', 6.0, 100 + k)
         pe.parent = nac
         pe.location = (-1.4, 0, 0)
+        lamp = SFX._link(bpy.data.objects.new(f'{name}Leg{k}PlumeLight', bpy.data.lights.new(f'{name}Leg{k}PlumeL', 'POINT')))
+        lamp.data.color = GOLD
+        lamp.data.energy = 0
+        lamp.data.shadow_soft_size = 0.6
+        lamp.parent = pe
+        lamp.location = (-1.0, 0, 0)
         nac.parent = segs[0]
         nac.location = (SEG[0] - 0.55, 0, 0.55)      # elbow, on the outer (+Z) side
-        legs.append(dict(seg=segs, nac=nac, plume=pe, rad=rad, tan=tan, k=k))
+        legs.append(dict(seg=segs, nac=nac, plume=pe, var=variants, lamp=lamp, rad=rad, tan=tan, k=k,
+                         base=rad * RING))
     return root, legs
 
 
-def _smooth(x):
+def _ease(x):
     x = min(1.0, max(0.0, x))
     return x * x * (3 - 2 * x)
 
 
-def _pose_fd(pose, ax, rad, tan, d0):
-    if pose == 'sprint':
-        return -ax
-    if pose == 'grab':
-        return (-ax * 0.6 - rad * 0.4).normalized()
-    if pose == 'spread':
-        return -d0
-    return -tan
+def _fabrik(base_p, tgt, pts, lens, pole, iters=14):
+    """3-bone FABRIK in body space, warm-started from last frame's joints, bent toward pole, kept off the hull."""
+    total = sum(lens)
+    d = tgt - base_p
+    if d.length > total * 0.97:
+        tgt = base_p + d.normalized() * total * 0.97
+    if d.length < 2.2:
+        tgt = base_p + (d.normalized() if d.length > 1e-4 else pole) * 2.2
+    pts = [p.copy() for p in pts]
+    for it in range(iters):
+        bias = 0.25 if it < iters - 3 else 0.0
+        for i in (1, 2):
+            pts[i] = pts[i] + pole * bias
+        pts[3] = tgt.copy()
+        for i in (2, 1, 0):
+            pts[i] = pts[i + 1] + (pts[i] - pts[i + 1]).normalized() * lens[i]
+        pts[0] = base_p.copy()
+        for i in (1, 2, 3):
+            pts[i] = pts[i - 1] + (pts[i] - pts[i - 1]).normalized() * lens[i - 1]
+            r = Vector((0, pts[i].y, pts[i].z))
+            if X1 - 1.0 < pts[i].x < X0 + 0.8 and r.length < R_ + 0.7:
+                pts[i] = Vector((pts[i].x, 0, 0)) + (r.normalized() if r.length > 1e-4 else pole) * (R_ + 0.7)
+    return pts
 
 
-def animate_orb(root, legs, keys, f0, f1, seed=3, fps=24):
-    """Bake per-frame leg motion. keys = [(frame, pose)], sorted. Every leg runs its own clock: it starts each
-    pose change at its own moment and speed, and keeps its own stroke (sprint), swirl (turn), clutch (grab)
-    and twitch on top, rippling from hip to harpoon tip."""
-    import random
+def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=1.0):
+    """Bake the legs. Every leg is its own little creature: its own stroke clock (re-rolled every stroke), its
+    own spring (stiffness, damping), its own reaction to the body's acceleration and spin, its own thruster
+    that fires lightning when (and where) that leg pushes. Grabs: dicts(f_reach, f_grab, f_tear, hold, legs)."""
     rnd = random.Random(seed)
+    sc = bpy.context.scene
     ax = Vector((1, 0, 0))
-    per = []
-    for L in legs:
-        per.append(dict(delay=[rnd.uniform(-3, 7) for _ in keys], dur=[rnd.uniform(5, 12) for _ in keys],
-                        ph=rnd.uniform(0, 2 * math.pi), fq=rnd.uniform(0.7, 1.35), ph2=rnd.uniform(0, 2 * math.pi),
-                        fq2=rnd.uniform(1.6, 2.6), amp=rnd.uniform(0.7, 1.3)))
-    WOB = {'sprint': 0.32, 'turn': 0.42, 'grab': 0.14, 'spread': 0.5}
+    lens = list(SEG)
+    L = sum(lens)
+    # body motion, sampled
+    M, P = {}, {}
+    for f in range(f0 - 2, f1 + 3):
+        sc.frame_set(f)
+        M[f] = root.matrix_world.copy()
+        P[f] = M[f].translation.copy()
+    dt = 1.0 / fps
+
+    def accel_local(f):
+        a = (P[f + 1] - 2 * P[f] + P[f - 1]) / (dt * dt)
+        al = M[f].to_3x3().normalized().inverted() @ a / scale
+        if al.length > 900:
+            al = al.normalized() * 900
+        return al
+
+    def vel_local(f):
+        v = (P[f + 1] - P[f - 1]) / (2 * dt)
+        return M[f].to_3x3().normalized().inverted() @ v / scale
+    st = []
+    for Lg in legs:
+        cyc, t = [], rnd.uniform(-1.0, 0.0)
+        while t < (f1 - f0) / fps + 2:
+            dur = rnd.uniform(0.42, 1.05)
+            cyc.append((t, dur, rnd.uniform(0.6, 1.0), rnd.uniform(-1.0, 1.0), rnd.uniform(0.45, 0.72)))
+            t += dur * rnd.uniform(0.95, 1.35)        # sometimes it glides a beat before the next stroke
+        b = Lg['base']
+        rest = b + (-ax * 0.9 + Lg['rad'] * 0.45).normalized() * L * 0.9
+        st.append(dict(cyc=cyc, w=rnd.uniform(10.0, 17.0), z=rnd.uniform(0.32, 0.55), x=rest.copy(), v=Vector(),
+                       pts=[b, b + (rest - b) * 0.33, b + (rest - b) * 0.66, rest], thr=0.0,
+                       ph=rnd.uniform(0, 6.283), gk=rnd.uniform(0.7, 1.3), q_prev=None, flick=rnd.randrange(N_VAR)))
+    grab_of = {}
+    for g in grabs:
+        for k in g['legs']:
+            grab_of.setdefault(k, []).append(dict(g, d=rnd.randint(-5, 3), spin=rnd.uniform(-0.5, 0.5)))
+    vis_prev = {}
     for f in range(f0, f1 + 1):
-        t = f / fps
-        for L, P in zip(legs, per):
-            k, rad, tan = L['k'], L['rad'], L['tan']
-            # which two poses this leg is between, on its own clock
-            cur, w, prev = keys[0][1], 1.0, keys[0][1]
-            for i in range(1, len(keys)):
-                start = keys[i][0] + P['delay'][i]
-                if f >= start:
-                    prev, cur = keys[i - 1][1], keys[i][1]
-                    w = _smooth((f - start) / P['dur'][i])
-            dA = [(ax * da + rad * dr + tan * dt).normalized() for da, dr, dt in _leg_dirs(prev, k)]
-            dB = [(ax * da + rad * dr + tan * dt).normalized() for da, dr, dt in _leg_dirs(cur, k)]
-            wob = WOB[prev] * (1 - w) + WOB[cur] * w
-            dirs = []
-            for j in range(3):
-                d = dA[j].lerp(dB[j], w).normalized()
-                lag = j * 0.9                         # the wave runs out to the tip
-                s1 = math.sin(2 * math.pi * P['fq'] * t + P['ph'] - lag)
-                s2 = math.sin(2 * math.pi * P['fq2'] * t + P['ph2'] - lag * 1.3)
-                a = wob * P['amp'] * (0.5 + 0.35 * j)
-                d = (d + rad * (a * s1) + tan * (a * 0.6 * s2)).normalized()
-                dirs.append(d)
-            qs = [_frame_q(d, rad, ax) for d in dirs]
-            for j, s in enumerate(L['seg']):
-                s.rotation_quaternion = qs[0] if j == 0 else qs[j - 1].inverted() @ qs[j]
-                s.keyframe_insert('rotation_quaternion', frame=f)
-            fA = _pose_fd(prev, ax, rad, tan, dirs[0])
-            fB = _pose_fd(cur, ax, rad, tan, dirs[0])
-            fd = fA.lerp(fB, w)
-            if fd.length < 1e-3:
-                fd = -dirs[0]
-            # nacelle swivels on its own gimbal to point its thrust; keeps twitching a little
-            fd = (fd.normalized() + tan * 0.12 * math.sin(2 * math.pi * 3.1 * t + P['ph'])).normalized()
-            qn = _frame_q(-fd, rad, ax)
-            L['nac'].rotation_quaternion = qs[0].inverted() @ qn
-            L['nac'].keyframe_insert('rotation_quaternion', frame=f)
-            th = POSE_THRUST[prev] * (1 - w) + POSE_THRUST[cur] * w
-            th *= 0.85 + 0.15 * math.sin(2 * math.pi * 5.3 * t + P['ph2'])
-            L['plume'].scale = (max(0.001, th), max(0.001, min(1.0, th * 1.4)), max(0.001, min(1.0, th * 1.4)))
-            L['plume'].keyframe_insert('scale', frame=f)
+        t = (f - f0) / fps
+        al = accel_local(f)
+        vl = vel_local(f)
+        lat = al - ax * al.dot(ax)
+        R_prev, R_now = M[f - 1].to_3x3().normalized(), M[f].to_3x3().normalized()
+        R_delta = R_now.inverted() @ R_prev                 # how last frame's body space looks from this frame
+        spin = R_delta.to_quaternion().angle * fps          # rad/s
+        speed = vl.length
+        for Lg, S in zip(legs, st):
+            k, rad, tan, b = Lg['k'], Lg['rad'], Lg['tan'], Lg['base']
+            # ---- its own stroke: reach forward-out (slow, curled), then sweep back hard (fast, straight)
+            c = next((c for c in reversed(S['cyc']) if c[0] <= t), S['cyc'][0])
+            u = (t - c[0]) / c[1]
+            amp = c[2] * (0.6 + 0.4 * min(1.0, (lat.length / 260 + spin / 2.5)))   # harder work in turns / dodges
+            if speed > 60 and lat.length < 80:
+                amp *= 0.85                                     # a little streamlining at full sprint
+            side = c[3]
+            trail = b + (-ax * 0.92 + rad * 0.4 + tan * side * 0.15).normalized() * L * 0.92
+            reach = b + (ax * (0.35 + 0.85 * amp) + rad * 0.9 + tan * side * 0.9).normalized() * L * (0.62 + 0.1 * amp)
+            reach = trail.lerp(reach, 0.6 + 0.4 * amp)
+            pw = c[4]
+            if u >= 1.0:                                       # gliding between strokes: drift trailing
+                tgt, stroking = trail, 0.0
+            elif u < pw:                                       # recovery: curl in and swing round
+                e = _ease(u / pw)
+                tgt = trail.lerp(reach, e) - rad * math.sin(math.pi * e) * L * 0.18 * amp
+                stroking = 0.0
+            else:                                              # power: whip back, fully extended
+                e = (u - pw) / (1 - pw)
+                e = 1 - (1 - e) ** 2.4
+                tgt = reach.lerp(trail, e) + rad * math.sin(math.pi * e) * L * 0.12 * amp
+                stroking = math.sin(math.pi * min(1.0, e * 1.1)) * amp
+            # its own idle life: slow wander of the tip
+            tgt = tgt + (rad * math.sin(t * 1.7 * S['gk'] + S['ph']) + tan * math.sin(t * 2.3 * S['gk'] + S['ph'] * 1.7)) * 0.9
+            w, z = S['w'], S['z']
+            # ---- grabs: this leg reaches for its own point on the target, on its own beat
+            for g in grab_of.get(k, []):
+                fa, fg, ft = g['f_reach'] + g['d'], g['f_grab'] + g['d'] // 2, g['f_tear']
+                hold = g['hold']
+                wrap = hold + rad * 1.2 + tan * g['spin'] * 0.6 - ax * 0.4
+                if fa <= f < fg:
+                    e = _ease((f - fa) / max(1, fg - fa))
+                    wide = hold + rad * 3.6 + ax * 1.2 + tan * g['spin'] * 2.0
+                    tgt = wide.lerp(wrap, e ** 1.6)
+                    w, z, stroking = S['w'] * 1.4, 0.5, 0.45
+                elif fg <= f < ft:
+                    tgt = wrap + rad * 0.12 * math.sin(f * 2.1 + k)  # clutching, flexing
+                    w, z, stroking = 22.0, 0.8, 0.25
+                elif ft <= f < ft + 9:
+                    tgt = hold + rad * 6.5 - ax * 1.8 + tan * g['spin'] * 3.0   # rip it apart
+                    w, z, stroking = 26.0, 0.5, 0.9
+            if f_die is not None and f >= f_die:
+                tgt = b + (rad * 1.0 + tan * (rnd.random() - 0.5)).normalized() * L * 1.1
+                w, z, stroking = 18.0, 0.3, 0.0
+            # ---- its own physics: carry last frame's tip through the body's spin, push it with the body's
+            # acceleration, then spring toward where the leg wants to be
+            x = R_delta @ S['x']
+            vv = R_delta @ S['v']
+            acc = (tgt - x) * (w * w) - vv * (2 * z * w) - al * 0.55
+            vv = vv + acc * dt
+            x = x + vv * dt
+            S['x'], S['v'] = x, vv
+            pole = (rad * 1.0 + ax * 0.45 * math.sin(t * 1.3 * S['gk'] + S['ph']) + tan * 0.35 * math.sin(t * 0.9 + S['ph'] * 2.3)).normalized()
+            pts = _fabrik(b, x, [R_delta @ p for p in S['pts']], lens, pole)
+            S['pts'] = pts
+            qs = [_frame_q(pts[j + 1] - pts[j], rad, ax) for j in range(3)]
+            for j, s_ in enumerate(Lg['seg']):
+                s_.rotation_quaternion = qs[0] if j == 0 else qs[j - 1].inverted() @ qs[j]
+                s_.keyframe_insert('rotation_quaternion', frame=f)
+            # ---- its own thruster: exhaust opposite to where this leg wants to push the body
+            need = -lat * (1.0 / 300) + ax * (0.25 + (0.6 if speed > 30 else 0.2))
+            push_dir = need + (-vv.normalized() * 0.6 * stroking if vv.length > 1 else Vector())
+            if push_dir.length < 1e-3:
+                push_dir = ax.copy()
+            exhaust = -push_dir.normalized()
+            share = 0.5 + 0.5 * max(0.0, -rad.dot(lat.normalized())) if lat.length > 20 else 0.6
+            thr = min(1.0, 0.15 + stroking * 0.9 + min(1.0, lat.length / 400) * share + (0.25 if speed > 60 else 0))
+            if f_die is not None and f >= f_die:
+                thr = 0.0
+            S['thr'] += (thr - S['thr']) * 0.45
+            qn = _frame_q(-exhaust, rad, ax)                   # nacelle +X = intake, so -X points down the exhaust
+            Lg['nac'].rotation_quaternion = qs[0].inverted() @ qn
+            Lg['nac'].keyframe_insert('rotation_quaternion', frame=f)
+            th = S['thr']
+            Lg['plume'].scale = (max(0.02, th), 0.5 + 0.5 * th, 0.5 + 0.5 * th)
+            Lg['plume'].keyframe_insert('scale', frame=f)
+            Lg['lamp'].data.energy = 250 * th
+            Lg['lamp'].data.keyframe_insert('energy', frame=f)
+            # lightning flickers: a new variant every 1-2 frames, nothing when idle
+            if f % 2 == 0 or rnd.random() < 0.4:
+                S['flick'] = (S['flick'] + 1 + rnd.randrange(N_VAR - 1)) % N_VAR
+            on = S['flick'] if th > 0.08 else -1
+            if vis_prev.get(k) != on:
+                for vi, objs in enumerate(Lg['var']):
+                    for o in objs:
+                        o.hide_render = vi != on
+                        o.keyframe_insert('hide_render', frame=f)
+                vis_prev[k] = on
+    for Lg in legs:
+        for o in [Lg['plume']] + list(Lg['plume'].children_recursive):
+            ad = o.animation_data
+            if not ad or not ad.action:
+                continue
+            try:
+                curves = ad.action.fcurves
+            except AttributeError:
+                curves = [fc for layer in ad.action.layers for strip in layer.strips
+                          for bag in strip.channelbags for fc in bag.fcurves]
+            for fc in curves:
+                if fc.data_path == 'hide_render':
+                    for kp in fc.keyframe_points:
+                        kp.interpolation = 'CONSTANT'
+    sc.frame_set(f0)
     return root
