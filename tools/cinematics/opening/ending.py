@@ -28,14 +28,14 @@ F55 = fr(55.0)
 VIO = (0.62, 0.25, 1.0)
 VCORE = (0.55, 0.22, 1.0)
 BLUE = (0.3, 0.7, 1.0)
-GATE_AT = Vector((-290.0, -30.0, 40.0))
+GATE_AT = Vector((-250.0, -30.0, 85.0))
 GATE_N = Vector((1.0, -0.55, 0.05)).normalized()     # faces the fleet, turned toward the camera
 GATE_R = 95.0
 T_GATE = fr(57.0)
 T_GATE_FOLD = fr(58.15)
 T_RIFT_SHUT = fr(58.3)
 CAM_P = Vector((150.0, -1150.0, 250.0))
-CAM_T = Vector((150.0, 0.0, -10.0))
+CAM_T = Vector((215.0, 0.0, 10.0))
 
 
 def _hide_from(ob, f, tree=True):
@@ -49,7 +49,7 @@ def _hide_from(ob, f, tree=True):
         x.keyframe_insert('hide_render', frame=f - 1)
         x.hide_render = True
         x.keyframe_insert('hide_render', frame=f)
-        C.set_interp(x, 'CONSTANT')
+        SP._interp_where(x, 'hide_render', 'CONSTANT')
 
 
 class Ending:
@@ -149,7 +149,7 @@ class Ending:
         sc = bpy.context.scene
         sc.frame_set(f0)
         p0 = ob.matrix_world.translation.copy()
-        mid = p0.lerp(target, 0.35) + Vector((0, 0, 12))
+        mid = p0.lerp(target, 0.4) + Vector((0, -40, 75))   # climb clear of the wreck smoke
         SP.key_loc(ob, [(f0, p0), (f0 + (f1 - f0) // 2, mid), (f1, target), (f1 + 10, through)], 'BEZIER')
         rz = ob.rotation_euler.copy()
         SP.key_rot(ob, [(f0, (math.degrees(rz.x), math.degrees(rz.y), yaw0)),
@@ -157,6 +157,30 @@ class Ending:
                         (NF, (math.degrees(rz.x), math.degrees(rz.y), yaw1))], 'BEZIER')
         _hide_from(ob, f1 + 3)
         enter_flash(target, f1 + 2)
+        # dark hulls vanish against space at this distance: a portal-coloured key light rides with each runner
+        size = max(ob.dimensions)
+        L = bpy.data.objects.new(key + 'RunLight', bpy.data.lights.new(key + 'RunLight', 'POINT'))
+        SP.link(L)
+        L.parent = ob
+        L.location = (0, -size * 0.8, size * 0.9)
+        terran = enter_flash.__name__ == 'blue_flash'
+        L.data.color = (0.6, 0.8, 1.0) if terran else (1.0, 0.8, 0.5)
+        L.data.energy = 25.0 * size * size
+        L.data.shadow_soft_size = size * 0.4
+        SP.show(L, f0, f1 + 2)
+        # main drive lit for the run: a plume trailing opposite the flight path, in the ship's own frame
+        pm = SP.emit(key + 'DriveM', (0.3, 0.6, 1.0) if terran else (1.0, 0.6, 0.2), 9.0)
+        sc.frame_set(min(f1, f0 + 16))
+        back = (ob.matrix_world.to_3x3().inverted() @ -(target - p0)).normalized()
+        sx = min(max(ob.dimensions), 45.0)
+        for j, (ln, rad) in enumerate([(0.45, 0.08), (0.8, 0.04)]):
+            pl = C.uv_sphere(f'{key}Drive{j}', 1.0, seg=(12, 8), mat=pm, scale=(sx * ln, sx * rad, sx * rad))
+            pl.parent = ob
+            pl.location = back * (max(ob.dimensions) * 0.45 + sx * ln * 0.85)
+            pl.rotation_mode = 'QUATERNION'
+            pl.rotation_quaternion = back.to_track_quat('X', 'Z')
+            pl.visible_shadow = False
+            SP.show(pl, f0 + 6, f1 + 2)
 
     def escape(self):
         T0 = fr(56.6)
@@ -218,5 +242,5 @@ class Ending:
     # ------------------------------------------------------------ camera
     def camera(self, sid):
         up = CAM_P + Vector((0, 120, 120))
-        return [(F55, CAM_P, CAM_T, 38), (fr(57.5), CAM_P, CAM_T, 38),
-                (fr(59.0), up, CAM_T + Vector((0, 0, 700)), 38), (NF, up, CAM_T + Vector((0, 0, 700)), 38)]
+        return [(F55, CAM_P, CAM_T, 27), (fr(58.45), CAM_P, CAM_T, 27),
+                (fr(59.4), up, CAM_T + Vector((0, 0, 700)), 27), (NF, up, CAM_T + Vector((0, 0, 700)), 27)]

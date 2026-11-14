@@ -97,7 +97,7 @@ def show(obj, f0, f1, tree=True):
         o.keyframe_insert('hide_render', frame=max(1, f0))
         o.hide_render = True
         o.keyframe_insert('hide_render', frame=f1 + 1)
-        C.set_interp(o, 'CONSTANT')
+        _interp_where(o, 'hide_render', 'CONSTANT')
 
 
 def link(o):
@@ -391,7 +391,7 @@ def flicker_lightning(pairs, seed, f0, f1, every=2, width=0.3, name='Lightning',
     for o in objs:
         o.hide_render = True
         o.keyframe_insert('hide_render', frame=f1 + 1)
-        C.set_interp(o, 'CONSTANT')
+        _interp_where(o, 'hide_render', 'CONSTANT')
         o.visible_shadow = False
     if zone_col is not None:
         m = emit(_uid('LtM'), zone_col, strength)
