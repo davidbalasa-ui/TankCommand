@@ -245,6 +245,9 @@ def engines(ob, name, col, hot=(0.85, 0.95, 1.0), n=None, length=None, r=None, t
     n = n or (1 if W < 12 else (2 if W < 30 else 3))
     r = r or min(W, H) * (0.22 if n == 1 else 0.14)
     length = length or r * 9
+    if col[2] < col[0] * 0.5:            # Arcadian (warm gold): their thrusters are lightning, never flame
+        return lightning_engines(ob, name, [(x0, cy + (i - (n - 1) / 2) * W * 0.32, cz) for i in range(n)],
+                                 r, length, thr_keys, len_keys)
     mant = flame_mat(name + 'MantM', col, 2.2, 2.0)
     core = flame_mat(name + 'CoreM', hot, 4.0, 1.4)
     out = []
@@ -266,6 +269,56 @@ def engines(ob, name, col, hot=(0.85, 0.95, 1.0), n=None, length=None, r=None, t
     if thr_keys:
         SP.key_node(mant, 'thr', thr_keys)
         SP.key_node(core, 'thr', thr_keys)
+    return out
+
+
+def lightning_engines(ob, name, nozzles, r, length, thr_keys=None, len_keys=None, seed=0, f_end=None):
+    """Arcadian thrusters (David 2026-11-14: ALL Arcadian ships use lightning for thrusters): crackling gold
+    bolts out of each nozzle (local -X of ob), flickering between variants every frame or two. thr_keys /
+    len_keys as engines(). Returns the thruster roots."""
+    import random
+    import orb_fighter as OF
+    rnd = random.Random(hash(name) & 0xffff ^ seed)
+    k = max(0.2, r / 0.3)                         # bolt meshes are built for a 0.3-radius nozzle
+    thr_keys = thr_keys or [(1, 1.0)]
+    len_keys = len_keys or [(1, 1.0)]
+    frames = sorted({f for f, _ in thr_keys} | {f for f, _ in len_keys})
+    f_end = f_end or max(frames + [bpy.context.scene.frame_end])
+
+    def val(keys, f):
+        if f <= keys[0][0]:
+            return keys[0][1]
+        for (fa, a), (fb, b) in zip(keys, keys[1:]):
+            if fa <= f <= fb:
+                return a + (b - a) * (f - fa) / max(1, fb - fa)
+        return keys[-1][1]
+    out = []
+    for i, p in enumerate(nozzles):
+        root, variants = OF._bolt_thruster(f'{name}Bolt{i}', length / k, rnd.randrange(1 << 16))
+        root.parent = ob
+        root.location = Vector(p)
+        out.append(root)
+        for f in frames:
+            th = min(1.0, val(thr_keys, f) / 1.5)
+            lk = val(len_keys, f)
+            if th < 0.04 or lk < 0.08:
+                root.scale = (0.001,) * 3
+            else:
+                root.scale = (k * lk * (0.35 + 0.65 * th), k * (0.5 + 0.5 * th), k * (0.5 + 0.5 * th))
+            root.keyframe_insert('scale', frame=f)
+        cur, prev = rnd.randrange(OF.N_VAR), None
+        for f in range(1, f_end + 1):
+            if f % 2 == 0 or rnd.random() < 0.4:
+                cur = (cur + 1 + rnd.randrange(OF.N_VAR - 1)) % OF.N_VAR
+            if cur != prev:
+                for vi, objs in enumerate(variants):
+                    for o in objs:
+                        o.hide_render = vi != cur
+                        o.keyframe_insert('hide_render', frame=f)
+                prev = cur
+        for objs in variants:
+            for o in objs:
+                SP._interp_where(o, 'hide_render', 'CONSTANT')
     return out
 
 

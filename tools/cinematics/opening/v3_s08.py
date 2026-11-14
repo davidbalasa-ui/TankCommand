@@ -155,12 +155,26 @@ def build(draft=True):
           (fr(T_GRAB2), g2 + Vector((4, -6, 0))), (fr(T_TEAR2), g2 + Vector((-6, 4, 2))),
           (fr(T_TURN3), g2 + Vector((-14, 8, 4))), (fr(T_DASH), g2 + Vector((-30, 24, 8))),
           (fr(T_HIT), TF_AT + Vector((95, -60, -12))), (fr(T_DIE), TF_AT + Vector((60, -36, -6)))]
+    # dodging the frigate's bolts: three snap jinks across its line of charge, each a different way
+    pa, pb = g2 + Vector((-30, 24, 8)), TF_AT + Vector((95, -60, -12))
+    lane = (pb - pa).normalized()
+    s1_ = lane.cross(Vector((0, 0, 1))).normalized()
+    s2_ = s1_.cross(lane).normalized()
+
+    def on_line(t):
+        return pa.lerp(pb, (t - T_DASH) / (T_HIT - T_DASH))
+    jinks = [(T_HIT - 0.55, s1_ * 8 + s2_ * 3), (T_HIT - 0.33, -s1_ * 5 + s2_ * 7), (T_HIT - 0.12, s1_ * 2 - s2_ * 6)]
+    rk = rk[:-2] + [(fr(t), on_line(t) + o) for t, o in jinks] + rk[-2:]
     key_loc(rig, rk, 'BEZIER')
-    bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2)
+    bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2, roll_k=0.9)
     # leg motion: every leg on its own clock (stroke, reach, clutch, swirl), see orb_fighter.animate_orb
-    OF.animate_orb(orb, legs, [(1, 'sprint'), (fr(T_REACH1) - 8, 'grab'), (fr(T_TEAR1), 'turn'),
-                               (fr(T_REACH2) - 8, 'grab'), (fr(T_TEAR2), 'turn'), (fr(T_DASH) - 6, 'sprint'),
-                               (fr(T_DIE) - 4, 'spread')], 1, fr(T_DIE) + 31, seed=8)
+    # every leg on its own physics, stroke clock and thruster; two grabs with different legs
+    hold = Vector((OF.X0 + 2.4, 0, 0))
+    OF.animate_orb(orb, legs, 1, fr(T_DIE) + 31, seed=8, scale=ORB_K, f_die=fr(T_DIE),
+                   grabs=[dict(f_reach=fr(T_REACH1) - 4, f_grab=fr(T_GRAB1), f_tear=fr(T_TEAR1), hold=hold,
+                               legs=[0, 1, 3, 4, 6]),
+                          dict(f_reach=fr(T_REACH2) - 4, f_grab=fr(T_GRAB2), f_tear=fr(T_TEAR2), hold=hold,
+                               legs=[1, 2, 5, 6, 7])])
     # ---------------------------------------------------------------- attack run: bolts on the shield
     hits = []
     for k in range(14):
@@ -233,7 +247,9 @@ def build(draft=True):
         t = T_HIT - 0.55 + k * 0.08
         f0 = fr(t)
         src = at(tf, t) + Vector((rnd.uniform(-4, 4), rnd.uniform(-3, 3), rnd.uniform(0, 3)))
-        tgt = at(rig, t + 0.15) + Vector((rnd.uniform(-2, 2), rnd.uniform(-2, 2), rnd.uniform(-2, 2)))
+        # aimed where it would be on its straight charge: it jinks out of the way (the late ones connect)
+        tgt = (on_line(t + 0.15) if t + 0.15 < T_HIT else at(rig, t + 0.15)) + \
+            Vector((rnd.uniform(-2, 2), rnd.uniform(-2, 2), rnd.uniform(-2, 2)))
         n_ = max(3, int((tgt - src).length / 160 * 24))
         SP.bolt(src, tgt, f0, n_, BLUE, size=(4.0, 0.22, 0.22), strength=30.0)
         if k % 2 == 0:
@@ -297,9 +313,14 @@ def build(draft=True):
              (fr(12.6) - 1, g2 + Vector((-22, -26, 8)), at(rig, 12.5), 30)],
             shake=[(fr(T_GRAB2), 1.2, 12), (fr(T_TEAR2), 2.0, 16)])
     # D: over the frigate's shoulder as the Orb charges it, and dies
-    sc.shot('D', fr(12.6), fr(16.0) - 1,
-            [(fr(12.6), at(tf, 12.6) + Vector((-45, 40, 26)), at(rig, 12.6), 24),
-             (fr(T_HIT), at(tf, T_HIT) + Vector((-50, 44, 26)), at(rig, T_HIT) * 0.7 + at(tf, T_HIT) * 0.3, 26),
+    sc.shot('D', fr(12.6), fr(T_HIT) - 1,
+            [(f_, at(rig, f_ / 24.0 - 1 / 24.0) - lane * 34 + s1_ * 20 + s2_ * 8,
+              at(rig, f_ / 24.0 - 1 / 24.0) + lane * 18, 28) for f_ in range(fr(12.6), fr(T_HIT), 3)] +
+            [(fr(T_HIT) - 1, at(rig, T_HIT - 1 / 24.0) - lane * 34 + s1_ * 20 + s2_ * 8, at(rig, T_HIT) + lane * 18, 28)],
+            shake=[(fr(T_HIT - 0.55), 0.8, 20)])
+    # D2: over the frigate's shoulder as its lance connects, and the Orb dies
+    sc.shot('D2', fr(T_HIT), fr(16.0) - 1,
+            [(fr(T_HIT), at(tf, T_HIT) + Vector((-50, 44, 26)), at(rig, T_HIT) * 0.7 + at(tf, T_HIT) * 0.3, 26),
              (fr(16.0) - 1, at(tf, 16.0) + Vector((-55, 48, 28)), pd * 0.7 + at(tf, 16.0) * 0.3, 26)],
             shake=[(fr(T_HIT), 1.5, 14), (fr(T_DIE), 4.0, 24)])
     sc.shot('E', fr(16.0), nf,
