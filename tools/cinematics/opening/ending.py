@@ -75,8 +75,13 @@ class Ending:
         keys = [(f_hit - 3, 1.0, 0.4), (f_hit, L, 1.0), (f_hit + 10, L, 1.0), (f_hit + 16, L, 0.0)]
         if sweep:
             keys = [(sweep[2] - 3, 1.0, 0.4), (sweep[2], L, 1.0), (sweep[3], L, 1.0), (sweep[3] + 6, L, 0.0)]
-        b = SP.beam(base, Vector((0, 0, 1)), SP._uid('ShardBeam'), VIO, VCORE, 15.0, keys, strength=5.0, glow=6.0)
-        b.data.materials[0] = SP.flow_emit(SP._uid('ShardBeamFlow'), (0.55, 0.2, 1.0), 4.5, scale=0.05, speed=6.0)
+        b = SP.beam(base, Vector((0, 0, 1)), SP._uid('ShardBeam'), VIO, VCORE, 7.0, keys, strength=5.0, glow=3.0)
+        b.data.materials[0] = SP.flow_emit(SP._uid('ShardBeamFlow'), (0.8, 0.6, 1.0), 7.0, scale=0.25, speed=12.0,
+                                           lo=0.35, hi=2.2)
+        if not sweep:      # crackling violet ribbons wound round the column, racing up it
+            SP.beam_twist(base, Vector((0, 0, 1)), SP._uid('ShardTwist'), VIO,
+                          [(k[0], k[1] if k[2] > 0 else 0.0) for k in keys], keys[0][0], keys[-1][0],
+                          radius=11.0, pitch=60.0, strands=3, width=0.9, turns_per_s=2.5, length=L)
         if sweep:
             piv = bpy.data.objects.new(SP._uid('BeamPivot'), None)
             SP.link(piv)

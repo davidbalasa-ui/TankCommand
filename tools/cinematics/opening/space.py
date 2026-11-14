@@ -338,7 +338,7 @@ def violet_boom(p, f0, size, **kw):
     return boom(p, f0, size, hot=(0.8, 0.45, 1.0), cool=(0.2, 0.02, 0.4), **kw)
 
 
-def shards(p, f0, n, col, size, speed, seed, life=1.5, kind='tri', strength=8.0, frames=None, drift=None):
+def shards(p, f0, n, col, size, speed, seed, life=1.5, kind='tri', strength=3.5, frames=None, drift=None):
     """n small flat shards (triangles or hexagons) bursting out of p at f0."""
     rnd = random.Random(seed)
     m = emit(_uid('ShardM'), col, strength)
@@ -363,6 +363,7 @@ def shards(p, f0, n, col, size, speed, seed, life=1.5, kind='tri', strength=8.0,
         key_loc(o, [(f0, p), (f1, Vector(p) + d * v * life)], 'LINEAR')
         key_rot(o, [(f0, (rnd.uniform(0, 360), rnd.uniform(0, 360), 0)),
                     (f1, (rnd.uniform(0, 220), rnd.uniform(0, 220), rnd.uniform(0, 100)))], 'LINEAR')
+        key_scale(o, [(f0, 1.0), (f0 + (f1 - f0) // 3, 0.8), (f1, 0.1)], 'LINEAR')   # burn out as they fly
         show(o, f0, f1)
         o.visible_shadow = False
         objs.append(o)
@@ -1267,14 +1268,14 @@ class Space:
             show(c, t0, t0 + 14)
         # charge ribbons: helix round each barrel near the muzzle, 4 frames each
         base._faction('terran')
-        rib_m = emit('RibbonM', (0.45, 0.8, 1.0), 22.0)
+        rib_m = emit('RibbonM', (0.3, 0.65, 1.0), 9.0)
         for ci, mz in enumerate(self.muzzles):
             pts = []
             for k in range(60):
                 t = k / 59
                 a = t * 4 * 2 * math.pi
                 pts.append((mz.x + 2.2 * math.cos(a), mz.y + 7.0 * (1 - t), mz.z + 2.2 * math.sin(a)))
-            r = F.sweep(pts, [(0.18, 0.18)] * 60, 'glow', sides=4)
+            r = F.sweep(pts, [(0.07, 0.07)] * 60, 'glow', sides=4)
             ro = base._join([r], f'ChargeRibbon{ci}')
             ro.data.materials.clear()
             ro.data.materials.append(rib_m)

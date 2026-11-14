@@ -189,7 +189,7 @@ class Dogfight:
                 seg.rotation_mode = 'QUATERNION'
                 seg.rotation_quaternion = look_quat(b - a)
                 L = (b - a).length / 2 + 0.6
-                SP.key_scale(seg, [(f0 + i, (L, 0.14, 0.14)), (f0 + i + 8, (L, 0.5, 0.5))], 'LINEAR')
+                SP.key_scale(seg, [(f0 + i, (L, 0.16, 0.16)), (f0 + i + 8, (L, 0.05, 0.05))], 'LINEAR')   # glow thins out as it lingers
                 SP.show(seg, f0 + i + 1, f0 + i + 8)
                 seg.visible_shadow = False
             # launch flash at the tube, blast at the target
