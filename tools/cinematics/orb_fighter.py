@@ -189,15 +189,24 @@ def _flame_mat(name, col, k, p):
     m, n = BP._new_mat(name)
     tc = n.node('ShaderNodeTexCoord')
     t = BP.time_value(m, 'time', 1.0)
-    nz = n.node('ShaderNodeTexNoise', Scale=5.0, Detail=6.0, Roughness=0.6)
+    # streaky noise: stretched along the flame (local X), churning fast
+    vm = n.node('ShaderNodeVectorMath')
+    vm.operation = 'MULTIPLY'
+    n.set(vm.inputs[0], tc.outputs['Object'])
+    vm.inputs[1].default_value = (0.35, 3.0, 3.0)
+    nz = n.node('ShaderNodeTexNoise', Scale=4.0, Detail=6.0, Roughness=0.65)
     nz.noise_dimensions = '4D'
-    n.set(nz.inputs['Vector'], tc.outputs['Object'])
-    n.set(nz.inputs['W'], n.math('MULTIPLY', t, 8.0))
+    n.set(nz.inputs['Vector'], vm.outputs[0])
+    n.set(nz.inputs['W'], n.math('MULTIPLY', t, 14.0))
     lw = n.node('ShaderNodeLayerWeight', Blend=0.5)
     g = n.math('POWER', n.math('SUBTRACT', 1.0, lw.outputs['Facing']), p)
-    brk = n.maprange(nz.outputs['Fac'], 0.3, 0.7, 0.25, 1.4)
+    brk = n.maprange(nz.outputs['Fac'], 0.35, 0.7, 0.05, 1.5)
+    # fade out toward the tail (generated X runs 0 at the tail .. 1 at the nozzle)
+    sx = n.node('ShaderNodeSeparateXYZ')
+    n.set(sx.inputs[0], tc.outputs['Generated'])
+    fade = n.math('POWER', sx.outputs['X'], 1.8)
     em = n.node('ShaderNodeEmission', Color=(*col, 1))
-    n.set(em.inputs['Strength'], n.math('MULTIPLY', n.math('MULTIPLY', g, brk), k))
+    n.set(em.inputs['Strength'], n.math('MULTIPLY', n.math('MULTIPLY', n.math('MULTIPLY', g, brk), fade), k))
     tr = n.node('ShaderNodeBsdfTransparent')
     add = n.node('ShaderNodeAddShader')
     n.set(add.inputs[0], tr.outputs[0])
@@ -212,7 +221,7 @@ def _plume(p, d, length, r, name):
     d = Vector(d).normalized()
     pts = [Vector(p) + d * length * f for f in (0, 0.06, 0.2, 0.4, 0.6, 0.8, 1.0)]
     core = _flame_mat('OrbPlumeCoreM', HOTG, 5.0, 0.8)
-    mant = _flame_mat('OrbPlumeMantleM', GOLD, 4.0, 1.5)
+    mant = _flame_mat('OrbPlumeMantleM', GOLD, 2.6, 1.5)
     soft = _flame_mat('OrbPlumeSoftM', (1.0, 0.45, 0.1), 0.8, 2.5)
     objs = [SFX._tube_path(name + 'Core', pts[:4], [r * 0.3, r * 0.26, r * 0.12, 0.01], core, sides=16),
             SFX._tube_path(name + 'Mantle', pts, [r * 0.85, r * 1.05, r * 1.05, r * 0.9, r * 0.65, r * 0.35, 0.02], mant, sides=24),
