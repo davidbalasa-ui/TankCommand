@@ -638,7 +638,8 @@ ZONES = {
         'core': dict(kind='orb', emit=GOLD, strength=1.1),
         'violet': dict(kind='glow', emit=(0.35, 0.08, 1.0), strength=2.0),
         'copper': dict(kind='etched', base=(0.3, 0.13, 0.06), base2=(0.16, 0.07, 0.035), rough=0.36, veins=0.25),
-        'wing': dict(kind='membrane', base=(0.8, 0.72, 0.5), emit=GOLD, strength=0.22),
+        'wing': dict(kind='membrane', base=(0.9, 0.87, 0.72), emit=GOLD, strength=0.1),
+        'bolt': dict(kind='glow', emit=(1.0, 0.86, 0.5), strength=3.4),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
@@ -1175,12 +1176,15 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         for g, o in made.items():
             o.parent = root
         plist = [pivot] if pivot and isinstance(pivot[0], str) else (pivot or [])
-        for i, pv in enumerate(plist):
+        ploc = {}
+        for i, pv in enumerate(plist):   # (group, location[, node name[, parent group]]); parents first
             g, loc = pv[0], pv[1]
             e = bpy.data.objects.new(pv[2] if len(pv) > 2 else ('TurretPivot' if i == 0 else f'Pivot{i}'), None)
             scene.collection.objects.link(e)
-            e.parent = root
-            e.location = loc
+            par = pv[3] if len(pv) > 3 else None
+            e.parent = pivots[par] if par else root
+            e.location = tuple(a - b for a, b in zip(loc, ploc[par])) if par else loc
+            ploc[g] = loc
             made[g].parent = e
             made[g].location = tuple(-c for c in loc)
             pivots[g] = e

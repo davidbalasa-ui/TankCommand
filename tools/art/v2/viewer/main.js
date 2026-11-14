@@ -59,12 +59,31 @@ scene.add(ground);
 
 const rows = Math.ceil(files.length / cols);
 const camera = new THREE.PerspectiveCamera(48, W / H, 0.5, 800);
-const pitch = THREE.MathUtils.degToRad(49);
+const pitch = THREE.MathUtils.degToRad(Number(q.get('pitch') || 49));
 const cz = ((rows - 1) * gap) / 2;
 camera.position.set(0, Math.sin(pitch) * dist, cz + Math.cos(pitch) * dist);
 camera.lookAt(0, 0, cz);
 
 let loaded = 0;
+// Moving parts (extras.anim written by motion.py): posed for a given time, as the game does.
+const parts = [];
+const turn = new THREE.Quaternion();
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+window.__setTime = (t) => {
+  for (const { node, spec, rest } of parts) {
+    const axis = spec.axis ? new THREE.Vector3(...spec.axis).normalize() : null;
+    if (spec.type === 'spin') {
+      node.quaternion.copy(rest).multiply(turn.setFromAxisAngle(axis, spec.speed * t));
+    } else if (spec.type === 'swing') {
+      node.quaternion.copy(rest).multiply(turn.setFromAxisAngle(axis, spec.amp * Math.sin(Math.PI * 2 * spec.speed * t + (spec.phase || 0))));
+    } else if (spec.type === 'flicker') {
+      const tick = Math.floor(t * spec.rate);
+      node.visible = hash(tick) < spec.duty && Math.floor(hash(tick + 0.5) * spec.slots) === spec.slot;
+    }
+  }
+  renderer.render(scene, camera);
+};
+
 const loader = new GLTFLoader();
 const lod = q.get('lod') === '1';
 const loadModel = (file, done, fail) => {
@@ -88,18 +107,20 @@ files.forEach((file, i) => {
     holder.add(root);
     const s = kind === 'unit' ? (TANK_LENGTH / Math.max(size.x, size.z)) * (scales[i] || 1) : (scales[i] || 1);
     holder.scale.setScalar(s);
-    holder.rotation.y = kind === 'unit' ? -0.6 : 0;
+    holder.rotation.y = q.has('yaw') ? Number(q.get('yaw')) : kind === 'unit' ? -0.6 : 0;
     box = new THREE.Box3().setFromObject(holder);
     const centre = box.getCenter(new THREE.Vector3());
     const col = i % cols;
     const row = Math.floor(i / cols);
-    holder.position.set((col - (Math.min(cols, files.length) - 1) / 2) * gap - centre.x, -box.min.y, row * gap - centre.z);
+    holder.position.set((col - (Math.min(cols, files.length) - 1) / 2) * gap - centre.x, -box.min.y + Number(q.get('lift') || 0), row * gap - centre.z);
+    root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone() }); });
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(holder);
     loaded += 1;
   }, () => { loaded += 1; });
 });
 window.__ready = () => loaded === files.length;
+if (q.has('t')) { const wait = setInterval(() => { if (window.__ready()) { window.__setTime(Number(q.get('t'))); clearInterval(wait); } }, 100); }
 function loop() {
   renderer.render(scene, camera);
   requestAnimationFrame(loop);

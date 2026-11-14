@@ -7,6 +7,10 @@ model's _lod file). The game reads it from node.userData.anim:
 
     type   'spin'   turn about `axis` at `speed` rad/s
            'swing'  rock about `axis`: angle = amp * sin(2 pi * speed * t), speed in Hz
+                    optional `phase` (radians) offsets it so paired parts move out of step
+           'flicker' electricity: of the nodes sharing `slots`, show only one at a time (or none),
+                    re-picked at random `rate` times a second; `duty` is the chance one shows.
+                    `idle` replaces duty while `when` is not met.
            'scroll' on the mesh node 'Tread': slide its material's texture along U
                     (map.offset.x) by `speed` tiles per second while moving
     axis   in the node's own glTF space (Y up, model front +X)
@@ -31,6 +35,10 @@ def swing(axis, amp, speed, when='always', **kw):
     return dict(type='swing', axis=axis, amp=amp, speed=speed, when=when, **kw)
 
 
+def flicker(slot, slots, rate=18.0, duty=0.75, idle=0.12, when='moving'):
+    return dict(type='flicker', slot=slot, slots=slots, rate=rate, duty=duty, idle=idle, when=when)
+
+
 SPEC = {
     'human/prospector': {'DrumPivot': spin(LEFT, 6.0, 'mining')},
     'alien/gorger': {'GrinderPivot': spin(FWD, 8.0, 'mining')},
@@ -39,7 +47,13 @@ SPEC = {
     'alien/weaver': {'TurretPivot': spin(UP, 1.0, busySpeed=4.0)},
     'human/mender': {'TurretPivot': swing(UP, 0.6, 0.5, 'working')},
     'alien/disc': {'BladesPivot': spin(UP, 1.5)},
-    'alien/dragonfly': {'WingLPivot': swing(FWD, 0.2, 9.0), 'WingRPivot': swing([-1, 0, 0], 0.2, 9.0)},
+    'alien/dragonfly': {
+        'WingFLPivot': swing(FWD, 0.3, 14.0), 'WingFRPivot': swing([-1, 0, 0], 0.3, 14.0),
+        'WingHLPivot': swing(FWD, 0.26, 14.0, phase=1.6), 'WingHRPivot': swing([-1, 0, 0], 0.26, 14.0, phase=1.6),
+        'Tail1Pivot': swing(LEFT, 0.07, 0.7), 'Tail2Pivot': swing(LEFT, 0.1, 0.7, phase=-0.9),
+        'Tail3Pivot': swing(LEFT, 0.14, 0.7, phase=-1.8),
+        'ArcA': flicker(0, 3), 'ArcB': flicker(1, 3), 'ArcC': flicker(2, 3),
+    },
     'structures/terran_radar': {'TurretPivot': spin(UP, 1.0)},
     'structures/terran_air_base': {'DishPivot': spin(UP, 1.0)},
     'structures/kesh_seer_spire': {'TurretPivot': spin(UP, 0.6)},

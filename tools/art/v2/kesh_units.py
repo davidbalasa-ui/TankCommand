@@ -341,51 +341,102 @@ def halo():
     return dict(name='KeshHalo', single=True)
 
 
-@asset('alien/dragonfly.glb', 'Kesh Dragonfly (aircraft, role not assigned)')
+@asset('alien/dragonfly.glb', 'Arcadian Dragonfly (fighter)')
 def dragonfly():
+    import random
     Z = 1.15
-    # Thorax and head: a compact layered lens hull with caged gold eyes at the nose.
+    # Thorax and head: a compact layered lens hull with big caged gold eyes at the nose.
     fn = lensfn(-1.1, 2.3, 0.78, Z + 0.72, Z - 0.5, Z + 0.05, nose=0.75)
     K.layered_hull(fn, sides=False, rear=True)
     for s in (1, -1):
-        K.core((1.75, s * 0.42, Z + 0.3), 0.26, ring=False)
+        K.core((1.72, s * 0.44, Z + 0.3), 0.31, ring=False)
         # Twin lances under the chin.
         tube((1.2, s * 0.26, Z - 0.3), (3.3, s * 0.26, Z - 0.3), [(0, 0.11), (0.15, 0.13), (0.2, 0.065), (0.92, 0.05), (0.94, 0.085), (1, 0.085)], 8, 'barrel')
         cyl((3.29, s * 0.26, Z - 0.3), (3.31, s * 0.26, Z - 0.3), 0.06, 8, 'glow')
-    K.core((0.55, 0, Z + 0.74), 0.22)
-    # Long straight segmented tail.
-    n = 7
-    x, r = -0.8, 0.5
-    zc = Z + 0.05
-    x_start, r_start = x, r
-    for k in range(n):
-        ln = 0.82 - k * 0.03
-        r1 = r * 0.86
-        tube((x, 0, zc), (x - ln, 0, zc), [(0, r * 0.72), (0.18, r), (0.7, r * 0.92), (1, r1 * 0.7)], 10,
-             'shell' if k % 2 == 0 else 'bronze')
-        K.ring((x - ln, 0, zc), r1 * 0.78, 0.035, 'glow', sides=10, tilt=(0, 90))
-        x, r = x - ln, r1
-    for s in (1, -1):   # tail claspers
-        K.blade((x - 0.05, s * 0.75, zc), 0.75, s * -80, s * -190, 0.3, 0.06)
-    # Straight lines down the back: a glowing spine flanked by two bronze rails, nose to tail tip.
-    sweep([(1.1, 0, Z + 0.66), (-0.9, 0, Z + 0.62), (x + 0.2, 0, zc + r + 0.06)], [(0.035, 0.03), (0.035, 0.03), (0.02, 0.02)], 'glow', sides=4)
+        # Legs folded back under the thorax.
+        for x in (1.0, 0.4, -0.2):
+            sweep([(x, s * 0.4, Z - 0.3), (x + 0.2, s * 0.85, Z - 0.5), (x - 0.5, s * 0.6, Z - 0.72)],
+                  [(0.055, 0.055), (0.04, 0.04), (0.015, 0.015)], 'bronze', sides=5)
+        # Wing-root shoulders.
+        orb((0.25, s * 0.42, Z + 0.48), 0.32, 'bronze', seg=(10, 8), sq=(2.3, 0.8, 0.6))
+    K.core((0.55, 0, Z + 0.74), 0.24)
+    sweep([(1.1, 0, Z + 0.66), (-0.8, 0, Z + 0.63)], [(0.035, 0.03), (0.035, 0.03)], 'glow', sides=4)
     for s in (1, -1):
-        sweep([(0.9, s * 0.2, Z + 0.6), (-0.9, s * 0.2, Z + 0.56), (x + 0.2, s * 0.07, zc + r + 0.04)],
-              [(0.05, 0.05), (0.05, 0.05), (0.025, 0.03)], 'bronze', sides=4, power=1.6)
-    # Four long see-through wings in two pairs, each with straight veins and a bronze leading spar.
-    for s in (1, -1):
-        for (x0, span, sweep_, rise, chord) in ((0.75, 6.2, -0.4, 0.9, 0.62), (-0.3, 5.2, -1.9, 0.55, 0.54)):
-            root = (x0, s * 0.35, Z + 0.5)
-            tip = (x0 + sweep_, s * (0.35 + span), Z + 0.5 + rise)
-            def at(t, dx=0.0, dz=0.0):
-                return (root[0] + (tip[0] - root[0]) * t + dx, root[1] + (tip[1] - root[1]) * t, root[2] + (tip[2] - root[2]) * t + dz)
-            with F.group('WingL' if s > 0 else 'WingR'):   # each side is its own part so the wings can beat
-                sweep([at(0), at(0.3), at(0.7), at(1)], [(chord * 0.5, 0.03), (chord, 0.025), (chord * 0.9, 0.02), (chord * 0.2, 0.012)], 'wing', sides=6, power=0.7)
-                sweep([at(0, chord * 0.5, 0.02), at(0.3, chord, 0.02), at(0.7, chord * 0.9, 0.02), at(1, chord * 0.2, 0.01)],
-                      [(0.09, 0.07), (0.08, 0.06), (0.06, 0.05), (0.02, 0.02)], 'bronze', sides=6)
-                for off in (-0.45, 0.0, 0.42):   # straight veins
-                    sweep([at(0.04, chord * off * 0.5, 0.03), at(0.95, chord * off * 0.25, 0.02)], [(0.018, 0.012), (0.01, 0.01)], 'glow', sides=4)
-        orb((0.25, s * 0.42, Z + 0.48), 0.3, 'bronze', seg=(10, 8), sq=(1.9, 0.8, 0.6))
+        sweep([(0.9, s * 0.2, Z + 0.6), (-0.8, s * 0.2, Z + 0.57)], [(0.05, 0.05), (0.05, 0.05)], 'bronze', sides=4, power=1.6)
+
+    # Long tail in three jointed sections, so it can flex. Straight lines run down its back.
+    x, r, zc = -0.8, 0.5, Z + 0.05
+    joints = []
+    for k in range(9):
+        if k % 3 == 0:
+            joints.append((x, 0, zc))
+        with F.group(f'Tail{k // 3 + 1}'):
+            ln = 0.84 - k * 0.025
+            r1 = r * 0.885
+            tube((x, 0, zc), (x - ln, 0, zc), [(0, r * 0.72), (0.18, r), (0.7, r * 0.92), (1, r1 * 0.7)], 10,
+                 'shell' if k % 2 == 0 else 'bronze')
+            K.ring((x - ln, 0, zc), r1 * 0.78, 0.035, 'glow', sides=10, tilt=(0, 90))
+            sweep([(x + 0.05, 0, zc + r + 0.05), (x - ln, 0, zc + r1 + 0.05)], [(0.03, 0.025), (0.026, 0.022)], 'glow', sides=4)
+            for s in (1, -1):
+                sweep([(x + 0.05, s * r * 0.42, zc + r * 0.93), (x - ln, s * r1 * 0.42, zc + r1 * 0.93)],
+                      [(0.04, 0.04), (0.035, 0.035)], 'bronze', sides=4, power=1.6)
+            x, r = x - ln, r1
+    with F.group('Tail3'):   # claspers and a charged sting at the tip
+        for s in (1, -1):
+            K.blade((x - 0.05, s * 0.75, zc), 0.75, s * -80, s * -190, 0.3, 0.06)
+        tube((x + 0.05, 0, zc), (x - 1.1, 0, zc + 0.12), [(0, r * 0.7), (0.3, r * 0.45), (1, 0.02)], 8, 'barrel')
+        orb((x - 0.22, 0, zc + 0.03), r * 0.62, 'core', seg=(10, 8))
+
+    # Four very long, thin wings. Each is its own part so the pairs can beat out of step.
+    def wing(group, root, L, c, dihedral, back, s):
+        with F.group(group):
+            m = F.mark()
+            lead = [(0.08, 0.0), (0.13, 0.12), (0.16, 0.3), (0.16, 0.5), (0.13, 0.7), (0.07, 0.86), (-0.03, 0.95), (-0.16, 0.99)]
+            trail = [(-0.32, 1.0), (-0.5, 0.985), (-0.68, 0.94), (-0.85, 0.85), (-0.96, 0.7), (-1.0, 0.52), (-0.97, 0.34),
+                     (-0.86, 0.18), (-0.66, 0.07), (-0.4, 0.015)]
+            F.plate([(a * c, s * b * L) for a, b in lead + trail], -0.01, 0.01, 'wing')
+            sweep([(a * c, s * b * L, 0.012) for a, b in lead], [(0.07, 0.06), (0.065, 0.055), (0.06, 0.05), (0.052, 0.044), (0.044, 0.036), (0.034, 0.028), (0.024, 0.02), (0.014, 0.012)],
+                  'bronze', sides=6)
+            for a0, a1, b1 in ((-0.02, -0.2, 0.985), (-0.12, -0.6, 0.93), (-0.2, -0.92, 0.72), (-0.28, -0.97, 0.45)):   # straight veins
+                sweep([(a0 * c, s * 0.02 * L, 0.014), (a1 * c, s * b1 * L, 0.014)], [(0.02, 0.012), (0.009, 0.008)], 'glow', sides=4)
+            for b in (0.3, 0.55, 0.78):   # cross struts
+                sweep([(0.14 * c, s * b * L, 0.013), (-0.93 * c * (1.0 if b < 0.7 else 0.9), s * (b + 0.03) * L, 0.013)],
+                      [(0.012, 0.008), (0.008, 0.006)], 'bronze', sides=4)
+            F.plate([(0.05 * c, s * 0.84 * L), (0.03 * c, s * 0.9 * L), (-0.12 * c, s * 0.905 * L), (-0.1 * c, s * 0.845 * L)], 0.011, 0.016, 'copper')
+            orb((0, s * 0.05, 0.02), 0.1, 'glow', seg=(8, 6))
+            F.rot_all(m, 'X', s * dihedral)
+            F.rot_all(m, 'Z', s * back)
+            F.move_all(m, root)
+    pivots = []
+    for s, side in ((1, 'L'), (-1, 'R')):
+        for name, rx, rz, L, c, dih, back in (('F', 0.78, 0.52, 9.4, 0.82, 7, -4), ('H', -0.22, 0.47, 8.2, 0.98, 4, 15)):
+            root = (rx, s * 0.36, Z + rz)
+            wing(f'Wing{name}{side}', root, L, c, dih, back, s)
+            pivots.append((f'Wing{name}{side}', root, f'Wing{name}{side}Pivot'))
+    pivots += [('Tail1', joints[0], 'Tail1Pivot'), ('Tail2', joints[1], 'Tail2Pivot', 'Tail1'), ('Tail3', joints[2], 'Tail3Pivot', 'Tail2')]
+
+    # Electricity: three different sets of bolts. The game shows one at a time, changing fast.
+    def bolt(p0, p1, rnd, kinks=6, jit=0.24, r=0.075):
+        pts = []
+        for i in range(kinks + 1):
+            t = i / kinks
+            j = (jit * math.sin(math.pi * t) + 0.03) * (0 < i < kinks)
+            pts.append(tuple(p0[a] + (p1[a] - p0[a]) * t + rnd.uniform(-j, j) for a in range(3)))
+        for a, b in zip(pts[:-1], pts[1:]):
+            sweep([a, b], [(r, r), (r * 0.8, r * 0.8)], 'bolt', sides=4)
+        return pts
+    heart = (0.55, 0, Z + 0.95)
+    for gi, gname in enumerate(('ArcA', 'ArcB', 'ArcC')):
+        rnd = random.Random(70 + gi)
+        with F.group(gname):
+            for s in (1, -1):
+                reach = rnd.uniform(2.4, 4.2)
+                pts = bolt(heart, (0.75 + rnd.uniform(-0.3, 0.3), s * reach, Z + 0.95 + rnd.uniform(0.0, 0.35)), rnd)
+                k = rnd.randint(2, 4)
+                bolt(pts[k], (pts[k][0] + rnd.uniform(-0.7, 0.7), pts[k][1] + s * 0.5, pts[k][2] + rnd.uniform(0.2, 0.6)), rnd, kinks=3, jit=0.14, r=0.05)
+            bolt((-0.7, 0, Z + 0.72), (-2.4 - 0.5 * gi, rnd.uniform(-0.25, 0.25), Z + 0.72), rnd, kinks=5, jit=0.2, r=0.06)
+            bolt((3.3, 0.26, Z - 0.3), (3.3, -0.26, Z - 0.3), rnd, kinks=4, jit=0.1, r=0.04)
+            if gi != 1:
+                bolt((1.72, 0.44, Z + 0.62), (1.72, -0.44, Z + 0.62), rnd, kinks=4, jit=0.12, r=0.04)
     K.lifters([(0.6, 0, Z - 0.5)], 0.3)
-    return dict(name='KeshDragonfly', clear='wing',
-                pivot=[('WingL', (0.2, 0.35, Z + 0.5), 'WingLPivot'), ('WingR', (0.2, -0.35, Z + 0.5), 'WingRPivot')])
+    return dict(name='KeshDragonfly', clear='wing', clear_alpha=0.3, pivot=pivots)
