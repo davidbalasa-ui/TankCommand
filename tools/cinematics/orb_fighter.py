@@ -211,7 +211,7 @@ def _plume(p, d, length, r, name):
     """Exhaust: white-gold core, gold mantle, wide soft glow, three shock diamonds. Returns objects."""
     d = Vector(d).normalized()
     pts = [Vector(p) + d * length * f for f in (0, 0.06, 0.2, 0.4, 0.6, 0.8, 1.0)]
-    core = SFX._emit('OrbPlumeCoreM', HOTG, 18.0)
+    core = _flame_mat('OrbPlumeCoreM', HOTG, 5.0, 0.8)
     mant = _flame_mat('OrbPlumeMantleM', GOLD, 4.0, 1.5)
     soft = _flame_mat('OrbPlumeSoftM', (1.0, 0.45, 0.1), 0.8, 2.5)
     objs = [SFX._tube_path(name + 'Core', pts[:4], [r * 0.3, r * 0.26, r * 0.12, 0.01], core, sides=16),
