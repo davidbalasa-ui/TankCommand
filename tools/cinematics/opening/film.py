@@ -260,10 +260,21 @@ def stitch(out, quality='draft', crf=26):
         os.symlink(p, os.path.join(all_dir, f'f_{f:04d}.png'))
         last = p
     mp4 = os.path.join(out, f'opening-{quality}.mp4')
-    w0, w1, w2 = (fr(36.85) - 1) / FPS, (fr(37.3) - 1) / FPS, (fr(38.0) - 1) / FPS
-    vf = (f"fade=t=out:st={w0:.3f}:d={w1 - w0:.3f}:color=white,"
-          f"fade=t=in:st={w2:.3f}:d=0.35:color=white,"
-          f"fade=t=out:st={59.5:.3f}:d=0.5:color=black")
+    # white-out at 0:36.85-0:37.3, held, then back from white at 0:38 over 0.35 s: baked into the frames
+    # (chained ffmpeg fades would leave everything after the first fade white)
+    from PIL import Image
+    a0, a1, a2, a3 = fr(36.85), fr(37.3), fr(38.0), fr(38.35)
+    for f in range(a0, a3 + 1):
+        dst = os.path.join(all_dir, f'f_{f:04d}.png')
+        if not os.path.lexists(dst):
+            continue
+        k = (f - a0) / max(1, a1 - a0) if f < a1 else (1.0 if f < a2 else 1.0 - (f - a2) / max(1, a3 - a2))
+        k = max(0.0, min(1.0, k))
+        im = Image.open(os.path.realpath(dst)).convert('RGB')
+        im = Image.blend(im, Image.new('RGB', im.size, (255, 255, 255)), k)
+        os.remove(dst)
+        im.save(dst)
+    vf = f"fade=t=out:st={59.5:.3f}:d=0.5:color=black"
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(FPS), '-start_number', '1',
            '-i', os.path.join(all_dir, 'f_%04d.png'), '-vf', vf, '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
            '-crf', str(crf), '-preset', 'slow', mp4]

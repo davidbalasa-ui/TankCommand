@@ -719,7 +719,7 @@ class Ground:
     def shot(self, p0, p1, f0, f1, col, width=0.25, name=None):
         m = self._shot_mat(col)
         d = p1 - p0
-        o = C.uv_sphere(name or SP._uid('Shot'), 1.0, seg=(8, 5), mat=m, scale=(5.0, width, width))
+        o = C.uv_sphere(name or SP._uid('Shot'), 1.0, seg=(8, 5), mat=m, scale=(3.0, width * 0.7, width * 0.7))
         o.rotation_mode = 'QUATERNION'
         o.rotation_quaternion = look_quat(d)
         SP.key_loc(o, [(f0, p0), (f1, p1)], 'LINEAR')
@@ -731,7 +731,7 @@ class Ground:
 
     def _shot_mat(self, col):
         if col not in self._shot_mats:
-            self._shot_mats[col] = SP.emit(SP._uid('ShotM'), col, 22.0)
+            self._shot_mats[col] = SP.emit(SP._uid('ShotM'), col, 9.0)
         return self._shot_mats[col]
 
     def unit_pos(self, side, i, f):
