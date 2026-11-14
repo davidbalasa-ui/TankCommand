@@ -137,67 +137,10 @@ class Ending:
 
     # ------------------------------------------------------------ the Terran gate
     def gate(self):
-        """A flat ring of blue triangles unfolding out of nothing, a calm mirror inside; at 0:58.15
-        it folds flat to a line and is gone."""
-        root = bpy.data.objects.new('TerranGate', None)
-        SP.link(root)
-        root.location = GATE_AT
-        root.rotation_mode = 'QUATERNION'
-        root.rotation_quaternion = GATE_N.to_track_quat('Z', 'Y')
-        tri_m = SP.emit('GateTriM', BLUE, 7.0)
-        edge_m = SP.emit('GateEdgeM', (0.75, 0.92, 1.0), 14.0)
-        n = 30
-        for k in range(n):
-            a = 2 * math.pi * k / n
-            me = bpy.data.meshes.new(f'GateTri{k}')
-            w = GATE_R * math.pi / n * 1.05
-            d = 9.0 if k % 2 == 0 else 6.5
-            s = 1 if k % 2 == 0 else -1          # alternate in and out, like a jaw of teeth
-            verts = [(-w, 0, -0.6), (w, 0, -0.6), (0, s * d, -0.6), (-w, 0, 0.6), (w, 0, 0.6), (0, s * d, 0.6)]
-            faces = [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)]
-            me.from_pydata(verts, [], faces)
-            me.materials.append(tri_m if k % 3 else edge_m)
-            t = bpy.data.objects.new(f'GateTri{k}', me)
-            SP.link(t)
-            t.parent = root
-            t.location = (math.cos(a) * GATE_R, math.sin(a) * GATE_R, 0)
-            t.rotation_mode = 'XYZ'
-            spin = a - math.pi / 2
-            f0 = T_GATE + (k * 7) % n // 4
-            SP.key_rot(t, [(1, (math.radians(90), 0, spin)), (f0, (math.radians(90), 0, spin)),
-                           (f0 + 5, (0, 0, spin))], 'BEZIER')
-            SP.key_scale(t, [(1, 0.01), (f0, 0.01), (f0 + 3, 1.0)], 'BEZIER')
-            t.visible_shadow = False
-        # the mirror: a still, perfectly flat surface inside the ring
-        mm = bpy.data.materials.new('GateMirror')
-        mm.use_nodes = True
-        bsdf = mm.node_tree.nodes['Principled BSDF']
-        bsdf.inputs['Base Color'].default_value = (0.75, 0.88, 1.0, 1)
-        bsdf.inputs['Metallic'].default_value = 1.0
-        bsdf.inputs['Roughness'].default_value = 0.02
-        bsdf.inputs['Emission Color'].default_value = (0.2, 0.5, 1.0, 1)
-        bsdf.inputs['Emission Strength'].default_value = 0.25
-        disc = C.uv_sphere('GateMirror', 1.0, seg=(48, 6), mat=mm, scale=(GATE_R - 3, GATE_R - 3, 0.05))
-        disc.parent = root
-        disc.location = (0, 0, 0)
-        SP.key_scale(disc, [(1, (0.01, 0.01, 0.05)), (T_GATE + 4, (0.01, 0.01, 0.05)),
-                            (T_GATE + 10, (GATE_R - 3, GATE_R - 3, 0.05))], 'BEZIER')
-        disc.visible_shadow = False
-        L = bpy.data.objects.new('GateLight', bpy.data.lights.new('GateLight', 'POINT'))
-        SP.link(L)
-        L.location = GATE_AT + GATE_N * 30
-        L.data.color = BLUE
-        L.data.shadow_soft_size = 30
-        for f, e in [(1, 0), (T_GATE, 0), (T_GATE + 2, 3e6), (T_GATE_FOLD, 2e6), (T_GATE_FOLD + 8, 0)]:
-            L.data.energy = e
-            L.data.keyframe_insert('energy', frame=f)
-        SP.lin(L.data)
-        # folds flat to a line, then gone
-        root.scale = (1, 1, 1)
-        SP.key_scale(root, [(1, 1.0), (T_GATE_FOLD, 1.0), (T_GATE_FOLD + 5, (1.0, 0.02, 1.0)),
-                            (T_GATE_FOLD + 8, (0.01, 0.02, 1.0))], 'BEZIER')
-        SP.show(root, T_GATE, T_GATE_FOLD + 8)
-        SP.boom(GATE_AT, T_GATE_FOLD + 8, 6.0, hot=(0.7, 0.9, 1.0), cool=(0.1, 0.3, 0.9), life=0.4)
+        """The Terran way out: space torn open by brute force (shared with every Terran exit, portals.py)."""
+        import portals
+        root = portals.terran_tear('Gate', GATE_AT, GATE_N, GATE_R * 1.3, T_GATE, T_GATE_FOLD, seed=21)
+        SP.boom(GATE_AT, T_GATE_FOLD + 5, 6.0, hot=(0.7, 0.9, 1.0), cool=(0.1, 0.3, 0.9), life=0.4)
         self.gate_root = root
 
     # ------------------------------------------------------------ the survivors run

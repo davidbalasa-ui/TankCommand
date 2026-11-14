@@ -629,10 +629,11 @@ def torn_hole(parent, loc_l, nrm_l, name, f0, f_grow, r0=1.5, r1=3.4, lift=1.2, 
     return root
 
 # ================================================================== Terran triangle shield (keyable)
-def tshield(name, size, hit=None, hole=None):
+def tshield(name, size, hit=None, hole=None, hit2=None):
     """Triangle shield (see barrage_pieces.tri_shield) with keyable Value nodes:
     'vis' (0..1 shown), 'hitk' (0..1 hit darkening), 'ring' (ripple radius, unit-sphere units),
-    'hole' (hole radius, 0 = none)."""
+    'hole' (hole radius, 0 = none). hit2 adds a second impact point with its own 'hitk2', 'ring2'
+    and 'hole2' (the beam coming out through the far side)."""
     o = BP.tri_shield(size, hits=(), hole=None, name=name)
     m = o.data.materials[0]
     nt = m.node_tree
@@ -649,14 +650,17 @@ def tshield(name, size, hit=None, hole=None):
         if nd.type == 'ATTRIBUTE':
             edge = n.math('SUBTRACT', 1.0, nd.outputs['Fac'])
     vis = value_node(m, 'vis', 1.0).outputs[0]
-    hitk = value_node(m, 'hitk', 0.0).outputs[0]
-    ring = value_node(m, 'ring', 0.0).outputs[0]
-    hole_r = value_node(m, 'hole', 0.0).outputs[0]
     opa, strength, col = opa_sock, str_sock, col_sock
-    if hit is not None:
+    keep = 1.0
+    for hp, sfx in ((hit, ''), (hit2, '2')):
+        if hp is None:
+            continue
+        hitk = value_node(m, 'hitk' + sfx, 0.0).outputs[0]
+        ring = value_node(m, 'ring' + sfx, 0.0).outputs[0]
+        hole_r = value_node(m, 'hole' + sfx, 0.0).outputs[0]
         d = n.node('ShaderNodeVectorMath', operation='DISTANCE')
         n.set(d.inputs[0], tc.outputs['Object'])
-        d.inputs[1].default_value = tuple(Vector(hit).normalized())
+        d.inputs[1].default_value = tuple(Vector(hp).normalized())
         dist = d.outputs['Value']
         zone = n.math('MULTIPLY', n.maprange(dist, 0.05, 0.45, 1.0, 0.0), hitk)
         col = n.mix(n.math('MULTIPLY', zone, 0.9), col, (0.0, 0.02, 0.45))
@@ -675,7 +679,12 @@ def tshield(name, size, hit=None, hole=None):
         strength = n.math('MULTIPLY_ADD', rim, 25.0, strength)
         opa = n.math('ADD', opa, rim)
         inside = n.math('LESS_THAN', dist, n.math('SUBTRACT', hole_r, 0.01))
-        opa = n.math('MULTIPLY', opa, n.math('SUBTRACT', 1.0, inside))
+        keep = n.math('MULTIPLY', keep, n.math('SUBTRACT', 1.0, inside))
+    if hit is None:                     # keep the 'hitk' / 'ring' / 'hole' nodes for callers that key them
+        for nm in ('hitk', 'ring', 'hole'):
+            value_node(m, nm, 0.0)
+    if keep != 1.0:
+        opa = n.math('MULTIPLY', opa, keep)
     opa = n.math('MULTIPLY', n.math('MINIMUM', opa, 1.0), vis)
     n.set(mix.inputs[0], opa)
     n.set(em.inputs['Strength'], strength)
@@ -746,43 +755,35 @@ class Space:
             disc.keyframe_insert('location', frame=f)
         lin(disc)
         show(disc, 1, fr(3.0))
-        rf = OS.rift()
+        import portals
+        rf = portals.arcadian_portal()                 # David 2026-11-14: black, crisp, precise, electric
         rf.location = RIFT_AT
         rf.rotation_mode = 'QUATERNION'
         rf.rotation_quaternion = Vector((-1, 0, 0.05)).to_track_quat('Z', 'Y')
         S = 260.0
-        # 0:03 hairline crack -> 0:04 rips open -> stays (a slight breathing)
-        key_scale(rf, [(1, (0.01, 0.01, 1)), (fr(3.0) - 1, (0.01, 0.01, 1)), (fr(3.0), (S * 0.6, 0.6, 1)),
-                       (fr(3.7), (S * 0.9, 3.0, 1)), (fr(4.4), (S, S, 1)), (fr(5.5), (S * 1.02, S * 1.02, 1)),
-                       (NF, (S * 1.05, S * 1.05, 1))])
+        # 0:03 a point of white light -> 0:03-0:04.4 a perfect circle opens, exactly, and holds
+        key_scale(rf, [(1, (0.01, 0.01, 1)), (fr(3.0) - 1, (0.01, 0.01, 1)), (fr(3.0), (S * 0.02, S * 0.02, 1)),
+                       (fr(3.25), (S * 0.3, S * 0.3, 1)), (fr(4.4), (S, S, 1)), (NF, (S, S, 1))])
         show(rf, fr(3.0), NF)
         self.rift = rf
-        # black eye just behind the swirl, so ships still inside the rift stay hidden
-        eye = C.uv_sphere('RiftEye', 1.0, seg=(48, 8), mat=emit('RiftEyeM', (0, 0, 0), 0.0), scale=(0.47, 0.47, 0.001))
-        eye.parent = rf
-        eye.location = (0, 0, -3.0)
-        eye.visible_shadow = False
-        show(eye, fr(3.0), NF)
-        # rift light on the scene
+        # the opening: a hard point of white light, then the circle draws itself open
+        pt = C.uv_sphere('RiftSpark', 1.0, seg=(24, 12), mat=BP._halo_mat('RiftSparkM', (0.85, 0.92, 1.0), 14.0))
+        pt.location = RIFT_AT + Vector((-6, 0, 0))
+        pt.visible_shadow = False
+        key_scale(pt, [(fr(3.0) - 2, 0.5), (fr(3.0), 14.0), (fr(3.0) + 3, 6.0), (fr(3.4), 0.5)])
+        show(pt, fr(3.0) - 2, fr(3.4))
+        # its light on the scene: cold and dim, it is a hole, not a lamp
         L = bpy.data.objects.new('RiftLight', bpy.data.lights.new('RiftLight', 'POINT'))
         link(L)
         L.location = RIFT_AT + Vector((-120, 0, 0))
-        L.data.color = (0.8, 0.45, 1.0)
+        L.data.color = (0.75, 0.85, 1.0)
         L.data.shadow_soft_size = 60
-        for f, e in [(1, 0), (fr(3.0), 0), (fr(4.4), 4e7), (NF, 3e7)]:
+        for f, e in [(1, 0), (fr(3.0) - 1, 0), (fr(3.0), 3e7), (fr(3.5), 6e6), (fr(4.4), 1.2e7), (NF, 1.0e7)]:
             L.data.energy = e
             L.data.keyframe_insert('energy', frame=f)
         lin(L.data)
-        # gold lightning round the rift rim while it opens (fixed seeds)
-        rnd = random.Random(7)
-        pairs = []
-        for i in range(7):
-            a0 = rnd.uniform(0, 2 * math.pi)
-            p0 = RIFT_AT + Vector((-5, math.cos(a0) * S * 0.75, math.sin(a0) * S * 0.75))
-            a1 = a0 + rnd.uniform(0.3, 0.8)
-            p1 = RIFT_AT + Vector((-25, math.cos(a1) * S * 1.15, math.sin(a1) * S * 1.15))
-            pairs.append((p0, p1))
-        flicker_lightning(pairs, 3, fr(3.8), fr(6.2), every=2, width=2.6, name='RiftBolt', zone_col=(1.0, 0.7, 0.25))
+        # crisp electric arcs between its rings, the whole minute
+        portals.arcadian_arcs(RIFT_AT, Vector((-1, 0, 0.05)), S * 0.5, fr(3.6), NF, seed=11, every=12)
 
     # -------------------------------------------------------------- fleets
     def terran_fleet(self):
@@ -848,7 +849,7 @@ class Space:
             size = (dims.x * 0.62, dims.y * 0.75 + 2.5, dims.z * 1.0 + 2.5)
             cen = sum((Vector(b) for b in ob.bound_box), Vector()) / 8
             hit = self.dread_hit_u if k == 'dread' else ((1.0, 0.0, 0.0) if k == 'bship' else None)
-            sh = tshield(f'TShield_{k}', size, hit=hit)
+            sh = tshield(f'TShield_{k}', size, hit=hit, hit2=getattr(self, 'dread_hit2_u', None) if k == 'dread' else None)
             sh.parent = ob
             sh.scale = size
             sh.location = cen
@@ -999,6 +1000,15 @@ class Space:
                          exit_w=W @ exit_ if ok2 else tgt, entry_l=entry if ok else inv @ tgt,
                          exit_l=exit_ if ok2 else inv @ tgt, nrm_l=nrm, d_l=d_l)
         self.dread_hit_u = tuple(u)
+        # where the beam, out of the hull, meets the shield again on the far side
+        xl = exit_ if ok2 else inv @ tgt
+        q = Vector(((xl.x - cen_l.x) / size_l.x, (xl.y - cen_l.y) / size_l.y, (xl.z - cen_l.z) / size_l.z))
+        dd = Vector((d_l.x / size_l.x, d_l.y / size_l.y, d_l.z / size_l.z))
+        a_, b_, c_ = dd.dot(dd), 2 * q.dot(dd), q.dot(q) - 1
+        t_ = (-b_ + math.sqrt(max(b_ * b_ - 4 * a_ * c_, 0))) / (2 * a_)
+        u2 = q + dd * t_
+        self.dread_hit2_u = tuple(u2)
+        self.beam['shield2_w'] = W @ Vector((cen_l.x + u2.x * size_l.x, cen_l.y + u2.y * size_l.y, cen_l.z + u2.z * size_l.z))
         sc.frame_set(1)
 
     def world_at(self, obj, local, f):
@@ -1085,24 +1095,42 @@ class Space:
         key_node(sm, 'ring', rk)
         key_node(sm, 'hole', [(1, 0.0), (self.F_BREAK - 1, 0.0), (self.F_BREAK + 1, 0.16), (self.F_BREAK + 4, 0.24),
                               (self.F_OFF, 0.34), (self.F_OFF + 4, 0.8), (self.F_OFF + 9, 2.2)])
+        # (David 01:34) the beam comes out of the hull and hits the far side of the shield: the same
+        # warble starts there, it punches through, and at the end that side collapses too, a beat later
+        f2 = self.F_EXIT + 1
+        key_node(sm, 'hitk2', [(1, 0.0), (f2, 0.0), (f2 + 2, 1.0), (self.F_OFF + 4, 0.6)])
+        rk2, f, n2 = [(1, 0.0)], float(f2 + 1), 0
+        while f < self.F_OFF - 1:
+            u = (f - f2) / float(self.F_OFF - f2)
+            per = max(2.0, 6.0 - 4.5 * u)
+            rk2 += [(int(round(f)), 0.03), (int(round(f + per)) - 1, 0.4 + 0.2 * u)]
+            f += per
+        rk2 += [(self.F_OFF, 0.0)]
+        key_node(sm, 'ring2', rk2)
+        key_node(sm, 'hole2', [(1, 0.0), (f2 + 5, 0.0), (f2 + 7, 0.16), (f2 + 10, 0.22), (self.F_OFF + 3, 0.3),
+                               (self.F_OFF + 7, 0.8), (self.F_OFF + 12, 2.2)])
+        impact_flare(b['shield2_w'] - d * 0.5, d, f2, f2 + 7, (1.0, 0.6, 0.2), 4.0, 'ShieldSplash2')
+        spark_stream(b['shield2_w'] - d * 1.0, f2, f2 + 7, (1.0, 0.75, 0.3), -d * 0.9, 83, size=0.3, speed=55)
+        shards(b['shield2_w'], f2 + 7, 24, (0.35, 0.7, 1.0), 1.6, 70, seed=64, life=1.4, drift=d * 0.6)
+        blue_boom(b['shield2_w'], f2 + 7, 4.0, life=0.5, light=1.5e5)
         # brightens as it strains, then fades as it peels away (vis keys are stepped, so key each frame)
         key_node(sm, 'vis', [(self.F_BEAM + 6 + 3 * k, min(1.0, 0.7 + 0.06 * k)) for k in range(6)]
-                 + [(self.F_OFF + 2 + k, 1.0 * (1 - k / 7.0)) for k in range(8)], 'CONSTANT')
+                 + [(self.F_OFF + 2 + k, 1.0 * (1 - k / 10.0)) for k in range(11)], 'CONSTANT')
         # warble: the field wobbles under the beam, faster and harder until it gives
         s0 = Vector(sh.scale)
         ph = 0.0
-        for f in range(self.F_BEAM, self.F_OFF + 10):
+        for f in range(self.F_BEAM, self.F_OFF + 13):
             if f <= self.F_BREAK:
                 u = (f - self.F_BEAM) / float(self.F_BREAK - self.F_BEAM)
                 amp, w = 0.01 + 0.05 * u * u, 0.35 + 2.2 * u
             else:
                 amp, w = 0.02, 1.5
             ph += w
-            pull = 0.0 if f <= self.F_OFF else 0.22 * ((f - self.F_OFF) / 9.0) ** 1.5   # pulls away, gone
+            pull = 0.0 if f <= self.F_OFF else 0.22 * ((f - self.F_OFF) / 12.0) ** 1.5  # pulls away, gone
             sh.scale = (s0.x * (1 + amp * math.sin(ph) + pull), s0.y * (1 - amp * math.sin(ph + 1.7) + pull),
                         s0.z * (1 + amp * math.sin(ph + 3.1) + pull))
             sh.keyframe_insert('scale', frame=f)
-        show(sh, 1, self.F_OFF + 9, tree=False)
+        show(sh, 1, self.F_OFF + 12, tree=False)
         shards(b['shield_w'], self.F_BREAK, 30, (0.35, 0.7, 1.0), 1.6, 70, seed=60, life=1.4, drift=-d * 0.6)
         blue_boom(b['shield_w'], self.F_BREAK, 4.0, life=0.5, light=2e5)
         # hull: white-hot spot (0:15-0:15.5), molten hole, spray out of the far side (0:15.5)
@@ -1120,7 +1148,12 @@ class Space:
             em.inputs[0].keyframe_insert('default_value', frame=f)
             em.inputs[1].keyframe_insert('default_value', frame=f)
         hot.visible_shadow = False
-        boom(b['exit_w'] + d * 3, self.F_EXIT, 6.0, life=0.9, light=3e5, follow=d * 10)
+        boom(b['exit_w'] + d * 3, self.F_EXIT, 15.0, life=1.3, light=8e5, follow=d * 14)
+        # (David 01:34) the hull hit itself goes up in a much bigger blast
+        boom(b['entry_w'] - d * 2, self.F_BREAK + 1, 13.0, life=1.4, light=8e5, follow=-d * 6)
+        boom(b['entry_w'] + nrm_w * 3, self.F_BREAK + 4, 9.0, life=1.2, follow=nrm_w * 8, seed=3)
+        spark_stream(b['entry_w'] - d * 1.0, self.F_BREAK + 1, self.F_BREAK + 3, (1.0, 0.6, 0.2), nrm_w * 1.4 - d * 0.6,
+                     84, n=60, size=0.45, speed=85, life=1.1, strength=14.0)
         spark_stream(b['exit_w'] + d * 2, self.F_EXIT, self.F_EXIT + 1, (1.0, 0.55, 0.15), d * 1.4, 61,
                      n=50, size=0.5, speed=90, life=1.2, strength=14.0)
         # lights go out section by section (each neon material), then it rolls over, burning

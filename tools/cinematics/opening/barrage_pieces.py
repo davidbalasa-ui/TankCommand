@@ -36,7 +36,7 @@ class _NT:
     def node(self, kind, **inputs):
         n = self.nt.nodes.new(kind)
         for k, v in inputs.items():
-            if k in ('operation', 'feature', 'data_type'):
+            if k in ('operation', 'feature', 'data_type') or (k not in n.inputs and hasattr(n, k)):
                 setattr(n, k, v)
             else:
                 self.set(n.inputs[k], v)
