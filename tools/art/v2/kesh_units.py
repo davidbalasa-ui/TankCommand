@@ -387,6 +387,31 @@ def dragonfly():
         tube((x + 0.05, 0, zc), (x - 1.1, 0, zc + 0.12), [(0, r * 0.7), (0.3, r * 0.45), (1, 0.02)], 8, 'barrel')
         orb((x - 0.22, 0, zc + 0.03), r * 0.62, 'core', seg=(10, 8))
 
+    # Electricity: thin white-hot cores with a soft gold halo, jagged by midpoint displacement, with tapering forks.
+    from mathutils import Vector
+
+    def arc(p0, p1, rnd, r=0.042, rough=0.2, depth=4, forks=2, zj=1.0, tip=False):
+        pts = [Vector(p0), Vector(p1)]
+        for _ in range(depth):
+            out = [pts[0]]
+            for u, v in zip(pts[:-1], pts[1:]):
+                j = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1) * zj)) * (v - u).length * rough
+                out += [(u + v) / 2 + j, v]
+            pts = out
+        n = len(pts)
+        w = [(1.0 - 0.9 * i / (n - 1)) if tip else (0.3 + 0.7 * math.sin(math.pi * i / (n - 1)) ** 0.5) for i in range(n)]
+        path = [tuple(q) for q in pts]
+        sweep(path, [(r * k, r * k) for k in w], 'bolt', sides=3, caps=False)
+        sweep(path, [(r * 3.6 * k, r * 3.6 * k) for k in w], 'halo', sides=4, caps=False)
+        span = (pts[-1] - pts[0]).length
+        for _ in range(forks):
+            i = rnd.randint(max(1, n // 5), n - 3)
+            d = (pts[i + 1] - pts[i - 1]).normalized()
+            side = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.2, 1) * zj)).normalized()
+            end = pts[i] + (d * 0.7 + side * 0.75).normalized() * span * rnd.uniform(0.22, 0.42)
+            arc(pts[i], end, rnd, r * 0.62, rough, max(2, depth - 1), forks - 1, zj, tip=True)
+        return pts
+
     # Four very long scythe wings: swept, hooked tip, barbed trailing edge, gold spar and fine gold line work.
     # Each is its own part so the pairs can beat out of step.
     def wing(group, root, L, c, dihedral, back, s):
@@ -429,39 +454,59 @@ def dragonfly():
                 sweep([P(la, b), P(back_a, b + 0.015)], [(0.0075, 0.006), (0.005, 0.004)], 'glow', sides=4)
             # Bright root orb.
             orb((0, s * 0.05, 0.03), 0.14, 'glow', seg=(8, 6))
+            for v in (1, 2):   # two different crawls of electricity along the spar, shown at different moments
+                rnd = random.Random(sum(map(ord, group)) * 7 + v)
+                with F.group(f'Arc{group[4:]}{v}'):
+                    far = rnd.uniform(0.3, 0.42) if v == 1 else rnd.uniform(0.5, 0.68)
+                    pts = arc(P(0.0, 0.004, 0.1), P(0.12, far, 0.1), rnd, r=0.046, rough=0.11, depth=4, forks=0, zj=0.5)
+                    for k in sorted(rnd.sample(range(3, len(pts) - 1), 3)):
+                        q = pts[k]
+                        arc(q, (q[0] - rnd.uniform(0.5, 0.95) * c, q[1] + s * rnd.uniform(0.2, 1.1), 0.06), rnd, r=0.03, rough=0.2, depth=3, forks=1, zj=0.3, tip=True)
             F.rot_all(m, 'X', s * dihedral)
             F.rot_all(m, 'Z', s * back)
             F.move_all(m, root)
-    pivots = []
+    pivots, wing_arcs = [], []
     for s, side in ((1, 'L'), (-1, 'R')):
         for name, rx, rz, L, c, dih, back in (('F', 0.78, 0.52, 13.0, 1.5, 8, 6), ('H', -0.22, 0.47, 11.0, 1.7, 4, 24)):
             root = (rx, s * 0.36, Z + rz)
             wing(f'Wing{name}{side}', root, L, c, dih, back, s)
             pivots.append((f'Wing{name}{side}', root, f'Wing{name}{side}Pivot'))
+            wing_arcs += [(f'Arc{name}{side}{v}', root, f'Arc{name}{side}{v}Pivot', f'Wing{name}{side}') for v in (1, 2)]
     pivots += [('Tail1', joints[0], 'Tail1Pivot'), ('Tail2', joints[1], 'Tail2Pivot', 'Tail1'), ('Tail3', joints[2], 'Tail3Pivot', 'Tail2')]
 
-    # Electricity: three different sets of bolts. The game shows one at a time, changing fast.
-    def bolt(p0, p1, rnd, kinks=6, jit=0.24, r=0.075):
-        pts = []
-        for i in range(kinks + 1):
-            t = i / kinks
-            j = (jit * math.sin(math.pi * t) + 0.03) * (0 < i < kinks)
-            pts.append(tuple(p0[a] + (p1[a] - p0[a]) * t + rnd.uniform(-j, j) for a in range(3)))
-        for a, b in zip(pts[:-1], pts[1:]):
-            sweep([a, b], [(r, r), (r * 0.8, r * 0.8)], 'bolt', sides=4)
-        return pts
-    heart = (0.55, 0, Z + 0.95)
-    for gi, gname in enumerate(('ArcA', 'ArcB', 'ArcC')):
-        rnd = random.Random(70 + gi)
+    pivots += wing_arcs
+    # Body electricity: four different sets. The game shows one at a time, changing fast.
+    heart = (0.55, 0, Z + 0.98)
+    roots = {(n, sd): (rx, sd * 0.36, Z + rz + 0.12) for n, rx, rz in (('F', 0.78, 0.52), ('H', -0.22, 0.47)) for sd in (1, -1)}
+    for gi, gname in enumerate(('ArcA', 'ArcB', 'ArcC', 'ArcD')):
+        rnd = random.Random(170 + gi)
+        sd = 1 if gi % 2 == 0 else -1
         with F.group(gname):
-            for s in (1, -1):
-                reach = rnd.uniform(3.2, 6.0)
-                pts = bolt(heart, (0.75 + rnd.uniform(-0.3, 0.3), s * reach, Z + 0.95 + rnd.uniform(0.0, 0.35)), rnd)
-                k = rnd.randint(2, 4)
-                bolt(pts[k], (pts[k][0] + rnd.uniform(-0.7, 0.7), pts[k][1] + s * 0.5, pts[k][2] + rnd.uniform(0.2, 0.6)), rnd, kinks=3, jit=0.14, r=0.05)
-            bolt((-0.7, 0, Z + 0.72), (-2.4 - 0.5 * gi, rnd.uniform(-0.25, 0.25), Z + 0.72), rnd, kinks=5, jit=0.2, r=0.06)
-            bolt((3.3, 0.26, Z - 0.3), (3.3, -0.26, Z - 0.3), rnd, kinks=4, jit=0.1, r=0.04)
-            if gi != 1:
-                bolt((1.72, 0.44, Z + 0.62), (1.72, -0.44, Z + 0.62), rnd, kinks=4, jit=0.12, r=0.04)
+            arc(heart, (-1.4 - rnd.uniform(0.0, 1.6), rnd.uniform(-0.2, 0.2), Z + 0.68), rnd, rough=0.13, forks=2, zj=0.7)
+            arc(heart, (1.72, sd * 0.44, Z + 0.64), rnd, r=0.034, rough=0.16, depth=3, forks=1, zj=0.6)
+            arc((3.3, 0.26, Z - 0.3), (3.3, -0.26, Z - 0.3), rnd, r=0.02, rough=0.24, depth=3, forks=0)
+            arc(roots[('F', sd)], roots[('H', sd)], rnd, r=0.034, rough=0.22, depth=3, forks=1)
+            arc(roots[('F', -sd)], roots[('H', sd)] if gi > 1 else roots[('F', sd)], rnd, r=0.034, rough=0.2, depth=3, forks=0)
+            for _ in range(3):   # short corona spikes off the dorsal core
+                arc(heart, (heart[0] + rnd.uniform(-0.9, 0.9), rnd.uniform(-0.9, 0.9), heart[2] + rnd.uniform(0.25, 0.8)), rnd, r=0.024, rough=0.22, depth=3, forks=1, tip=True)
+    # Lightning thruster (Arcadians fly on lightning): a forked jet of arcs streaming back off the tail sting.
+    # Three variants ride on the last tail section; the game shows one at a time while it flies.
+    for gi, gname in enumerate(('ThrustA', 'ThrustB', 'ThrustC')):
+        rnd = random.Random(310 + gi)
+        with F.group(gname):
+            src = [(x - 1.05, 0, zc + 0.12), (x - 0.75, 0.62, zc), (x - 0.75, -0.62, zc)]
+            for k in range(5):
+                p0 = src[0] if k < 3 else src[k - 2]
+                ln = rnd.uniform(2.6, 4.4) if k < 3 else rnd.uniform(1.4, 2.4)
+                arc(p0, (p0[0] - ln, p0[1] * 0.4 + rnd.uniform(-0.7, 0.7), p0[2] + rnd.uniform(-0.6, 0.6)), rnd,
+                    r=0.06 if k < 3 else 0.04, rough=0.15, depth=4 if k < 3 else 3, forks=2 if k < 3 else 1, tip=True)
+            arc(src[1], src[2], rnd, r=0.03, rough=0.2, depth=3, forks=0)
+        pivots.append((gname, joints[2], gname + 'Pivot', 'Tail3'))
+    for gi, gname in enumerate(('LiftA', 'LiftB')):   # lift arcs striking down from the belly pad
+        rnd = random.Random(350 + gi)
+        with F.group(gname):
+            for _ in range(3):
+                arc((0.6 + rnd.uniform(-0.2, 0.2), rnd.uniform(-0.15, 0.15), Z - 0.55), (0.6 + rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), Z - 1.1 - rnd.uniform(0, 0.25)), rnd,
+                    r=0.03, rough=0.2, depth=3, forks=1, tip=True)
     K.lifters([(0.6, 0, Z - 0.5)], 0.3)
-    return dict(name='KeshDragonfly', clear='wing', clear_alpha=0.3, pivot=pivots)
+    return dict(name='KeshDragonfly', clear=('wing', 'halo'), clear_alpha=0.3, pivot=pivots)

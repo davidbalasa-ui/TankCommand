@@ -640,7 +640,8 @@ ZONES = {
         'copper': dict(kind='etched', base=(0.3, 0.13, 0.06), base2=(0.16, 0.07, 0.035), rough=0.36, veins=0.25),
         'wing': dict(kind='membrane', base=(0.86, 0.74, 0.46), emit=GOLD, strength=0.12),
         'gold': dict(kind='etched', base=(0.95, 0.68, 0.22), base2=(0.7, 0.42, 0.1), rough=0.2, veins=0.0, fine=True),
-        'bolt': dict(kind='glow', emit=(1.0, 0.8, 0.36), strength=1.35),
+        'bolt': dict(kind='glow', emit=(1.0, 0.95, 0.8), strength=2.6),
+        'halo': dict(kind='glow', emit=(1.0, 0.5, 0.06), strength=1.15),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
@@ -1015,7 +1016,7 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         me.materials.clear()
         me.materials.append(zone_mat(o['zone']))
         att = me.attributes.new('grp', 'INT', 'FACE')
-        gi = groups.index(o['group']) + (100 if (gem and o['zone'] == gem) or (clear and o['zone'] == clear) else 0)
+        gi = groups.index(o['group']) + (100 if (gem and o['zone'] == gem) or (clear and o['zone'] in ((clear,) if isinstance(clear, str) else clear)) else 0)
         att.data.foreach_set('value', [gi] * len(me.polygons))
         uk = me.attributes.new('uvk', 'FLOAT', 'FACE')
         uk.data.foreach_set('value', [float(o.get('uv', UV_PRIORITY.get(o['zone'], 1.0)))] * len(me.polygons))
