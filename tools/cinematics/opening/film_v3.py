@@ -20,8 +20,10 @@ sys.path.insert(0, HERE)
 FPS = 24
 # scene id: seconds (order = film order)
 SCENES = [('s01', 8.0), ('s02', 8.0), ('s03', 3.0), ('s04', 9.0), ('s05', 9.0), ('s06', 5.0), ('s07', 6.0),
-          ('s08', 19.0), ('s10', 5.0), ('s11', 8.0), ('s12', 12.0), ('s13', 10.0), ('s14', 6.0),
-          ('s15', 8.0), ('s16', 8.0)]
+          ('s08', 19.0), ('s10', 5.0), ('s11', 5.0), ('s12', 12.0), ('s13', 10.0), ('s14', 6.0),
+          ('s15', 5.0), ('s16', 5.0)]
+# fades baked into frames at stitch time: scene -> [(kind, seconds)]
+FADES = {'s11': [('out_white', 0.5)], 's12': [('in_white', 0.4)]}
 QUALITY = {
     'draft': dict(res=(640, 288), samples=8, blur=False, threshold=0.1),
     'final': dict(res=(1280, 576), samples=24, blur=True, threshold=0.05),
@@ -69,6 +71,7 @@ def render_scene(scene, out, quality='draft', step=1, frames=None, only=None, pi
         for o in [o for o in bpy.data.objects if o.type == 'CAMERA']:
             bpy.data.objects.remove(o)
         v3base.build_camera(keys, shake)
+        tmap = getattr(S, 'tmap', None)
         a, b = (max(f0, frames[0]), min(f1, frames[1])) if frames else (f0, f1)
         d = os.path.join(out, quality, 'v3', f'{scene}_{sid}')
         os.makedirs(d, exist_ok=True)
@@ -79,7 +82,11 @@ def render_scene(scene, out, quality='draft', step=1, frames=None, only=None, pi
             final = os.path.join(d, f'f_{f:04d}.png')
             if os.path.exists(final) and os.path.getsize(final) > 0:
                 continue
-            sc.frame_set(f)
+            if tmap:                      # v2 global-clock scene played back on this scene's clock
+                g = tmap(f)
+                sc.frame_set(int(g), subframe=g - int(g))
+            else:
+                sc.frame_set(f)
             tmp = os.path.join(d, f'_part_{f:04d}.png')
             sc.render.filepath = tmp
             bpy.ops.render.render(write_still=True)
@@ -101,12 +108,27 @@ def stitch(out, quality='draft', crf=24):
         for d in sorted(glob.glob(os.path.join(out, quality, 'v3', f'{scene}_*'))):
             for p in glob.glob(os.path.join(d, 'f_*.png')):
                 have[int(os.path.basename(p)[2:6])] = p
+        fades = FADES.get(scene, [])
         for f in range(1, nf + 1):
             p = have.get(f, last)
             last = p
             n += 1
-            if p is not None:
-                os.symlink(p, os.path.join(all_dir, f'f_{n:05d}.png'))
+            if p is None:
+                continue
+            dst = os.path.join(all_dir, f'f_{n:05d}.png')
+            k = 0.0
+            for kind, sec in fades:
+                m = int(round(sec * FPS))
+                if kind == 'out_white' and f > nf - m:
+                    k = max(k, (f - (nf - m)) / m)
+                if kind == 'in_white' and f <= m:
+                    k = max(k, 1.0 - (f - 1) / m)
+            if k > 0:
+                from PIL import Image
+                im = Image.open(p).convert('RGB')
+                Image.blend(im, Image.new('RGB', im.size, (255, 255, 255)), min(1.0, k)).save(dst)
+            else:
+                os.symlink(p, dst)
     mp4 = os.path.join(out, f'opening-v3-{quality}.mp4')
     total = n / FPS
     cmd = ['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(FPS), '-start_number', '1',

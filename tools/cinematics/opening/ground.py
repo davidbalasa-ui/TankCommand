@@ -613,15 +613,28 @@ class Ground:
         sti = load_unit('alien/stinger_lod', mat_from='alien/stinger')
         self.lancer_mats = unit_material(lan) + unit_material(load_unit('human/lancer'))
         self.stinger_mats = unit_material(sti) + unit_material(load_unit('alien/stinger'))
+        # v3 (David 2026-11-14): the full unit mix on both sides, not just Lancers and Stingers
+        mix = {-1: [lan], 1: [sti]}
+        for side, fac, names in ((-1, 'human', ('bulwark', 'javelin', 'longbow', 'outrider')),
+                                 (1, 'alien', ('carapace', 'gorger', 'spitter', 'mortar_beast', 'weaver'))):
+            for nm in names:
+                if not os.path.exists(os.path.join(MODELS, f'{fac}/{nm}_lod.glb')):
+                    continue
+                t = load_unit(f'{fac}/{nm}_lod', mat_from=f'{fac}/{nm}')
+                mix[side].append(t)
+                ms = unit_material(t) + unit_material(load_unit(f'{fac}/{nm}'))
+                (self.lancer_mats if side < 0 else self.stinger_mats).extend(ms)
         self.units = {-1: [], 1: []}
         frames = list(range(T_PODS - 30, G_END + 1, 2))
         if frames[-1] != G_END:
             frames.append(G_END)
         bm = {-1: SP.emit('BeaconT', CYAN, 12.0), 1: SP.emit('BeaconA', GOLD, 12.0)}
         self.beacon_mats = bm
-        for side, tm in ((-1, lan), (1, sti)):
+        for side in (-1, 1):
             for row in range(4):
                 for j in range(52):
+                    tm = mix[side][0] if (row == 0 and j % 4) or rnd.random() < 0.35 else \
+                        mix[side][rnd.randrange(len(mix[side]))]
                     y = -365 + j * 14.3 + rnd.uniform(-3, 3) + (7 if row % 2 else 0)
                     if side == -1 and abs(y - HERO_Y) < 9 and row == 0:
                         continue                     # the hero's own slot
@@ -791,20 +804,27 @@ class Ground:
 
     # ------------------------------------------------------------ aircraft overhead (0:43)
     def aircraft(self):
+        """v3: many more and of every kind: Condors, Falcons and Skimmers over the Terran line; Dragonflies,
+        saucers (Discs), Darters and Gliders over the Arcadians. Several height bands, some low and close."""
         rnd = random.Random(3806)
-        cd = load_unit('human/condor')
-        df = load_unit('alien/dragonfly')
-        for side, t, n in ((-1, cd, 7), (1, df, 7)):
-            for i in range(n):
-                f0 = T_FIRE - 6 + i * 4 + rnd.randint(0, 3)
-                y = rnd.uniform(-200, 200)
-                z = rnd.uniform(55, 90)
-                p0 = Vector((-side * 650, y, z))
-                p1 = Vector((side * 650, y + rnd.uniform(-60, 60), z + rnd.uniform(-10, 10)))
+        kinds = {-1: [n for n in ('condor', 'falcon', 'skimmer') if os.path.exists(os.path.join(MODELS, f'human/{n}.glb'))],
+                 1: [n for n in ('dragonfly', 'disc', 'darter', 'glider') if os.path.exists(os.path.join(MODELS, f'alien/{n}.glb'))]}
+        for side in (-1, 1):
+            fac = 'human' if side < 0 else 'alien'
+            tm = [load_unit(f'{fac}/{n}') for n in kinds[side]]
+            for i in range(26):
+                t = tm[i % len(tm)]
+                f0 = T_ROLL + rnd.randint(0, T_SPLIT - T_ROLL - 30)
+                y = rnd.uniform(-260, 260)
+                z = rnd.choice((rnd.uniform(18, 35), rnd.uniform(40, 70), rnd.uniform(70, 110)))
+                dur = rnd.randint(50, 80)
+                p0 = Vector((-side * 700, y, z))
+                p1 = Vector((side * 500 * rnd.uniform(0.3, 1.0), y + rnd.uniform(-90, 90), z + rnd.uniform(-12, 12)))
                 o = instance(t, f'Air{side}_{i}')
-                o.rotation_euler = (0, 0, 0 if side < 0 else math.pi)
-                SP.key_loc(o, [(f0, p0), (f0 + 48, p1)], 'LINEAR')
-                SP.show(o, f0, f0 + 48)
+                o.rotation_euler = (rnd.uniform(-0.25, 0.25), 0, 0 if side < 0 else math.pi)
+                SP.key_loc(o, [(f0, p0), (f0 + dur, p1)], 'LINEAR')
+                SP.show(o, f0, f0 + dur)
+                o.scale = (1.4,) * 3
 
     # ------------------------------------------------------------ the crack and the Shard
     def shard(self):
@@ -844,7 +864,8 @@ class Ground:
             lt.data.energy = e
             lt.data.keyframe_insert('energy', frame=f)
         # the Shard itself (cinematic build, without its ruin ring), rising out of the crack
-        crystal = NP.shard('Shard', height=42.0)
+        import shard_hd
+        crystal = shard_hd.shard_hd('Shard', height=42.0)
         for nm in ('Shard_Ruins', 'Shard_Lightning'):
             o = bpy.data.objects.get(nm)
             if o:
@@ -918,6 +939,17 @@ class Ground:
                     pairs.append((src, tgt))
                 SP.flicker_lightning(pairs, 3900 + n_ + (0 if side < 0 else 50), f, f + 1, every=1, width=0.5,
                                      name=SP._uid('ShardBolt'), zone_col=(0.7, 0.45, 1.0), strength=30.0)
+            # v3: the big forked bolts (shard_fx): thick violet channels with branches, impact flash and
+            # scorched glowing ground, three volleys of three
+            import shard_fx
+            for v in range(3):
+                fv = f0 + v * 5
+                for q in range(3):
+                    tgt = pos[rnd.randrange(len(pos))] + Vector((0, 0, 1.5))
+                    src = top + Vector((side * rnd.uniform(14, 26), rnd.uniform(-14, 14), rnd.uniform(-20, 20)))
+                    for o in shard_fx.lightning(src, tgt, seed=5000 + v * 10 + q + (0 if side < 0 else 500), width=0.9,
+                                                name=SP._uid('HeroBolt')):
+                        SP.show(o, fv, fv + 3)
             # crust: violet crystal clusters growing over every tank, nearest the Shard first
             for i, p in enumerate(pos):
                 fc = f0 + 2 + int(abs(p.x) / 25) + rnd.randint(0, 6)
