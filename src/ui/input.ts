@@ -6,6 +6,13 @@ import {
   BOX_DRAG_THRESHOLD,
   DOUBLE_TAP_DISTANCE,
   DOUBLE_TAP_MS,
+  FLING_DECAY_SEC,
+  FLING_HOLD_MS,
+  FLING_MAX_SPEED,
+  FLING_MIN_SPAN_MS,
+  FLING_MIN_SPEED,
+  FLING_STOP_SPEED,
+  FLING_WINDOW_MS,
   KEY_ROTATE_SPEED,
   LONG_PRESS_MS,
   MIN_PINCH_DISTANCE,
@@ -116,6 +123,10 @@ export class InputController {
   private lastIssued: IssuedCommand | null = null;
   private placementPointerId: number | null = null;
   private disposed = false;
+  /** Recent camera moves from dragging, to carry the pan on after the finger lifts. */
+  private panSamples: Array<{ t: number; dx: number; dz: number }> = [];
+  /** World units per second the camera keeps gliding at after a flick; null when still. */
+  private fling: { vx: number; vz: number } | null = null;
 
   constructor(host: InputHost) {
     this.host = host;
@@ -163,6 +174,9 @@ export class InputController {
       return;
     }
     const camera = this.host.renderView.getCamera();
+    if (this.fling) {
+      this.glide(seconds);
+    }
     const forward = { x: Math.sin(camera.yaw), z: Math.cos(camera.yaw) };
     const right = { x: Math.cos(camera.yaw), z: -Math.sin(camera.yaw) };
     let mx = 0;
@@ -273,6 +287,9 @@ export class InputController {
       return;
     }
     event.preventDefault();
+    // Touching the map stops a glide, the way a hand stops a sliding map.
+    this.fling = null;
+    this.panSamples = [];
     const canvas = this.host.canvas;
     try {
       canvas.setPointerCapture(event.pointerId);
@@ -386,6 +403,10 @@ export class InputController {
       (info.button === 1 || info.button === 2) &&
       total > BOX_DRAG_THRESHOLD
     ) {
+      if (!info.dragged) {
+        // The ground under the cursor stays under it, as with a finger.
+        this.panGrab = info.downGround;
+      }
       info.dragged = true;
       this.panBy(event.clientX, event.clientY, dx, dy);
       return;
@@ -453,6 +474,7 @@ export class InputController {
       } else if (this.panPointerId === event.pointerId) {
         this.panPointerId = null;
         this.panGrab = null;
+        this.startFling();
       } else if (!this.longPressReady && total < TAP_MAX_MOVE && duration < TAP_MAX_MS) {
         if (this.host.isSelectMode?.()) {
           this.toggleTapped(info.startX, info.startY);
@@ -471,6 +493,12 @@ export class InputController {
       this.finishBox(event.clientX, event.clientY);
       this.boxSelecting = false;
       this.boxStart = null;
+      return;
+    }
+
+    if ((info.button === 1 || info.button === 2) && info.dragged) {
+      this.panGrab = null;
+      this.startFling();
       return;
     }
 
@@ -609,6 +637,8 @@ export class InputController {
   private panBy(clientX: number, clientY: number, dx: number, dy: number): void {
     const view = this.host.renderView;
     const camera = view.getCamera();
+    const beforeX = camera.targetX;
+    const beforeZ = camera.targetZ;
     const current = view.pickGround(clientX, clientY);
     if (this.panGrab && current) {
       camera.pan(this.panGrab.x - current.x, this.panGrab.z - current.z);
@@ -617,6 +647,74 @@ export class InputController {
     }
     camera.clampTarget();
     view.applyCamera();
+    this.recordPan(camera.targetX - beforeX, camera.targetZ - beforeZ);
+  }
+
+  private recordPan(dx: number, dz: number): void {
+    const now = performance.now();
+    this.panSamples.push({ t: now, dx, dz });
+    while (this.panSamples.length > 0 && now - (this.panSamples[0]?.t ?? now) > FLING_WINDOW_MS) {
+      this.panSamples.shift();
+    }
+  }
+
+  /** On release: keep gliding at the speed of the last moment of the drag, if it was a flick. */
+  private startFling(): void {
+    const now = performance.now();
+    const samples = this.panSamples.filter((sample) => now - sample.t <= FLING_WINDOW_MS);
+    this.panSamples = [];
+    const last = samples[samples.length - 1];
+    const first = samples[0];
+    // A finger that stopped before lifting means "stay here".
+    // A real flick moves over a few frames; a jump in one instant is not a flick.
+    if (!last || !first || now - last.t > FLING_HOLD_MS || samples.length < 3 || last.t - first.t < FLING_MIN_SPAN_MS) {
+      return;
+    }
+    const span = Math.max(FLING_MIN_SPAN_MS, now - first.t) / 1000;
+    let dx = 0;
+    let dz = 0;
+    for (const sample of samples) {
+      dx += sample.dx;
+      dz += sample.dz;
+    }
+    const vx = dx / span;
+    const vz = dz / span;
+    const camera = this.host.renderView.getCamera();
+    // Speeds scale with zoom: what counts as a flick is measured in screen terms.
+    const scale = Math.max(1, camera.distance);
+    const speed = Math.hypot(vx, vz);
+    if (speed / scale < FLING_MIN_SPEED) {
+      return;
+    }
+    const capped = Math.min(1, (FLING_MAX_SPEED * scale) / speed);
+    this.fling = { vx: vx * capped, vz: vz * capped };
+  }
+
+  private glide(seconds: number): void {
+    const fling = this.fling;
+    if (!fling) {
+      return;
+    }
+    const camera = this.host.renderView.getCamera();
+    const beforeX = camera.targetX;
+    const beforeZ = camera.targetZ;
+    // A long hitch between frames must not throw the camera across the map in one jump.
+    const step = Math.min(seconds, 0.1);
+    camera.pan(fling.vx * step, fling.vz * step);
+    camera.clampTarget();
+    // Slows smoothly; stops at the map edge rather than pressing against it.
+    const decay = Math.exp(-step / FLING_DECAY_SEC);
+    fling.vx = camera.targetX === beforeX ? 0 : fling.vx * decay;
+    fling.vz = camera.targetZ === beforeZ ? 0 : fling.vz * decay;
+    if (Math.hypot(fling.vx, fling.vz) < Math.max(1, camera.distance) * FLING_STOP_SPEED) {
+      this.fling = null;
+    }
+    this.host.renderView.applyCamera();
+  }
+
+  /** True while the camera is still gliding after a flick. */
+  isGliding(): boolean {
+    return this.fling !== null;
   }
 
   private screenPan(dx: number, dy: number): void {
@@ -676,6 +774,12 @@ export class InputController {
       const camera = this.host.renderView.getCamera();
       this.zoomAt(midX, midY, this.pinch.distance / distance);
       camera.rotate(angleDiff(angle, this.pinch.angle));
+      // Two fingers moving together drag the map too, as in any map app.
+      const mdx = midX - this.pinch.midX;
+      const mdy = midY - this.pinch.midY;
+      if (Math.abs(mdx) + Math.abs(mdy) > 0.5) {
+        this.screenPan(mdx, mdy);
+      }
       camera.clampTarget();
       this.host.renderView.applyCamera();
     }
