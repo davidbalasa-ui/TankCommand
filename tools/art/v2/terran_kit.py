@@ -309,7 +309,7 @@ def missile_box(c, s, nx=2, nz=2, tip='red', zone='armor', group=None):
             pz = z - sz + sz * 2 * (j + 0.5) / nz
             tube((x + sx - 0.02, py, pz), (x + sx + 0.05, py, pz), [(0, r * 1.14), (1, r * 1.14), (1, r * 0.92), (0.2, r * 0.9)], 6, 'plate')
             mm = F.mark()
-            x0m = x + sx - (sx * 1.5 if group else 0.12)
+            x0m = x + sx - (sx * 0.85 if group else 0.12)
             tube((x0m, py, pz), (x + sx + 0.1, py, pz), [(0, r * 0.74), (1 - 0.12 / (x + sx + 0.1 - x0m), r * 0.74), (1, r * 0.08)], 8, 'steel')
             cyl((x + sx - 0.035, py, pz), (x + sx - 0.005, py, pz), r * 0.78, 8, 'amber' if tip == 'red' else tip)
             if group:   # the whole missile is its own part so the game can launch it; a flame rides its tail

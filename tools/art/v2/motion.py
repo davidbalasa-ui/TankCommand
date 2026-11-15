@@ -92,9 +92,9 @@ SPEC = {
     'alien/dragonfly': {
         'WingFLPivot': swing(FWD, 0.3, 14.0), 'WingFRPivot': swing([-1, 0, 0], 0.3, 14.0),
         'WingHLPivot': swing(FWD, 0.26, 14.0, phase=1.6), 'WingHRPivot': swing([-1, 0, 0], 0.26, 14.0, phase=1.6),
-        # Firing: the tail whips down and forward (snap = extra radians, eased like a recoil hit) and the sting discharges.
-        'Tail1Pivot': swing(LEFT, 0.07, 0.7, snap=0.4, attack=0.12, recover=0.55), 'Tail2Pivot': swing(LEFT, 0.1, 0.7, phase=-0.9, snap=0.5, attack=0.12, recover=0.55),
-        'Tail3Pivot': swing(LEFT, 0.14, 0.7, phase=-1.8, snap=0.55, attack=0.12, recover=0.55),
+        # Firing: the tail whips up and over the back like a scorpion, sting aimed forward (snap = extra radians, eased like a recoil hit) and the sting discharges.
+        'Tail1Pivot': swing(LEFT, 0.07, 0.7, snap=0.85, attack=0.12, recover=0.55), 'Tail2Pivot': swing(LEFT, 0.1, 0.7, phase=-0.9, snap=0.95, attack=0.12, recover=0.55),
+        'Tail3Pivot': swing(LEFT, 0.14, 0.7, phase=-1.8, snap=1.0, attack=0.12, recover=0.55),
         'StingPivot': flash([-1, 0, 0], 0.12, 0.1),
         'ThrustAPivot': flicker(0, 3, rate=24.0, duty=1.0, idle=0.3), 'ThrustBPivot': flicker(1, 3, rate=24.0, duty=1.0, idle=0.3),
         'ThrustCPivot': flicker(2, 3, rate=24.0, duty=1.0, idle=0.3),
