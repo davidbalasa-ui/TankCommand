@@ -4,7 +4,8 @@ const chromiumPath = process.env.PW_CHROMIUM_PATH;
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  // CI runners draw 1080p frames in software on two cores; the desktop project needs the headroom.
+  timeout: process.env.CI ? 60_000 : 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
