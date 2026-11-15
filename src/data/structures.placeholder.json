@@ -1,0 +1,500 @@
+[
+  {
+    "id": "structure.human.landing_pad",
+    "name": "Landing Pad",
+    "faction": "human",
+    "kind": "pad",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 15,
+    "hp": 1200,
+    "armor": 8,
+    "footprint": {
+      "cellsX": 6,
+      "cellsZ": 6
+    },
+    "sightRange": 18,
+    "modelId": "structure.human.landing_pad",
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "roleLabel": "Landing pad"
+  },
+  {
+    "id": "structure.human.metal_station",
+    "name": "Metal Station",
+    "faction": "human",
+    "kind": "metalStation",
+    "cost": {
+      "ore": 200,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 600,
+    "armor": 4,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.human.metal_station",
+    "buildOnMetalDeposit": true,
+    "metalRatePerSec": 1.5,
+    "containerSize": 10,
+    "maxContainers": 5,
+    "placeholder": false,
+    "roleLabel": "Metal station",
+    "packSec": 8,
+    "packedUnitId": "unit.human.metal_station_packed"
+  },
+  {
+    "id": "structure.alien.landing_pad",
+    "name": "Landing Ring",
+    "faction": "alien",
+    "kind": "pad",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 15,
+    "hp": 1200,
+    "armor": 8,
+    "footprint": {
+      "cellsX": 6,
+      "cellsZ": 6
+    },
+    "sightRange": 18,
+    "modelId": "structure.alien.landing_pad",
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "roleLabel": "Landing pad"
+  },
+  {
+    "id": "structure.alien.metal_station",
+    "name": "Metal Siphon",
+    "faction": "alien",
+    "kind": "metalStation",
+    "cost": {
+      "ore": 200,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 600,
+    "armor": 4,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.alien.metal_station",
+    "buildOnMetalDeposit": true,
+    "metalRatePerSec": 1.5,
+    "containerSize": 10,
+    "maxContainers": 5,
+    "placeholder": false,
+    "roleLabel": "Metal station",
+    "packSec": 8,
+    "packedUnitId": "unit.alien.metal_station_packed"
+  },
+  {
+    "faction": "human",
+    "armor": 6,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.human.turret",
+    "name": "Bastion Gun",
+    "kind": "turret",
+    "cost": {
+      "ore": 150,
+      "metal": 0
+    },
+    "deliverySec": 10,
+    "hp": 400,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 14,
+    "modelId": "structure.human.turret",
+    "weapon": {
+      "damage": 25,
+      "range": 14,
+      "reloadSec": 2,
+      "projectileSpeed": 45,
+      "accuracy": 0.85,
+      "splashRadius": 0,
+      "targets": [
+        "ground",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.human.turret_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "roleLabel": "Gun tower"
+  },
+  {
+    "faction": "human",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.human.radar",
+    "name": "Radar Tower",
+    "kind": "radar",
+    "cost": {
+      "ore": 150,
+      "metal": 0
+    },
+    "deliverySec": 8,
+    "hp": 250,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 14,
+    "modelId": "structure.human.radar",
+    "sensorRange": 30,
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Radar tower"
+  },
+  {
+    "faction": "human",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.human.lab",
+    "name": "Research Lab",
+    "kind": "lab",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.human.lab",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Research lab",
+    "buyable": false
+  },
+  {
+    "faction": "alien",
+    "armor": 6,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.alien.turret",
+    "name": "Sentinel",
+    "kind": "turret",
+    "cost": {
+      "ore": 150,
+      "metal": 0
+    },
+    "deliverySec": 10,
+    "hp": 400,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 14,
+    "modelId": "structure.alien.turret",
+    "weapon": {
+      "damage": 25,
+      "range": 14,
+      "reloadSec": 2,
+      "projectileSpeed": 45,
+      "accuracy": 0.85,
+      "splashRadius": 0,
+      "targets": [
+        "ground",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.alien.turret_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "roleLabel": "Gun tower"
+  },
+  {
+    "faction": "alien",
+    "armor": 3,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.alien.radar",
+    "name": "Oracle",
+    "kind": "radar",
+    "cost": {
+      "ore": 150,
+      "metal": 0
+    },
+    "deliverySec": 8,
+    "hp": 250,
+    "footprint": {
+      "cellsX": 1,
+      "cellsZ": 1
+    },
+    "sightRange": 14,
+    "modelId": "structure.alien.radar",
+    "sensorRange": 30,
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Radar tower"
+  },
+  {
+    "faction": "alien",
+    "armor": 4,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.alien.lab",
+    "name": "Star Vault",
+    "kind": "lab",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 10,
+    "modelId": "structure.alien.lab",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "roleLabel": "Research lab",
+    "buyable": false
+  },
+  {
+    "faction": "human",
+    "armor": 5,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.human.air_base",
+    "name": "Airfield",
+    "kind": "airBase",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 14,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.human.air_base",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4,
+    "roleLabel": "Airfield"
+  },
+  {
+    "faction": "alien",
+    "armor": 5,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.alien.air_base",
+    "name": "Aerie",
+    "kind": "airBase",
+    "cost": {
+      "ore": 300,
+      "metal": 0
+    },
+    "deliverySec": 14,
+    "hp": 500,
+    "footprint": {
+      "cellsX": 3,
+      "cellsZ": 3
+    },
+    "sightRange": 10,
+    "modelId": "structure.alien.air_base",
+    "dismantleSec": 4,
+    "dismantleRefundPercent": 70,
+    "airCapacity": 4,
+    "roleLabel": "Airfield"
+  },
+  {
+    "faction": "human",
+    "armor": 5,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.human.missile_battery",
+    "name": "Harpoon Battery",
+    "kind": "turret",
+    "cost": {
+      "ore": 200,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 350,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 14,
+    "modelId": "structure.human.missile_battery",
+    "weapon": {
+      "damage": 25,
+      "range": 20,
+      "reloadSec": 3,
+      "projectileSpeed": 35,
+      "accuracy": 0.9,
+      "splashRadius": 0.5,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.human.missile_battery_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "roleLabel": "Missile tower"
+  },
+  {
+    "faction": "alien",
+    "armor": 5,
+    "buildOnMetalDeposit": false,
+    "placeholder": false,
+    "id": "structure.alien.missile_battery",
+    "name": "Corona",
+    "kind": "turret",
+    "cost": {
+      "ore": 200,
+      "metal": 0
+    },
+    "deliverySec": 12,
+    "hp": 350,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 14,
+    "modelId": "structure.alien.missile_battery",
+    "weapon": {
+      "damage": 25,
+      "range": 20,
+      "reloadSec": 3,
+      "projectileSpeed": 35,
+      "accuracy": 0.9,
+      "splashRadius": 0.5,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 150,
+    "packSec": 4,
+    "packedUnitId": "unit.alien.missile_battery_packed",
+    "dismantleSec": 3,
+    "dismantleRefundPercent": 70,
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "roleLabel": "Missile tower"
+  },
+  {
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "buyable": false,
+    "faction": "alien",
+    "kind": "turret",
+    "id": "structure.alien.shard_core",
+    "name": "The Shard",
+    "hp": 6000,
+    "armor": 10,
+    "footprint": {
+      "cellsX": 4,
+      "cellsZ": 4
+    },
+    "sightRange": 30,
+    "modelId": "structure.shard.core",
+    "weapon": {
+      "kind": "shard",
+      "damage": 70,
+      "range": 26,
+      "reloadSec": 3,
+      "projectileSpeed": 50,
+      "accuracy": 0.9,
+      "splashRadius": 2.5,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 90,
+    "roleLabel": "Crystal core"
+  },
+  {
+    "cost": {
+      "ore": 0,
+      "metal": 0
+    },
+    "deliverySec": 1,
+    "buildOnMetalDeposit": false,
+    "placeholder": true,
+    "buyable": false,
+    "faction": "alien",
+    "kind": "turret",
+    "id": "structure.alien.shard_spire",
+    "name": "Shard Spire",
+    "hp": 1000,
+    "armor": 6,
+    "footprint": {
+      "cellsX": 2,
+      "cellsZ": 2
+    },
+    "sightRange": 22,
+    "modelId": "structure.shard.spire",
+    "weapon": {
+      "kind": "shard",
+      "damage": 30,
+      "range": 18,
+      "reloadSec": 2,
+      "projectileSpeed": 50,
+      "accuracy": 0.85,
+      "splashRadius": 1,
+      "targets": [
+        "ground",
+        "air",
+        "structure"
+      ]
+    },
+    "turretTurnDegPerSec": 120,
+    "roleLabel": "Crystal tower"
+  }
+]

@@ -1,0 +1,3552 @@
+@font-face {
+  font-family: Inter;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/inter-800.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/inter-900.woff2') format('woff2');
+}
+
+/* UI redesign v1 tokens (see /mnt/project-files/ui-redesign/spec-v1.md). */
+:root {
+  --panel: rgba(9, 14, 24, 0.8);
+  --panel-solid: #0b1220;
+  --panel-raised: rgba(20, 32, 52, 0.85);
+  --panel-button: rgba(30, 46, 72, 0.9);
+  --line: rgba(120, 200, 255, 0.22);
+  --cyan: #3fd8ff;
+  --cyan-d: #1a7fa0;
+  --cyan-hi: #5fe3ff;
+  --orange: #ff9a2e;
+  --orange-d: #e5721a;
+  --text: #e8f1ff;
+  --dim: #8aa0b8;
+  --soft: #cfe0f2;
+  --red: #ff5a5a;
+  --amber: #ffc24a;
+  --green: #5fe08a;
+  --ore: #ff5fc8;
+  --panel-blur: blur(4px);
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #070c15;
+  color: var(--text);
+}
+
+html.quality-low {
+  --panel-blur: none;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+html,
+body {
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body {
+  font-size: 14px;
+}
+
+html.text-large {
+  font-size: 16px;
+}
+
+#app {
+  position: relative;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  background: radial-gradient(ellipse at 30% 20%, #14243a 0%, #070c15 70%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  overflow: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.screen.overlay {
+  z-index: 10;
+  background: radial-gradient(ellipse at 30% 20%, rgba(20, 36, 58, 0.97) 0%, rgba(7, 12, 21, 0.97) 70%);
+}
+
+.screen-inGame {
+  padding: 0;
+  overflow: hidden;
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  touch-action: manipulation;
+}
+
+button:active {
+  filter: brightness(1.25);
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+button.active {
+  background: var(--cyan-d);
+  border-color: var(--cyan-hi);
+}
+
+button.primary {
+  color: #1b0e02;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--orange), var(--orange-d));
+  border-color: transparent;
+  box-shadow: 0 0 18px rgba(255, 154, 46, 0.35);
+}
+
+.ico {
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  backdrop-filter: var(--panel-blur);
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  flex: none;
+}
+
+button.header-back {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+p {
+  margin: 0;
+}
+
+.game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.health-bar {
+  position: absolute;
+  width: 40px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-sizing: border-box;
+}
+
+.health-fill {
+  height: 100%;
+  background: #5ee07a;
+}
+
+.selection-box {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  z-index: 20;
+  border: 1px solid #8fd3ff;
+  background: rgba(80, 160, 255, 0.15);
+}
+
+.credits-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.render-error {
+  color: #ffb4b4;
+}
+
+.hud-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hud-shell button {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 12px;
+}
+
+.hud-toast {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 60%;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(9, 13, 22, 0.88);
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.briefing-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.briefing-map {
+  width: 128px;
+  height: 128px;
+  flex: none;
+  border: 1px solid #3d5f8f;
+  image-rendering: pixelated;
+}
+
+.briefing-text p,
+.objective-list,
+.briefing-objectives {
+  margin: 0 0 8px;
+  color: #dfe8ef;
+}
+
+.objective-list {
+  list-style: none;
+  padding: 0;
+  font-size: 16px;
+}
+
+.objective-list li {
+  padding: 6px 0;
+}
+
+.objective-list li[data-status='done'] {
+  color: #8fd18f;
+}
+
+.objective-list li[data-status='failed'] {
+  color: #e88;
+}
+
+.alert-toasts {
+  position: fixed;
+  top: 56px;
+  right: 8px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.alert-toast {
+  pointer-events: auto;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 300px;
+  padding: 8px 12px;
+  font-size: 13px;
+  text-align: left;
+  background: rgba(72, 31, 31, 0.96);
+  border-color: #d98080;
+}
+
+/* Pause menu: two columns so all nine buttons fit a 412 px-tall phone screen. */
+.pause-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 260px));
+  gap: 8px;
+  width: 100%;
+}
+
+/* Quit confirmation is one inline row, so it fits under the grid. */
+.pause-confirm {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+  background: rgba(15, 26, 44, 0.96);
+}
+
+.pause-confirm p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pause-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Settings: sliders left, toggles right, actions underneath. */
+.settings-form,
+.bug-report-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.settings-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-toggles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
+}
+
+.settings-toggles button {
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.setting-row {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.setting-row input[type='range'] {
+  flex: 1;
+  min-height: 44px;
+}
+
+.setting-row input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+}
+
+.setting-value {
+  min-width: 48px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.settings-status,
+.save-status,
+.bug-status {
+  min-height: 18px;
+  font-size: 13px;
+  margin: 0;
+}
+
+.hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.save-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.save-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bug report: two columns so Save and Back stay above the fold. */
+.bug-report-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.bug-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bug-meta,
+.bug-logs {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: rgba(15, 26, 44, 0.9);
+  border: 1px solid #2c4972;
+  border-radius: 6px;
+}
+
+.bug-text {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  padding: 8px;
+  font-size: 14px;
+  color: #e8edf5;
+  background: #0f1a2c;
+  border: 1px solid #3d5f8f;
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+
+.bug-logs {
+  max-height: 200px;
+  overflow: auto;
+}
+
+.base-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.base-row-text {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+}
+
+.base-row-text small {
+  opacity: 0.7;
+}
+
+.base-row button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.base-bar {
+  flex: 0 0 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.base-bar > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #6cf58a;
+}
+
+.fps-meter {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #b8ffb0;
+  font: 11px/1.3 ui-monospace, monospace;
+  white-space: pre;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ---------- Title screen (redesign v1) ---------- */
+.screen-title {
+  padding: 0;
+  background: #05090f;
+}
+
+.title-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 78% 55%, rgba(63, 216, 255, 0.16) 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 90%, rgba(255, 154, 46, 0.1) 0%, transparent 50%),
+    linear-gradient(160deg, #1b2c22 0%, #0f1c19 40%, #0a1018 100%);
+}
+
+.title-backdrop canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.title-backdrop canvas.ready {
+  opacity: 1;
+}
+
+.title-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 9, 16, 0.96) 0%,
+    rgba(5, 9, 16, 0.88) 36%,
+    rgba(5, 9, 16, 0.25) 70%,
+    rgba(5, 9, 16, 0.1) 100%
+  );
+}
+
+.title-logo {
+  position: absolute;
+  left: 36px;
+  top: 26px;
+}
+
+h1.title-name {
+  font-weight: 900;
+  font-size: 34px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.title-name span {
+  color: var(--cyan);
+}
+
+
+.title-menu {
+  position: absolute;
+  left: 36px;
+  top: 104px;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button.menu-button {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  text-align: left;
+}
+
+.menu-button .ico {
+  width: 26px;
+  height: 26px;
+}
+
+.menu-button .chev {
+  width: 20px;
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.menu-button-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.menu-button-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.menu-button-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button.menu-button.primary {
+  color: var(--text);
+  letter-spacing: normal;
+  text-transform: none;
+  background: linear-gradient(90deg, #1593b8, #0f6c8c);
+  border-color: var(--cyan-hi);
+  box-shadow: 0 0 18px rgba(63, 216, 255, 0.35);
+}
+
+.menu-button.primary .menu-button-sub {
+  color: #cdeffa;
+}
+
+.title-small-row {
+  position: absolute;
+  left: 36px;
+  bottom: 22px;
+  display: flex;
+  gap: 10px;
+}
+
+button.icon-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.title-small-row button.icon-button {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+}
+
+.icon-caption {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--dim);
+  line-height: 1.1;
+}
+
+.title-version {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ---------- Skirmish setup (redesign v1) ---------- */
+.screen-skirmishSetup {
+  display: block;
+}
+
+.screen-skirmishSetup .screen-header {
+  position: absolute;
+  left: 20px;
+  top: 14px;
+  right: 20px;
+}
+
+.map-card {
+  position: absolute;
+  left: 20px;
+  top: 68px;
+  max-height: calc(100% - 78px);
+  width: 300px;
+  box-sizing: border-box;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  aspect-ratio: 1;
+  max-height: 220px;
+  align-self: center;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.map-preview canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.spawn {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #c0761f;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spawn.you {
+  background: var(--cyan-d);
+}
+
+.map-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.map-nav button.icon-button {
+  width: 44px;
+  height: 44px;
+  background: var(--panel-button);
+}
+
+.map-name {
+  text-align: center;
+  min-width: 0;
+}
+
+.map-name b {
+  font-size: 16px;
+}
+
+.map-name div {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.setup-options {
+  position: absolute;
+  left: 336px;
+  top: 64px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.option-label {
+  flex: none;
+  width: 104px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.option-pair .option-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.option-pair .option-row .option-label {
+  display: none;
+}
+
+.segmented {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  min-width: 0;
+  border-radius: 10px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+}
+
+.segmented button {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--dim);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.segmented button.on,
+.pause-grid button.speed-option.on {
+  color: #fff;
+  background: var(--cyan-d);
+  box-shadow: inset 0 0 0 1px var(--cyan-hi);
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+button.start-button {
+  position: absolute;
+  right: 20px;
+  bottom: 10px;
+  width: 220px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 19px;
+  letter-spacing: 0.1em;
+}
+
+.start-button .ico {
+  stroke-width: 3;
+}
+
+/* Phone landscape: the option rows use the full height, so START moves up into the header row. */
+@media (max-height: 520px) {
+  button.start-button {
+    top: 14px;
+    bottom: auto;
+    height: 44px;
+    width: 200px;
+    font-size: 17px;
+  }
+}
+
+/* ---------- Other menus (redesign v1) ---------- */
+.choice-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+}
+
+button.choice-card {
+  min-height: 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 16px;
+  text-align: left;
+  background: linear-gradient(180deg, rgba(20, 32, 52, 0.6), rgba(20, 32, 52, 0.95));
+}
+
+.choice-card .choice-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 14px;
+  color: var(--cyan);
+}
+
+.choice-card.tone-alien .choice-icon {
+  color: var(--amber);
+}
+
+.choice-card.tone-training .choice-icon {
+  color: var(--soft);
+}
+
+.choice-card.tone-human {
+  border-color: rgba(63, 216, 255, 0.45);
+}
+
+.choice-card.tone-alien {
+  border-color: rgba(255, 194, 74, 0.45);
+}
+
+.choice-title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.choice-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+}
+
+.mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+}
+
+button.mission-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px 0 8px;
+  text-align: left;
+}
+
+.mission-order {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  background: var(--cyan-d);
+}
+
+.mission-row[data-status='done'] .mission-order {
+  background: #1f6b3d;
+}
+
+.mission-row[data-status='locked'] .mission-order {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mission-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mission-state {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.mission-row[data-status='done'] .mission-state {
+  color: var(--green);
+}
+
+.chev {
+  width: 20px;
+  height: 20px;
+  opacity: 0.6;
+}
+
+.briefing-body {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+canvas.briefing-map {
+  width: 220px;
+  height: 220px;
+  flex: none;
+  padding: 0;
+  image-rendering: auto;
+}
+
+.briefing-text {
+  flex: 1;
+  min-width: 0;
+  max-width: 600px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.briefing-text p {
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+.section-label {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.briefing-objectives {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.briefing-objectives li[data-kind='optional'] {
+  color: var(--dim);
+}
+
+button.corner-action,
+.screen .results-actions {
+  position: absolute;
+  right: 20px;
+  bottom: 14px;
+}
+
+button.corner-action {
+  min-width: 200px;
+  height: 50px;
+  font-size: 17px;
+}
+
+.screen-results h1 {
+  font-size: 30px;
+  color: var(--red);
+}
+
+.screen-results.won h1 {
+  color: var(--cyan);
+}
+
+.results-mission {
+  font-size: 15px;
+  color: var(--soft);
+}
+
+.results-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 140px));
+  gap: 10px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.stat-tile b {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile span {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.results-actions button {
+  min-width: 120px;
+  height: 48px;
+}
+
+.objective-list {
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-width: 320px;
+  box-sizing: border-box;
+}
+
+.credits-text {
+  width: 100%;
+  max-width: 880px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.help-card {
+  padding: 10px 14px;
+}
+
+.help-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.help-card ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--soft);
+}
+
+.credits-text h2 {
+  margin: 4px 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.credits-text p {
+  margin: 0 0 8px;
+  color: var(--dim);
+}
+
+.credits-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.credits-text th,
+.credits-text td {
+  padding: 3px 8px 3px 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(120, 200, 255, 0.08);
+}
+
+.credits-text th {
+  font-weight: 700;
+  color: var(--dim);
+}
+
+.save-row {
+  padding: 0 4px 0 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.pause-grid {
+  max-width: 540px;
+}
+
+/* ---------- In-game HUD (redesign v1) ---------- */
+.hud-shell [hidden] {
+  display: none !important;
+}
+
+.hud-shell .panel,
+.hud-shell .hud-icon-button,
+.hud-shell .hud-group-button,
+.hud-shell .hud-cmd {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: var(--panel-blur);
+}
+
+.hud-resbar {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  pointer-events: auto;
+}
+
+.hud-res {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-res + .hud-res {
+  border-left: 1px solid var(--line);
+}
+
+.hud-res .ico.hud-res-ico {
+  width: 18px;
+  height: 18px;
+  color: #9fd8ff;
+}
+
+.hud-res-cap {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.hud-clockbar {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  height: 46px;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 0 12px;
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.hud-shell button.hud-speed {
+  min-width: 52px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(30, 46, 72, 0.95);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 9px 9px 0;
+}
+
+.hud-corner {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-icon-button {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.hud-toast {
+  top: 60px;
+  border-color: var(--line);
+  border-radius: 10px;
+}
+
+/* Control-group tiles down the left edge. 1-4 on a phone, 1-5 when there is room. */
+.hud-groups {
+  position: absolute;
+  left: 8px;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-group-button {
+  width: 66px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 9px;
+  line-height: 1;
+}
+
+.group-number {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.group-caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.hud-shell .hud-group-button.empty {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.hud-shell .hud-group-button.selected {
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 0 1px var(--cyan);
+}
+
+.hud-groups.open .hud-group-button {
+  opacity: 1;
+  border-color: var(--orange);
+  border-style: solid;
+  animation: group-arm 1s ease-in-out infinite alternate;
+}
+
+.hud-shell .hud-group-button.assigned {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+@keyframes group-arm {
+  from {
+    box-shadow: inset 0 0 0 1px rgba(255, 154, 46, 0.2);
+  }
+  to {
+    box-shadow: inset 0 0 0 1px var(--orange), 0 0 10px rgba(255, 154, 46, 0.45);
+  }
+}
+
+@media (max-height: 469px) {
+  .hud-groups .hud-group-button[data-group='5'] {
+    display: none;
+  }
+}
+
+.hud-minimap {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  width: 140px;
+  height: 140px;
+  padding: 5px;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.minimap-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 6px;
+  touch-action: none;
+}
+
+/* Selection panel: portraits for a group, details for one unit. */
+.hud-selection {
+  position: absolute;
+  left: 158px;
+  bottom: 8px;
+  height: 76px;
+  max-width: calc(100% - 158px - 216px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  pointer-events: auto;
+}
+
+.hud-selection-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+}
+
+.hud-selection.single .hud-selection-body {
+  width: 300px;
+}
+
+.hud-selection-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  flex: none;
+  line-height: 1;
+}
+
+.hud-selection-count b {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hud-selection-count span {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-selection-list {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.hud-shell button.selection-icon {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 62px;
+  padding: 0;
+  overflow: hidden;
+  background: #0e1726;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.selection-thumb,
+.card-thumb,
+.queue-thumb,
+.place-thumb {
+  position: absolute;
+  inset: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: center / cover no-repeat;
+  color: var(--dim);
+}
+
+.thumb-fallback {
+  opacity: 0.6;
+}
+
+.selection-hp {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.selection-hp-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--green);
+}
+
+.selection-more {
+  flex: none;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--soft);
+  padding: 0 4px;
+}
+
+.hud-shell button.selection-single-portrait {
+  width: 64px;
+  height: 64px;
+}
+
+.selection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.selection-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.selection-name {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-role {
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.hud-shell .bar {
+  position: relative;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.hud-shell .bar.thin {
+  height: 5px;
+}
+
+.hud-shell .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.selection-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--soft);
+  white-space: nowrap;
+}
+
+.selection-status span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selection-cargo-text {
+  font-weight: 700;
+}
+
+.hud-shell button.hud-deselect {
+  flex: none;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-button);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.hud-deselect .ico {
+  width: 18px;
+  height: 18px;
+}
+
+/* Command grid: two columns above the dock, only the commands that apply. */
+.hud-commandbar {
+  position: absolute;
+  right: 8px;
+  bottom: 84px;
+  display: grid;
+  grid-template-columns: repeat(2, 60px);
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-cmd {
+  width: 60px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 10px;
+}
+
+.hud-cmd-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--soft);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.hud-shell button.hud-cmd.active {
+  border-color: var(--orange);
+  box-shadow: inset 0 0 0 1px var(--orange);
+}
+
+.hud-cmd.active .ico {
+  color: var(--orange);
+}
+
+.hud-airinfo {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--soft);
+  text-align: right;
+  text-shadow: 0 1px 2px #000;
+}
+
+.hud-dock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-build-button {
+  min-width: 120px;
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1b0e02;
+  background: linear-gradient(135deg, var(--orange), #d9651a);
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 14px rgba(255, 154, 46, 0.35);
+  white-space: nowrap;
+}
+
+.hud-build-button .ico {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.4;
+}
+
+/* Build and Base drawers: right side, full height, map stays visible on the left. */
+.hud-build-panel,
+.hud-base-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(470px, 100%);
+  box-sizing: border-box;
+  display: none;
+  flex-direction: column;
+  background: rgba(8, 13, 22, 0.94);
+  border-left: 1px solid var(--line);
+  pointer-events: auto;
+  z-index: 6;
+}
+
+.hud-shell.build-open .hud-build-panel,
+.hud-shell.base-open .hud-base-panel {
+  display: flex;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 6px 12px;
+  flex: none;
+}
+
+.drawer-title {
+  margin: 0 auto 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.drawer-pads {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drawer-pad-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dim);
+  margin-right: 2px;
+}
+
+.hud-shell button.build-pad {
+  height: 44px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--panel-button);
+}
+
+.hud-shell button.build-pad.active {
+  border-color: var(--cyan-hi);
+  background: var(--cyan-d);
+}
+
+.hud-shell button.drawer-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-button);
+}
+
+.drawer-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  flex: none;
+}
+
+.hud-shell button.drawer-tab {
+  flex: 1;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dim);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+}
+
+.hud-shell button.drawer-tab.on {
+  color: #fff;
+  border-bottom-color: var(--orange);
+  background: rgba(255, 154, 46, 0.08);
+}
+
+.drawer-cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 7px;
+  padding: 8px 12px;
+  align-content: start;
+}
+
+.hud-shell button.build-card {
+  position: relative;
+  height: 118px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  text-align: left;
+  overflow: hidden;
+  background: rgba(22, 34, 54, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.hud-shell button.build-card:disabled {
+  opacity: 1;
+}
+
+.build-card .card-thumb {
+  inset: 0 0 50px;
+  background-color: #111c2c;
+}
+
+.build-card:disabled .card-thumb,
+.build-card:disabled .card-name,
+.build-card:disabled .card-cost {
+  opacity: 0.5;
+}
+
+.card-name {
+  padding: 0 7px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 7px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cost-part {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.cost-time {
+  color: var(--dim);
+}
+
+.card-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--orange);
+  color: #1b0e02;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.card-reason {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.card-reason .ico {
+  width: 12px;
+  height: 12px;
+}
+
+.card-reason.afford {
+  color: #ffb0b0;
+}
+
+.card-reason.done {
+  color: var(--green);
+}
+
+.build-empty {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.drawer-queue {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 62px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.queue-label {
+  flex: none;
+  width: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-shell button.queue-tile {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 46px;
+  padding: 0;
+  overflow: hidden;
+  background: #0e1726;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.queue-tile .queue-thumb {
+  inset: 0;
+}
+
+.queue-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.queue-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 0;
+  background: var(--orange);
+}
+
+.queue-eta {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.3;
+}
+
+.hud-shell button.build-place {
+  position: relative;
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 46px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.build-place .place-thumb {
+  inset: 2px auto 2px 2px;
+  width: 40px;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Base drawer content (research, structures, vehicles) keeps its rows. */
+.hud-base-panel .build-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px 12px;
+  font-size: 12px;
+}
+
+.build-section-title {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.base-row {
+  padding: 6px 8px;
+  background: rgba(22, 34, 54, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.hud-placement {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  display: none;
+  gap: 6px;
+  padding: 4px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+.hud-placement.open {
+  display: flex;
+}
+
+.hud-placement button {
+  min-width: 110px;
+}
+
+/* Focused modes: placing a kit, or a drawer open. */
+.hud-shell.placing .hud-groups,
+.hud-shell.placing .hud-commandbar,
+.hud-shell.placing .hud-selection,
+.hud-shell.placing .hud-dock,
+.hud-shell.placing .hud-build-panel,
+.hud-shell.placing .hud-base-panel,
+.hud-shell.build-open .hud-groups,
+.hud-shell.build-open .hud-commandbar,
+.hud-shell.build-open .hud-selection,
+.hud-shell.build-open .hud-dock,
+.hud-shell.build-open .hud-clockbar,
+.hud-shell.build-open .hud-corner,
+.hud-shell.base-open .hud-groups,
+.hud-shell.base-open .hud-commandbar,
+.hud-shell.base-open .hud-selection,
+.hud-shell.base-open .hud-dock,
+.hud-shell.base-open .hud-clockbar,
+.hud-shell.base-open .hud-corner {
+  display: none;
+}
+
+/* Left-handed: command grid and dock on the left, groups and minimap on the right. */
+.hud-shell.left-handed .hud-minimap {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-groups {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-commandbar {
+  right: auto;
+  left: 8px;
+}
+
+.hud-shell.left-handed .hud-dock {
+  right: auto;
+  left: 8px;
+  flex-direction: row-reverse;
+}
+
+.hud-shell.left-handed .hud-selection {
+  left: auto;
+  right: 158px;
+}
+
+.hud-shell.left-handed .hud-build-panel,
+.hud-shell.left-handed .hud-base-panel {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--line);
+}
+
+@media (min-width: 1100px) and (min-height: 700px) {
+  .hud-minimap {
+    width: 180px;
+    height: 180px;
+  }
+  .hud-selection {
+    left: 198px;
+    max-width: calc(100% - 198px - 216px);
+  }
+  .hud-shell.left-handed .hud-selection {
+    right: 198px;
+  }
+}
+
+.worker-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(9, 14, 24, 0.85);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.worker-label.miner {
+  color: #ff9fdc;
+}
+
+.worker-label.hauler {
+  color: #9fd8ff;
+}
+
+/* ---------- Portrait phones ----------
+ * The game is played sideways, but the menus must work when the phone is held upright
+ * (web preview, or before the app locks landscape): single columns, and menus scroll. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .screen:not(.screen-inGame) {
+    padding: 12px 16px 16px;
+    touch-action: pan-y;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .choice-cards {
+    grid-template-columns: 1fr;
+  }
+
+  button.choice-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    row-gap: 2px;
+    align-items: center;
+    padding: 14px 16px;
+  }
+
+  .choice-card .choice-icon {
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+
+  .title-logo {
+    left: 20px;
+    right: 20px;
+    top: 28px;
+  }
+
+  h1.title-name {
+    font-size: 30px;
+  }
+
+  .title-menu {
+    left: 20px;
+    right: 20px;
+    width: auto;
+    top: 120px;
+  }
+
+  .title-small-row {
+    left: 20px;
+    bottom: 24px;
+  }
+
+  .title-shade {
+    background: linear-gradient(
+      180deg,
+      rgba(5, 9, 16, 0.92) 0%,
+      rgba(5, 9, 16, 0.75) 45%,
+      rgba(5, 9, 16, 0.3) 75%,
+      rgba(5, 9, 16, 0.6) 100%
+    );
+  }
+
+  .screen-skirmishSetup {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen-skirmishSetup .screen-header,
+  .map-card,
+  .setup-options,
+  button.start-button {
+    position: static;
+    width: auto;
+    max-height: none;
+  }
+
+  .map-card {
+    flex: none;
+  }
+
+  .map-preview {
+    width: min(100%, 260px);
+    max-height: none;
+  }
+
+  .option-row {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .option-label {
+    width: 100%;
+  }
+
+  .option-pair .segmented {
+    flex-basis: 100%;
+  }
+
+  .option-pair .option-row {
+    flex-basis: 100%;
+  }
+
+  button.start-button {
+    flex: none;
+    height: 52px;
+    margin-top: 6px;
+  }
+
+  /* Keep Start on screen while the options scroll under it. */
+  .screen-skirmishSetup button.start-button {
+    position: sticky;
+    bottom: 10px;
+    z-index: 5;
+    align-self: stretch;
+    justify-content: center;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .briefing-body {
+    flex-direction: column;
+  }
+
+  canvas.briefing-map {
+    width: min(100%, 260px);
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  button.corner-action,
+  .screen .results-actions {
+    position: static;
+    align-self: stretch;
+  }
+
+  .results-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .help-grid,
+  .settings-grid,
+  .settings-toggles,
+  .bug-report-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pause-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .credits-text {
+    font-size: 11px;
+    overflow-x: auto;
+  }
+}
+
+/* In a match, ask for landscape: the HUD and the battlefield need the width. */
+.rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .screen-inGame .rotate-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    text-align: center;
+    background: rgba(5, 9, 16, 0.94);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .rotate-hint .ico {
+    width: 56px;
+    height: 56px;
+    color: var(--cyan);
+    animation: rotate-hint 2.4s ease-in-out infinite;
+  }
+
+  .rotate-hint-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .rotate-hint-actions button {
+    min-height: 48px;
+    padding: 0 20px;
+  }
+
+  .rotate-hint small {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--dim);
+  }
+}
+
+@keyframes rotate-hint {
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
+  }
+}
+
+.game-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1b2c22 0%, #0f1c19 40%, #0a1018 100%);
+  color: #cfe7f2;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.game-loading.done {
+  opacity: 0;
+}
+
+/* ---------- Match screen layout (overhaul step 3) ----------
+ * Every panel has one fixed home on an edge, and nothing covers another panel's home:
+ *   top-left: resources, and under them the alert line;   top-centre: build queue, and under it
+ *   the objective line;   top-right: pause;   left edge: select mode;   bottom-left: minimap and
+ *   selection;   bottom, right of the selection: group tiles;   right edge: commands.
+ * The drop menu is a bottom strip about a third of the screen tall. */
+
+/* Alert line: one line under the resource bar. */
+.alert-toasts {
+  top: 58px;
+  left: max(8px, env(safe-area-inset-left));
+  right: auto;
+  max-width: 280px;
+}
+
+:root[data-hand='left'] .alert-toasts {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+.alert-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  max-width: 280px;
+  padding: 0 12px 0 6px;
+  border: 1px solid #d98080;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: max-width 0.4s ease, padding 0.4s ease;
+}
+
+.alert-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--red, #e05555);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 30px;
+  text-align: center;
+}
+
+.alert-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.4s ease;
+}
+
+/* After a few seconds only the icon is left; it still jumps to the newest alert. */
+.alert-toast.faded {
+  max-width: 44px;
+  padding: 0 6px;
+}
+
+.alert-toast.faded .alert-text {
+  opacity: 0;
+  width: 0;
+}
+
+.alert-edge-flash {
+  position: fixed;
+  z-index: 29;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.alert-edge-flash[data-side='left'] {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  background: linear-gradient(90deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='right'] {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  background: linear-gradient(270deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='top'] {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background: linear-gradient(180deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash[data-side='bottom'] {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: linear-gradient(0deg, rgba(255, 60, 60, 0.75), transparent);
+}
+
+.alert-edge-flash.on {
+  animation: edge-flash 1.2s ease-out;
+}
+
+@keyframes edge-flash {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Build queue strip, top centre. */
+.hud-queue {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 640px);
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-queue-tiles {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+
+.hud-shell button.hud-queue-tile {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.hud-shell button.hud-queue-tile.place {
+  border-color: var(--orange);
+  box-shadow: inset 0 0 0 1px var(--orange);
+}
+
+.hud-queue-thumb {
+  position: absolute;
+  inset: 0 0 17px;
+  background: center / cover no-repeat;
+}
+
+.hud-queue-track {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.hud-queue-progress {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--orange);
+}
+
+.hud-queue-cost {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 12px;
+}
+
+.hud-shell button.hud-queue-undo {
+  flex: none;
+  height: 44px;
+  padding: 0 12px;
+  font-weight: 700;
+  color: #1b0e02;
+  background: var(--orange);
+  border: 0;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+/* Objective line, under the queue. It grows to fit its text (never cut short); the word limits in
+ * src/ui/textLimits.ts keep it to two or three lines. Its width leaves the side buttons clear. */
+.hud-shell button.hud-objective {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(480px, calc(100% - 2 * max(96px, env(safe-area-inset-left), env(safe-area-inset-right))));
+  min-width: 160px;
+  min-height: 44px;
+  height: auto;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--soft);
+  background: rgba(9, 13, 22, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-objective .ico {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--orange);
+}
+
+.hud-objective-text {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.hud-shell button.hud-objective.message {
+  color: #fff;
+  border-color: #3d5f8f;
+  background: rgba(9, 13, 22, 0.9);
+}
+
+/* The objective line's mission message replaces the old floating toast. */
+.hud-objective .hud-toast {
+  position: static;
+  transform: none;
+  max-width: none;
+  padding: 0;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+}
+
+/* Select mode toggle, left edge. */
+.hud-shell button.hud-select-mode {
+  position: absolute;
+  left: max(8px, env(safe-area-inset-left));
+  top: 110px;
+  width: 60px;
+  height: 56px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-shell button.hud-select-mode.active {
+  border-color: var(--cyan-hi, #6fe3ff);
+  box-shadow: inset 0 0 0 1px var(--cyan-hi, #6fe3ff), 0 0 12px rgba(111, 227, 255, 0.35);
+}
+
+.hud-shell.select-mode {
+  box-shadow: inset 0 0 0 2px rgba(111, 227, 255, 0.45);
+}
+
+/* Group tiles along the bottom, right of the selection panel and left of the commands. */
+.hud-groups {
+  left: auto;
+  top: auto;
+  right: 142px;
+  bottom: 8px;
+  flex-direction: row;
+}
+
+.hud-shell button.hud-group-button {
+  width: 56px;
+  height: 52px;
+}
+
+.hud-shell .hud-group-button.all {
+  border-color: rgba(255, 154, 46, 0.6);
+}
+
+.hud-shell .hud-group-button.empty {
+  opacity: 0.45;
+  border-style: dashed;
+  background: transparent;
+}
+
+.hud-shell .hud-group-button.empty .group-caption {
+  font-size: 12px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1;
+}
+
+.hud-groups .hud-group-button[data-group='5'] {
+  display: none;
+}
+
+/* Commands down the right edge, from the bottom. */
+.hud-commandbar {
+  bottom: 8px;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+/* Selection panel between the minimap and the group tiles. */
+.hud-selection {
+  left: 156px;
+  max-width: calc(100% - 156px - 142px - 316px - 8px);
+}
+
+.hud-selection.single .hud-selection-body {
+  width: auto;
+  max-width: 260px;
+}
+
+/* Drop menu: a strip along the bottom, about a third of the screen tall. */
+.hud-shell .hud-build-panel {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: clamp(146px, 36vh, 210px);
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  padding: 0 max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
+}
+
+.hud-build-panel .drawer-tabs {
+  align-items: center;
+  padding: 2px 0 0;
+}
+
+.hud-build-panel .drawer-tabs .drawer-header {
+  margin-left: auto;
+  padding: 0;
+}
+
+.hud-shell .hud-build-panel button.drawer-tab {
+  flex: none;
+  min-width: 96px;
+  padding: 0 14px;
+}
+
+.hud-build-panel .drawer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.hud-shell .hud-build-panel .drawer-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  gap: 7px;
+  padding: 6px 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  align-items: stretch;
+}
+
+.hud-shell .hud-build-panel button.build-card {
+  flex: none;
+  width: 116px;
+  height: auto;
+  min-height: 92px;
+}
+
+.hud-build-panel .build-card .card-thumb {
+  inset: 0 0 46px;
+}
+
+.hud-build-panel .card-role {
+  padding: 0 7px;
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 14px;
+}
+
+.hud-build-panel .card-cost {
+  padding-bottom: 4px;
+}
+
+/* Short of ore: dim the card and turn the price red; it never moves. */
+.hud-build-panel .build-card.short .card-thumb,
+.hud-build-panel .build-card.short .card-name,
+.hud-build-panel .build-card.short .card-role {
+  opacity: 0.5;
+}
+
+.hud-build-panel .build-card.short .card-cost {
+  color: #ff7b7b;
+  opacity: 1;
+}
+
+/* While the drop menu is open it covers the minimap, selection, groups, commands and select
+ * mode; the battlefield above stays live. */
+.hud-shell.build-open .hud-minimap,
+.hud-shell.build-open .hud-select-mode,
+.hud-shell.placing .hud-select-mode,
+.hud-shell.base-open .hud-select-mode {
+  display: none;
+}
+
+/* Left-handed: the whole layout mirrors. */
+.hud-shell.left-handed .hud-resbar {
+  left: auto;
+  right: 8px;
+}
+
+.hud-shell.left-handed .hud-corner {
+  right: auto;
+  left: 8px;
+}
+
+.hud-shell.left-handed .hud-select-mode {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+}
+
+.hud-shell.left-handed .hud-groups {
+  right: auto;
+  left: 142px;
+}
+
+.hud-shell.left-handed .hud-selection {
+  left: auto;
+  right: 156px;
+}
+
+.hud-shell.left-handed .hud-build-panel {
+  border-right: 0;
+}
+
+@media (min-width: 1100px) and (min-height: 700px) {
+  .hud-selection {
+    left: 196px;
+    max-width: calc(100% - 196px - 142px - 316px - 8px);
+  }
+  .hud-shell.left-handed .hud-selection {
+    right: 196px;
+  }
+}
+
+.alert-toast[hidden],
+.alert-edge-flash[hidden] {
+  display: none;
+}
+
+/* Several units: smaller portraits so more fit beside the group tiles. */
+.hud-shell .hud-selection:not(.single) button.selection-icon {
+  width: 46px;
+  height: 58px;
+}
+
+.hud-shell button.hud-hint {
+  position: absolute;
+  left: 76px;
+  top: 110px;
+  width: max-content;
+  max-width: min(230px, calc(100% - 152px));
+  min-height: 56px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--text);
+  background: rgba(9, 13, 22, 0.92);
+  border: 1px solid var(--cyan-hi, #6fe3ff);
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.hud-shell.left-handed button.hud-hint {
+  left: auto;
+  right: 76px;
+}
+
+.hud-shell.build-open button.hud-hint,
+.hud-shell.placing button.hud-hint {
+  display: none;
+}
+
+/* A mission message wraps as far as it needs to; it is never clamped. */
+.hud-objective.message .hud-objective-text {
+  font-size: 12px;
+}
+
+/* Research (overhaul step 4): a locked card is its own unlock. The picture is dimmed, the label
+ * says what one tap researches, and the price and time are the research's. */
+.hud-build-panel .locked-card .card-thumb {
+  opacity: 0.45;
+  filter: saturate(0.4);
+}
+
+.hud-build-panel .locked-card .research-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 2px 5px;
+  font-size: 10px;
+  line-height: 12px;
+  white-space: normal;
+  color: var(--cyan);
+}
+
+.hud-build-panel .locked-card .research-label .ico {
+  display: inline-block;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+.hud-build-panel .locked-card[data-research-state='busy'] .research-label {
+  color: var(--dim);
+}
+
+.hud-build-panel .locked-card .card-cost {
+  color: var(--cyan);
+}
+
+.hud-build-panel .locked-card.short .card-cost {
+  color: #ff7b7b;
+}
+
+.card-research-track {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 2px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.card-research-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--cyan);
+}
+
+/* Research tiles in the top queue strip: cyan, a little wider for the name. */
+.hud-shell button.hud-queue-tile.research {
+  width: 72px;
+  border-color: var(--cyan);
+}
+
+.hud-shell button.hud-queue-tile.research .hud-queue-progress {
+  background: var(--cyan);
+}
+
+.hud-shell button.hud-queue-tile.research .hud-queue-cost {
+  display: block;
+  padding: 0 3px;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-shell button.hud-queue-tile.research.waiting {
+  opacity: 0.6;
+}
+
+/* ---------- Pause menu (redesign v2) ----------
+ * A card over the battlefield, which stays visible behind it, dimmed and softened. */
+.screen-pause.overlay {
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 45%, rgba(6, 11, 19, 0.32) 0%, rgba(4, 7, 12, 0.7) 80%);
+  backdrop-filter: blur(4px) saturate(0.8);
+  -webkit-backdrop-filter: blur(5px) saturate(0.8);
+  animation: pause-fade 0.18s ease-out;
+}
+
+@keyframes pause-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.pause-card {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(160deg, rgba(20, 34, 54, 0.94), rgba(9, 15, 26, 0.96));
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: pause-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pause-rise {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+.pause-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.pause-head h1 {
+  margin: 0 6px 0 0;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pause-clock,
+.pause-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.pause-clock .ico,
+.pause-goal .ico {
+  width: 16px;
+  height: 16px;
+  color: var(--cyan);
+}
+
+.pause-goal {
+  flex-basis: 100%;
+  color: var(--dim);
+}
+
+.pause-goal .ico {
+  color: var(--orange);
+}
+
+.pause-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.pause-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pause-card button.pause-resume {
+  flex: 1;
+  min-height: 64px;
+  max-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 20px;
+  border-radius: 14px;
+}
+
+.pause-resume .ico {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.pause-speed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pause-speed-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.pause-speed-label .ico {
+  width: 16px;
+  height: 16px;
+}
+
+.pause-card .pause-speed-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.pause-card .pause-speed-row button.speed-option {
+  min-height: 46px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--soft);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+}
+
+.pause-card .pause-speed-row button.speed-option.on {
+  color: #fff;
+  background: var(--cyan-d);
+  box-shadow: inset 0 0 0 1px var(--cyan-hi), 0 0 14px rgba(63, 216, 255, 0.25);
+}
+
+.pause-card .pause-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: none;
+}
+
+.pause-card button.pause-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 15px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(120, 200, 255, 0.16);
+}
+
+.pause-card button.pause-item .ico {
+  width: 20px;
+  height: 20px;
+  color: var(--cyan);
+}
+
+.pause-card button.pause-quit {
+  margin-top: auto;
+  color: #ffb4b4;
+  border-color: rgba(217, 128, 128, 0.35);
+  background: rgba(120, 30, 30, 0.18);
+}
+
+.pause-card button.pause-quit .ico {
+  color: #ff8a8a;
+}
+
+/* Quit confirmation: covers the card's body so it is clearly the only question. */
+/* Confirming a quit swaps the menu for the question, so nothing sits under it. */
+.pause-card.confirming .pause-body {
+  display: none;
+}
+
+.pause-card .pause-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: auto;
+  padding: 14px;
+  background: rgba(30, 14, 16, 0.97);
+  border: 1px solid #d98080;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.pause-card .pause-confirm p {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pause-card .pause-confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pause-card .pause-confirm-actions button {
+  min-height: 46px;
+  font-size: 13px;
+}
+
+button.danger {
+  color: #fff;
+  background: #8c2d2d;
+  border-color: #d98080;
+}
+
+@media (max-height: 430px) {
+  .pause-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .pause-card button.pause-resume {
+    min-height: 76px;
+  }
+
+  .pause-card button.pause-item {
+    min-height: 46px;
+  }
+}
+
+@media (max-width: 560px) {
+  .pause-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Title screen (redesign v2) ----------
+   The battle behind the menu stays visible: the shade only darkens the menu column, a vignette
+   frames the picture, and the menu sits on glass panels that slide in one after another. */
+.screen-title .title-shade {
+  background:
+    linear-gradient(90deg, rgba(4, 8, 14, 0.9) 0%, rgba(4, 8, 14, 0.62) 30%, rgba(4, 8, 14, 0.08) 58%, transparent 100%),
+    radial-gradient(ellipse 120% 95% at 60% 50%, transparent 55%, rgba(2, 5, 10, 0.7) 100%);
+}
+
+.screen-title .title-logo {
+  top: 22px;
+  animation: title-logo-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.screen-title h1.title-name {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 0.95;
+  /* Brushed metal: light at the top edge, a darker band through the middle. */
+  background: linear-gradient(180deg, #ffffff 0%, #dfe8f2 38%, #8c9aab 52%, #c9d4e0 70%, #f4f8fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(63, 216, 255, 0.18));
+}
+
+.screen-title .title-name span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62em;
+  letter-spacing: 0.46em;
+  background: linear-gradient(180deg, #b6f2ff 0%, #3fd8ff 55%, #1a95c0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.title-rule {
+  position: relative;
+  width: 210px;
+  height: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(63, 216, 255, 0.55), rgba(63, 216, 255, 0.12) 70%, transparent);
+}
+
+.title-rule::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  left: -60px;
+  background: linear-gradient(90deg, transparent, #ffb15c, transparent);
+  animation: title-rule-sweep 6s ease-in-out 1.2s 3;
+}
+
+.screen-title .title-menu {
+  top: 128px;
+  width: 320px;
+  gap: 9px;
+}
+
+.screen-title .title-menu button.menu-button {
+  position: relative;
+  height: 54px;
+  border-radius: 10px;
+  border: 1px solid rgba(140, 210, 255, 0.2);
+  background: linear-gradient(90deg, rgba(16, 28, 44, 0.9), rgba(12, 20, 32, 0.74));
+
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+/* A lit edge on the left of each entry. */
+.screen-title .title-menu button.menu-button::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgba(63, 216, 255, 0.55);
+  transition: background 0.15s ease, top 0.15s ease, bottom 0.15s ease;
+}
+
+.screen-title .title-menu button.menu-button:hover,
+.screen-title .title-menu button.menu-button:focus-visible {
+  transform: translateX(4px);
+  border-color: rgba(95, 227, 255, 0.55);
+}
+
+.screen-title .title-menu button.menu-button:hover::before,
+.screen-title .title-menu button.menu-button:focus-visible::before {
+  top: 6px;
+  bottom: 6px;
+  background: var(--cyan-hi);
+}
+
+.screen-title .title-menu button.menu-button:active {
+  transform: translateX(2px) scale(0.985);
+}
+
+.screen-title .title-menu button.menu-button.primary {
+  border-color: rgba(95, 227, 255, 0.75);
+  background: linear-gradient(90deg, rgba(21, 147, 184, 0.92), rgba(15, 108, 140, 0.72));
+  box-shadow: 0 0 22px rgba(63, 216, 255, 0.32), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.screen-title .title-menu button.menu-button.primary::before {
+  background: #ffb15c;
+}
+
+.screen-title .title-menu .menu-button .ico {
+  color: var(--cyan-hi);
+}
+
+.screen-title .title-menu .menu-button.primary .ico {
+  color: #fff;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(1) {
+  animation-delay: 0.15s;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(2) {
+  animation-delay: 0.23s;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(3) {
+  animation-delay: 0.31s;
+}
+
+.screen-title .title-small-row {
+  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) 0.42s both;
+}
+
+.screen-title .title-small-row button.icon-button {
+  border: 1px solid rgba(140, 210, 255, 0.2);
+  background: rgba(12, 20, 32, 0.7);
+
+}
+
+.screen-title .title-version {
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.08em;
+}
+
+@keyframes title-logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    letter-spacing: 0.3em;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-rule-sweep {
+  0% {
+    left: -60px;
+  }
+  45%,
+  100% {
+    left: 220px;
+  }
+}
+
+@media (max-width: 560px) {
+  .screen-title h1.title-name {
+    font-size: 38px;
+  }
+
+  .screen-title .title-menu {
+    top: 136px;
+    width: auto;
+  }
+
+  .screen-title .title-shade {
+    background:
+      linear-gradient(180deg, rgba(4, 8, 14, 0.88) 0%, rgba(4, 8, 14, 0.55) 45%, rgba(4, 8, 14, 0.2) 72%, rgba(4, 8, 14, 0.6) 100%);
+  }
+}
+
+@media (max-height: 380px) {
+  .screen-title h1.title-name {
+    font-size: 36px;
+  }
+
+  .screen-title .title-menu {
+    top: 108px;
+  }
+
+  .screen-title .title-menu button.menu-button {
+    height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-title .title-logo,
+  .screen-title .title-menu button.menu-button,
+  .screen-title .title-small-row,
+  .title-rule::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,284 @@
+[
+  {
+    "id": "research.alien.aviation",
+    "name": "Aviation",
+    "faction": "alien",
+    "cost": {
+      "ore": 150,
+      "metal": 100
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.alien.sensors"
+    ],
+    "unlocks": [
+      "structure.alien.air_base",
+      "unit.alien.fighter",
+      "unit.alien.saucer"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.field_repair",
+    "name": "Field Repair",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.alien.repair"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.fortifications",
+    "name": "Fortifications",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "structure.alien.missile_battery"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.heavy_armor",
+    "name": "Heavy Armor",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.alien.heavy_tank"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.heavy_ordnance",
+    "name": "Heavy Ordnance",
+    "faction": "alien",
+    "cost": {
+      "ore": 150,
+      "metal": 100
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.alien.missiles"
+    ],
+    "unlocks": [
+      "unit.alien.artillery"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.hover_drive",
+    "name": "Hover Drive",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.alien.glider"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.missiles",
+    "name": "Missiles",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.alien.missile_tank"
+    ],
+    "upgrades": [
+      "fireRate"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.alien.sensors",
+    "name": "Sensors",
+    "faction": "alien",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "structure.alien.radar",
+      "unit.alien.radar"
+    ],
+    "upgrades": [
+      "stealth"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.aviation",
+    "name": "Aviation",
+    "faction": "human",
+    "cost": {
+      "ore": 150,
+      "metal": 100
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.human.sensors"
+    ],
+    "unlocks": [
+      "structure.human.air_base",
+      "unit.human.fighter",
+      "unit.human.bomber"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.field_repair",
+    "name": "Field Repair",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.human.repair"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.fortifications",
+    "name": "Fortifications",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "structure.human.missile_battery"
+    ],
+    "upgrades": [
+      "armor"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.heavy_armor",
+    "name": "Heavy Armor",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.human.heavy_tank"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.heavy_ordnance",
+    "name": "Heavy Ordnance",
+    "faction": "human",
+    "cost": {
+      "ore": 150,
+      "metal": 100
+    },
+    "timeSec": 45,
+    "requires": [
+      "research.human.missiles"
+    ],
+    "unlocks": [
+      "unit.human.artillery"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.hover_drive",
+    "name": "Hover Drive",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.human.hover_tank"
+    ],
+    "upgrades": [],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.missiles",
+    "name": "Missiles",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "unit.human.missile_tank"
+    ],
+    "upgrades": [
+      "fireRate"
+    ],
+    "placeholder": false
+  },
+  {
+    "id": "research.human.sensors",
+    "name": "Sensors",
+    "faction": "human",
+    "cost": {
+      "ore": 100,
+      "metal": 50
+    },
+    "timeSec": 30,
+    "requires": [],
+    "unlocks": [
+      "structure.human.radar",
+      "unit.human.radar"
+    ],
+    "upgrades": [
+      "stealth"
+    ],
+    "placeholder": false
+  }
+]

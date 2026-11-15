@@ -1,3 +1,12 @@
 node_modules/
 dist/
+android/
+coverage/
+playwright-report/
+test-results/
 .DS_Store
+*.log
+.env
+.env.local
+.deepseek-runs/
+__pycache__/

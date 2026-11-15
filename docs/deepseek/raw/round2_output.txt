@@ -1,0 +1,1668 @@
+<<<FILE vite.config.ts>>>
+import { defineConfig } from 'vite';
+
+export default defineConfig(({ mode }) => ({
+  base: './',
+  define: {
+    __TEST_HOOK__: JSON.stringify(process.env.VITE_TEST_HOOK === '1' || mode === 'development'),
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    // three.js is lazily loaded at runtime; its standalone chunk (~700 kB minified) exceeds the default 500 kB limit.
+    chunkSizeWarningLimit: 1000,
+  },
+}));
+<<<END FILE>>>
+<<<FILE src/app.ts>>>
+import rawManifest from '../public/assets/manifest.json';
+import { parseAssetManifest } from './assets/manifestSchema';
+import { AssetRegistry } from './assets/registry';
+import { createScreens } from './ui/screens';
+import { ScreenRouter, type RendererHandle, type ScreenContext } from './ui/router';
+import { createWorld, snapshot, step, type WorldState } from './sim/world';
+import { validateCommand, type Command } from './sim/commands';
+import { FixedStepLoop } from './sim/loop';
+import { SIM_TICK_HZ } from './sim/constants';
+import { Watchdog, installGlobalErrorCapture } from './platform/watchdog';
+import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
+import type { RenderStats, RenderView } from './render/renderer';
+
+export class App {
+  public readonly router: ScreenRouter;
+  private readonly registry: AssetRegistry;
+  private world: WorldState;
+  private pendingCommands: Command[] = [];
+  private readonly fixed: FixedStepLoop;
+  private readonly watchdog: Watchdog;
+  private lifecycle: Lifecycle | null = null;
+  private renderView: RenderView | null = null;
+  private raf = 0;
+  private checkTimer = 0;
+  private lastFrame = 0;
+  private paused = false;
+  private uiPaused = false;
+  private lifecyclePaused = false;
+  private freezeSimUntil = 0;
+
+  constructor(root: HTMLElement) {
+    this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
+    this.world = createWorld(1);
+    this.fixed = new FixedStepLoop({
+      tickHz: SIM_TICK_HZ,
+      maxStepsPerFrame: 5,
+      step: () => {
+        this.stepSimulation();
+      },
+    });
+    this.watchdog = new Watchdog({
+      now: () => performance.now(),
+      freezeMs: 2000,
+      recoverMs: 5000,
+      onFreeze: () => {
+        this.router.go('recovery');
+      },
+      onRecover: () => undefined,
+    });
+
+    this.router = new ScreenRouter(root, createScreens(), (router): ScreenContext => ({
+      router,
+      go: (id) => {
+        router.go(id);
+      },
+      pauseSim: (paused) => {
+        this.pauseSim(paused);
+      },
+      attachRenderer: (canvas) => this.attachRenderer(canvas),
+    }));
+  }
+
+  start(): void {
+    this.router.start('title');
+    this.lifecycle = bindLifecycleToBrowserAndCapacitor();
+    this.lifecycle.on('pause', () => {
+      this.pauseLifecycle();
+    });
+    this.lifecycle.on('resume', () => {
+      this.resumeLifecycle();
+    });
+    this.lifecycle.on('back', () => {
+      this.router.back();
+    });
+    window.addEventListener('keydown', this.onKeyDown);
+    installGlobalErrorCapture(window, (error) => {
+      console.error(error.message);
+    });
+  }
+
+  snapshot(): WorldState {
+    return { ...snapshot(this.world) };
+  }
+
+  sendCommand(command: unknown): boolean {
+    const validated = validateCommand(command);
+    if (!validated) {
+      return false;
+    }
+    this.pendingCommands.push(validated);
+    return true;
+  }
+
+  renderStats(): RenderStats {
+    if (!this.renderView) {
+      return { loadedModels: [], meshCount: 0, drawCalls: 0, frame: 0 };
+    }
+    return this.renderView.stats();
+  }
+
+  freezeSim(ms: number): void {
+    this.freezeSimUntil = performance.now() + Math.max(0, ms);
+  }
+
+  pauseSim(paused: boolean): void {
+    this.uiPaused = paused;
+    this.applyPauseState();
+  }
+
+  private attachRenderer(canvas: HTMLCanvasElement): Promise<RendererHandle> {
+    return import('./render/renderer').then(
+      (mod) => {
+        const view = new mod.RenderView(canvas, this.registry);
+        this.renderView = view;
+        this.startLoop();
+        return {
+          error: null,
+          dispose: (): void => {
+            if (this.renderView === view) {
+              this.stopLoop();
+              view.dispose();
+              this.renderView = null;
+            }
+          },
+        };
+      },
+      () => ({
+        error: '3D rendering is unavailable on this device.',
+        dispose: (): void => undefined,
+      }),
+    );
+  }
+
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      this.router.back();
+    }
+  };
+
+  private pauseLifecycle(): void {
+    this.lifecyclePaused = true;
+    this.applyPauseState();
+  }
+
+  private resumeLifecycle(): void {
+    this.lifecyclePaused = false;
+    this.applyPauseState();
+  }
+
+  private applyPauseState(): void {
+    const next = this.uiPaused || this.lifecyclePaused;
+    if (next === this.paused) {
+      return;
+    }
+    this.paused = next;
+    if (next) {
+      this.watchdog.setSuspended(true);
+      this.stopLoop();
+    } else {
+      this.watchdog.setSuspended(false);
+      this.startLoop();
+    }
+  }
+
+  private startLoop(): void {
+    if (this.raf !== 0 || !this.renderView || this.paused) {
+      return;
+    }
+    this.lastFrame = performance.now();
+    this.watchdog.beat('sim');
+    this.watchdog.beat('render');
+    this.checkTimer = window.setInterval(() => {
+      this.watchdog.check();
+    }, 250);
+    this.raf = window.requestAnimationFrame(this.frame);
+  }
+
+  private stopLoop(): void {
+    if (this.raf !== 0) {
+      window.cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+    if (this.checkTimer !== 0) {
+      window.clearInterval(this.checkTimer);
+      this.checkTimer = 0;
+    }
+  }
+
+  private readonly frame = (now: number): void => {
+    this.raf = 0;
+    if (this.paused || !this.renderView) {
+      return;
+    }
+
+    const elapsed = now - this.lastFrame;
+    this.lastFrame = now;
+    const frozen = now < this.freezeSimUntil;
+    let alpha = 0;
+
+    if (!frozen) {
+      const result = this.fixed.advance(elapsed);
+      alpha = result.alpha;
+      if (result.steps > 0) {
+        this.watchdog.beat('sim');
+      }
+    }
+
+    this.watchdog.beat('render');
+    this.watchdog.check();
+    this.renderView.render(alpha);
+    this.raf = window.requestAnimationFrame(this.frame);
+  };
+
+  private stepSimulation(): void {
+    const nextTick = this.world.tick + 1;
+    const due = this.pendingCommands.filter((command) => command.tick === nextTick);
+    this.world = step(this.world, due);
+    this.pendingCommands = this.pendingCommands.filter((command) => command.tick > nextTick);
+  }
+}
+
+export function createApp(root: HTMLElement): App {
+  return new App(root);
+}
+<<<END FILE>>>
+<<<FILE src/assets/threeDecoders.ts>>>
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { AssetDecoders } from './loader';
+
+export function createThreeDecoders(): AssetDecoders<THREE.Object3D, THREE.Texture, ArrayBuffer> {
+  return {
+    model: async (buffer) => {
+      const loader = new GLTFLoader();
+      return new Promise<THREE.Object3D>((resolve, reject) => {
+        loader.parse(
+          buffer,
+          '',
+          (gltf) => {
+            resolve(gltf.scene);
+          },
+          (error: unknown) => {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          },
+        );
+      });
+    },
+    texture: async (buffer) => {
+      const bitmap = await createImageBitmap(new Blob([buffer]));
+      const texture = new THREE.Texture(bitmap);
+      texture.needsUpdate = true;
+      return texture;
+    },
+    audio: (buffer) => Promise.resolve(buffer),
+  };
+}
+
+export function fallbackModel(): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xff00ff }),
+  );
+  mesh.position.set(0, 1, 0);
+  return mesh;
+}
+<<<END FILE>>>
+<<<FILE src/platform/kv.ts>>>
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Preferences } from '@capacitor/preferences';
+
+export interface KvStore {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+  keys(): Promise<string[]>;
+}
+
+export class StorageFullError extends Error {
+  constructor(message = 'Storage is full') {
+    super(message);
+    this.name = 'StorageFullError';
+  }
+}
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error(String(error));
+}
+
+export class MemoryKvStore implements KvStore {
+  private readonly data = new Map<string, string>();
+
+  get(key: string): Promise<string | null> {
+    return Promise.resolve(this.data.get(key) ?? null);
+  }
+
+  set(key: string, value: string): Promise<void> {
+    this.data.set(key, value);
+    return Promise.resolve();
+  }
+
+  remove(key: string): Promise<void> {
+    this.data.delete(key);
+    return Promise.resolve();
+  }
+
+  keys(): Promise<string[]> {
+    return Promise.resolve([...this.data.keys()].sort());
+  }
+}
+
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
+    return true;
+  }
+  if (error instanceof Error) {
+    return (
+      error.name === 'QuotaExceededError' || error.message.toLowerCase().includes('quota')
+    );
+  }
+  return false;
+}
+
+export class WebKvStore implements KvStore {
+  private readonly storage: Storage;
+
+  constructor(storage?: Storage) {
+    this.storage = storage ?? globalThis.localStorage;
+  }
+
+  get(key: string): Promise<string | null> {
+    try {
+      return Promise.resolve(this.storage.getItem(key));
+    } catch (error) {
+      return Promise.reject(toError(error));
+    }
+  }
+
+  set(key: string, value: string): Promise<void> {
+    try {
+      this.storage.setItem(key, value);
+      return Promise.resolve();
+    } catch (error) {
+      if (isQuotaError(error)) {
+        return Promise.reject(new StorageFullError());
+      }
+      return Promise.reject(toError(error));
+    }
+  }
+
+  remove(key: string): Promise<void> {
+    try {
+      this.storage.removeItem(key);
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(toError(error));
+    }
+  }
+
+  keys(): Promise<string[]> {
+    try {
+      const result: string[] = [];
+      for (let i = 0; i < this.storage.length; i += 1) {
+        const key = this.storage.key(i);
+        if (key !== null) {
+          result.push(key);
+        }
+      }
+      return Promise.resolve(result);
+    } catch (error) {
+      return Promise.reject(toError(error));
+    }
+  }
+}
+
+const SETTINGS_PREFIX = 'setting.';
+
+export class NativeKvStore implements KvStore {
+  async get(key: string): Promise<string | null> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      const result = await Preferences.get({ key });
+      return result.value;
+    }
+    try {
+      const result = await Filesystem.readFile({
+        path: `saves/${key}.json`,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      return typeof result.data === 'string' ? result.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      await Preferences.set({ key, value });
+      return;
+    }
+    await Filesystem.writeFile({
+      path: `saves/${key}.json`,
+      directory: Directory.Data,
+      data: value,
+      encoding: Encoding.UTF8,
+    });
+  }
+
+  async remove(key: string): Promise<void> {
+    if (key.startsWith(SETTINGS_PREFIX)) {
+      await Preferences.remove({ key });
+      return;
+    }
+    try {
+      await Filesystem.deleteFile({
+        path: `saves/${key}.json`,
+        directory: Directory.Data,
+      });
+    } catch {
+      return;
+    }
+  }
+
+  async keys(): Promise<string[]> {
+    if (!Capacitor.isNativePlatform()) {
+      return [];
+    }
+
+    const result: string[] = [];
+    try {
+      const listing = await Filesystem.readdir({
+        path: 'saves',
+        directory: Directory.Data,
+      });
+      const entries = listing.files as unknown as Array<string | { name: string }>;
+      for (const entry of entries) {
+        const name = typeof entry === 'string' ? entry : entry.name;
+        if (name.endsWith('.json')) {
+          result.push(name.slice(0, -5));
+        }
+      }
+    } catch {
+      // The saves directory may not exist yet.
+    }
+
+    const preferences = await Preferences.keys();
+    result.push(...preferences.keys);
+    return result;
+  }
+}
+
+export function createKvStore(): KvStore {
+  return Capacitor.isNativePlatform() ? new NativeKvStore() : new WebKvStore();
+}
+<<<END FILE>>>
+<<<FILE src/platform/watchdog.ts>>>
+export type WatchdogChannel = 'sim' | 'render';
+
+export interface WatchdogReport {
+  channel: WatchdogChannel;
+  stalledMs: number;
+  lastBeats: Record<WatchdogChannel, number>;
+}
+
+export interface WatchdogOptions {
+  now: () => number;
+  freezeMs?: number;
+  recoverMs?: number;
+  onFreeze: (report: WatchdogReport) => void;
+  onRecover: (report: WatchdogReport) => void;
+}
+
+interface ChannelState {
+  lastBeat: number;
+  freezeFired: boolean;
+  recoverFired: boolean;
+}
+
+export class Watchdog {
+  private readonly opts: WatchdogOptions;
+  private readonly freezeMs: number;
+  private readonly recoverMs: number;
+  private readonly states: Record<WatchdogChannel, ChannelState>;
+  private suspended = false;
+
+  constructor(opts: WatchdogOptions) {
+    this.opts = opts;
+    this.freezeMs = opts.freezeMs ?? 2000;
+    this.recoverMs = opts.recoverMs ?? 5000;
+    const now = opts.now();
+    this.states = {
+      sim: { lastBeat: now, freezeFired: false, recoverFired: false },
+      render: { lastBeat: now, freezeFired: false, recoverFired: false },
+    };
+  }
+
+  beat(channel: WatchdogChannel): void {
+    const state = this.states[channel];
+    state.lastBeat = this.opts.now();
+    state.freezeFired = false;
+    state.recoverFired = false;
+  }
+
+  setSuspended(suspended: boolean): void {
+    this.suspended = suspended;
+    if (!suspended) {
+      const now = this.opts.now();
+      for (const channel of ['sim', 'render'] as const) {
+        const state = this.states[channel];
+        state.lastBeat = now;
+        state.freezeFired = false;
+        state.recoverFired = false;
+      }
+    }
+  }
+
+  check(): void {
+    if (this.suspended) {
+      return;
+    }
+
+    const now = this.opts.now();
+    const stalled = (['sim', 'render'] as const).map((channel) => {
+      const state = this.states[channel];
+      return {
+        channel,
+        state,
+        stalledMs: now - state.lastBeat,
+      };
+    });
+
+    const freeze = stalled.find(
+      (item) => item.stalledMs >= this.freezeMs && !item.state.freezeFired,
+    );
+    if (freeze) {
+      for (const item of stalled) {
+        if (item.stalledMs >= this.freezeMs) {
+          item.state.freezeFired = true;
+        }
+      }
+      this.opts.onFreeze({
+        channel: freeze.channel,
+        stalledMs: freeze.stalledMs,
+        lastBeats: {
+          sim: this.states.sim.lastBeat,
+          render: this.states.render.lastBeat,
+        },
+      });
+    }
+
+    const recover = stalled.find(
+      (item) => item.stalledMs >= this.recoverMs && !item.state.recoverFired,
+    );
+    if (recover) {
+      for (const item of stalled) {
+        if (item.stalledMs >= this.recoverMs) {
+          item.state.recoverFired = true;
+        }
+      }
+      this.opts.onRecover({
+        channel: recover.channel,
+        stalledMs: recover.stalledMs,
+        lastBeats: {
+          sim: this.states.sim.lastBeat,
+          render: this.states.render.lastBeat,
+        },
+      });
+    }
+  }
+}
+
+export interface CapturedError {
+  message: string;
+  stack?: string;
+  kind: 'error' | 'unhandledrejection';
+}
+
+export interface ErrorTarget {
+  addEventListener(type: string, listener: (event: Event) => void): void;
+  removeEventListener?(type: string, listener: (event: Event) => void): void;
+}
+
+export function installGlobalErrorCapture(
+  target: ErrorTarget,
+  onError: (error: CapturedError) => void,
+): () => void {
+  const errorHandler = (event: Event): void => {
+    const errorEvent = event as ErrorEvent;
+    const rawError: unknown = errorEvent.error;
+    const error = rawError instanceof Error ? rawError : undefined;
+    const message =
+      errorEvent.message ||
+      error?.message ||
+      (typeof rawError === 'string' ? rawError : 'Unknown error');
+    onError({
+      message,
+      stack: error?.stack,
+      kind: 'error',
+    });
+  };
+
+  const rejectionHandler = (event: Event): void => {
+    const rejection = event as PromiseRejectionEvent;
+    const reason: unknown = rejection.reason;
+    const error = reason instanceof Error ? reason : undefined;
+    onError({
+      message: error?.message ?? String(reason),
+      stack: error?.stack,
+      kind: 'unhandledrejection',
+    });
+  };
+
+  target.addEventListener('error', errorHandler);
+  target.addEventListener('unhandledrejection', rejectionHandler);
+
+  return () => {
+    target.removeEventListener?.('error', errorHandler);
+    target.removeEventListener?.('unhandledrejection', rejectionHandler);
+  };
+}
+<<<END FILE>>>
+<<<FILE src/ui/router.ts>>>
+export type ScreenId =
+  | 'title'
+  | 'campaignSelect'
+  | 'missionSelect'
+  | 'briefing'
+  | 'skirmishSetup'
+  | 'loading'
+  | 'inGame'
+  | 'pause'
+  | 'settings'
+  | 'help'
+  | 'objectives'
+  | 'results'
+  | 'credits'
+  | 'bugReport'
+  | 'recovery';
+
+export interface RendererHandle {
+  error: string | null;
+  dispose: () => void;
+}
+
+export interface ScreenContext {
+  router: ScreenRouter;
+  go: (id: ScreenId) => void;
+  pauseSim: (paused: boolean) => void;
+  attachRenderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
+}
+
+export interface ScreenModule {
+  id: ScreenId;
+  mount(root: HTMLElement, ctx: ScreenContext): () => void;
+}
+
+interface MountedScreen {
+  id: ScreenId;
+  el: HTMLDivElement;
+  unmount: () => void;
+}
+
+const OVERLAY_IDS = new Set<ScreenId>(['pause', 'objectives', 'help', 'recovery', 'bugReport']);
+
+const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
+  title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help'],
+  campaignSelect: ['title', 'missionSelect'],
+  missionSelect: ['campaignSelect', 'briefing'],
+  briefing: ['missionSelect', 'loading'],
+  skirmishSetup: ['title', 'loading'],
+  loading: ['inGame', 'title'],
+  inGame: ['pause', 'objectives', 'help', 'bugReport', 'recovery', 'results', 'title'],
+  pause: ['settings', 'bugReport', 'title', 'inGame'],
+  settings: ['title', 'pause', 'inGame'],
+  help: ['title', 'inGame'],
+  objectives: ['inGame'],
+  results: ['title', 'missionSelect'],
+  credits: ['title'],
+  bugReport: ['title', 'inGame', 'pause'],
+  recovery: ['inGame', 'title'],
+};
+
+const PARENT: Partial<Record<ScreenId, ScreenId>> = {
+  campaignSelect: 'title',
+  missionSelect: 'campaignSelect',
+  briefing: 'missionSelect',
+  skirmishSetup: 'title',
+  loading: 'title',
+  settings: 'title',
+  help: 'title',
+  objectives: 'inGame',
+  results: 'title',
+  credits: 'title',
+  bugReport: 'inGame',
+  recovery: 'inGame',
+  pause: 'inGame',
+};
+
+export class ScreenRouter {
+  private readonly root: HTMLElement;
+  private readonly screens: Record<ScreenId, ScreenModule>;
+  private readonly contextFactory: (router: ScreenRouter) => ScreenContext;
+  private context: ScreenContext | null = null;
+  private base: MountedScreen | null = null;
+  private overlays: MountedScreen[] = [];
+
+  constructor(
+    root: HTMLElement,
+    screens: Record<ScreenId, ScreenModule>,
+    contextFactory: (router: ScreenRouter) => ScreenContext,
+  ) {
+    this.root = root;
+    this.screens = screens;
+    this.contextFactory = contextFactory;
+  }
+
+  start(id: ScreenId = 'title'): void {
+    this.mountBase(id);
+  }
+
+  current(): ScreenId {
+    return this.overlays.at(-1)?.id ?? this.base?.id ?? 'title';
+  }
+
+  go(id: ScreenId): void {
+    const current = this.current();
+    if (id === current) {
+      return;
+    }
+
+    const overlay = this.isOverlayTarget(id, current);
+    if (!this.canGo(current, id)) {
+      this.reject(id);
+      return;
+    }
+
+    if (overlay) {
+      this.mountOverlay(id);
+    } else {
+      this.mountBase(id);
+    }
+  }
+
+  back(): void {
+    if (this.overlays.length > 0) {
+      this.popOverlay();
+      return;
+    }
+    if (!this.base) {
+      return;
+    }
+    if (this.base.id === 'inGame') {
+      this.go('pause');
+      return;
+    }
+    const parent = PARENT[this.base.id];
+    if (parent) {
+      this.go(parent);
+    }
+  }
+
+  private isOverlayTarget(id: ScreenId, current: ScreenId): boolean {
+    if (id === 'settings') {
+      return current === 'pause' && this.base?.id === 'inGame';
+    }
+    return OVERLAY_IDS.has(id) && this.base?.id === 'inGame';
+  }
+
+  private canGo(from: ScreenId, to: ScreenId): boolean {
+    return ALLOWED[from].includes(to);
+  }
+
+  private reject(id: ScreenId): void {
+    const message = `Screen transition not allowed: ${id}`;
+    if (import.meta.env.DEV) {
+      throw new Error(message);
+    }
+    console.warn(message);
+  }
+
+  private mountBase(id: ScreenId): void {
+    for (const overlay of [...this.overlays].reverse()) {
+      this.unmountScreen(overlay);
+    }
+    this.overlays = [];
+    if (this.base) {
+      this.unmountScreen(this.base);
+    }
+    const mounted = this.createScreen(id, false);
+    mounted.el.style.visibility = 'visible';
+    this.base = mounted;
+  }
+
+  private mountOverlay(id: ScreenId): void {
+    const top = this.currentMounted();
+    if (top) {
+      top.el.style.visibility = 'hidden';
+    }
+    const mounted = this.createScreen(id, true);
+    mounted.el.style.visibility = 'visible';
+    this.overlays.push(mounted);
+  }
+
+  private popOverlay(): void {
+    const mounted = this.overlays.pop();
+    if (!mounted) {
+      return;
+    }
+    this.unmountScreen(mounted);
+    const top = this.currentMounted();
+    if (top) {
+      top.el.style.visibility = 'visible';
+    }
+  }
+
+  private currentMounted(): MountedScreen | null {
+    return this.overlays.at(-1) ?? this.base;
+  }
+
+  private createScreen(id: ScreenId, overlay: boolean): MountedScreen {
+    const el = document.createElement('div');
+    el.className = `screen screen-${id}${overlay ? ' overlay' : ''}`;
+    el.dataset.screenId = id;
+    this.root.append(el);
+    const screen = this.screens[id];
+    const unmount = screen.mount(el, this.ensureContext());
+    return { id, el, unmount };
+  }
+
+  private unmountScreen(mounted: MountedScreen): void {
+    mounted.unmount();
+    mounted.el.remove();
+  }
+
+  private ensureContext(): ScreenContext {
+    if (!this.context) {
+      this.context = this.contextFactory(this);
+    }
+    return this.context;
+  }
+}
+<<<END FILE>>>
+<<<FILE src/ui/screens.ts>>>
+import { button } from './controls';
+import type { RendererHandle, ScreenContext, ScreenId, ScreenModule } from './router';
+
+type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
+
+function makeScreen(id: ScreenId, title: string, build?: Build): ScreenModule {
+  return {
+    id,
+    mount(root, ctx) {
+      root.replaceChildren();
+      const heading = document.createElement('h1');
+      heading.textContent = title;
+      root.append(heading);
+      const cleanup = build?.(root, ctx);
+      return () => {
+        cleanup?.();
+        root.replaceChildren();
+      };
+    },
+  };
+}
+
+function addButton(
+  root: HTMLElement,
+  screenId: string,
+  name: string,
+  label: string,
+  onClick: () => void,
+): void {
+  root.append(button(screenId, name, label, onClick));
+}
+
+function emit(name: string): void {
+  window.dispatchEvent(new CustomEvent(`tc:${name}`));
+}
+
+export function createScreens(): Record<ScreenId, ScreenModule> {
+  const screens: Record<ScreenId, ScreenModule> = {
+    title: makeScreen('title', 'TankCommand', (root, ctx) => {
+      addButton(root, 'title', 'campaign', 'Campaign', () => {
+        ctx.go('campaignSelect');
+      });
+      addButton(root, 'title', 'skirmish', 'Skirmish', () => {
+        ctx.go('skirmishSetup');
+      });
+      addButton(root, 'title', 'settings', 'Settings', () => {
+        ctx.go('settings');
+      });
+      addButton(root, 'title', 'credits', 'Credits', () => {
+        ctx.go('credits');
+      });
+      addButton(root, 'title', 'help', 'Help', () => {
+        ctx.go('help');
+      });
+    }),
+
+    campaignSelect: makeScreen('campaignSelect', 'Campaign'),
+
+    missionSelect: makeScreen('missionSelect', 'Select Mission'),
+
+    briefing: makeScreen('briefing', 'Briefing'),
+
+    skirmishSetup: makeScreen('skirmishSetup', 'Skirmish Setup', (root, ctx) => {
+      addButton(root, 'skirmishSetup', 'start', 'Start', () => {
+        ctx.go('loading');
+      });
+    }),
+
+    loading: makeScreen('loading', 'Loading', (_root, ctx) => {
+      const timer = window.setTimeout(() => {
+        ctx.go('inGame');
+      }, 200);
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }),
+
+    inGame: makeScreen('inGame', 'In Game', (root, ctx) => {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'game-canvas';
+      root.append(canvas);
+
+      let disposed = false;
+      let handle: RendererHandle | null = null;
+
+      const showError = (message: string): void => {
+        canvas.remove();
+        const errorEl = document.createElement('p');
+        errorEl.className = 'render-error';
+        errorEl.textContent = message;
+        root.prepend(errorEl);
+      };
+
+      void ctx
+        .attachRenderer(canvas)
+        .then((resolved) => {
+          if (disposed) {
+            resolved.dispose();
+            return;
+          }
+          handle = resolved;
+          if (resolved.error) {
+            showError(resolved.error);
+          }
+        })
+        .catch(() => {
+          if (!disposed) {
+            showError('3D rendering is unavailable on this device.');
+          }
+        });
+
+      addButton(root, 'inGame', 'pause', 'Pause', () => {
+        ctx.go('pause');
+      });
+
+      return () => {
+        disposed = true;
+        handle?.dispose();
+      };
+    }),
+
+    pause: makeScreen('pause', 'Paused', (root, ctx) => {
+      ctx.pauseSim(true);
+      addButton(root, 'pause', 'resume', 'Resume', () => {
+        ctx.router.back();
+      });
+      addButton(root, 'pause', 'settings', 'Settings', () => {
+        ctx.go('settings');
+      });
+      addButton(root, 'pause', 'bugReport', 'Report bug', () => {
+        ctx.go('bugReport');
+      });
+      addButton(root, 'pause', 'quit', 'Quit to title', () => {
+        ctx.go('title');
+      });
+      return () => {
+        ctx.pauseSim(false);
+      };
+    }),
+
+    settings: makeScreen('settings', 'Settings', (root, ctx) => {
+      addButton(root, 'settings', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    help: makeScreen('help', 'Help', (root, ctx) => {
+      addButton(root, 'help', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    objectives: makeScreen('objectives', 'Objectives'),
+
+    results: makeScreen('results', 'Results'),
+
+    credits: makeScreen('credits', 'Credits', (root, ctx) => {
+      const text = document.createElement('pre');
+      text.className = 'credits-text';
+      text.textContent = 'Loading credits...';
+      root.append(text);
+      let cancelled = false;
+      void Promise.resolve()
+        .then(() => fetch('./CREDITS.md'))
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return response.text();
+        })
+        .then((content) => {
+          if (!cancelled) {
+            text.textContent = content;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            text.textContent = 'Credits are unavailable in this environment.';
+          }
+        });
+      addButton(root, 'credits', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+      return () => {
+        cancelled = true;
+      };
+    }),
+
+    bugReport: makeScreen('bugReport', 'Report Bug', (root, ctx) => {
+      addButton(root, 'bugReport', 'back', 'Back', () => {
+        ctx.router.back();
+      });
+    }),
+
+    recovery: makeScreen('recovery', 'Recovery', (root) => {
+      addButton(root, 'recovery', 'resume', 'Resume', () => {
+        emit('recovery-resume');
+      });
+      addButton(root, 'recovery', 'loadAutosave', 'Load autosave', () => {
+        emit('recovery-load-autosave');
+      });
+      addButton(root, 'recovery', 'reportBug', 'Send bug report & return to menu', () => {
+        emit('recovery-report-bug');
+      });
+    }),
+  };
+
+  return screens;
+}
+<<<END FILE>>>
+<<<FILE src/testhook/testhook.ts>>>
+import type { App } from '../app';
+import { ControlInventory } from '../ui/controls';
+import type { ScreenId } from '../ui/router';
+import type { WorldState } from '../sim/world';
+import type { RenderStats } from '../render/renderer';
+
+export interface TestHook {
+  snapshot(): WorldState;
+  sendCommand(command: unknown): boolean;
+  screen(): string;
+  renderStats(): RenderStats;
+  freezeSim(ms: number): void;
+  pauseSim(paused: boolean): void;
+  controls(): string[];
+  go(screenId: string): void;
+}
+
+export function installTestHook(app: App): void {
+  const hook: TestHook = {
+    snapshot: () => app.snapshot(),
+    sendCommand: (command) => app.sendCommand(command),
+    screen: () => app.router.current(),
+    renderStats: () => app.renderStats(),
+    freezeSim: (ms) => {
+      app.freezeSim(ms);
+    },
+    pauseSim: (paused) => {
+      app.pauseSim(paused);
+    },
+    controls: () => ControlInventory.all(),
+    go: (screenId) => {
+      app.router.go(screenId as ScreenId);
+    },
+  };
+
+  (window as unknown as { __TC_TEST__?: TestHook }).__TC_TEST__ = hook;
+}
+<<<END FILE>>>
+<<<FILE tests/unit/ui.test.ts>>>
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { createScreens } from '../../src/ui/screens';
+import { ControlInventory } from '../../src/ui/controls';
+import {
+  ScreenRouter,
+  type RendererHandle,
+  type ScreenContext,
+  type ScreenId,
+} from '../../src/ui/router';
+
+function makeContext(router: ScreenRouter): ScreenContext {
+  return {
+    router,
+    go: (id) => {
+      router.go(id);
+    },
+    pauseSim: () => undefined,
+    attachRenderer: () =>
+      Promise.resolve<RendererHandle>({ error: null, dispose: () => undefined }),
+  };
+}
+
+const stubRouter = {
+  go: () => undefined,
+  back: () => undefined,
+  current: () => 'title',
+} as unknown as ScreenRouter;
+
+function makeRoot(): HTMLDivElement {
+  const root = document.createElement('div');
+  document.body.append(root);
+  return root;
+}
+
+describe('ui shell', () => {
+  it('[UI-01] every screen mounts and unmounts without leaving nodes behind', () => {
+    const screens = createScreens();
+    const ids = Object.keys(screens) as ScreenId[];
+    const ctx = makeContext(stubRouter);
+
+    for (const id of ids) {
+      const holder = document.createElement('div');
+      document.body.append(holder);
+      const screen = screens[id];
+      const unmount = screen.mount(holder, ctx);
+      unmount();
+      expect(holder.childNodes.length).toBe(0);
+      holder.remove();
+    }
+  });
+
+  it('[UI-02] overlays stack and back pops settings then pause to inGame', () => {
+    const root = makeRoot();
+    const screens = createScreens();
+    const router = new ScreenRouter(root, screens, (r) => makeContext(r));
+
+    router.start('title');
+    router.go('skirmishSetup');
+    router.go('loading');
+    router.go('inGame');
+    router.go('pause');
+    router.go('settings');
+
+    expect(router.current()).toBe('settings');
+    expect(root.querySelectorAll('[data-screen-id]').length).toBe(3);
+
+    router.back();
+    expect(router.current()).toBe('pause');
+    expect(root.querySelectorAll('[data-screen-id="settings"]').length).toBe(0);
+
+    router.back();
+    expect(router.current()).toBe('inGame');
+  });
+
+  it('[UI-03] rapid repeated go to settings mounts only one settings root', () => {
+    const root = makeRoot();
+    const screens = createScreens();
+    const router = new ScreenRouter(root, screens, (r) => makeContext(r));
+    router.start('title');
+
+    for (let i = 0; i < 20; i += 1) {
+      router.go('settings');
+    }
+
+    expect(root.querySelectorAll('[data-screen-id="settings"]').length).toBe(1);
+  });
+
+  it('[UI-04] every registered control id is listed in the inventory file', () => {
+    ControlInventory.clear();
+    const screens = createScreens();
+    const ctx = makeContext(stubRouter);
+    const ids = Object.keys(screens) as ScreenId[];
+
+    for (const id of ids) {
+      const holder = document.createElement('div');
+      document.body.append(holder);
+      const unmount = screens[id].mount(holder, ctx);
+      unmount();
+      holder.remove();
+    }
+
+    const registered = ControlInventory.all();
+    const listed = JSON.parse(
+      readFileSync('tests/controls.inventory.json', 'utf8'),
+    ) as string[];
+    const missing = registered.filter((id) => !listed.includes(id));
+    expect(missing).toEqual([]);
+  });
+});
+<<<END FILE>>>
+<<<FILE tests/e2e/helpers.ts>>>
+import { expect, type Page } from '@playwright/test';
+import { inflateSync } from 'node:zlib';
+
+export interface TestSnapshot {
+  tick: number;
+  seed: number;
+  rngState: number;
+  counter: number;
+}
+
+export interface RenderStats {
+  loadedModels: string[];
+  meshCount: number;
+  drawCalls: number;
+  frame: number;
+}
+
+export interface TestHook {
+  snapshot(): TestSnapshot;
+  sendCommand(command: unknown): boolean;
+  screen(): string;
+  renderStats(): RenderStats;
+  freezeSim(ms: number): void;
+  pauseSim(paused: boolean): void;
+  controls(): string[];
+  go(screenId: string): void;
+}
+
+declare global {
+  interface Window {
+    __TC_TEST__?: TestHook;
+  }
+}
+
+export async function waitForHook(page: Page): Promise<void> {
+  await page.waitForFunction(() => window.__TC_TEST__ !== undefined);
+}
+
+export async function enterGame(page: Page): Promise<void> {
+  await page.goto('/');
+  await waitForHook(page);
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await page.waitForFunction(() => (window.__TC_TEST__?.renderStats().frame ?? 0) > 0);
+}
+
+export async function assertButtonLayout(page: Page): Promise<void> {
+  const boxes = await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter(
+      (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      },
+    );
+
+    return buttons.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        id: element.dataset.controlId ?? element.textContent ?? 'button',
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+  });
+
+  for (const box of boxes) {
+    expect(box.width, `${box.id} width`).toBeGreaterThanOrEqual(44);
+    expect(box.height, `${box.id} height`).toBeGreaterThanOrEqual(44);
+  }
+
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (!a || !b) {
+        continue;
+      }
+      const overlaps =
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y;
+      expect(overlaps, `${a.id} overlaps ${b.id}`).toBe(false);
+    }
+  }
+}
+
+export function countDistinctPngColors(buffer: Buffer): number {
+  const signature = buffer.subarray(0, 8).toString('hex');
+  if (signature !== '89504e470d0a1a0a') {
+    throw new Error('Not a PNG');
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idat: Buffer[] = [];
+
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8] ?? 0;
+      colorType = data[9] ?? 0;
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset += 12 + length;
+  }
+
+  if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+    throw new Error(`Unsupported PNG format: bitDepth=${bitDepth} colorType=${colorType}`);
+  }
+
+  const bpp = colorType === 6 ? 4 : 3;
+  const stride = width * bpp;
+  const raw = inflateSync(Buffer.concat(idat));
+  const out = Buffer.alloc(stride * height);
+  let pos = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[pos];
+    pos += 1;
+    if (filter === undefined) {
+      throw new Error('Truncated PNG');
+    }
+    const rowStart = y * stride;
+    for (let x = 0; x < stride; x += 1) {
+      const rawByte = raw[pos];
+      pos += 1;
+      if (rawByte === undefined) {
+        throw new Error('Truncated PNG');
+      }
+      const left = x >= bpp ? out[rowStart + x - bpp] ?? 0 : 0;
+      const up = y > 0 ? out[rowStart - stride + x] ?? 0 : 0;
+      const upLeft = y > 0 && x >= bpp ? out[rowStart - stride + x - bpp] ?? 0 : 0;
+      let value = 0;
+      if (filter === 0) {
+        value = rawByte;
+      } else if (filter === 1) {
+        value = rawByte + left;
+      } else if (filter === 2) {
+        value = rawByte + up;
+      } else if (filter === 3) {
+        value = rawByte + Math.floor((left + up) / 2);
+      } else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const predictor = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        value = rawByte + predictor;
+      } else {
+        throw new Error(`Unsupported PNG filter ${filter}`);
+      }
+      out[rowStart + x] = value & 0xff;
+    }
+  }
+
+  const colors = new Set<string>();
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * stride + x * bpp;
+      colors.add(`${out[index] ?? 0},${out[index + 1] ?? 0},${out[index + 2] ?? 0}`);
+    }
+  }
+  return colors.size;
+}
+<<<END FILE>>>
+<<<FILE tests/e2e/game.spec.ts>>>
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect, test } from '@playwright/test';
+import {
+  assertButtonLayout,
+  countDistinctPngColors,
+  enterGame,
+  waitForHook,
+} from './helpers';
+
+test('[ASSET-10] the real PoC tank loads through the registry, loader and GLTF decoder', async ({
+  page,
+}) => {
+  await enterGame(page);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.renderStats().loadedModels ?? []))
+    .toContain('unit.human.poc_tank');
+  const stats = await page.evaluate(() => window.__TC_TEST__?.renderStats());
+  expect(stats?.meshCount ?? 0).toBeGreaterThan(1);
+});
+
+test('[HOOK-02] test hook validates commands and invalid commands change nothing', async ({ page }) => {
+  await enterGame(page);
+
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
+  const before = await page.evaluate(() => window.__TC_TEST__?.snapshot());
+  const accepted = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return false;
+    }
+    const current = hook.snapshot();
+    return hook.sendCommand({
+      kind: 'debug.addCounter',
+      amount: 1000,
+      tick: current.tick + 1,
+      issuer: 1,
+    });
+  });
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
+
+  expect(accepted).toBe(true);
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0))
+    .toBeGreaterThanOrEqual((before?.counter ?? 0) + 1000);
+
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(true));
+  const beforeInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
+  const rejected = await page.evaluate(() => {
+    const hook = window.__TC_TEST__;
+    if (!hook) {
+      return true;
+    }
+    return hook.sendCommand({
+      kind: 'debug.addCounter',
+      amount: 1 / 0,
+      tick: hook.snapshot().tick + 1,
+      issuer: 1,
+    });
+  });
+  await page.waitForTimeout(150);
+  const afterInvalid = await page.evaluate(() => window.__TC_TEST__?.snapshot().counter ?? 0);
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
+
+  expect(rejected).toBe(false);
+  expect(afterInvalid).toBe(beforeInvalid);
+});
+
+test('[REND-01] canvas is non-blank and frames increase', async ({ page }) => {
+  await enterGame(page);
+  const canvas = page.locator('canvas');
+  await canvas.waitFor({ state: 'visible' });
+  const screenshot = await canvas.screenshot();
+  expect(countDistinctPngColors(screenshot)).toBeGreaterThan(2);
+
+  const first = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(1000);
+  const second = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(second).toBeGreaterThan(first);
+});
+
+test('[REND-02] hidden page stops frames and resumes without sim-time jump', async ({ page }) => {
+  await enterGame(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForTimeout(500);
+  const hiddenFirst = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(300);
+  const hiddenSecond = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(hiddenSecond).toBe(hiddenFirst);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const tickBefore = await page.evaluate(() => window.__TC_TEST__?.snapshot().tick ?? 0);
+  const started = Date.now();
+  await page.waitForTimeout(500);
+  const tickAfter = await page.evaluate(() => window.__TC_TEST__?.snapshot().tick ?? 0);
+  const visibleMs = Date.now() - started;
+  expect(tickAfter - tickBefore).toBeLessThanOrEqual(Math.ceil(visibleMs / 50) * 2 + 2);
+
+  const resumedFirst = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  await page.waitForTimeout(300);
+  const resumedSecond = await page.evaluate(() => window.__TC_TEST__?.renderStats().frame ?? 0);
+  expect(resumedSecond).toBeGreaterThan(resumedFirst);
+});
+
+test('[WD-04] frozen sim shows the recovery screen with three buttons', async ({ page }) => {
+  await enterGame(page);
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+  await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
+  await expect(page.getByRole('button', { name: 'Resume', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Load autosave', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Send bug report & return to menu', exact: true }),
+  ).toBeVisible();
+});
+
+test('[UI-05] all controls meet touch size and do not overlap across the main flow', async ({ page }) => {
+  await page.goto('/');
+  await waitForHook(page);
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Campaign', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'title');
+
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Report bug', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.keyboard.press('Escape');
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Quit to title', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Credits', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Help', exact: true }).click();
+  await assertButtonLayout(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
+  await page.evaluate(() => window.__TC_TEST__?.freezeSim(6000));
+  await expect(page.locator('[data-screen-id="recovery"]')).toBeVisible({ timeout: 7000 });
+  await assertButtonLayout(page);
+
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await page.getByRole('button', { name: 'Load autosave', exact: true }).click();
+  await page.getByRole('button', { name: 'Send bug report & return to menu', exact: true }).click();
+  await assertButtonLayout(page);
+});
+
+test('[BUILD-01] built index uses relative urls and copies public assets', () => {
+  const index = readFileSync(join(process.cwd(), 'dist/index.html'), 'utf8');
+  expect(index).not.toMatch(/(?:src|href)="\//);
+  expect(readFileSync(join(process.cwd(), 'dist/assets/manifest.json'), 'utf8')).toContain(
+    'unit.human.poc_tank',
+  );
+  expect(() =>
+    readFileSync(join(process.cwd(), 'dist/assets/models/human/poc_tank.glb')),
+  ).not.toThrow();
+});
+<<<END FILE>>>
+<<<REPORT>>>
+# Fix round 1
+
+## Fixes
+
+### 1. Lint errors (13 → 0)
+
+- **`src/app.ts:5`** — `ScreenId` was imported but never referenced. Removed it from the import.
+- **`src/assets/threeDecoders.ts:17`** (`prefer-promise-reject-errors`) — the GLTF parse error callback forwarded a possibly-non-Error rejection reason. Wrapped it: `reject(error instanceof Error ? error : new Error(String(error)))`.
+- **`src/assets/threeDecoders.ts:28`** (`require-await`) — `audio` was declared `async` but never awaited. Changed to `(buffer) => Promise.resolve(buffer)`.
+- **`src/platform/kv.ts`** (`require-await` × 8) — `MemoryKvStore` and `WebKvStore` methods were `async` with no `await`. Rewrote them as plain methods returning `Promise.resolve(...)` / `Promise.reject(...)` (with a `toError` helper so non-Error throws become rejection reasons). Quota detection/extraction is unchanged.
+- **`src/platform/watchdog.ts:133,143`** (`no-unsafe-assignment`) — `ErrorEvent.error` and `PromiseRejectionEvent.reason` are typed `any` in `lib.dom`, and assigning to a `const` triggered the rule. Replaced with `const rawError: unknown = errorEvent.error;` / `const reason: unknown = rejection.reason;` and narrowed with `instanceof Error` before building the report.
+
+### 2. E2E determinism
+
+- **`freezeSim` semantics decided.** `freezeSim(ms)` keeps its exact meaning: a timed freeze that suppresses sim steps **and** sim watchdog beats, used only by WD-04 to make the watchdog trip within a bounded window. It is not a general-purpose "pause".
+- **New hook method `pauseSim(paused)`.** Added to `TestHook` (`src/testhook/testhook.ts`, `tests/e2e/helpers.ts`) and to `App` (`pauseSim(paused: boolean)`) which delegates to the same UI-pause path the pause screen now uses (`ScreenContext.pauseSim`). Internally `App` now tracks `uiPaused` and `lifecyclePaused` separately and derives the effective `paused` flag (`applyPauseState`), so the pause screen and the visibility lifecycle don't clobber each other. `pause()`’s `watchdog.setSuspended(true)` + `stopLoop()` and `resume()`’s `setSuspended(false)` + `startLoop()` are preserved.
+- **`src/ui/screens.ts` pause screen** now actually pauses the sim: `ctx.pauseSim(true)` on mount, `ctx.pauseSim(false)` in its unmount cleanup (which the router runs when the pause overlay is popped or replaced). This makes the "same path the pause screen uses" true.
+- **HOOK-02 rewritten** to use `pauseSim(true)` instead of `freezeSim`. Root cause of the flake: `freezeSim(1000)` only guaranteed "no sim steps for the next second"; each `page.evaluate` round-trip cost tens to hundreds of ms, so on some runs the 1 s budget expired mid-test, the sim resumed, ~2 extra ticks ran (counter 90 → 110), and the `afterInvalid === beforeInvalid` assertion tripped. With `pauseSim`, the sim is genuinely stopped (rAF cancelled, `paused` flag set), and the counter cannot move. Test amount was raised to 1000 so that even if the command were silently dropped the RNG-driven counter could not reach the threshold within the 5 s poll budget — the assertion is now strict, not permissive.
+- **UI-05 root cause: stale watchdog beats.** After the async renderer chunk resolves and `startLoop()` runs, the watchdog constructor's `lastBeat` (set at page load) could already be >2 s old — the first frames run at ~60 Hz so no sim step (and thus no `beat('sim')`) happens until 50 ms elapsed. On the tablet viewport (higher resolution → slightly slower render startup) the very first `check()` crossed the 2 s threshold and `onFreeze` navigated to `recovery`, which hides the `inGame` base (`visibility: hidden`) and removed the Pause button from the accessibility tree before the click could land. Fix: `startLoop()` now calls `watchdog.beat('sim')` and `watchdog.beat('render')` before starting the interval, so every loop start (initial mount, resume from lifecycle pause, resume from UI pause) begins a fresh watchdog window.
+
+### 3. Bundle split
+
+`src/app.ts` no longer statically imports `RenderView`. `App.attachRenderer` now returns `Promise<RendererHandle>` and does `import('./render/renderer')` — a lazy chunk containing three.js and the decoders. `ScreenContext.attachRenderer`, the `inGame` screen, and the unit-test mock were updated to the async shape (screen awaits, then either stores the handle or renders the "3D rendering is unavailable" message). To keep the build warning-free with a lazily-loaded `three` chunk (~700 kB minified) the `vite.config.ts` `build.chunkSizeWarningLimit` was raised to 1000 with an inline comment. The main chunk no longer contains three.js, and `dist/index.html` remains relative.
+
+### 4. Ripple changes
+
+- `src/ui/router.ts` — `ScreenContext.attachRenderer` type is now `(canvas) => Promise<RendererHandle>`; added `pauseSim: (paused: boolean) => void` to the context.
+- `src/ui/screens.ts` — `inGame` handles the async renderer (and shows the fallback message on rejection); pause screen uses `ctx.pauseSim(true|false)` on mount/unmount.
+- `tests/unit/ui.test.ts` — mock context updated with `pauseSim` and `Promise.resolve`-returning `attachRenderer`; imports `RendererHandle` for the typed promise.
+- `tests/e2e/helpers.ts` — `TestHook` interface gained `pauseSim(paused: boolean): void`.
+- `tests/e2e/game.spec.ts` — HOOK-02 only.
+
+## Files changed
+
+- `vite.config.ts` — `chunkSizeWarningLimit: 1000` for the three.js lazy chunk.
+- `src/app.ts` — dynamic renderer import, `pauseSim`, watchdog beat reset in `startLoop`, split `uiPaused`/`lifecyclePaused`, removed unused import.
+- `src/assets/threeDecoders.ts` — wrap rejection reason, non-async audio decoder.
+- `src/platform/kv.ts` — sync methods returning `Promise.resolve`/`Promise.reject`, `toError` helper.
+- `src/platform/watchdog.ts` — `unknown` narrowing in error capture.
+- `src/ui/router.ts` — `attachRenderer` returns `Promise`, `pauseSim` added to context.
+- `src/ui/screens.ts` — async inGame attach, pause screen truly pauses the sim.
+- `src/testhook/testhook.ts` — `pauseSim` on the hook.
+- `tests/unit/ui.test.ts` — mock context for new `ScreenContext` shape.
+- `tests/e2e/helpers.ts` — `pauseSim` in the `TestHook` type.
+- `tests/e2e/game.spec.ts` — HOOK-02 rewritten deterministically.
+
+## Expected results
+
+- `npm run lint` — 0 errors, 0 warnings.
+- `npm test` — 52/52 pass (no test-code changes to sim/assets/data/saves/watchdog/lifecycle/config/lint suites).
+- `npm run build` — no chunk-size warning; three.js in its own lazy chunk.
+- `npm run test:e2e` — HOOK-02 and UI-05 both deterministic; the desktop-only HOOK-01 remains skipped on phone/tablet as designed.
+
+## Remaining uncertainty
+
+- `@capacitor/filesystem` `readdir` result typing is still cast defensively; not exercised by unit tests (as allowed).
+- The PNG screenshot decoder in `tests/e2e/helpers.ts` still assumes Playwright emits 8-bit RGB/RGBA non-interlaced PNGs — unchanged, and REND-01 passed in all three viewports on the last run.
+<<<END REPORT>>>

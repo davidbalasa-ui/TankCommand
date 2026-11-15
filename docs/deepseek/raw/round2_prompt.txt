@@ -1,0 +1,74 @@
+I ran your output for real (Node 22, after `npm install`). Results:
+
+- `npm run typecheck`: PASS
+- `npm test`: PASS (52 tests)
+- `npm run credits:check`, `npm run coverage:req`, `npm run build`: PASS (build warns that the main chunk is 702 kB)
+- `npm run lint`: FAIL (13 errors, output below)
+- `npm run test:e2e`: 20 passed, 2 failed, 2 skipped (the skips are your intentional desktop-only HOOK-01). The two failures look like timing races: each test passed in the other two viewports. Output below.
+
+Fix round. Rules:
+1. Fix every lint error properly (no eslint-disable comments, no weakening the lint config).
+2. Make both failing e2e tests deterministic, not just more patient. HOOK-02 races against the running sim: `freezeSim` evidently does not stop sim steps (the counter moved from 90 to 110 while "frozen"), or freezeSim only stops the watchdog beat. Decide what freezeSim should mean (the spec says it blocks sim beats for the watchdog test) and give the hook a separate deterministic way to stop the sim for HOOK-02, e.g. a `pauseSim(bool)` hook method that pauses the simulation through the same path the pause screen uses. The UI-05 tablet failure: the Pause button was not found after entering inGame. Find the real cause (e.g. a screen transition still in flight, the loading screen timing, or the button hidden behind an overlay) and fix the cause.
+3. Split three.js out of the main chunk with a dynamic import of the renderer so the build has no chunk-size warning.
+4. Return ONLY the files you changed, as full files, in the same block format, then a short REPORT block listing each fix and its root cause.
+
+=== lint output ===
+
+/home/user/TankCommand/src/app.ts
+  5:70  error  'ScreenId' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/user/TankCommand/src/assets/threeDecoders.ts
+  17:13  error  Expected the Promise rejection reason to be an Error  @typescript-eslint/prefer-promise-reject-errors
+  28:5   error  Async method 'audio' has no 'await' expression        @typescript-eslint/require-await
+
+/home/user/TankCommand/src/platform/kv.ts
+  22:3  error  Async method 'get' has no 'await' expression     @typescript-eslint/require-await
+  26:3  error  Async method 'set' has no 'await' expression     @typescript-eslint/require-await
+  30:3  error  Async method 'remove' has no 'await' expression  @typescript-eslint/require-await
+  34:3  error  Async method 'keys' has no 'await' expression    @typescript-eslint/require-await
+  58:3  error  Async method 'get' has no 'await' expression     @typescript-eslint/require-await
+  62:3  error  Async method 'set' has no 'await' expression     @typescript-eslint/require-await
+  73:3  error  Async method 'remove' has no 'await' expression  @typescript-eslint/require-await
+  77:3  error  Async method 'keys' has no 'await' expression    @typescript-eslint/require-await
+
+/home/user/TankCommand/src/platform/watchdog.ts
+  133:11  error  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
+  143:11  error  Unsafe assignment of an `any` value  @typescript-eslint/no-unsafe-assignment
+
+✖ 13 problems (13 errors, 0 warnings)
+
+
+=== e2e failures ===
+  1) [tablet] › tests/e2e/game.spec.ts:119:1 › [UI-05] all controls meet touch size and do not overlap across the main flow 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Pause', exact: true })
+
+
+      133 |   await assertButtonLayout(page);
+      134 |
+    > 135 |   await page.getByRole('button', { name: 'Pause', exact: true }).click();
+          |                                                                  ^
+      136 |   await assertButtonLayout(page);
+      137 |
+      138 |   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+        at /home/user/TankCommand/tests/e2e/game.spec.ts:135:66
+  2) [desktop] › tests/e2e/game.spec.ts:22:1 › [HOOK-02] test hook validates commands and invalid commands change nothing 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 90
+    Received: 110
+
+      60 |
+      61 |   expect(rejected).toBe(false);
+    > 62 |   expect(afterInvalid).toBe(beforeInvalid);
+         |                        ^
+      63 | });
+      64 |
+      65 | test('[REND-01] canvas is non-blank and frames increase', async ({ page }) => {
+        at /home/user/TankCommand/tests/e2e/game.spec.ts:62:24
+
