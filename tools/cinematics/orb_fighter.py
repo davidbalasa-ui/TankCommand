@@ -648,3 +648,152 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                         kp.interpolation = 'CONSTANT'
     sc.frame_set(f0)
     return root
+
+
+# ================================================================== arm v2 (2026-11-15): many short sleeved segments
+# on real Blender bones. David: mechanical joints that flow and bend naturally. Three long rigid segments could only
+# make spider-leg angles; a dozen short tapering segments, each sleeved into the next like vertebrae / armour
+# plates, add up to a continuous curve while every joint still reads as machined.
+ARM_N = 12
+ARM_LEN = 10.6
+
+
+def arm_dims(n=ARM_N, total=ARM_LEN):
+    w = [1.0 - 0.45 * i / (n - 1) for i in range(n)]               # segments shorten toward the tip
+    k = total / sum(w)
+    lens = [x * k for x in w]
+    rad = [0.36 - 0.26 * (i / (n - 1)) ** 0.9 for i in range(n + 1)]  # radius at each joint, base -> tip
+    return lens, rad
+
+
+def _vertebra(l, r0, r1, last=False):
+    """One arm segment along +X from its joint (0) to the next joint (l). Rear sleeve flares back over the
+    previous joint so a bend never shows a gap."""
+    F.tube((0, 0, 0), (l, 0, 0), [(0, r0 * 0.78), (0.12, r0 * 0.92), (0.88, r1 * 0.95), (1, r1 * 0.8)], 12, 'shell',
+           sharp=40)
+    # armour sleeve: cup over the previous joint, tapering to the waist before the next
+    F.tube((-0.22 * l, 0, 0), (0.68 * l, 0, 0),
+           [(0, r0 * 1.22), (0.08, r0 * 1.34), (0.55, (r0 + r1) * 0.62), (1, r1 * 1.12)], 12, 'bronze', sharp=35)
+    # clamp band and a glowing joint ring sitting in the gap
+    F.tube((0.74 * l, 0, 0), (0.8 * l, 0, 0), [(0, r1 * 1.18), (1, r1 * 1.18)], 12, 'pale')
+    F.tube((-0.02 * l, 0, 0), (0.03 * l, 0, 0), [(0, r0 * 1.02), (1, r0 * 1.02)], 16, 'glow', caps=False)
+    # dorsal crest plate (outer side = +Z) and the glowing tendon under it
+    F.sweep([(-0.1 * l, 0, r0 * 1.25), (0.3 * l, 0, r0 * 1.48), (0.62 * l, 0, r1 * 1.25)],
+            [(0.03, 0.05), (0.05, 0.1), (0.02, 0.04)], 'pale', sides=4)
+    F.sweep([(0.05 * l, 0, r0 * 0.95), (0.5 * l, 0, (r0 + r1) * 0.5), (0.95 * l, 0, r1 * 0.92)],
+            [(0.035, 0.035)] * 3, 'glow', sides=4)
+    # ventral grip studs
+    for f in (0.3, 0.55):
+        F.orb((f * l, 0, -(r0 * (1 - f) + r1 * f) * 1.05), 0.05 + r1 * 0.12, 'pale', seg=(6, 4))
+    if last:
+        _harpoon(Vector((l, 0, 0)), Vector((1, 0, 0)), Vector((0, 0, 1)))
+
+
+def orb_rig2(name='Orb'):
+    """Body + armature with 8 bone chains (ARM_N bones each); one sleeved segment mesh per bone, a compact lightning
+    nacelle on bone 1. Returns (arm_obj, root_body, legs) where legs[k] = dict(bones=[names], rad, tan, base, nac,
+    plume, var, lamp)."""
+    from mathutils import Matrix
+    ax = Vector((1, 0, 0))
+    lens, rads = arm_dims()
+    with AF.gold_palette():
+        base._faction('kesh')
+
+        def body():
+            _body()
+            for k in range(8):
+                a = 2 * math.pi * k / 8 + math.pi / 8
+                rad = Vector((0, math.cos(a), math.sin(a)))
+                F.tube(tuple(rad * RING * 0.88), tuple(rad * RING * 1.12), [(0, 0.42), (1, 0.38)], 10, 'bronze')
+                F.orb(tuple(rad * RING * 1.12), 0.4, 'bronze', seg=(12, 8))
+        root = _part(body, name)
+        seg_mesh = []
+        for j in range(ARM_N):
+            ob = _part(lambda j=j: _vertebra(lens[j], rads[j], rads[j + 1], last=j == ARM_N - 1), f'{name}V{j}')
+            ob.data.transform(Matrix.Rotation(math.pi / 2, 4, 'Z'))       # build axis +X -> bone axis +Y
+            seg_mesh.append(ob.data)
+            bpy.data.objects.remove(ob)
+        nac = _part(lambda: _nacelle(Vector((0, 0, 0)), ax, Vector((0, 0, 1))), f'{name}Nac')
+        nac.data.transform(Matrix.Scale(0.62, 4))
+        nac_mesh = nac.data
+        bpy.data.objects.remove(nac)
+    cx = X0 - R_ * 0.45
+    pl = SFX.C.uv_sphere(name + 'CorePlasma', R_ * 0.57, seg=(32, 16), mat=SFX._plasma('OrbCorePlasmaM', GOLD, 6.0, 3.0))
+    pl.location = (cx, 0, 0)
+    pl.parent = root
+    gl = SFX.C.uv_sphere(name + 'CoreGlow', R_ * 0.72, seg=(32, 16), mat=SFX._halo('OrbCoreGlowM', GOLD, 0.6, 4.0))
+    gl.location = (cx + 0.15, 0, 0)
+    gl.visible_shadow = False
+    gl.parent = root
+    lt = SFX._link(bpy.data.objects.new(name + 'CoreLight', bpy.data.lights.new(name + 'CoreLight', 'POINT')))
+    lt.location = (X0 + 0.6, 0, 0)
+    lt.data.color = GOLD
+    lt.data.energy = 600
+    lt.parent = root
+    # ---- armature
+    ad = bpy.data.armatures.new(name + 'Arms')
+    arm = SFX._link(bpy.data.objects.new(name + 'Arms', ad))
+    arm.parent = root
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.context.view_layer.objects.active = arm
+    arm.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    legs = []
+    for k in range(8):
+        a = 2 * math.pi * k / 8 + math.pi / 8
+        rad = Vector((0, math.cos(a), math.sin(a)))
+        tan = Vector((0, -math.sin(a), math.cos(a)))
+        d0 = (-ax * 0.75 + rad * 0.66).normalized()                    # rest: swept back and out
+        p = rad * RING * 1.12
+        names, prev = [], None
+        for j in range(ARM_N):
+            b = ad.edit_bones.new(f'L{k}_{j}')
+            b.head = p
+            b.tail = p + d0 * lens[j]
+            b.align_roll(rad - d0 * d0.dot(rad))                         # bone Z = outward (crest side)
+            if prev is not None:
+                b.parent = prev
+                b.use_connect = True
+            prev = b
+            names.append(b.name)
+            p = b.tail.copy()
+        legs.append(dict(bones=names, rad=rad, tan=tan, base=rad * RING * 1.12, k=k, d0=d0))
+    bpy.ops.object.mode_set(mode='OBJECT')
+    for L in legs:
+        for j, bn in enumerate(L['bones']):
+            o = SFX._link(bpy.data.objects.new(f'{name}Leg{L["k"]}Seg{j}', seg_mesh[j]))
+            o.parent = arm
+            o.parent_type = 'BONE'
+            o.parent_bone = bn
+            o.matrix_world = arm.matrix_world @ ad.bones[bn].matrix_local
+        nb = L['bones'][1]
+        nac = SFX._link(bpy.data.objects.new(f'{name}Leg{L["k"]}Nacelle', nac_mesh))
+        nac.rotation_mode = 'QUATERNION'
+        nac.parent = arm
+        nac.parent_type = 'BONE'
+        nac.parent_bone = nb
+        # nacelle rides on the outer side of bone 1, nozzle aft (down the bone toward the body)
+        bm = arm.matrix_world @ ad.bones[nb].matrix_local
+        nac.matrix_world = bm @ Matrix.Translation((0, lens[1] * 0.5, rads[1] * 1.9)) @ Matrix.Rotation(-math.pi / 2, 4, 'Z')
+        pe, variants = _bolt_thruster(f'{name}Leg{L["k"]}Plume', 5.0, 300 + L['k'])
+        pe.parent = nac
+        pe.location = (-1.4 * 0.62, 0, 0)
+        pe.scale = (0.7, 0.7, 0.7)
+        lamp = SFX._link(bpy.data.objects.new(f'{name}Leg{L["k"]}PlumeLight', bpy.data.lights.new(f'{name}Leg{L["k"]}PL', 'POINT')))
+        lamp.data.color = GOLD
+        lamp.data.energy = 0
+        lamp.parent = pe
+        lamp.location = (-1.0, 0, 0)
+        L.update(nac=nac, plume=pe, var=variants, lamp=lamp)
+    return arm, root, legs
+
+
+def pose_arm(arm, leg, bends, twist=0.0):
+    """Stills / tests: bend every joint of one leg. bends = list of (about_x, about_z) degrees per joint."""
+    from mathutils import Quaternion
+    for j, bn in enumerate(leg['bones']):
+        pb = arm.pose.bones[bn]
+        pb.rotation_mode = 'QUATERNION'
+        bx, bz = bends[j] if j < len(bends) else (0, 0)
+        pb.rotation_quaternion = Quaternion((1, 0, 0), math.radians(bx)) @ Quaternion((0, 0, 1), math.radians(bz)) @ \
+            Quaternion((0, 1, 0), math.radians(twist))

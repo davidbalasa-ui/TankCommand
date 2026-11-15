@@ -324,6 +324,17 @@ def lightning_engines(ob, name, nozzles, r, length, thr_keys=None, len_keys=None
 
 # ================================================================== Terran ships
 def terran_ship(kind, name=None):
+    """kind: dread | bship | frigate | missile | corvette | twinx. Returns (object, extra).
+    Turrets come out as live parts (fleet_life): a yawing base and a pitching, recoiling gun."""
+    import fleet_life as FL
+    with FL.capture_turrets() as specs:
+        ob, extra = _terran_ship_raw(kind, name)
+    if specs:
+        FL.add_turrets(ob, specs)
+    return ob, extra
+
+
+def _terran_ship_raw(kind, name=None):
     """kind: dread | bship | frigate | missile | corvette | twinx. Returns (object, extra)."""
     import terran_fleet as T
     import ships_hd as hd
