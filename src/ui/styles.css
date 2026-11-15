@@ -661,13 +661,6 @@ h1.title-name {
   color: var(--cyan);
 }
 
-.title-tag {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--dim);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-}
 
 .title-menu {
   position: absolute;
@@ -3073,4 +3066,486 @@ button.corner-action {
 
 .hud-shell button.hud-queue-tile.research.waiting {
   opacity: 0.6;
+}
+
+/* ---------- Pause menu (redesign v2) ----------
+ * A card over the battlefield, which stays visible behind it, dimmed and softened. */
+.screen-pause.overlay {
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 45%, rgba(6, 11, 19, 0.32) 0%, rgba(4, 7, 12, 0.7) 80%);
+  backdrop-filter: blur(4px) saturate(0.8);
+  -webkit-backdrop-filter: blur(5px) saturate(0.8);
+  animation: pause-fade 0.18s ease-out;
+}
+
+@keyframes pause-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.pause-card {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(160deg, rgba(20, 34, 54, 0.94), rgba(9, 15, 26, 0.96));
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: pause-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pause-rise {
+  from {
+    transform: translateY(10px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+.pause-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.pause-head h1 {
+  margin: 0 6px 0 0;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pause-clock,
+.pause-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--soft);
+}
+
+.pause-clock .ico,
+.pause-goal .ico {
+  width: 16px;
+  height: 16px;
+  color: var(--cyan);
+}
+
+.pause-goal {
+  flex-basis: 100%;
+  color: var(--dim);
+}
+
+.pause-goal .ico {
+  color: var(--orange);
+}
+
+.pause-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.pause-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pause-card button.pause-resume {
+  flex: 1;
+  min-height: 64px;
+  max-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 20px;
+  border-radius: 14px;
+}
+
+.pause-resume .ico {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.pause-speed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pause-speed-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.pause-speed-label .ico {
+  width: 16px;
+  height: 16px;
+}
+
+.pause-card .pause-speed-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.pause-card .pause-speed-row button.speed-option {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--soft);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+}
+
+.pause-card .pause-speed-row button.speed-option.on {
+  color: #fff;
+  background: var(--cyan-d);
+  box-shadow: inset 0 0 0 1px var(--cyan-hi), 0 0 14px rgba(63, 216, 255, 0.25);
+}
+
+.pause-card .pause-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: none;
+}
+
+.pause-card button.pause-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 15px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(120, 200, 255, 0.16);
+}
+
+.pause-card button.pause-item .ico {
+  width: 20px;
+  height: 20px;
+  color: var(--cyan);
+}
+
+.pause-card button.pause-quit {
+  margin-top: auto;
+  color: #ffb4b4;
+  border-color: rgba(217, 128, 128, 0.35);
+  background: rgba(120, 30, 30, 0.18);
+}
+
+.pause-card button.pause-quit .ico {
+  color: #ff8a8a;
+}
+
+/* Quit confirmation: covers the card's body so it is clearly the only question. */
+.pause-card .pause-confirm {
+  position: absolute;
+  inset: auto 12px 12px 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: auto;
+  padding: 14px;
+  background: rgba(30, 14, 16, 0.97);
+  border: 1px solid #d98080;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.pause-card .pause-confirm p {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pause-card .pause-confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pause-card .pause-confirm-actions button {
+  min-height: 46px;
+  font-size: 13px;
+}
+
+button.danger {
+  color: #fff;
+  background: #8c2d2d;
+  border-color: #d98080;
+}
+
+@media (max-height: 430px) {
+  .pause-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .pause-card button.pause-resume {
+    min-height: 76px;
+  }
+
+  .pause-card button.pause-item {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 560px) {
+  .pause-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Title screen (redesign v2) ----------
+   The battle behind the menu stays visible: the shade only darkens the menu column, a vignette
+   frames the picture, and the menu sits on glass panels that slide in one after another. */
+.screen-title .title-shade {
+  background:
+    linear-gradient(90deg, rgba(4, 8, 14, 0.9) 0%, rgba(4, 8, 14, 0.62) 30%, rgba(4, 8, 14, 0.08) 58%, transparent 100%),
+    radial-gradient(ellipse 120% 95% at 60% 50%, transparent 55%, rgba(2, 5, 10, 0.7) 100%);
+}
+
+.screen-title .title-logo {
+  top: 22px;
+  animation: title-logo-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.screen-title h1.title-name {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 0.95;
+  /* Brushed metal: light at the top edge, a darker band through the middle. */
+  background: linear-gradient(180deg, #ffffff 0%, #dfe8f2 38%, #8c9aab 52%, #c9d4e0 70%, #f4f8fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(63, 216, 255, 0.18));
+}
+
+.screen-title .title-name span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62em;
+  letter-spacing: 0.46em;
+  background: linear-gradient(180deg, #b6f2ff 0%, #3fd8ff 55%, #1a95c0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.title-rule {
+  position: relative;
+  width: 210px;
+  height: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(63, 216, 255, 0.55), rgba(63, 216, 255, 0.12) 70%, transparent);
+}
+
+.title-rule::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  left: -60px;
+  background: linear-gradient(90deg, transparent, #ffb15c, transparent);
+  animation: title-rule-sweep 6s ease-in-out 1.2s infinite;
+}
+
+.screen-title .title-menu {
+  top: 128px;
+  width: 320px;
+  gap: 9px;
+}
+
+.screen-title .title-menu button.menu-button {
+  position: relative;
+  height: 54px;
+  border-radius: 10px;
+  border: 1px solid rgba(140, 210, 255, 0.2);
+  background: linear-gradient(90deg, rgba(16, 28, 44, 0.86), rgba(12, 20, 32, 0.62));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+/* A lit edge on the left of each entry. */
+.screen-title .title-menu button.menu-button::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgba(63, 216, 255, 0.55);
+  transition: background 0.15s ease, top 0.15s ease, bottom 0.15s ease;
+}
+
+.screen-title .title-menu button.menu-button:hover,
+.screen-title .title-menu button.menu-button:focus-visible {
+  transform: translateX(4px);
+  border-color: rgba(95, 227, 255, 0.55);
+}
+
+.screen-title .title-menu button.menu-button:hover::before,
+.screen-title .title-menu button.menu-button:focus-visible::before {
+  top: 6px;
+  bottom: 6px;
+  background: var(--cyan-hi);
+}
+
+.screen-title .title-menu button.menu-button:active {
+  transform: translateX(2px) scale(0.985);
+}
+
+.screen-title .title-menu button.menu-button.primary {
+  border-color: rgba(95, 227, 255, 0.75);
+  background: linear-gradient(90deg, rgba(21, 147, 184, 0.92), rgba(15, 108, 140, 0.72));
+  box-shadow: 0 0 22px rgba(63, 216, 255, 0.32), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.screen-title .title-menu button.menu-button.primary::before {
+  background: #ffb15c;
+}
+
+.screen-title .title-menu .menu-button .ico {
+  color: var(--cyan-hi);
+}
+
+.screen-title .title-menu .menu-button.primary .ico {
+  color: #fff;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(1) {
+  animation-delay: 0.15s;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(2) {
+  animation-delay: 0.23s;
+}
+
+.screen-title .title-menu button.menu-button:nth-child(3) {
+  animation-delay: 0.31s;
+}
+
+.screen-title .title-small-row {
+  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) 0.42s both;
+}
+
+.screen-title .title-small-row button.icon-button {
+  border: 1px solid rgba(140, 210, 255, 0.2);
+  background: rgba(12, 20, 32, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.screen-title .title-version {
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.08em;
+}
+
+@keyframes title-logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    letter-spacing: 0.3em;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-rule-sweep {
+  0% {
+    left: -60px;
+  }
+  45%,
+  100% {
+    left: 220px;
+  }
+}
+
+@media (max-width: 560px) {
+  .screen-title h1.title-name {
+    font-size: 38px;
+  }
+
+  .screen-title .title-menu {
+    top: 136px;
+    width: auto;
+  }
+
+  .screen-title .title-shade {
+    background:
+      linear-gradient(180deg, rgba(4, 8, 14, 0.88) 0%, rgba(4, 8, 14, 0.55) 45%, rgba(4, 8, 14, 0.2) 72%, rgba(4, 8, 14, 0.6) 100%);
+  }
+}
+
+@media (max-height: 380px) {
+  .screen-title h1.title-name {
+    font-size: 36px;
+  }
+
+  .screen-title .title-menu {
+    top: 108px;
+  }
+
+  .screen-title .title-menu button.menu-button {
+    height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-title .title-logo,
+  .screen-title .title-menu button.menu-button,
+  .screen-title .title-small-row,
+  .title-rule::after {
+    animation: none;
+  }
 }
