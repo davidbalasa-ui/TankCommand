@@ -189,10 +189,10 @@ def build_outside():
         sect = [(7.0 * (1 - 0.9 * (k / (n - 1)) ** 1.4) + 0.4, 5.0 * (1 - 0.9 * (k / (n - 1)) ** 1.4) + 0.3) for k in range(n)]
         F.sweep([tuple(p) for p in pts], sect, 'shell', sides=10, power=0.8)
         F.sweep([tuple(p + Vector((0, 0, sect[k][1] * 0.98))) for k, p in enumerate(pts)], [(0.25, 0.25)] * n, 'glow', sides=4)
-        for k in range(4, n - 6, 5):
+        for k in range(7, n - 8, 13):    # a few broad swept-back crescent fins, not a row of thorns
             t = (pts[k + 1] - pts[k - 1]).normalized()
-            A.blade(pts[k] + Vector((0, 0, sect[k][1] * 0.8)), Vector((0, 0, 1)), -t, 4.0 + sect[k][0] * 1.3, 4.0, 0.5,
-                    'pale' if k % 2 else 'bronze', lean=0.6)
+            A.blade(pts[k] + Vector((0, 0, sect[k][1] * 0.7)), Vector((0, 0, 1)), -t, 7.0 + sect[k][0] * 1.6, 11.0, 0.6,
+                    'pale', lean=1.1)
         tips.append(pts[-1])
         F.orb(tuple(pts[-1]), 1.6, 'bolt', seg=(12, 8))
         K.point(pts[-1], 3e5, col=(1.0, 0.8, 0.45), r=2.0)
