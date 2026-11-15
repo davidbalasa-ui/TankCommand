@@ -18,6 +18,7 @@ import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
+import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
 import { collectPartMotions, pivotIsSpinner, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
 import {
   QUALITY_LADDER,
@@ -56,6 +57,8 @@ const SKIRT_DEPTH = 10;
 const SKY_ZENITH = '#16233a';
 const SKY_MID = '#4d6b8c';
 const SKY_HORIZON = '#b9a98d';
+/** Sky dome radius: inside the camera's far plane, beyond the outermost hills. */
+const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
@@ -578,8 +581,9 @@ export class RenderView {
   private contacts: Array<{ x: number; z: number }> = [];
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
+  private outerLand: THREE.Mesh | null = null;
   private pickTargets: THREE.Object3D[] = [];
-  private skyTexture: THREE.Texture | null = null;
+  private sky: THREE.Mesh | null = null;
   private templateRoot: THREE.Group | null = null;
   // Per-model templates keyed by asset id (unit type modelId); units without one use templateRoot.
   private readonly templates = new Map<string, THREE.Group>();
@@ -616,6 +620,7 @@ export class RenderView {
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
+  private healthBarsHidden = false;
   private colorBlind = false;
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
@@ -729,6 +734,16 @@ export class RenderView {
     this.applyQuality();
   }
 
+  /** Holds the camera at a fixed pitch (radians) for a scripted shot; null hands it back to zoom. */
+  setShotPitch(pitch: number | null): void {
+    this.rtsCamera.pitchOverride = pitch;
+  }
+
+  /** Hides health bars entirely (scenery views such as the title backdrop). */
+  setHealthBarsHidden(hidden: boolean): void {
+    this.healthBarsHidden = hidden;
+  }
+
   setHealthBarsMode(mode: 'damaged' | 'always'): void {
     this.healthBarsMode = mode;
   }
@@ -742,8 +757,10 @@ export class RenderView {
   }
 
   applyCamera(): void {
-    const position = this.rtsCamera.position((x, z) => heightAt(this.world.map, x, z));
+    // Outside the map the camera has to clear the surrounding hills too.
+    const position = this.rtsCamera.position((x, z) => groundHeightAt(this.world.map, x, z));
     this.camera.position.set(position.x, position.y, position.z);
+    this.sky?.position.copy(this.camera.position);
     const targetY = heightAt(this.world.map, this.rtsCamera.targetX, this.rtsCamera.targetZ) + 1;
     this.camera.lookAt(this.rtsCamera.targetX, targetY, this.rtsCamera.targetZ);
     this.camera.updateMatrixWorld();
@@ -1238,6 +1255,10 @@ export class RenderView {
     this.effects.dispose();
     this.landscape?.dispose();
     this.terrainDetail.value?.dispose();
+    if (this.outerLand) {
+      this.outerLand.geometry.dispose();
+      (this.outerLand.material as THREE.Material).dispose();
+    }
     this.unitInstances.clear();
     this.wreckInstances.clear();
     for (const group of this.markerMeshes) {
@@ -1256,7 +1277,10 @@ export class RenderView {
     this.observer.disconnect();
     this.overlay.remove();
     this.clearPlacement();
-    this.skyTexture?.dispose();
+    if (this.sky) {
+      this.sky.geometry.dispose();
+      (this.sky.material as THREE.Material).dispose();
+    }
     this.loader.release(TANK_ASSET_ID);
     this.renderer.dispose();
   }
@@ -1352,8 +1376,9 @@ export class RenderView {
   }
 
   private buildScene(): void {
-    this.skyTexture = this.buildSky();
-    this.scene.background = this.skyTexture;
+    this.sky = this.buildSky();
+    this.scene.add(this.sky);
+    this.scene.background = new THREE.Color(SKY_HORIZON);
 
     const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
     this.scene.add(hemisphere);
@@ -1401,34 +1426,63 @@ export class RenderView {
     if (this.skirt) {
       this.scene.add(this.skirt);
     }
+    this.outerLand = this.buildOuterLand();
+    this.scene.add(this.outerLand);
+    // The old flat plain stays only as an invisible pick surface past the far hills.
     this.farPlane = this.buildFarPlane();
-    if (this.farPlane) {
-      this.scene.add(this.farPlane);
-    }
+    this.farPlane.visible = false;
+    this.scene.add(this.farPlane);
     this.scene.add(this.buildBorder());
 
-    this.pickTargets = [this.terrain, this.skirt, this.farPlane].filter(
+    this.pickTargets = [this.terrain, this.outerLand, this.skirt, this.farPlane].filter(
       (mesh): mesh is THREE.Mesh => mesh !== null,
     );
   }
 
-  private buildSky(): THREE.Texture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 4;
-    canvas.height = 256;
-    const context = canvas.getContext('2d');
-    if (context) {
-      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, SKY_ZENITH);
-      gradient.addColorStop(0.55, SKY_MID);
-      gradient.addColorStop(1, SKY_HORIZON);
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
+  /**
+   * The sky is a dome around the camera, shaded by how far above the horizon each direction looks,
+   * so the haze sits on the real horizon behind the hills at any camera angle (a screen-space
+   * gradient put dark zenith blue right on top of the hills on low shots).
+   */
+  private buildSky(): THREE.Mesh {
+    const geometry = new THREE.SphereGeometry(SKY_DOME_RADIUS, 24, 12);
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uZenith: { value: new THREE.Color(SKY_ZENITH) },
+        uMid: { value: new THREE.Color(SKY_MID) },
+        uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+      },
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uZenith;
+        uniform vec3 uMid;
+        uniform vec3 uHorizon;
+        varying vec3 vDir;
+        void main() {
+          float h = normalize(vDir).y;
+          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, 0.32, h));
+          color = mix(color, uZenith, smoothstep(0.32, 0.95, h));
+          gl_FragColor = vec4(color, 1.0);
+          #include <colorspace_fragment>
+        }
+      `,
+      side: THREE.BackSide,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+    });
+    const dome = new THREE.Mesh(geometry, material);
+    dome.name = 'sky';
+    dome.renderOrder = -1000;
+    dome.frustumCulled = false;
+    dome.matrixAutoUpdate = true;
+    return dome;
   }
 
   private mapFloor(): number {
@@ -1493,6 +1547,22 @@ export class RenderView {
       side: THREE.DoubleSide,
     });
     return new THREE.Mesh(geometry, material);
+  }
+
+  private buildOuterLand(): THREE.Mesh {
+    const geometry = buildOuterLandGeometry(this.world.map, {
+      grass: new THREE.Color(0x5f7a3c),
+      dry: new THREE.Color(0x8d8455),
+      rock: new THREE.Color(0x7d7a70),
+      haze: new THREE.Color(SKY_HORIZON),
+    });
+    // A plain lit material: this ground fills much of the screen on low or zoomed-out views, and the
+    // battlefield's detailed ground shader there cost a third of the frame on slow devices. Nothing
+    // casts a shadow out here, so it receives none.
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    mesh.receiveShadow = false;
+    mesh.name = 'OuterLand';
+    return mesh;
   }
 
   private buildFarPlane(): THREE.Mesh {
@@ -1630,18 +1700,18 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     return mesh;
   }
 
-  private buildBorder(): THREE.LineLoop {
-    const map = this.world.map;
-    const half = map.size / 2;
-    const points = [
-      new THREE.Vector3(-half, heightAt(map, -half, -half) + 0.25, -half),
-      new THREE.Vector3(half, heightAt(map, half, -half) + 0.25, -half),
-      new THREE.Vector3(half, heightAt(map, half, half) + 0.25, half),
-      new THREE.Vector3(-half, heightAt(map, -half, half) + 0.25, half),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0xdfe8f5 });
-    return new THREE.LineLoop(geometry, material);
+  /** The playable edge: a soft light band lying on the ground, fading inward. */
+  private buildBorder(): THREE.Mesh {
+    const material = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(buildEdgeBandGeometry(this.world.map), material);
+    mesh.name = 'MapEdge';
+    mesh.renderOrder = 1;
+    return mesh;
   }
 
   private updateLight(): void {
@@ -3025,7 +3095,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       const type = this.world.unitTypes.get(unit.typeId);
       const maxHp = type?.hp ?? unit.hp;
       const selected = this.selection.includes(unit.id);
-      if (!selected && this.healthBarsMode === 'damaged' && unit.hp >= maxHp) {
+      if (this.healthBarsHidden || (!selected && this.healthBarsMode === 'damaged' && unit.hp >= maxHp)) {
         continue;
       }
       alive.add(unit.id);

@@ -328,6 +328,9 @@ const PARENT: Partial<Record<ScreenId, ScreenId>> = {
   pause: 'inGame',
 };
 
+/** Overlays drawn over the screen below rather than replacing it (the battlefield behind the pause card). */
+const SEE_THROUGH_OVERLAYS: ReadonlySet<ScreenId> = new Set<ScreenId>(['pause']);
+
 export class ScreenRouter {
   private readonly root: HTMLElement;
   private readonly screens: Record<ScreenId, ScreenModule>;
@@ -426,7 +429,12 @@ export class ScreenRouter {
   private mountOverlay(id: ScreenId): void {
     const top = this.currentMounted();
     if (top) {
-      top.el.style.visibility = 'hidden';
+      if (SEE_THROUGH_OVERLAYS.has(id)) {
+        // The screen below stays in view (dimmed by the overlay) but takes no input or focus.
+        top.el.inert = true;
+      } else {
+        top.el.style.visibility = 'hidden';
+      }
     }
     const mounted = this.createScreen(id, true);
     mounted.el.style.visibility = 'visible';
@@ -442,6 +450,7 @@ export class ScreenRouter {
     const top = this.currentMounted();
     if (top) {
       top.el.style.visibility = 'visible';
+      top.el.inert = false;
     }
   }
 

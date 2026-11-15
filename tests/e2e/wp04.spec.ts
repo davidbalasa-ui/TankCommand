@@ -94,7 +94,14 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
   if (!tug) {
     return;
   }
-  const oreBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
+  // Ore that did not come from gathering: the miner and tug keep delivering while this test runs,
+  // so the refund is measured against ore minus everything gathered, which a delivery leaves alone.
+  const unearnedOre = (): Promise<number> =>
+    page.evaluate(() => {
+      const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+      return side ? side.ore - side.oreGathered : 0;
+    });
+  const oreBefore = await unearnedOre();
   // Salvage refunds half the tug's ore price (read from the build list so price changes don't break this).
   const tugOre = await page.evaluate(
     (typeId) => window.__TC_TEST__?.buildItems().find((item) => item.id === typeId)?.ore ?? null,
@@ -138,7 +145,7 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
     )
     .toBe(false);
   await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
+    .poll(unearnedOre)
     .toBe(oreBefore + Math.floor(((tugOre ?? 0) * 50) / 100));
 });
 

@@ -157,7 +157,12 @@ function isPlayerOrder(command: Command): boolean {
   return command.kind !== 'noop' && !command.kind.startsWith('debug.');
 }
 
-const TITLE_SIDE_OFFSET = 11;
+/** How far the title camera's target sits to the screen-left of the fight, keeping it clear of the menu. */
+const TITLE_SIDE_OFFSET = 12;
+/** Where the title fight centres, metres from the pad toward the raiders. */
+const TITLE_FIGHT_REACH = 14;
+/** The title camera's pitch: well below the in-match range, for a cinematic, near-ground view. */
+const TITLE_PITCH = (24 * Math.PI) / 180;
 
 export class App {
   public readonly router: ScreenRouter;
@@ -1674,17 +1679,18 @@ export class App {
   }
 
   /**
-   * Title screen background: a separate demo skirmish (own pad and starting force, no fog) drawn
-   * by its own renderer with the camera slowly orbiting the pad. Nothing is simulated. It only
-   * draws while the title is the top screen and is skipped on the low quality level.
+   * Title screen background: a separate demo skirmish drawn by its own renderer. Arcadian raids
+   * keep rolling in on a Terran pad and its defenders (see titleBattle.ts), and the camera drifts
+   * slowly along the fight line, keeping the action to the right of the menu column. It only runs
+   * while the title is the top screen and is skipped on the low quality level.
    */
   private attachTitleBackdrop(canvas: HTMLCanvasElement): Promise<() => void> {
     const settings = this.services?.settings();
     if (settings?.graphicsQuality === 'low') {
       return Promise.resolve(() => undefined);
     }
-    return import('./render/renderer').then(
-      (mod) => {
+    return Promise.all([import('./render/renderer'), import('./titleBattle')]).then(
+      ([mod, scene]) => {
         const world = createSkirmishWorld(
           this.simData,
           7,
@@ -1694,17 +1700,22 @@ export class App {
           ],
           { fog: false, mapId: this.mapIdValue, resources: 'normal', force: 'padForce' },
         );
-        world.aiStates = [];
-        const view = new mod.RenderView(canvas, this.registry, world);
+        const battle = new scene.TitleBattle(world);
+        const view = new mod.RenderView(canvas, this.registry, battle.current());
+        // Low and side-on, so the hills behind the fight show; no health bars on scenery.
+        view.setShotPitch(TITLE_PITCH);
+        view.setHealthBarsHidden(true);
         // The canvas stays invisible (CSS) until the models are in, then fades up; the gradient
         // behind it shows meanwhile, never the grey placeholder tanks.
         void view.whenReady().then(() => {
           canvas.classList.add('ready');
         });
-        const pad = world.structures.find((item) => item.owner === 1);
-        const centreX = pad?.x ?? 0;
-        const centreZ = pad?.z ?? 0;
+        const { x: padX, z: padZ, approach } = battle.focus;
+        // The middle of the fight: a little past the defenders' line, toward the raiders.
+        const fightX = padX + Math.cos(approach) * TITLE_FIGHT_REACH;
+        const fightZ = padZ + Math.sin(approach) * TITLE_FIGHT_REACH;
         const started = performance.now();
+        let last = started;
         let raf = 0;
         let disposed = false;
         const frame = (now: number): void => {
@@ -1712,18 +1723,24 @@ export class App {
           if (disposed) {
             return;
           }
+          const dt = (now - last) / 1000;
+          last = now;
           if (this.router.current() === 'title' && document.visibilityState === 'visible') {
             const t = (now - started) / 1000;
-            const yaw = 0.6 + t * 0.035;
-            // Drift round the pad. The target sits to the pad's screen-left so the pad stays in the
-            // right-hand part of the picture, clear of the menu column.
+            // Side-on to the raid line, swaying slowly so both sides and the pad stay in shot.
+            const sway = Math.sin(t * 0.045) * 0.45;
+            const yaw = Math.atan2(-Math.sin(approach), Math.cos(approach)) + sway;
+            // The camera's screen-left, in world x/z (the camera looks along (sin yaw, cos yaw)).
+            const leftX = Math.cos(yaw);
+            const leftZ = -Math.sin(yaw);
+            const alpha = battle.advance(dt);
             view.setCamera({
-              targetX: centreX + Math.cos(yaw) * TITLE_SIDE_OFFSET,
-              targetZ: centreZ - Math.sin(yaw) * TITLE_SIDE_OFFSET,
-              distance: 34,
+              targetX: fightX + leftX * TITLE_SIDE_OFFSET,
+              targetZ: fightZ + leftZ * TITLE_SIDE_OFFSET,
+              distance: 36,
               yaw,
             });
-            view.render(0, world);
+            view.render(alpha, battle.current());
           }
           raf = window.requestAnimationFrame(frame);
         };

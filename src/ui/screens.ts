@@ -152,10 +152,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       accent.textContent = 'COMMAND';
       name.append('TANK', accent);
       name.setAttribute('aria-label', 'TankCommand');
-      const tag = document.createElement('div');
-      tag.className = 'title-tag';
-      tag.textContent = 'Working title · name pending';
-      logo.append(name, tag);
+      // A thin rule under the name, with a lit segment that sweeps across it now and then.
+      const rule = document.createElement('div');
+      rule.className = 'title-rule';
+      rule.setAttribute('aria-hidden', 'true');
+      logo.append(name, rule);
 
       const menu = document.createElement('div');
       menu.className = 'title-menu';
@@ -753,50 +754,71 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       };
     }),
 
-    // The pause menu has more controls than fit in a 412 px-tall phone viewport
-    // as a single column, and the page-wide `touch-action: none` (TCH-04) means
-    // the player cannot scroll to reach a control that is below the fold. Two
-    // columns put every button on screen at 915x412; the quit confirmation is a
-    // single inline row so it fits under the grid.
+    // Pause menu (redesign v2): a card over the dimmed, blurred battlefield. Resume and game
+    // speed on the left, everything else in a list on the right, so every control fits a
+    // 412 px-tall phone screen without scrolling (the page is touch-action: none, TCH-04).
     pause: makeScreen('pause', 'Paused', (root, ctx) => {
       ctx.pauseSim(true);
+      root.querySelector('.screen-header')?.remove();
+      const card = document.createElement('div');
+      card.className = 'pause-card';
+      root.append(card);
+
+      const head = document.createElement('div');
+      head.className = 'pause-head';
+      const title = document.createElement('h1');
+      title.textContent = 'Paused';
+      head.append(title);
       // The match clock lives here rather than on the battlefield.
       const world = ctx.getWorld?.();
       if (world) {
         const seconds = Math.floor(world.tick / SIM_TICK_HZ);
         const clock = document.createElement('p');
         clock.className = 'pause-clock';
-        clock.textContent = `Match time ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-        root.append(clock);
+        clock.append(icon('clock'), document.createTextNode(`Match time ${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`));
+        head.append(clock);
+        const objective = world.mission?.objectives.find((item) => item.kind === 'primary' && item.status === 'active');
+        if (objective) {
+          const goal = document.createElement('p');
+          goal.className = 'pause-goal';
+          goal.append(icon('flag'), document.createTextNode(objective.text));
+          head.append(goal);
+        }
       }
-      const grid = document.createElement('div');
-      grid.className = 'pause-grid';
-      root.append(grid);
-      const add = (name: string, label: string, onClick: () => void): void => {
-        grid.append(button('pause', name, label, onClick));
-      };
 
-      add('resume', 'Resume', () => {
+      const body = document.createElement('div');
+      body.className = 'pause-body';
+      const main = document.createElement('div');
+      main.className = 'pause-main';
+      const list = document.createElement('div');
+      list.className = 'pause-list';
+      body.append(main, list);
+      card.append(head, body);
+      // Kept for the layout tests and older styles that look for the grid.
+      const grid = list;
+      grid.classList.add('pause-grid');
+
+      const resume = button('pause', 'resume', 'Resume', () => {
         ctx.router.back();
       });
-      grid.querySelector('[data-control-id="pause.resume"]')?.classList.add('primary');
-      add('save', 'Save game', () => {
-        ctx.go('saveSlots');
-      });
-      add('load', 'Load game', () => {
-        ctx.go('saveSlots');
-      });
-      add('settings', 'Settings', () => {
-        ctx.go('settings');
-      });
-      add('bugReport', 'Report bug', () => {
-        ctx.go('bugReport');
-      });
-      // Speed buttons show the active speed, so a tap visibly does something.
-      const speeds: Array<[string, string, number]> = [
-        ['speedSlow', 'Speed slow', SIM_SPEED_SLOW],
-        ['speedNormal', 'Speed normal', SIM_SPEED_NORMAL],
-        ['speedFast', 'Speed fast', SIM_SPEED_FAST],
+      resume.classList.add('primary', 'pause-resume');
+      resume.replaceChildren(icon('play'), document.createTextNode('Resume'));
+      main.append(resume);
+
+      // Game speed: one segmented control; the lit segment is the current speed.
+      const speedBox = document.createElement('div');
+      speedBox.className = 'pause-speed';
+      const speedLabel = document.createElement('span');
+      speedLabel.className = 'pause-speed-label';
+      speedLabel.append(icon('speed'), document.createTextNode('Game speed'));
+      const speedRow = document.createElement('div');
+      speedRow.className = 'segmented pause-speed-row';
+      speedBox.append(speedLabel, speedRow);
+      main.append(speedBox);
+      const speeds: Array<[string, string, string, number]> = [
+        ['speedSlow', 'Speed slow', 'Slow', SIM_SPEED_SLOW],
+        ['speedNormal', 'Speed normal', 'Normal', SIM_SPEED_NORMAL],
+        ['speedFast', 'Speed fast', 'Fast', SIM_SPEED_FAST],
       ];
       const speedButtons: Array<[HTMLButtonElement, number]> = [];
       const markSpeed = (): void => {
@@ -807,26 +829,49 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           node.setAttribute('aria-pressed', on ? 'true' : 'false');
         }
       };
-      for (const [name, label, value] of speeds) {
+      for (const [name, label, short, value] of speeds) {
         const node = button('pause', name, label, () => {
           ctx.api?.setSpeedMultiplier(value);
           markSpeed();
         });
         node.classList.add('speed-option');
-        grid.append(node);
+        node.setAttribute('aria-label', label);
+        node.textContent = short;
+        speedRow.append(node);
         speedButtons.push([node, value]);
       }
       markSpeed();
 
+      const add = (name: string, label: string, iconName: IconName, onClick: () => void): HTMLButtonElement => {
+        const node = button('pause', name, label, onClick);
+        node.classList.add('pause-item');
+        node.setAttribute('aria-label', label);
+        node.replaceChildren(icon(iconName), document.createTextNode(label));
+        grid.append(node);
+        return node;
+      };
+      add('save', 'Save game', 'save', () => {
+        ctx.go('saveSlots');
+      });
+      add('load', 'Load game', 'list', () => {
+        ctx.go('saveSlots');
+      });
+      add('settings', 'Settings', 'gear', () => {
+        ctx.go('settings');
+      });
+      add('bugReport', 'Report bug', 'bug', () => {
+        ctx.go('bugReport');
+      });
+
       let confirmPanel: HTMLDivElement | null = null;
-      add('quit', 'Quit to title', () => {
+      const quit = add('quit', 'Quit to title', 'x', () => {
         if (confirmPanel) {
           return;
         }
         confirmPanel = document.createElement('div');
         confirmPanel.className = 'pause-confirm';
         const text = document.createElement('p');
-        text.textContent = 'Quit this mission? Save before leaving?';
+        text.textContent = 'Quit this match? Save before leaving?';
         const actions = document.createElement('div');
         actions.className = 'pause-confirm-actions';
         const saveQuit = button('pause', 'confirmSaveQuit', 'Save & quit', () => {
@@ -835,17 +880,22 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             ctx.go('title');
           })();
         });
-        const quit = button('pause', 'confirmQuit', 'Quit without saving', () => {
+        saveQuit.classList.add('primary');
+        const quitNow = button('pause', 'confirmQuit', 'Quit without saving', () => {
           ctx.go('title');
         });
+        quitNow.classList.add('danger');
         const cancel = button('pause', 'cancelQuit', 'Cancel', () => {
           confirmPanel?.remove();
           confirmPanel = null;
+          card.classList.remove('confirming');
         });
-        actions.append(saveQuit, quit, cancel);
+        actions.append(saveQuit, quitNow, cancel);
         confirmPanel.append(text, actions);
-        root.append(confirmPanel);
+        card.classList.add('confirming');
+        card.append(confirmPanel);
       });
+      quit.classList.add('pause-quit');
       return () => {
         confirmPanel?.remove();
         confirmPanel = null;
