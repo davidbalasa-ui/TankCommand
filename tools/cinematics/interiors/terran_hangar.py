@@ -526,4 +526,5 @@ def main():
            scatter=float(A.get('scatter', 0.22)), haze_col=(0.08, 0.25, 0.6))
 
 
-main()
+if __name__ == '__main__':
+    main()

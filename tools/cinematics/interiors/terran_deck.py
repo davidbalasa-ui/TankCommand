@@ -543,7 +543,7 @@ def units():
     T('skimmer', 118, 57, 200)
 
 
-def main():
+def main(hook=None, units_on=True):
     K.E.update(neon=2.6, cyan=1.3, orange=4.0, white=1.2)
     K.MATDEF['glass'] = lambda n: K._holo(n, (0.1, 0.4, 1.0), 0.5, 0.22)
     K.MATDEF['neon'] = lambda n: K._emit(n, (0.008, 0.16, 1.0), 7.0)
@@ -573,12 +573,15 @@ def main():
     conduit([(88.5, 87.2), (84.5, 87.2)], w=0.4)
     K.flush()
     lighting(sc)
-    units()
+    if units_on:
+        units()
+    if hook:
+        hook(sc)
     pitch = math.radians(float(A.get('pitch', 52)))
     if VIEW == 'wide':
         tgt, D = Vector((70, 44, 0)), float(A.get('dist', 108))
     elif VIEW == 'close':
-        tgt, D = Vector((66, 70, 0)), float(A.get('dist', 62))
+        tgt, D = Vector((float(A.get('tx', 66)), float(A.get('ty', 70)), 0)), float(A.get('dist', 62))
     else:
         tgt, D = Vector((32, 34, 0)), float(A.get('dist', 58))
     loc = tgt + Vector((0, -math.cos(pitch) * D, math.sin(pitch) * D))
@@ -588,4 +591,5 @@ def main():
     K.post(raw, A.get('final', os.path.join(OUT, NAME + '.jpg')), bloom=0.8, thresh=0.7, vignette=0.15)
 
 
-main()
+if __name__ == '__main__':
+    main()

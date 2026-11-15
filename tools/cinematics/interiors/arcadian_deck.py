@@ -39,6 +39,7 @@ VIEW = ARGS.get('view', 'game')
 RES = tuple(int(v) for v in ARGS.get('res', '960x540').split('x'))
 OUT = ARGS.get('out', f'/home/user/work/arcadian-interiors/deck_{VIEW}.jpg')
 GAME = VIEW == 'game'
+BREACH = int(ARGS.get('breach', 0))        # 1: Terrans are pushing through the launch aperture (game-view still)
 H = 6.0 if GAME else 7.5              # wall height (game view: the cut plane)
 rnd = random.Random(7)
 
@@ -419,7 +420,8 @@ def build_launch():
     or over the lane; the carrier fins lie flat against the throat walls and the two feed orbs hover
     high beside the lip."""
     ap_c = Vector((AP_X, 0.0, AP_Z))
-    K.aperture(ap_c, (1, 0, 0), AP_R, sq=(1.0, AP_SQ), rings=3, seed=4, bolts=8)
+    if not BREACH:
+        K.aperture(ap_c, (1, 0, 0), AP_R, sq=(1.0, AP_SQ), rings=3, seed=4, bolts=8)
     hh = 21.0 if not GAME else 10.0
     for s in (-1, 1):
         K.fin((ap_c.x - 1.0, s * (THROAT - 0.25), 0.0), (0, 0, 1), (-1, 0, 0), hh, 6.0, 'pale', lean=0.3, curve=2.0, rib=None)
@@ -434,6 +436,28 @@ def build_launch():
     K.strip([(AP_X - 0.4, -AP_R * 0.97, 0.05), (AP_X - 0.4, AP_R * 0.97, 0.05)], 0.5, 0.05, 'white', closed=False)   # threshold bar
     K.strip([(AP_X - 1.6, -AP_R * 0.97, 0.04), (AP_X - 1.6, AP_R * 0.97, 0.04)], 0.08, 0.04, 'line', closed=False)
     return ap_c
+
+
+def build_breach():
+    """Game-view still of the breach: a Terran tank two thirds of the way through the aperture skin
+    (see arcadian_breach.py for the animated version, seen from inside the hall)."""
+    import arcadian_breachfx as FX
+    ap_c = Vector((AP_X, 0.0, AP_Z))
+    rings = FX.Rings(ap_c, AP_R, (1.0, AP_SQ))
+    rings.update((23, -41, 17), (0.985, 0.95, 0.92))
+    mem = FX.Membrane(ap_c, AP_R, AP_SQ, strength=16.0)
+    intr = FX.Intruder('bulwark')
+    q, z = 13.5, 3.4
+    tent_len = intr.tip - intr.front
+    intr.place(AP_X - q, 0.0, z)
+    hullc = Vector((AP_X, 0.0, z + intr.h * 0.5))
+    mem.update(hullc, q + 1.0 - tent_len, tent=(tent_len - 0.2) / 0.8, tent_at=Vector((AP_X, 0, z + intr.gun_z)), a=4.0, strain=1.0, t=2.1, body=0.09)
+    FX.dyn_bolts(FX.breach_bolts(mem, intr, 1.0, seed=5, n_rim=7, n_crawl=14, width=0.1), seed=5)
+    for (n_, x, y, zz, yw) in (('lancer', AP_X + 17, 10.5, 6.0, 186), ('bulwark', AP_X + 27, -9.5, 3.0, 176), ('lancer', AP_X + 34, 2.0, 8.0, 180)):
+        w = FX.Intruder(n_)
+        w.place(x, y, zz, yaw=yw)
+    K.point((AP_X - 9, 0, 6.5), 9000, col=(1.0, 0.78, 0.4), r=1.0)
+    K.point((AP_X - 3, 0, 3.0), 2500, col=(0.3, 0.8, 1.0), r=1.0)
 
 
 def arch(x, t, h):
@@ -562,7 +586,10 @@ def main():
                                ('stinger', -15.8, 40.3, 12), ('darter', -17.6, 50.2, 192),                         # passing in the north arc
                                ('carapace', -24, -25.6, -41), ('spitter', -30, -32.4, 139)):                       # and in the south branch
             K.unit(n_, (x, y, 0.9), yaw=yw)
-        K.unit('glider', (82, -4, 5.0), yaw=0, pitch=-3)  # lifting off toward the aperture
+        if not BREACH:
+            K.unit('glider', (82, -4, 5.0), yaw=0, pitch=-3)  # lifting off toward the aperture
+        else:
+            build_breach()
         K.unit('disc', (WELL_C[0], WELL_C[1], 3.0), yaw=0)
     else:
         r2 = random.Random(3)
