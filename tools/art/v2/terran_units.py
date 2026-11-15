@@ -78,11 +78,11 @@ def lancer():
         V.arrow_turret(-1.9, 1.5, 1.05, tz, th)
         gz = tz + 0.36
         for s in (1, -1):
-            # Shoulder pod carrying each lance.
-            prism([(-1.2, gz - 0.26), (1.1, gz - 0.2), (1.5, gz), (1.1, gz + 0.2), (-1.2, gz + 0.3)], min(s * 0.95, s * 1.42), max(s * 0.95, s * 1.42), 'plate', bevel=0.035)
-            box((-0.1, s * 1.43, gz), (0.7, 0.012, 0.02), 'glow')
-            V.rail_lance(0.9, 6.3, s * 1.18, gz, 0.125, group='Barrel', flash_group='Flash')
-    return dict(pivot=[('Turret', (-0.35, 0, tz))] + K.gun_pivots([('', (1.45, 0, gz), (6.9, 0, gz))]))
+            # Cheek block carrying each lance, tight against the needle nose.
+            prism([(0.2, gz - 0.3), (1.5, gz - 0.24), (1.9, gz), (1.5, gz + 0.24), (0.2, gz + 0.34)], min(s * 0.3, s * 0.74), max(s * 0.3, s * 0.74), 'plate', bevel=0.035)
+            box((0.9, s * 0.75, gz), (0.45, 0.012, 0.02), 'glow')
+            V.rail_lance(1.2, 6.0, s * 0.52, gz, 0.15, group='Barrel', flash_group='Flash')
+    return dict(pivot=[('Turret', (-0.35, 0, tz))] + K.gun_pivots([('', (1.45, 0, gz), (6.6, 0, gz))]))
 
 
 @asset('human/outrider.glb', 'Terran Outrider (scout)')
@@ -406,7 +406,7 @@ def longbow():
         for s in (1, -1):
             box((-1.6, s * 0.63, gz), (0.9, 0.012, 0.14), 'coil')
         box((0.22, 0, gz), (0.06, 0.66, 0.56), 'plate', bevel=0.02)
-        step = V.tele_cannon(0.2, 8.0, gz, 0.5, 4)
+        step = V.tele_cannon(0.2, 9.0, gz, 0.44, 4)
         F.rot_all(m, 'Y', -26, about=(-0.8, 0, gz))
         with F.group('Radar'):   # fire-control dish
             c = (-2.0, 0.0, tz + 0.75)

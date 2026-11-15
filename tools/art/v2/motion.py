@@ -141,7 +141,7 @@ gun(_h('bulwark'), 'L', dist=0.5, kick=(0.035, 0.1, 0.7), recover=0.6)
 gun(_h('bulwark'), 'R', dist=0.5, delay=0.22, recover=0.6)
 _h('longbow')['FlashPivot'] = flash(up(26), 0.14, 0.0)
 for _k in (1, 2, 3, 4):   # telescoping cannon: every sleeve slams into the one behind (80% of the barrel length)
-    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.56 * _k, attack=0.07, recover=1.5)
+    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.76 * _k, attack=0.07, recover=1.5)
 _h('longbow')['@fire'] = dict(kick=0.1, slide=0.4, attack=0.06, recover=1.2)
 _order = [(s, i, j) for j in (1, 0) for i, s in ((0, 'L'), (2, 'R'), (1, 'L'), (0, 'R'), (2, 'L'), (1, 'R'))]
 for _k, (_s, _i, _j) in enumerate(_order):   # pause, then a ripple hopping back and forth between the two pods
