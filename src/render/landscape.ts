@@ -181,6 +181,8 @@ export function scatterProps(map: MapDef): Placement[] {
 /** How far past the map edge scenery is scattered (the hills beyond fade into haze). */
 const OUTSIDE_REACH = 80;
 const OUTSIDE_CELL = 4.5;
+/** Shrubs and grass only this far past the edge (metres); beyond it, rocks and dead trees. */
+const OUTSIDE_PLANT_REACH = 22;
 
 /**
  * Scenery on the land round the map: rocks, crags and dead trees on the hills, grass and shrubs
@@ -204,8 +206,11 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
         continue;
       }
       const r = hash(cx, cz, map.seed, 11);
-      // Thinner further out; the haze hides the rest.
-      if (r > 0.42 * (1 - d / (OUTSIDE_REACH * 1.25))) {
+      // Thinner further out; the haze hides the rest. Small plants only near the edge, where they
+      // can be seen; further out only cheap rock and tree silhouettes (keeps the triangle count
+      // within the phone budget).
+      const near = d < OUTSIDE_PLANT_REACH;
+      if (r > (near ? 0.24 : 0.08) * (1 - d / (OUTSIDE_REACH * 1.25))) {
         continue;
       }
       const pick = hash(cx, cz, map.seed, 14);
@@ -216,7 +221,7 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
       let prop: PropId;
       let scale: number;
       let sink = 0;
-      if (slope > 1.6 && pick < 0.45) {
+      if (near && slope > 1.6 && pick < 0.45) {
         prop = 'prop.nature.cliff';
         scale = 0.8 + size * 0.9;
         sink = 0.4;
@@ -231,10 +236,15 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
       } else if (pick < 0.58) {
         prop = 'prop.nature.dead_tree';
         scale = 0.8 + size * 0.7;
-      } else if (pick < 0.8) {
+      } else if (!near) {
+        prop = 'prop.nature.dead_tree';
+        scale = 0.8 + size * 0.7;
+      } else if (pick < 0.68) {
         prop = 'prop.nature.shrub';
         scale = 0.6 + size * 0.6;
         sink = 0.05;
+      } else if (pick < 0.84) {
+        continue;
       } else {
         prop = 'prop.nature.grass';
         scale = 1 + size * 0.9;

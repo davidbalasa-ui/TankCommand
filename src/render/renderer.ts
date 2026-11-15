@@ -57,6 +57,8 @@ const SKIRT_DEPTH = 10;
 const SKY_ZENITH = '#16233a';
 const SKY_MID = '#4d6b8c';
 const SKY_HORIZON = '#b9a98d';
+/** Sky dome radius: inside the camera's far plane, beyond the outermost hills. */
+const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
@@ -581,7 +583,7 @@ export class RenderView {
   private farPlane: THREE.Mesh | null = null;
   private outerLand: THREE.Mesh | null = null;
   private pickTargets: THREE.Object3D[] = [];
-  private skyTexture: THREE.Texture | null = null;
+  private sky: THREE.Mesh | null = null;
   private templateRoot: THREE.Group | null = null;
   // Per-model templates keyed by asset id (unit type modelId); units without one use templateRoot.
   private readonly templates = new Map<string, THREE.Group>();
@@ -618,6 +620,7 @@ export class RenderView {
   private disposed = false;
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
+  private healthBarsHidden = false;
   private colorBlind = false;
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
@@ -731,6 +734,16 @@ export class RenderView {
     this.applyQuality();
   }
 
+  /** Holds the camera at a fixed pitch (radians) for a scripted shot; null hands it back to zoom. */
+  setShotPitch(pitch: number | null): void {
+    this.rtsCamera.pitchOverride = pitch;
+  }
+
+  /** Hides health bars entirely (scenery views such as the title backdrop). */
+  setHealthBarsHidden(hidden: boolean): void {
+    this.healthBarsHidden = hidden;
+  }
+
   setHealthBarsMode(mode: 'damaged' | 'always'): void {
     this.healthBarsMode = mode;
   }
@@ -747,6 +760,7 @@ export class RenderView {
     // Outside the map the camera has to clear the surrounding hills too.
     const position = this.rtsCamera.position((x, z) => groundHeightAt(this.world.map, x, z));
     this.camera.position.set(position.x, position.y, position.z);
+    this.sky?.position.copy(this.camera.position);
     const targetY = heightAt(this.world.map, this.rtsCamera.targetX, this.rtsCamera.targetZ) + 1;
     this.camera.lookAt(this.rtsCamera.targetX, targetY, this.rtsCamera.targetZ);
     this.camera.updateMatrixWorld();
@@ -1259,7 +1273,10 @@ export class RenderView {
     this.observer.disconnect();
     this.overlay.remove();
     this.clearPlacement();
-    this.skyTexture?.dispose();
+    if (this.sky) {
+      this.sky.geometry.dispose();
+      (this.sky.material as THREE.Material).dispose();
+    }
     this.loader.release(TANK_ASSET_ID);
     this.renderer.dispose();
   }
@@ -1355,8 +1372,9 @@ export class RenderView {
   }
 
   private buildScene(): void {
-    this.skyTexture = this.buildSky();
-    this.scene.background = this.skyTexture;
+    this.sky = this.buildSky();
+    this.scene.add(this.sky);
+    this.scene.background = new THREE.Color(SKY_HORIZON);
 
     const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
     this.scene.add(hemisphere);
@@ -1417,23 +1435,50 @@ export class RenderView {
     );
   }
 
-  private buildSky(): THREE.Texture {
-    const canvas = document.createElement('canvas');
-    canvas.width = 4;
-    canvas.height = 256;
-    const context = canvas.getContext('2d');
-    if (context) {
-      const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, SKY_ZENITH);
-      gradient.addColorStop(0.55, SKY_MID);
-      gradient.addColorStop(1, SKY_HORIZON);
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
+  /**
+   * The sky is a dome around the camera, shaded by how far above the horizon each direction looks,
+   * so the haze sits on the real horizon behind the hills at any camera angle (a screen-space
+   * gradient put dark zenith blue right on top of the hills on low shots).
+   */
+  private buildSky(): THREE.Mesh {
+    const geometry = new THREE.SphereGeometry(SKY_DOME_RADIUS, 24, 12);
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uZenith: { value: new THREE.Color(SKY_ZENITH) },
+        uMid: { value: new THREE.Color(SKY_MID) },
+        uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+      },
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uZenith;
+        uniform vec3 uMid;
+        uniform vec3 uHorizon;
+        varying vec3 vDir;
+        void main() {
+          float h = normalize(vDir).y;
+          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, 0.32, h));
+          color = mix(color, uZenith, smoothstep(0.32, 0.95, h));
+          gl_FragColor = vec4(color, 1.0);
+          #include <colorspace_fragment>
+        }
+      `,
+      side: THREE.BackSide,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+    });
+    const dome = new THREE.Mesh(geometry, material);
+    dome.name = 'sky';
+    dome.renderOrder = -1000;
+    dome.frustumCulled = false;
+    dome.matrixAutoUpdate = true;
+    return dome;
   }
 
   private mapFloor(): number {
@@ -3044,7 +3089,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       const type = this.world.unitTypes.get(unit.typeId);
       const maxHp = type?.hp ?? unit.hp;
       const selected = this.selection.includes(unit.id);
-      if (!selected && this.healthBarsMode === 'damaged' && unit.hp >= maxHp) {
+      if (this.healthBarsHidden || (!selected && this.healthBarsMode === 'damaged' && unit.hp >= maxHp)) {
         continue;
       }
       alive.add(unit.id);

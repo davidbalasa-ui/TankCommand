@@ -42,6 +42,8 @@ export class RtsCamera {
   private fovDeg = CAMERA_FOV_DEG;
   private viewportSet = false;
   private sensitivity = 1;
+  /** A fixed pitch (radians) for scripted shots such as the title backdrop; null follows zoom. */
+  public pitchOverride: number | null = null;
 
   constructor(mapSize: number) {
     this.mapSize = mapSize;
@@ -89,6 +91,9 @@ export class RtsCamera {
    * readable ~50 degrees instead of a flat, top-down-looking 45.
    */
   get pitch(): number {
+    if (this.pitchOverride !== null) {
+      return this.pitchOverride;
+    }
     const max = this.maxDistance;
     const distance = clamp(this.distance, CAMERA_MIN_DISTANCE, max);
     const t = (distance - CAMERA_MIN_DISTANCE) / Math.max(0.001, max - CAMERA_MIN_DISTANCE);
