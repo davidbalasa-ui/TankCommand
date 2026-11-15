@@ -21,7 +21,7 @@ from mathutils import Vector  # noqa: E402
 OUT = K.ARGS.get('out', os.path.join(K.SCRATCH, '04_fleet_view.jpg'))
 k = K.Kit(sun_dir=(0.65, 0.3, -0.6), sun_energy=7.0, planet_c=(2400, -1650, 900), rim_dir=(-0.8, -0.3, 0.2), rim=2.0,
           fill_dir=(1, 0.0, -0.5), fill=2.2, tint='blue', nebula=2.4)
-cam = k.camera((-78, -8, 100), (-6, 8, 0), lens=29)
+cam = k.camera((-80, -8, 102), (-8, 7, 0), lens=27.5)
 
 # ---------------------------------------------------------------- the two capital ships
 dr = k.ship('dread', scale=2.2)
