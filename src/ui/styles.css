@@ -3107,7 +3107,7 @@ button.corner-action {
 
 @keyframes pause-rise {
   from {
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(10px);
     opacity: 0;
   }
 }
@@ -3216,7 +3216,7 @@ button.corner-action {
 }
 
 .pause-card .pause-speed-row button.speed-option {
-  min-height: 44px;
+  min-height: 46px;
   font-size: 14px;
   font-weight: 700;
   color: var(--soft);
@@ -3268,9 +3268,12 @@ button.corner-action {
 }
 
 /* Quit confirmation: covers the card's body so it is clearly the only question. */
+/* Confirming a quit swaps the menu for the question, so nothing sits under it. */
+.pause-card.confirming .pause-body {
+  display: none;
+}
+
 .pause-card .pause-confirm {
-  position: absolute;
-  inset: auto 12px 12px 12px;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
@@ -3315,7 +3318,7 @@ button.danger {
   }
 
   .pause-card button.pause-item {
-    min-height: 44px;
+    min-height: 46px;
   }
 }
 
@@ -3380,7 +3383,7 @@ button.danger {
   width: 60px;
   left: -60px;
   background: linear-gradient(90deg, transparent, #ffb15c, transparent);
-  animation: title-rule-sweep 6s ease-in-out 1.2s infinite;
+  animation: title-rule-sweep 6s ease-in-out 1.2s 3;
 }
 
 .screen-title .title-menu {
@@ -3394,9 +3397,8 @@ button.danger {
   height: 54px;
   border-radius: 10px;
   border: 1px solid rgba(140, 210, 255, 0.2);
-  background: linear-gradient(90deg, rgba(16, 28, 44, 0.86), rgba(12, 20, 32, 0.62));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: linear-gradient(90deg, rgba(16, 28, 44, 0.9), rgba(12, 20, 32, 0.74));
+
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
@@ -3469,8 +3471,7 @@ button.danger {
 .screen-title .title-small-row button.icon-button {
   border: 1px solid rgba(140, 210, 255, 0.2);
   background: rgba(12, 20, 32, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+
 }
 
 .screen-title .title-version {

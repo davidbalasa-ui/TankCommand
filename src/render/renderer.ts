@@ -1255,6 +1255,10 @@ export class RenderView {
     this.effects.dispose();
     this.landscape?.dispose();
     this.terrainDetail.value?.dispose();
+    if (this.outerLand) {
+      this.outerLand.geometry.dispose();
+      (this.outerLand.material as THREE.Material).dispose();
+    }
     this.unitInstances.clear();
     this.wreckInstances.clear();
     for (const group of this.markerMeshes) {
@@ -1552,9 +1556,11 @@ export class RenderView {
       rock: new THREE.Color(0x7d7a70),
       haze: new THREE.Color(SKY_HORIZON),
     });
-    // Same material as the battlefield, so the ground detail carries on past the edge.
-    const mesh = new THREE.Mesh(geometry, this.terrain?.material ?? new THREE.MeshStandardMaterial({ vertexColors: true }));
-    mesh.receiveShadow = true;
+    // A plain lit material: this ground fills much of the screen on low or zoomed-out views, and the
+    // battlefield's detailed ground shader there cost a third of the frame on slow devices. Nothing
+    // casts a shadow out here, so it receives none.
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    mesh.receiveShadow = false;
     mesh.name = 'OuterLand';
     return mesh;
   }

@@ -331,7 +331,10 @@ export async function assertButtonLayout(page: Page): Promise<void> {
       (element) => {
         const style = window.getComputedStyle(element);
         const rect = element.getBoundingClientRect();
+        // A screen left in view under an overlay (the battlefield under the pause card) is inert:
+        // its buttons can't be tapped or focused, so they are scenery, not controls.
         return (
+          element.closest('[inert]') === null &&
           style.visibility !== 'hidden' &&
           style.display !== 'none' &&
           rect.width > 0 &&
