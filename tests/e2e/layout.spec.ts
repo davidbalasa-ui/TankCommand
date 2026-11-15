@@ -32,23 +32,25 @@ test('[LAY-01] orders show in the top queue strip; tapping one cancels it and Un
   await expect(tile).toBeVisible();
   const box = await tile.boundingBox();
   expect(box?.y ?? 999).toBeLessThan(60);
+  const cost = await page.evaluate((id) => window.__TC_TEST__?.buildItems().find((entry) => entry.id === id)?.ore ?? 0, item);
+  expect(cost).toBeGreaterThan(0);
   const ore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
   await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 1)).toBe(0);
-  expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0)).toBeGreaterThan(ore);
-  const cost = await page.evaluate((id) => window.__TC_TEST__?.buildItems().find((entry) => entry.id === id)?.ore ?? 0, item);
-  expect(cost).toBeGreaterThan(0);
-  const unearnedAfterCancel = await page.evaluate(() => {
+  // Undo lasts 3 s; slow software frames can eat that, so it is pressed from the page itself, straight
+  // after the cancel, reading the money it starts from in the same step.
+  const { undone, unearnedAfterCancel, oreAfterCancel } = await page.evaluate(() => {
     const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
-    return side ? side.ore - side.oreGathered : 0;
-  });
-  // Undo lasts 3 s; slow software frames can eat that, so it is pressed from the page itself.
-  const undone = await page.evaluate(() => {
+    const before = {
+      unearnedAfterCancel: side ? side.ore - side.oreGathered : 0,
+      oreAfterCancel: window.__TC_TEST__?.hud()?.ore ?? 0,
+    };
     const undo = document.querySelector<HTMLButtonElement>('[data-control-id="inGame.queueUndo"]');
-    if (!undo || undo.hidden) return false;
+    if (!undo || undo.hidden) return { undone: false, ...before };
     undo.click();
-    return true;
+    return { undone: true, ...before };
   });
+  expect(oreAfterCancel).toBeGreaterThan(ore);
   expect(undone).toBe(true);
   // Undo orders the unit again, which pays for it again. Checked on the money rather than the queue:
   // on a slow runner the re-ordered unit can be built and gone from the queue before the next read.
