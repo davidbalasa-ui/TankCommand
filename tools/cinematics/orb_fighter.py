@@ -656,6 +656,7 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
 # plates, add up to a continuous curve while every joint still reads as machined.
 ARM_N = 12
 ARM_LEN = 10.6
+ORB_X, ORB_RC, ORB_RS = 0.0, 1.25, 3.4     # orb-core design: core centre, core radius, shoulder ring radius
 
 
 def arm_dims(n=ARM_N, total=ARM_LEN):
@@ -689,7 +690,7 @@ def _vertebra(l, r0, r1, last=False):
         _harpoon(Vector((l, 0, 0)), Vector((1, 0, 0)), Vector((0, 0, 1)))
 
 
-def orb_rig2(name='Orb'):
+def orb_rig2(name='Orb', core='hull'):
     """Body + armature with 8 bone chains (ARM_N bones each); one sleeved segment mesh per bone, a compact lightning
     nacelle on bone 1. Returns (arm_obj, root_body, legs) where legs[k] = dict(bones=[names], rad, tan, base, nac,
     plume, var, lamp)."""
@@ -700,6 +701,21 @@ def orb_rig2(name='Orb'):
         base._faction('kesh')
 
         def body():
+            if core == 'orb':
+                # no hull: eight floating shoulder sockets hang round the core, held only by lightning
+                for k in range(8):
+                    a = 2 * math.pi * k / 8 + math.pi / 8
+                    rad = Vector((0, math.cos(a), math.sin(a)))
+                    c = Vector((ORB_X, 0, 0)) + rad * ORB_RS
+                    F.orb(tuple(c), 0.42, 'bronze', seg=(14, 10))
+                    F.tube(tuple(c - rad * 0.32), tuple(c - rad * 0.18), [(0, 0.5), (1, 0.5)], 16, 'pale')
+                    F.tube(tuple(c - rad * 0.36), tuple(c - rad * 0.3), [(0, 0.36), (1, 0.36)], 16, 'glow', caps=False)
+                    for s_ in (-1, 1):                                  # two little fins either side
+                        tn = Vector((0, -math.sin(a), math.cos(a)))
+                        F.sweep([tuple(c + tn * s_ * 0.3), tuple(c + tn * s_ * 0.62 - rad * 0.15 + Vector((-0.3, 0, 0))),
+                                 tuple(c + tn * s_ * 0.75 - rad * 0.4 + Vector((-0.7, 0, 0)))],
+                                [(0.02, 0.12), (0.03, 0.14), (0.01, 0.04)], 'pale', sides=4)
+                return
             _body()
             for k in range(8):
                 a = 2 * math.pi * k / 8 + math.pi / 8
@@ -717,19 +733,55 @@ def orb_rig2(name='Orb'):
         nac.data.transform(Matrix.Scale(0.62, 4))
         nac_mesh = nac.data
         bpy.data.objects.remove(nac)
-    cx = X0 - R_ * 0.45
-    pl = SFX.C.uv_sphere(name + 'CorePlasma', R_ * 0.57, seg=(32, 16), mat=SFX._plasma('OrbCorePlasmaM', GOLD, 6.0, 3.0))
+    cx, cr = (X0 - R_ * 0.45, R_ * 0.57) if core != 'orb' else (ORB_X, ORB_RC)
+    pl = SFX.C.uv_sphere(name + 'CorePlasma', cr, seg=(48, 24),
+                         mat=SFX._plasma('OrbCorePlasmaM' if core != 'orb' else 'OrbCorePlasmaM2', GOLD if core != 'orb' else (1.0, 0.42, 0.06),
+                                         6.0 if core != 'orb' else 3.0, 3.0))
     pl.location = (cx, 0, 0)
     pl.parent = root
-    gl = SFX.C.uv_sphere(name + 'CoreGlow', R_ * 0.72, seg=(32, 16), mat=SFX._halo('OrbCoreGlowM', GOLD, 0.6, 4.0))
-    gl.location = (cx + 0.15, 0, 0)
+    gl = SFX.C.uv_sphere(name + 'CoreGlow', cr * (1.3 if core != 'orb' else 1.9), seg=(32, 16),
+                         mat=SFX._halo('OrbCoreGlowM' if core != 'orb' else 'OrbCoreGlowM2', GOLD,
+                                       0.6 if core != 'orb' else 0.3, 4.0 if core != 'orb' else 3.5))
+    gl.location = (cx, 0, 0)
     gl.visible_shadow = False
     gl.parent = root
     lt = SFX._link(bpy.data.objects.new(name + 'CoreLight', bpy.data.lights.new(name + 'CoreLight', 'POINT')))
-    lt.location = (X0 + 0.6, 0, 0)
+    lt.location = (cx + (0.6 if core != 'orb' else 0.0), 0, 0)
     lt.data.color = GOLD
-    lt.data.energy = 600
+    lt.data.energy = 600 if core != 'orb' else 1500
     lt.parent = root
+    tethers = []
+    if core == 'orb':
+        # two thin gold gyro rings round the core, and lightning tethers from core to every shoulder
+        import random as _r
+        with AF.gold_palette():
+            base._faction('kesh')
+            for i, (axis, rr) in enumerate((((1, 0, 0), cr * 1.45), ((0.3, 1, 0.2), cr * 1.6))):
+                ro = _part(lambda axis=axis, rr=rr: AF.oriented_ring((0, 0, 0), axis, rr, 0.07, 0.05, 'pale', gaps=4),
+                           f'{name}Gyro{i}')
+                ro.parent = root
+                ro.location = (cx, 0, 0)
+                tethers.append(('gyro', ro))
+        core_m = SFX._emit('OrbBoltCoreM', HOTG, 12.0)
+        sleeve_m = SFX._halo('OrbBoltSleeveM', (1.0, 0.55, 0.12), 4.0, 1.5)
+        for k in range(8):
+            a = 2 * math.pi * k / 8 + math.pi / 8
+            rad = Vector((0, math.cos(a), math.sin(a)))
+            c0 = Vector((cx, 0, 0)) + rad * cr * 0.95
+            c1 = Vector((ORB_X, 0, 0)) + rad * (ORB_RS - 0.4)
+            var = []
+            for v in range(N_VAR):
+                rnd = _r.Random(k * 17 + v)
+                objs = []
+                for b in range(3):
+                    off = Vector((rnd.uniform(-0.3, 0.3), rnd.uniform(-0.3, 0.3), rnd.uniform(-0.3, 0.3)))
+                    pts = SFX._jag(c0 + off * 0.5, c1 + off * 0.3, rnd, 4, 0.22)
+                    objs.append(SFX._tube_path(f'{name}Teth{k}V{v}B{b}C', pts, 0.035, core_m))
+                    objs.append(SFX._tube_path(f'{name}Teth{k}V{v}B{b}S', pts, 0.11, sleeve_m, sides=8))
+                for o in objs:
+                    o.parent = root
+                var.append(objs)
+            tethers.append(('tether', var))
     # ---- armature
     ad = bpy.data.armatures.new(name + 'Arms')
     arm = SFX._link(bpy.data.objects.new(name + 'Arms', ad))
@@ -744,7 +796,8 @@ def orb_rig2(name='Orb'):
         rad = Vector((0, math.cos(a), math.sin(a)))
         tan = Vector((0, -math.sin(a), math.cos(a)))
         d0 = (-ax * 0.75 + rad * 0.66).normalized()                    # rest: swept back and out
-        p = rad * RING * 1.12
+        p0 = rad * RING * 1.12 if core != 'orb' else Vector((ORB_X, 0, 0)) + rad * ORB_RS
+        p = rad * RING * 1.12 if core != 'orb' else Vector((ORB_X, 0, 0)) + rad * ORB_RS
         names, prev = [], None
         for j in range(ARM_N):
             b = ad.edit_bones.new(f'L{k}_{j}')
@@ -757,7 +810,7 @@ def orb_rig2(name='Orb'):
             prev = b
             names.append(b.name)
             p = b.tail.copy()
-        legs.append(dict(bones=names, rad=rad, tan=tan, base=rad * RING * 1.12, k=k, d0=d0))
+        legs.append(dict(bones=names, rad=rad, tan=tan, base=p0, k=k, d0=d0))
     bpy.ops.object.mode_set(mode='OBJECT')
     for L in legs:
         for j, bn in enumerate(L['bones']):
@@ -785,7 +838,8 @@ def orb_rig2(name='Orb'):
         lamp.parent = pe
         lamp.location = (-1.0, 0, 0)
         L.update(nac=nac, plume=pe, var=variants, lamp=lamp)
-    return arm, root, legs
+    root['tethers'] = len(tethers)
+    return arm, root, legs, tethers
 
 
 def pose_arm(arm, leg, bends, twist=0.0):
