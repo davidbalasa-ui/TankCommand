@@ -1255,8 +1255,7 @@ def preview(meshes, pivots, path, label, tris, views=None, res=(960, 640), sampl
         if o.name.startswith('Flash'):
             o.hide_render = True
     meshes = [o for o in meshes if not o.name.startswith('Flash')]
-    for e in pivots.values():
-        e.rotation_euler = (0, 0, math.radians(-18))
+    # Sheets show every part in its rest pose (turning the turret for the sheet read as a twisted model).
     bpy.context.view_layer.update()
     lo = Vector((1e9, 1e9, 1e9))
     hi = -lo
