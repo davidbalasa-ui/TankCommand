@@ -449,40 +449,63 @@ def _ease(x):
     return x * x * (3 - 2 * x)
 
 
-def _fabrik(base_p, tgt, pts, lens, pole, iters=14):
-    """3-bone FABRIK in body space, warm-started from last frame's joints, bent toward pole, kept off the hull."""
+def _fabrik(base_p, tgt, pts, lens, pole, iters=14, avoid=None):
+    """N-bone FABRIK in body space, warm-started from last frame's joints, bent toward pole, kept off the body.
+    avoid(p, pole) -> p pushes a joint out of the body (default: the hull of the original Orb)."""
+    n = len(lens)
     total = sum(lens)
     d = tgt - base_p
     if d.length > total * 0.97:
         tgt = base_p + d.normalized() * total * 0.97
-    if d.length < 2.2:
-        tgt = base_p + (d.normalized() if d.length > 1e-4 else pole) * 2.2
+    if d.length < total * 0.23:
+        tgt = base_p + (d.normalized() if d.length > 1e-4 else pole) * total * 0.23
+
+    def hull_avoid(p, pole):
+        r = Vector((0, p.y, p.z))
+        if X1 - 1.0 < p.x < X0 + 0.8 and r.length < R_ + 0.7:
+            return Vector((p.x, 0, 0)) + (r.normalized() if r.length > 1e-4 else pole) * (R_ + 0.7)
+        return p
+    avoid = avoid or hull_avoid
     pts = [p.copy() for p in pts]
     for it in range(iters):
-        bias = 0.25 if it < iters - 3 else 0.0
-        for i in (1, 2):
-            pts[i] = pts[i] + pole * bias
-        pts[3] = tgt.copy()
-        for i in (2, 1, 0):
+        bias = 0.25 * 3.0 / n if it < iters - 3 else 0.0
+        for i in range(1, n):
+            pts[i] = pts[i] + pole * bias * math.sin(math.pi * i / n)
+        pts[n] = tgt.copy()
+        for i in range(n - 1, -1, -1):
             pts[i] = pts[i + 1] + (pts[i] - pts[i + 1]).normalized() * lens[i]
         pts[0] = base_p.copy()
-        for i in (1, 2, 3):
+        for i in range(1, n + 1):
             pts[i] = pts[i - 1] + (pts[i] - pts[i - 1]).normalized() * lens[i - 1]
-            r = Vector((0, pts[i].y, pts[i].z))
-            if X1 - 1.0 < pts[i].x < X0 + 0.8 and r.length < R_ + 0.7:
-                pts[i] = Vector((pts[i].x, 0, 0)) + (r.normalized() if r.length > 1e-4 else pole) * (R_ + 0.7)
+            pts[i] = avoid(pts[i], pole)
     return pts
 
 
-def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=1.0):
+def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=1.0, arm=None, tethers=None):
     """Bake the legs. Every leg is its own little creature: its own stroke clock (re-rolled every stroke), its
     own spring (stiffness, damping), its own reaction to the body's acceleration and spin, its own thruster
     that fires lightning when (and where) that leg pushes. Grabs: dicts(f_reach, f_grab, f_tear, hold, legs)."""
     rnd = random.Random(seed)
     sc = bpy.context.scene
     ax = Vector((1, 0, 0))
-    lens = list(SEG)
+    lens = list(SEG) if arm is None else arm_dims()[0]
     L = sum(lens)
+    NJ = len(lens)
+    avoid = None
+    if arm is not None:
+        from mathutils import Matrix
+        cc = Vector((ORB_X, 0, 0))
+
+        def avoid(p, pole):                                # keep every joint clear of the core and its glow
+            r = p - cc
+            if r.length < ORB_RC * 2.0:
+                return cc + (r.normalized() if r.length > 1e-4 else pole) * ORB_RC * 2.0
+            return p
+        rest_m = {L_['k']: [arm.data.bones[bn].matrix_local.to_3x3() for bn in L_['bones']] for L_ in legs}
+        for L_ in legs:
+            for bn in L_['bones']:
+                arm.pose.bones[bn].rotation_mode = 'QUATERNION'
+        teth = [v for kind, v in (tethers or []) if kind == 'tether']
     # body motion, sampled
     M, P = {}, {}
     for f in range(f0 - 2, f1 + 3):
@@ -511,7 +534,8 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
         b = Lg['base']
         rest = b + (-ax * 0.9 + Lg['rad'] * 0.45).normalized() * L * 0.9
         st.append(dict(cyc=cyc, w=rnd.uniform(10.0, 17.0), z=rnd.uniform(0.32, 0.55), x=rest.copy(), v=Vector(),
-                       pts=[b, b + (rest - b) * 0.33, b + (rest - b) * 0.66, rest], thr=0.0,
+                       pts=[b + (rest - b) * (i_ / NJ) for i_ in range(NJ + 1)], thr=0.0,
+                       jv=[Vector() for _ in range(NJ + 1)],
                        ph=rnd.uniform(0, 6.283), gk=rnd.uniform(0.7, 1.3), q_prev=None, flick=rnd.randrange(N_VAR)))
     grab_of = {}
     for g in grabs:
@@ -569,6 +593,7 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
             # its own idle life: slow wander of the tip
             tgt = tgt + (rad * math.sin(t * 1.7 * S['gk'] + S['ph']) + tan * math.sin(t * 2.3 * S['gk'] + S['ph'] * 1.7)) * 0.9
             w, z = S['w'], S['z']
+            S['wave_k'] = 1.0
             # ---- grabs: this leg reaches for its own point on the target, on its own beat
             for g in grab_of.get(k, []):
                 fa, fg, ft = g['f_reach'] + g['d'], g['f_grab'] + g['d'] // 2, g['f_tear']
@@ -582,6 +607,7 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                 elif fg <= f < ft:
                     tgt = wrap + rad * 0.12 * math.sin(f * 2.1 + k)  # clutching, flexing
                     w, z, stroking = 22.0, 0.8, 0.25
+                    S['wave_k'] = 0.3
                 elif ft <= f < ft + 9:
                     tgt = hold + rad * 6.5 - ax * 1.8 + tan * g['spin'] * 3.0   # rip it apart
                     w, z, stroking = 26.0, 0.5, 0.9
@@ -592,17 +618,96 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
             # acceleration, then spring toward where the leg wants to be
             x = R_delta @ S['x']
             vv = R_delta @ S['v']
-            acc = (tgt - x) * (w * w) - vv * (2 * z * w) - al * 0.55
-            vv = vv + acc * dt
-            x = x + vv * dt
+            for _ss in range(4):                               # sub-stepped: stiff springs stay stable (no frame flicker)
+                acc = (tgt - x) * (w * w) - vv * (2 * z * w) - al * 0.55
+                vv = vv + acc * (dt / 4)
+                x = x + vv * (dt / 4)
             S['x'], S['v'] = x, vv
             pole = (rad * 1.0 + ax * 0.45 * math.sin(t * 1.3 * S['gk'] + S['ph']) + tan * 0.35 * math.sin(t * 0.9 + S['ph'] * 2.3)).normalized()
-            pts = _fabrik(b, x, [R_delta @ p for p in S['pts']], lens, pole)
-            S['pts'] = pts
-            qs = [_frame_q(pts[j + 1] - pts[j], rad, ax) for j in range(3)]
-            for j, s_ in enumerate(Lg['seg']):
-                s_.rotation_quaternion = qs[0] if j == 0 else qs[j - 1].inverted() @ qs[j]
-                s_.keyframe_insert('rotation_quaternion', frame=f)
+            prev_pts = [R_delta @ p for p in S['pts']]
+            pts = _fabrik(b, x, prev_pts, lens, pole, avoid=avoid)
+            if arm is None:
+                S['pts'] = pts
+                qs = [_frame_q(pts[j + 1] - pts[j], rad, ax) for j in range(3)]
+                for j, s_ in enumerate(Lg['seg']):
+                    s_.rotation_quaternion = qs[0] if j == 0 else qs[j - 1].inverted() @ qs[j]
+                    s_.keyframe_insert('rotation_quaternion', frame=f)
+            else:
+                # every joint follows the solved shape on its own spring, stiff at the shoulder, loose at the
+                # tip: a fast move ripples down the arm and the harpoon trails and settles after it
+                # a travelling bend runs from shoulder to tip on this leg's own clock (zero at both ends, widest
+                # mid-arm), quieter while it whips through a power stroke or clutches a target
+                wa = 0.62 * (1.0 - 0.55 * stroking) * S.get('wave_k', 1.0)
+                wf, wl = 3.4 * S['gk'], 6.5 + 1.5 * S['gk']
+                pts = list(pts)
+                for j_ in range(1, NJ):
+                    u_ = j_ / NJ
+                    sd = (pts[j_ + 1] - pts[j_ - 1])
+                    sd = sd.normalized() if sd.length > 1e-5 else ax
+                    ph_ = t * wf - u_ * wl + S['ph']
+                    dv = tan * math.sin(ph_) + rad * 0.45 * math.sin(t * 2.2 * S['gk'] - u_ * 5.0 + S['ph'] * 1.9)
+                    dv = dv - sd * sd.dot(dv)
+                    env = math.sin(math.pi * u_) ** 2
+                    for g in grab_of.get(k, []):              # the snap after a tear rolls back up the arm
+                        el = (f - g['f_tear']) / fps - (1.0 - u_) * 0.45
+                        if 0 < el < 1.6:
+                            dv = dv + rad * 1.1 * math.sin(el * 11) * math.exp(-el * 3.0)
+                    pts[j_] = pts[j_] + dv * wa * env
+                jp = list(prev_pts)
+                for j_ in range(1, NJ + 1):
+                    wj = 34.0 * (1.0 - 0.6 * j_ / NJ)
+                    jv_ = R_delta @ S['jv'][j_]
+                    for _ss in range(6):                       # sub-stepped (w*dt would be > 1 per frame)
+                        a_ = (pts[j_] - jp[j_]) * (wj * wj) - jv_ * (2 * 0.6 * wj) - al * 0.25
+                        jv_ = jv_ + a_ * (dt / 6)
+                        jp[j_] = jp[j_] + jv_ * (dt / 6)
+                    S['jv'][j_] = jv_
+                # re-chain from the shoulder: exact segment lengths, each joint bends at most 21 degrees (curls, never knots)
+                out_ = [b.copy()]
+                dprev = (jp[1] - b).normalized()
+                for j_ in range(NJ):
+                    dj = (jp[j_ + 1] - out_[-1])
+                    dj = dj.normalized() if dj.length > 1e-5 else dprev
+                    if j_ > 0:
+                        ang = dprev.angle(dj) if dprev.dot(dj) < 0.99999 else 0.0
+                        lim = math.radians(21)
+                        if ang > lim:
+                            axis = dprev.cross(dj)
+                            if axis.length > 1e-6:
+                                from mathutils import Quaternion as _Q
+                                dj = _Q(axis.normalized(), lim) @ dprev
+                    out_.append(out_[-1] + dj * lens[j_])
+                    dprev = dj
+                S['pts'] = out_
+                # bones: parallel-transport the crest side down the chain so the arm never twists
+                Rr = rest_m[k]
+                zref = rad.copy()
+                Dprev = None
+                for j_, bn in enumerate(Lg['bones']):
+                    y_ = (out_[j_ + 1] - out_[j_]).normalized()
+                    z_ = zref - y_ * y_.dot(zref)
+                    if z_.length < 1e-4:
+                        z_ = ax - y_ * y_.dot(ax)
+                    z_.normalize()
+                    x_ = y_.cross(z_)
+                    D = Matrix((x_, y_, z_)).transposed()
+                    if j_ == 0:
+                        B = Rr[0].inverted() @ D
+                    else:
+                        B = Rr[j_].inverted() @ Rr[j_ - 1] @ Dprev.transposed() @ D
+                    pb = arm.pose.bones[bn]
+                    pb.rotation_quaternion = B.to_quaternion()
+                    pb.keyframe_insert('rotation_quaternion', frame=f)
+                    Dprev, zref = D, z_
+                if teth:                                     # its lightning tether crackles: new strike each frame
+                    tv = teth[k]
+                    pick = (f * 7 + k * 3) % len(tv)
+                    if f_die is not None and f >= f_die:
+                        pick = -1                              # dead: the tethers go dark, the arms come loose
+                    for vi, objs in enumerate(tv):
+                        for o in objs:
+                            o.hide_render = vi != pick
+                            o.keyframe_insert('hide_render', frame=f)
             # ---- its own thruster: exhaust opposite to where this leg wants to push the body
             need = -lat * (1.0 / 300) + ax * (0.25 + (0.6 if speed > 30 else 0.2))
             push_dir = need + (-vv.normalized() * 0.6 * stroking if vv.length > 1 else Vector())
@@ -614,26 +719,29 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
             if f_die is not None and f >= f_die:
                 thr = 0.0
             S['thr'] += (thr - S['thr']) * 0.45
-            qn = _frame_q(-exhaust, rad, ax)                   # nacelle +X = intake, so -X points down the exhaust
-            Lg['nac'].rotation_quaternion = qs[0].inverted() @ qn
-            Lg['nac'].keyframe_insert('rotation_quaternion', frame=f)
+            if arm is None:
+                qn = _frame_q(-exhaust, rad, ax)               # nacelle +X = intake, so -X points down the exhaust
+                Lg['nac'].rotation_quaternion = qs[0].inverted() @ qn
+                Lg['nac'].keyframe_insert('rotation_quaternion', frame=f)
             th = S['thr']
-            Lg['plume'].scale = (max(0.02, th), 0.5 + 0.5 * th, 0.5 + 0.5 * th)
+            ps_ = 1.0 if arm is None else 0.6            # small arm nacelles: shorter bolts
+            Lg['plume'].scale = (max(0.02, th) * ps_, (0.5 + 0.5 * th) * ps_, (0.5 + 0.5 * th) * ps_)
             Lg['plume'].keyframe_insert('scale', frame=f)
             Lg['lamp'].data.energy = 250 * th
             Lg['lamp'].data.keyframe_insert('energy', frame=f)
             # lightning flickers: a new variant every 1-2 frames, nothing when idle
             if f % 2 == 0 or rnd.random() < 0.4:
                 S['flick'] = (S['flick'] + 1 + rnd.randrange(N_VAR - 1)) % N_VAR
-            on = S['flick'] if th > 0.08 else -1
+            on = S['flick'] if th > (0.08 if arm is None else 0.32) else -1   # arms: only legs that are pushing fire
             if vis_prev.get(k) != on:
                 for vi, objs in enumerate(Lg['var']):
                     for o in objs:
                         o.hide_render = vi != on
                         o.keyframe_insert('hide_render', frame=f)
                 vis_prev[k] = on
+    extra = [o for tv in (teth if arm is not None else []) for objs in tv for o in objs]
     for Lg in legs:
-        for o in [Lg['plume']] + list(Lg['plume'].children_recursive):
+        for o in [Lg['plume']] + list(Lg['plume'].children_recursive) + (extra if Lg is legs[0] else []):
             ad = o.animation_data
             if not ad or not ad.action:
                 continue
@@ -690,6 +798,37 @@ def _vertebra(l, r0, r1, last=False):
         _harpoon(Vector((l, 0, 0)), Vector((1, 0, 0)), Vector((0, 0, 1)))
 
 
+
+def _core_mat(name, hot=(1.0, 0.42, 0.0), rim=(1.0, 0.2, 0.0), kh=1.0, kr=0.4):
+    """Orb core: churning molten gold. Emission stays near 1 so the colour survives the AgX view transform."""
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    BP = SFX.BP
+    m, n = BP._new_mat(name)
+    tc = n.node('ShaderNodeTexCoord')
+    t = BP.time_value(m, 'time', 1.0)
+    nz = n.node('ShaderNodeTexNoise', Scale=3.0, Detail=10.0, Roughness=0.65)
+    nz.noise_dimensions = '4D'
+    n.set(nz.inputs['Vector'], tc.outputs['Object'])
+    n.set(nz.inputs['W'], n.math('MULTIPLY', t, 1.5))
+    rid = n.math('POWER', n.math('SUBTRACT', 1.0, n.math('ABSOLUTE', n.math('SUBTRACT', nz.outputs['Fac'], 0.5))), 90.0)
+    lw = n.node('ShaderNodeLayerWeight', Blend=0.5)
+    fac = n.math('POWER', lw.outputs['Facing'], 0.8)
+    mix = n.node('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    n.set(mix.inputs['Factor'], fac)
+    mix.inputs[6].default_value = (*hot, 1)
+    mix.inputs[7].default_value = (*rim, 1)
+    em = n.node('ShaderNodeEmission')
+    n.set(em.inputs['Color'], mix.outputs[2])
+    st = n.math('ADD', n.math('MULTIPLY', n.math('SUBTRACT', 1.0, fac), kh - kr), kr)
+    n.set(em.inputs['Strength'], n.math('MULTIPLY', st, n.math('ADD', 1.0, n.math('MULTIPLY', rid, 2.5))))
+    out = n.node('ShaderNodeOutputMaterial')
+    n.set(out.inputs['Surface'], em.outputs[0])
+    return m
+
+
 def orb_rig2(name='Orb', core='hull'):
     """Body + armature with 8 bone chains (ARM_N bones each); one sleeved segment mesh per bone, a compact lightning
     nacelle on bone 1. Returns (arm_obj, root_body, legs) where legs[k] = dict(bones=[names], rad, tan, base, nac,
@@ -735,13 +874,15 @@ def orb_rig2(name='Orb', core='hull'):
         bpy.data.objects.remove(nac)
     cx, cr = (X0 - R_ * 0.45, R_ * 0.57) if core != 'orb' else (ORB_X, ORB_RC)
     pl = SFX.C.uv_sphere(name + 'CorePlasma', cr, seg=(48, 24),
-                         mat=SFX._plasma('OrbCorePlasmaM' if core != 'orb' else 'OrbCorePlasmaM2', GOLD if core != 'orb' else (1.0, 0.42, 0.06),
-                                         6.0 if core != 'orb' else 3.0, 3.0))
+                         mat=SFX._plasma('OrbCorePlasmaM' if core != 'orb' else 'OrbCorePlasmaM2', GOLD if core != 'orb' else (1.0, 0.40, 0.04),
+                                         6.0 if core != 'orb' else 1.7, 3.0))
     pl.location = (cx, 0, 0)
     pl.parent = root
+    if core == 'orb':     # molten gold: hot gold face, deep orange limb, thin bright filaments (kept dim enough
+        pl.data.materials[0] = _core_mat('OrbCoreMoltenM')   # that AgX keeps it gold instead of washing to beige)
     gl = SFX.C.uv_sphere(name + 'CoreGlow', cr * (1.3 if core != 'orb' else 1.9), seg=(32, 16),
-                         mat=SFX._halo('OrbCoreGlowM' if core != 'orb' else 'OrbCoreGlowM2', GOLD,
-                                       0.6 if core != 'orb' else 0.3, 4.0 if core != 'orb' else 3.5))
+                         mat=SFX._halo('OrbCoreGlowM' if core != 'orb' else 'OrbCoreGlowM2', GOLD if core != 'orb' else (1.0, 0.35, 0.0),
+                                       0.6 if core != 'orb' else 0.12, 4.0 if core != 'orb' else 2.5))
     gl.location = (cx, 0, 0)
     gl.visible_shadow = False
     gl.parent = root

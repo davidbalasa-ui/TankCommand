@@ -130,7 +130,7 @@ def build(draft=True):
     # ---------------------------------------------------------------- the Orb (pose objects on one rig)
     rig = bpy.data.objects.new('OrbRig', None)
     V.link(rig)
-    orb, legs = OF.orb_rig('Orb')
+    orb_arm, orb, legs, orb_teth = OF.orb_rig2('Orb', core='orb')
     orb.parent = rig
     ORB_K = 1.5
     rig.scale = (ORB_K,) * 3
@@ -147,7 +147,7 @@ def build(draft=True):
     g1 = at(F[0], T_GRAB1)
     g2 = at(F[1], T_GRAB2)
     TF_AT = P(40, 260, 70)                          # the Terran frigate, coming up behind the fighters
-    nose = Vector((OF.X0 + 1.2, 0, 0)) * ORB_K      # grab point in front of the core (rig space, scaled)
+    nose = Vector((OF.ORB_RC + 2.2, 0, 0)) * ORB_K      # grab point in front of the core (rig space, scaled)
     rk = [(1, P(150, -260, 10)), (fr(T_IN), P(150, -260, 10)), (fr(T_IN + 1.0), P(200, -90, 30)),
           (fr(T_REACH1), g1 + (g1 - P(200, -90, 30)).normalized() * -9.0), (fr(T_GRAB1), g1 - Vector((nose.length, 0, 0))),
           (fr(T_TEAR1), g1 + Vector((6, 8, 3))),
@@ -169,28 +169,31 @@ def build(draft=True):
     bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2, roll_k=0.9)
     # leg motion: every leg on its own clock (stroke, reach, clutch, swirl), see orb_fighter.animate_orb
     # every leg on its own physics, stroke clock and thruster; two grabs with different legs
-    hold = Vector((OF.X0 + 2.4, 0, 0))
+    hold = Vector((OF.ORB_RC + 3.3, 0, 0))
     OF.animate_orb(orb, legs, 1, fr(T_DIE) + 31, seed=8, scale=ORB_K, f_die=fr(T_DIE),
                    grabs=[dict(f_reach=fr(T_REACH1) - 4, f_grab=fr(T_GRAB1), f_tear=fr(T_TEAR1), hold=hold,
                                legs=[0, 1, 3, 4, 6]),
                           dict(f_reach=fr(T_REACH2) - 4, f_grab=fr(T_GRAB2), f_tear=fr(T_TEAR2), hold=hold,
-                               legs=[1, 2, 5, 6, 7])])
+                               legs=[1, 2, 5, 6, 7])], arm=orb_arm, tethers=orb_teth)
     # ---------------------------------------------------------------- attack run: bolts on the shield
     hits = []
-    for k in range(14):
-        t = 1.6 + k * 0.2
-        i = k % 2
-        f0 = fr(t)
-        src = at(F[i], t)
-        tgt_c = at(afr, t + 0.25)
-        toward = (src - tgt_c).normalized()
-        hp = tgt_c + toward * shield_r * 0.92 + Vector((0, rnd.uniform(-5, 5), rnd.uniform(-4, 4)))
-        n_ = max(3, int((hp - src).length / 140 * 24))
-        SP.bolt(src + (hp - src).normalized() * 3, hp, f0, n_, BLUE, size=(3.0, 0.16, 0.16), strength=24.0)
-        fh = f0 + n_
-        SP.impact_flare(hp, -toward, fh, fh + 5, (1.0, 0.7, 0.3), 5.0, f'ShHit{k}')
-        SP.spark_stream(hp, fh, fh + 2, (1.0, 0.75, 0.35), toward, 900 + k, n=6, size=0.5, speed=40, life=0.5)
-        hits.append(fh)
+    import fleet_life as FL
+    # twin-X fighters: rapid blasters, ~8 small shots a second each, each on its own beat
+    for i in (0, 1):
+        for t in FL.shot_times('rapid', 1.6, 4.4, rnd, phase=0.05 * i):
+            f0 = fr(t)
+            src = at(F[i], t)
+            tgt_c = at(afr, t + 0.25)
+            toward = (src - tgt_c).normalized()
+            hp = tgt_c + toward * shield_r * 0.92 + Vector((0, rnd.uniform(-5, 5), rnd.uniform(-4, 4)))
+            n_ = max(3, int((hp - src).length / 160 * 24))
+            SP.bolt(src + (hp - src).normalized() * 3, hp, f0, n_, BLUE, size=(1.8, 0.08, 0.08), strength=22.0)
+            fh = f0 + n_
+            if rnd.random() < 0.35:
+                SP.impact_flare(hp, -toward, fh, fh + 3, (1.0, 0.7, 0.3), 2.5, SP._uid('ShHit'))
+            if rnd.random() < 0.2:
+                SP.spark_stream(hp, fh, fh + 2, (1.0, 0.75, 0.35), toward, 900 + f0, n=4, size=0.4, speed=40, life=0.4)
+            hits.append(fh)
     vk = [(1, 0.35)]
     for fh in hits:
         vk += [(fh - 1, 0.4), (fh, 1.0), (fh + 4, 0.5)]
@@ -201,7 +204,7 @@ def build(draft=True):
         f = F[fi]
         fg, ft = fr(t_grab), fr(t_tear)
         # held in the Orb's legs, just in front of its core, from grab to tear
-        hold_local = Vector((OF.X0 + 2.4, 0, 0))
+        hold_local = Vector((OF.ORB_RC + 3.3, 0, 0))
         follow_pos(lambda fr_: rig.matrix_world @ hold_local, fg, ft, f)
         sc_.frame_set(ft)
         pw = f.matrix_world.translation.copy()
@@ -243,17 +246,29 @@ def build(draft=True):
     yaw = math.degrees(math.atan2(-60, 95))
     key_rot(tf, [(1, (0, 0, -20)), (fr(T_DASH), (0, 0, -25)), (fr(T_HIT) - 6, (0, 0, yaw)), (nf, (0, 0, yaw + 6))])
     V.engines(tf, 'TFEng', BLUE, thr_keys=[(1, 0.5), (nf, 0.5)], len_keys=[(1, 0.5)])
-    for k in range(12):
-        t = T_HIT - 0.55 + k * 0.08
-        f0 = fr(t)
-        src = at(tf, t) + Vector((rnd.uniform(-4, 4), rnd.uniform(-3, 3), rnd.uniform(0, 3)))
-        # aimed where it would be on its straight charge: it jinks out of the way (the late ones connect)
-        tgt = (on_line(t + 0.15) if t + 0.15 < T_HIT else at(rig, t + 0.15)) + \
-            Vector((rnd.uniform(-2, 2), rnd.uniform(-2, 2), rnd.uniform(-2, 2)))
-        n_ = max(3, int((tgt - src).length / 160 * 24))
-        SP.bolt(src, tgt, f0, n_, BLUE, size=(4.0, 0.22, 0.22), strength=30.0)
-        if k % 2 == 0:
-            SP.blue_boom(tgt, f0 + n_, 2.5, life=0.4)
+    # its turrets track the Orb all the way in, and its twin cannons fire on their own rhythm
+    FL.bake_turrets({'tf': tf}, 1, nf, aim=lambda k_, i_, f_: at(rig, (f_ - 1) / 24.0) if f_ < fr(T_DIE) else None,
+                    seed=23)
+    tts = FL.turrets_of(tf)
+    for n_, t_ in enumerate(t_ for t_ in tts if t_['r'] >= 0.3):
+        for t in FL.shot_times('cannon', T_HIT - 0.9, T_DIE, rnd, phase=0.25 * n_):
+            f0 = fr(t)
+            sc_.frame_set(f0)
+            src = FL.muzzle_world(t_, int(t * 10))
+            # aimed where it would be on its straight charge: it jinks out of the way (the late ones connect)
+            tgt = (on_line(t + 0.15) if t + 0.15 < T_HIT else at(rig, t + 0.15)) + \
+                Vector((rnd.uniform(-2, 2), rnd.uniform(-2, 2), rnd.uniform(-2, 2)))
+            FL.fire_bolt(src, tgt, f0, 'cannon', BLUE, speed=380, impact=t + 0.15 >= T_HIT)
+            FL.recoil(t_, f0)
+    for t_ in [t_ for t_ in tts if t_['r'] < 0.3][:5]:
+        for t in FL.shot_times('flak', T_HIT - 0.7, T_DIE, rnd):
+            f0 = fr(t)
+            sc_.frame_set(f0)
+            src = FL.muzzle_world(t_, f0)
+            tgt = at(rig, t + 0.1) + Vector((rnd.uniform(-6, 6), rnd.uniform(-6, 6), rnd.uniform(-4, 4)))
+            FL.fire_bolt(src, tgt, f0, 'flak', BLUE, speed=500, impact=False)
+            FL.recoil(t_, f0)
+    sc_.frame_set(1)
     # its main gun: a lance of blue light
     sc_.frame_set(fr(T_HIT))
     s0 = tf.matrix_world @ Vector((12, 0, 1))

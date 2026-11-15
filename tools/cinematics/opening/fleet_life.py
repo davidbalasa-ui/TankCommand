@@ -349,3 +349,31 @@ def charge_rings(p, d, f_charge, f_fire, f_end, r=6.0, col=GOLD, name='Ring', n=
         SP.show(o, f_charge, f_end)
         out.append(o)
     return out
+
+
+def arc_shot(src, tgt, f, frames=3, seed=0, width=0.18, name='Arc'):
+    """Arcadian corvette lightning shot: one tight crackling channel src -> tgt (a few short forks), re-struck
+    every frame for `frames` frames, gold-white core in a gold sleeve."""
+    import shard_fx as SFX
+    rnd = random.Random(seed)
+    core_m = SFX._emit('ArcCoreM', (1.0, 0.92, 0.75), 18.0)
+    sleeve_m = SFX._halo('ArcSleeveM', (1.0, 0.6, 0.15), 5.0, 1.5)
+    src, tgt = Vector(src), Vector(tgt)
+    L = (tgt - src).length
+    out = []
+    for v in range(frames):
+        pts = SFX._jag(src, tgt, rnd, 6, 0.05)
+        objs = [SFX._tube_path(SP._uid(name + 'C'), pts, width * 0.3, core_m),
+                SFX._tube_path(SP._uid(name + 'S'), pts, width, sleeve_m, sides=8)]
+        for b in range(3):
+            j = rnd.randint(len(pts) // 5, len(pts) - 3)
+            d = (pts[j + 1] - pts[j]).normalized()
+            side = d.orthogonal().normalized()
+            side.rotate(SP.Quaternion(d, rnd.uniform(0, 6.28)))
+            e = pts[j] + (d + side * 0.8).normalized() * L * rnd.uniform(0.03, 0.07)
+            br = SFX._jag(pts[j], e, rnd, 3, 0.2)
+            objs.append(SFX._tube_path(SP._uid(name + 'F'), br, width * 0.5, sleeve_m, sides=6))
+        for o in objs:
+            SP.show(o, f + v, f + v)
+        out += objs
+    return out

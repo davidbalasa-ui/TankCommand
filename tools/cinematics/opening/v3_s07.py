@@ -147,8 +147,7 @@ def build(draft=True):
                 tgt_k = 'frigate'
             src = at(k, f) + Vector((-9, 0, 1.5))
             tgt = at(tgt_k, f + 1) + Vector((rnd.uniform(-5, 5), rnd.uniform(-5, 5), rnd.uniform(-3, 3)))
-            SP.flicker_lightning([(src, tgt)], seed=f * 7 + i_, f0=f, f1=f + 3, every=1, width=0.5,
-                                 name=SP._uid(f'Arc{k}'), zone_col=(1.0, 0.75, 0.35), strength=22.0)
+            FL.arc_shot(src, tgt, f, frames=3, seed=f * 7 + i_, width=0.35, name=f'Arc{k}')
             SP.impact_flare(tgt, (tgt - src).normalized(), f + 1, f + 5, (1.0, 0.7, 0.3), 4.0, SP._uid('ArcHit'))
     # every hull has its own slow bank / pitch and RCS puffs; Arcadian corvettes have orbiting parts
     for n_, (k, ob) in enumerate(R.obj.items()):
