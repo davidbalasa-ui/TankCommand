@@ -1171,7 +1171,8 @@ test('[GRP-01] control groups assign, select and centre by keyboard and by touch
 
 test('[DESK-01] right/middle-drag pan, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', DESKTOP_ONLY);
-  test.setTimeout(90_000);
+  // Five input families in one test; CI renders in software at 1080p, about twice as slow as local.
+  test.setTimeout(150_000);
   await enterGame(page);
 
   const start = await cameraOf(page);

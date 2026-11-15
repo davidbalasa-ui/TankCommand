@@ -7,6 +7,8 @@ export interface TestSnapshot {
   rngState: number;
   counter: number;
   result: { winner: number | null } | null;
+  /** Each side's resources and match totals. */
+  resources: Array<{ player: number; ore: number; oreGathered: number }>;
 }
 
 export interface TestUnit {

@@ -84,18 +84,16 @@ test('[ORD-03] a queued waypoint is drawn as an extended order path', async ({ p
     )
     .toBe(true);
 
+  // Read the drawn path and its queued flag together: the unit re-plans its path as it drives
+  // (avoidance), so the entry can be missing for a frame between two separate reads.
   await expect
-    .poll(async () =>
-      page.evaluate((id) => {
-        const entry = window.__TC_TEST__?.orderPaths().find((path) => path.unitId === id);
-        return entry ? entry.points : 0;
-      }, ownId),
+    .poll(
+      async () =>
+        page.evaluate((id) => {
+          const entry = window.__TC_TEST__?.orderPaths().find((path) => path.unitId === id);
+          return entry ? { extended: entry.points > 2, queued: entry.queued } : null;
+        }, ownId),
+      { message: 'the drawn path covers both legs and is marked as a queued path' },
     )
-    .toBeGreaterThan(2);
-
-  const drawn = await page.evaluate((id) => {
-    const entry = window.__TC_TEST__?.orderPaths().find((path) => path.unitId === id);
-    return entry ? entry.queued : null;
-  }, ownId);
-  expect(drawn, 'the drawn path is marked as a queued path').toBe(true);
+    .toEqual({ extended: true, queued: true });
 });
