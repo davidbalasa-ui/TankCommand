@@ -4,6 +4,7 @@ import math
 import forge as F
 from forge import box, cyl, hull, loft, plate, prism, sym, tube, orb, lathe, sweep
 import terran_kit as K
+import terran_v3 as V
 
 ASSETS = {}
 
@@ -70,27 +71,18 @@ def turret_kit(x0, x1, w, tz, h, cupola=True, rack=True):
 @asset('human/lancer.glb', 'Terran Lancer (light tank)')
 def lancer():
     L, hw, top = 6.4, 1.22, 1.42
-    K.tank_hull(L, hw, top)
-    K.hull_fittings(L, hw, top)
-    for s in (1, -1):
-        K.track_unit(-3.35, 3.3, s * 1.68, w=0.42, side=s)
-        box((0.0, s * 1.2, 1.1), (2.7, 0.12, 0.2), 'dark')
-        K.stow((-2.2, s * 0.86, top + 0.13), (0.5, 0.22, 0.12))
-        K.chevron(1.9, s * 0.55, top - 0.19, 0.1)
-    K.hatch(1.05, 0.0, top + 0.02, 0.26, 6)
-    tz, th = top + 0.04, 0.84
+    V.scifi_chassis(L, hw, top, pod=1.68, w=0.42, nwheels=5)
+    tz, th = top + 0.04, 0.7
     with F.group('Turret'):
         tube((-0.35, 0, tz - 0.03), (-0.35, 0, tz + 0.09), [(0, 1.02), (1, 0.98)], 20, 'dark')
-        turret_shell(-1.95, 1.3, 1.1, tz, th)
-        turret_kit(-1.95, 1.3, 1.1, tz, th)
-        K.mantlet(1.42, tz + 0.38, 0.74, 0.27, guns=(0.4, -0.4), r=0.118, length=0.8)
+        V.arrow_turret(-1.9, 1.5, 1.05, tz, th)
+        gz = tz + 0.36
         for s in (1, -1):
-            K.railgun(1.45, 6.55, s * 0.4, tz + 0.38, 0.118, group='Barrel', flash_group='Flash')
-        with F.group('Barrel'):
-            box((2.25, 0, tz + 0.38), (0.5, 0.26, 0.07), 'armor', bevel=0.02)
-        K.gun(0.2, 1.5, 0.62, tz + th + 0.2, 0.035)
-        box((0.25, 0.62, tz + th + 0.14), (0.14, 0.06, 0.07), 'dark', bevel=0.02)
-    return dict(pivot=[('Turret', (-0.35, 0, tz))] + K.gun_pivots([('', (1.45, 0, tz + 0.38), (6.7, 0, tz + 0.38))]))
+            # Shoulder pod carrying each lance.
+            prism([(-1.2, gz - 0.26), (1.1, gz - 0.2), (1.5, gz), (1.1, gz + 0.2), (-1.2, gz + 0.3)], min(s * 0.95, s * 1.42), max(s * 0.95, s * 1.42), 'plate', bevel=0.035)
+            box((-0.1, s * 1.43, gz), (0.7, 0.012, 0.02), 'glow')
+            V.rail_lance(0.9, 6.3, s * 1.18, gz, 0.125, group='Barrel', flash_group='Flash')
+    return dict(pivot=[('Turret', (-0.35, 0, tz))] + K.gun_pivots([('', (1.45, 0, gz), (6.9, 0, gz))]))
 
 
 @asset('human/outrider.glb', 'Terran Outrider (scout)')
@@ -390,79 +382,43 @@ def javelin():
 @asset('human/longbow.glb', 'Terran Longbow (artillery)', size=1024)
 def longbow():
     L, hw, top = 7.2, 1.3, 1.42
-    K.chassis(L, hw, top, pod=1.78, w=0.46, nwheels=6)
-    for s in (1, -1):
-        # Four folded stabiliser legs with toothed ground plates.
-        K.outrigger(-1.9, s * 2.12, 1.46, s, L=1.6, dirn=-1)
-        K.outrigger(1.3, s * 2.12, 1.46, s, L=1.3, dirn=1)
-        K.stow((2.2, s * 0.8, top + 0.12), (0.4, 0.3, 0.1))
+    V.scifi_chassis(L, hw, top, pod=1.78, w=0.46, nwheels=6, prow=1.3, fin=0.75, claws=(-2.0, 1.2))
     tz = top + 0.04
     with F.group('Turret'):
-        tube((-0.9, 0, tz - 0.03), (-0.9, 0, tz + 0.1), [(0, 1.2), (1, 1.12)], 20, 'dark')
-        # Open-backed gun house with trunnion cheeks.
-        hull([(-2.6, [(0, tz + 0.1), (1.0, tz + 0.1), (1.1, tz + 0.5), (0.9, tz + 0.9), (0, tz + 0.9)]),
-              (-0.2, [(0, tz + 0.1), (1.05, tz + 0.1), (1.12, tz + 0.5), (0.85, tz + 0.95), (0, tz + 0.95)]),
-              (0.7, [(0, tz + 0.12), (0.8, tz + 0.12), (0.86, tz + 0.4), (0.6, tz + 0.62), (0, tz + 0.62)])], 'armor', bevel=0.04)
+        tube((-0.9, 0, tz - 0.03), (-0.9, 0, tz + 0.1), [(0, 1.15), (1, 1.05)], 20, 'dark')
+        # Low wedge base with two shark-fin trunnion blades holding the cannon cradle.
+        hull([(-2.5, [(0, tz + 0.1), (0.7, tz + 0.1), (0.8, tz + 0.4), (0.5, tz + 0.62), (0, tz + 0.62)]),
+              (-0.6, [(0, tz + 0.1), (1.1, tz + 0.1), (1.18, tz + 0.4), (0.8, tz + 0.7), (0, tz + 0.7)]),
+              (1.3, [(0, tz + 0.12), (0.3, tz + 0.12), (0.34, tz + 0.26), (0.2, tz + 0.36), (0, tz + 0.37)])], 'armor', bevel=0.04)
+        gz = tz + 1.35
         for s in (1, -1):
-            prism([(-1.7, tz + 0.7), (0.1, tz + 0.7), (-0.3, tz + 1.75), (-1.3, tz + 1.75)], min(s * 0.62, s * 0.84), max(s * 0.62, s * 0.84), 'plate', bevel=0.035)
-            cyl((-0.8, s * 0.6, tz + 1.3), (-0.8, s * 0.92, tz + 1.3), 0.26, 12, 'steel')
-            cyl((-0.8, s * 0.92, tz + 1.3), (-0.8, s * 0.95, tz + 1.3), 0.14, 10, 'dark')
-            box((-1.0, s * 0.855, tz + 0.95), (0.4, 0.012, 0.02), 'glow')
-            K.ram((-0.2, s * 0.4, tz + 0.5), (1.15, s * 0.4, tz + 1.55), 0.085)   # elevation rams
-        # Autoloader magazine with shells on the right, ranging sensor pod on the left.
-        box((-1.3, -1.36, tz + 0.5), (0.8, 0.27, 0.36), 'armor', bevel=0.04)
-        box((-1.3, -1.36, tz + 0.87), (0.72, 0.2, 0.012), 'dark')
-        for k in range(4):
-            px = -1.85 + 0.37 * k
-            tube((px, -1.36, tz + 0.82), (px + 0.1, -1.36, tz + 1.3), [(0, 0.11), (0.62, 0.11), (1, 0.025)], 10, 'heat')
-            cyl((px + 0.06, -1.36, tz + 1.1), (px + 0.066, -1.36, tz + 1.13), 0.105, 10, 'amber')
-        box((-0.45, -1.36, tz + 0.5), (0.06, 0.2, 0.25), 'hazard')
-        box((-1.1, 1.32, tz + 0.68), (0.34, 0.2, 0.17), 'dark', bevel=0.04)
-        box((-0.75, 1.32, tz + 0.7), (0.012, 0.14, 0.09), 'glass')
-        cyl((-0.75, 1.32, tz + 0.9), (-0.73, 1.32, tz + 0.9), 0.045, 8, 'amber')
+            prism([(-2.2, tz + 0.5), (0.5, tz + 0.5), (-0.1, tz + 1.5), (-0.9, tz + 2.05), (-2.6, tz + 2.75), (-1.75, tz + 1.5)],
+                  min(s * 0.72, s * 0.9), max(s * 0.72, s * 0.9), 'plate', bevel=0.03)
+            cyl((-0.8, s * 0.7, gz), (-0.8, s * 0.97, gz), 0.3, 8, 'steel')
+            cyl((-0.8, s * 0.97, gz), (-0.8, s * 1.0, gz), 0.17, 8, 'glow')
+            box((-1.1, s * 0.905, tz + 0.82), (0.5, 0.012, 0.022), 'glow')
+            box((-2.1, s * 0.905, tz + 2.2), (0.16, 0.012, 0.03), 'amber')
         m = F.mark()
-        gz = tz + 1.3
-        box((-1.6, 0, gz), (0.8, 0.5, 0.42), 'armor', bevel=0.06)
-        # Heavy breech overhanging the rear. Breech and barrel are one part that slams back in the cradle.
-        mg = F.mark()
-        box((-2.75, 0, gz), (0.42, 0.42, 0.36), 'plate', bevel=0.05)
-        cyl((-3.17, 0, gz), (-3.3, 0, gz), 0.27, 12, 'steel')
-        cyl((-3.3, 0, gz), (-3.32, 0, gz), 0.12, 8, 'dark')
-        box((-3.0, 0.46, gz + 0.1), (0.05, 0.05, 0.2), 'steel')
-        K.railgun(-0.9, 8.4, 0.0, gz, 0.2)
-        # Stepped barrel: reinforced root with clamp rings, thermal sleeve, big slotted muzzle brake.
-        tube((-0.9, 0, gz), (0.98, 0, gz), [(0, 0.5), (0.9, 0.48), (1, 0.4)], 10, 'armor', sharp=30)
-        for xx in (-0.5, 0.1, 0.7):
-            cyl((xx - 0.05, 0, gz), (xx + 0.05, 0, gz), 0.53, 10, 'steel')
-        tube((3.5, 0, gz), (6.3, 0, gz), [(0, 0.22), (0.03, 0.28), (0.97, 0.28), (1, 0.22)], 10, 'plate', sharp=30)
-        for k in range(5):
-            xx = 3.75 + k * 0.58
-            cyl((xx - 0.04, 0, gz), (xx + 0.04, 0, gz), 0.31, 10, 'steel')
-        tube((7.6, 0, gz), (8.75, 0, gz), [(0, 0.22), (0.12, 0.5), (0.88, 0.5), (1, 0.38), (1, 0.24), (0.9, 0.22)], 8, 'armor', sharp=30)
-        for k in range(3):
-            box((7.9 + k * 0.27, 0, gz), (0.075, 0.52, 0.15), 'dark')
-        cyl((8.7, 0, gz), (8.74, 0, gz), 0.2, 8, 'dark')
-        tube((8.7, 0, gz), (8.75, 0, gz), [(0, 0.24), (1, 0.24), (1, 0.2), (0, 0.2)], 8, 'glow')
-        F.regroup(mg, 'Barrel')
-        K.flash(8.8, 0, gz, 0.3, 'Flash')
+        # Cradle housing the first sleeve slams back into.
+        box((-1.35, 0, gz), (1.55, 0.62, 0.52), 'armor', bevel=0.07)
+        box((-1.35, 0, gz + 0.53), (1.2, 0.2, 0.03), 'dark')
+        box((-1.35, 0, gz + 0.56), (1.1, 0.06, 0.012), 'glow')
         for s in (1, -1):
-            box((0.9, s * 0.52, gz), (1.6, 0.07, 0.1), 'dark', bevel=0.02)   # recoil rails
-            K.ram((-1.3, s * 0.26, gz + 0.52), (1.5, s * 0.26, gz + 0.52), 0.075)
-            K.ram((-1.3, s * 0.26, gz - 0.52), (1.5, s * 0.26, gz - 0.52), 0.075)
-        box((3.6, 0, gz - 0.36), (0.25, 0.3, 0.08), 'armor', bevel=0.02)
+            box((-1.6, s * 0.63, gz), (0.9, 0.012, 0.14), 'coil')
+        box((0.22, 0, gz), (0.06, 0.66, 0.56), 'plate', bevel=0.02)
+        step = V.tele_cannon(0.2, 8.0, gz, 0.5, 4)
         F.rot_all(m, 'Y', -26, about=(-0.8, 0, gz))
-        K.antenna(-2.3, 0.7, tz + 0.9, 1.3)
-        K.antenna(-2.3, 0.3, tz + 0.9, 0.9, tip='glow')
-        with F.group('Radar'):   # small fire-control dish
-            c = (-2.2, -0.6, tz + 1.5)
-            cyl((c[0], c[1], tz + 0.9), c, 0.05, 8, 'steel')
+        with F.group('Radar'):   # fire-control dish
+            c = (-2.0, 0.0, tz + 0.75)
+            cyl((c[0], c[1], tz + 0.55), c, 0.05, 8, 'steel')
             m = F.mark()
-            F.lathe([(0.04, 0.0), (0.3, 0.05), (0.46, 0.17), (0.49, 0.17), (0.3, 0.01), (0.04, -0.05)], 14, 'plate', center=(0, 0, 0), sharp=40)
-            cyl((0, 0, 0), (0, 0, 0.3), 0.02, 6, 'dark')
-            orb((0, 0, 0.32), 0.05, 'glow', seg=(8, 6))
-            F.rot_all(m, 'Y', 62)
+            F.lathe([(0.04, 0.0), (0.26, 0.05), (0.4, 0.15), (0.43, 0.15), (0.26, 0.01), (0.04, -0.05)], 6, 'plate', center=(0, 0, 0), sharp=40)
+            box((0, 0, 0.2), (0.02, 0.02, 0.12), 'glow')
+            F.rot_all(m, 'Y', -50)
             F.move_all(m, (c[0], c[1], c[2] + 0.12))
-    return dict(pivot=[('Turret', (-0.9, 0, tz)), ('Radar', (-2.2, -0.6, tz + 1.5), 'RadarPivot', 'Turret')] + K.gun_pivots([('', (-0.8, 0, gz), (-0.8, 0, gz))]))
+    p = (-0.8, 0, gz)
+    return dict(pivot=[('Turret', (-0.9, 0, tz)), ('Radar', (-2.0, 0.0, tz + 0.75), 'RadarPivot', 'Turret')]
+                + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Turret') for k in (1, 2, 3, 4)] + [('Flash', p, 'FlashPivot', 'Barrel4')])
 
 
 def cab(x, y, z, sx=0.7, sy=0.6, sz=0.55):
