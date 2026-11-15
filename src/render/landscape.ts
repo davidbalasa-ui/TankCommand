@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { heightAt, isWaterAt, slopeAt, type MapDef } from '../sim/map';
 import { MAX_SLOPE } from '../sim/tuning';
 import type { DepositState, WorldState } from '../sim/types';
+import { distanceOutside, groundHeightAt } from './outerLand';
 
 export const PROP_IDS = [
   'prop.nature.boulder',
@@ -173,7 +174,77 @@ export function scatterProps(map: MapDef): Placement[] {
       }
     }
   }
+  scatterOutside(map, out);
   return out;
+}
+
+/** How far past the map edge scenery is scattered (the hills beyond fade into haze). */
+const OUTSIDE_REACH = 80;
+const OUTSIDE_CELL = 4.5;
+
+/**
+ * Scenery on the land round the map: rocks, crags and dead trees on the hills, grass and shrubs
+ * near the edge, thinning out with distance. Nothing out here can be driven to.
+ */
+function scatterOutside(map: MapDef, out: Placement[]): void {
+  const half = map.size / 2;
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const s = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  const reach = half + OUTSIDE_REACH;
+  const cells = Math.ceil((reach * 2) / OUTSIDE_CELL);
+  for (let cz = 0; cz < cells; cz += 1) {
+    for (let cx = 0; cx < cells; cx += 1) {
+      const x = -reach + (cx + 0.1 + hash(cx, cz, map.seed, 12) * 0.8) * OUTSIDE_CELL;
+      const z = -reach + (cz + 0.1 + hash(cx, cz, map.seed, 13) * 0.8) * OUTSIDE_CELL;
+      const d = distanceOutside(map, x, z);
+      // Leave the strip right at the edge clear so the edge marker reads.
+      if (d < 3 || d > OUTSIDE_REACH) {
+        continue;
+      }
+      const r = hash(cx, cz, map.seed, 11);
+      // Thinner further out; the haze hides the rest.
+      if (r > 0.42 * (1 - d / (OUTSIDE_REACH * 1.25))) {
+        continue;
+      }
+      const pick = hash(cx, cz, map.seed, 14);
+      const size = hash(cx, cz, map.seed, 15);
+      const yaw = hash(cx, cz, map.seed, 16) * Math.PI * 2;
+      const slope = Math.abs(groundHeightAt(map, x + 1.5, z) - groundHeightAt(map, x - 1.5, z)) +
+        Math.abs(groundHeightAt(map, x, z + 1.5) - groundHeightAt(map, x, z - 1.5));
+      let prop: PropId;
+      let scale: number;
+      let sink = 0;
+      if (slope > 1.6 && pick < 0.45) {
+        prop = 'prop.nature.cliff';
+        scale = 0.8 + size * 0.9;
+        sink = 0.4;
+      } else if (pick < 0.3) {
+        prop = 'prop.nature.boulder';
+        scale = 0.8 + size * 1.1;
+        sink = 0.3;
+      } else if (pick < 0.45) {
+        prop = 'prop.nature.rock_cluster';
+        scale = 0.7 + size * 0.8;
+        sink = 0.15;
+      } else if (pick < 0.58) {
+        prop = 'prop.nature.dead_tree';
+        scale = 0.8 + size * 0.7;
+      } else if (pick < 0.8) {
+        prop = 'prop.nature.shrub';
+        scale = 0.6 + size * 0.6;
+        sink = 0.05;
+      } else {
+        prop = 'prop.nature.grass';
+        scale = 1 + size * 0.9;
+      }
+      q.setFromAxisAngle(up, yaw);
+      s.set(scale, scale, scale);
+      p.set(x, groundHeightAt(map, x, z) - sink * scale, z);
+      out.push({ prop, x, z, matrix: new THREE.Matrix4().compose(p, q, s) });
+    }
+  }
 }
 
 export class Landscape {

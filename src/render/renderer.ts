@@ -18,6 +18,7 @@ import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
+import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
 import { collectPartMotions, pivotIsSpinner, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
 import {
   QUALITY_LADDER,
@@ -578,6 +579,7 @@ export class RenderView {
   private contacts: Array<{ x: number; z: number }> = [];
   private skirt: THREE.Mesh | null = null;
   private farPlane: THREE.Mesh | null = null;
+  private outerLand: THREE.Mesh | null = null;
   private pickTargets: THREE.Object3D[] = [];
   private skyTexture: THREE.Texture | null = null;
   private templateRoot: THREE.Group | null = null;
@@ -742,7 +744,8 @@ export class RenderView {
   }
 
   applyCamera(): void {
-    const position = this.rtsCamera.position((x, z) => heightAt(this.world.map, x, z));
+    // Outside the map the camera has to clear the surrounding hills too.
+    const position = this.rtsCamera.position((x, z) => groundHeightAt(this.world.map, x, z));
     this.camera.position.set(position.x, position.y, position.z);
     const targetY = heightAt(this.world.map, this.rtsCamera.targetX, this.rtsCamera.targetZ) + 1;
     this.camera.lookAt(this.rtsCamera.targetX, targetY, this.rtsCamera.targetZ);
@@ -1401,13 +1404,15 @@ export class RenderView {
     if (this.skirt) {
       this.scene.add(this.skirt);
     }
+    this.outerLand = this.buildOuterLand();
+    this.scene.add(this.outerLand);
+    // The old flat plain stays only as an invisible pick surface past the far hills.
     this.farPlane = this.buildFarPlane();
-    if (this.farPlane) {
-      this.scene.add(this.farPlane);
-    }
+    this.farPlane.visible = false;
+    this.scene.add(this.farPlane);
     this.scene.add(this.buildBorder());
 
-    this.pickTargets = [this.terrain, this.skirt, this.farPlane].filter(
+    this.pickTargets = [this.terrain, this.outerLand, this.skirt, this.farPlane].filter(
       (mesh): mesh is THREE.Mesh => mesh !== null,
     );
   }
@@ -1493,6 +1498,20 @@ export class RenderView {
       side: THREE.DoubleSide,
     });
     return new THREE.Mesh(geometry, material);
+  }
+
+  private buildOuterLand(): THREE.Mesh {
+    const geometry = buildOuterLandGeometry(this.world.map, {
+      grass: new THREE.Color(0x5f7a3c),
+      dry: new THREE.Color(0x8d8455),
+      rock: new THREE.Color(0x7d7a70),
+      haze: new THREE.Color(SKY_HORIZON),
+    });
+    // Same material as the battlefield, so the ground detail carries on past the edge.
+    const mesh = new THREE.Mesh(geometry, this.terrain?.material ?? new THREE.MeshStandardMaterial({ vertexColors: true }));
+    mesh.receiveShadow = true;
+    mesh.name = 'OuterLand';
+    return mesh;
   }
 
   private buildFarPlane(): THREE.Mesh {
@@ -1630,18 +1649,18 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     return mesh;
   }
 
-  private buildBorder(): THREE.LineLoop {
-    const map = this.world.map;
-    const half = map.size / 2;
-    const points = [
-      new THREE.Vector3(-half, heightAt(map, -half, -half) + 0.25, -half),
-      new THREE.Vector3(half, heightAt(map, half, -half) + 0.25, -half),
-      new THREE.Vector3(half, heightAt(map, half, half) + 0.25, half),
-      new THREE.Vector3(-half, heightAt(map, -half, half) + 0.25, half),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0xdfe8f5 });
-    return new THREE.LineLoop(geometry, material);
+  /** The playable edge: a soft light band lying on the ground, fading inward. */
+  private buildBorder(): THREE.Mesh {
+    const material = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(buildEdgeBandGeometry(this.world.map), material);
+    mesh.name = 'MapEdge';
+    mesh.renderOrder = 1;
+    return mesh;
   }
 
   private updateLight(): void {
