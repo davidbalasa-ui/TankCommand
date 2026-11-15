@@ -535,21 +535,36 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
             amp = c[2] * (0.6 + 0.4 * min(1.0, (lat.length / 260 + spin / 2.5)))   # harder work in turns / dodges
             if speed > 60 and lat.length < 80:
                 amp *= 0.85                                     # a little streamlining at full sprint
-            side = c[3]
-            trail = b + (-ax * 0.92 + rad * 0.4 + tan * side * 0.15).normalized() * L * 0.92
-            reach = b + (ax * (0.35 + 0.85 * amp) + rad * 0.9 + tan * side * 0.9).normalized() * L * (0.62 + 0.1 * amp)
-            reach = trail.lerp(reach, 0.6 + 0.4 * amp)
+            # each stroke this leg works out its OWN three points (reach, curl, trail) from what the body needs
+            # right now plus its own randomness, and keeps clear of the points its neighbours have picked
+            ci = S['cyc'].index(c)
+            if S.get('plan_i') != ci:
+                need = ax * (0.6 if speed > 30 else 0.25) + (lat.normalized() * min(1.0, lat.length / 250) if lat.length > 1 else Vector())
+                for _try in range(6):
+                    rr = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
+                    rd = (need * (0.6 + 0.9 * amp) + rad * 0.85 + tan * c[3] * 0.7 + rr * 0.55)
+                    if rd.dot(rad) < 0.15:
+                        rd = rd + rad * (0.15 - rd.dot(rad) + 0.2)
+                    reach_p = b + rd.normalized() * L * rnd.uniform(0.55, 0.86)
+                    if all((reach_p - o_['plan'][0]).length > 2.6 for o_ in st if o_ is not S and 'plan' in o_):
+                        break
+                rt = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
+                trail_p = b + (-ax * 0.95 + rad * rnd.uniform(0.25, 0.6) - need * 0.35 + rt * 0.3).normalized() * L * rnd.uniform(0.78, 0.95)
+                rc = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
+                curl_p = b + (rad + rc * 0.6 - ax * 0.2).normalized() * L * rnd.uniform(0.32, 0.5)
+                S['plan'], S['plan_i'] = (reach_p, curl_p, trail_p), ci
+            reach, curl, trail = S['plan']
             pw = c[4]
             if u >= 1.0:                                       # gliding between strokes: drift trailing
                 tgt, stroking = trail, 0.0
-            elif u < pw:                                       # recovery: curl in and swing round
+            elif u < pw:                                       # recovery: curl in past its own via-point, then out
                 e = _ease(u / pw)
-                tgt = trail.lerp(reach, e) - rad * math.sin(math.pi * e) * L * 0.18 * amp
+                tgt = trail * (1 - e) ** 2 + curl * 2 * e * (1 - e) + reach * e * e
                 stroking = 0.0
-            else:                                              # power: whip back, fully extended
+            else:                                              # power: whip back to its own trail point
                 e = (u - pw) / (1 - pw)
                 e = 1 - (1 - e) ** 2.4
-                tgt = reach.lerp(trail, e) + rad * math.sin(math.pi * e) * L * 0.12 * amp
+                tgt = reach.lerp(trail, e) + rad * math.sin(math.pi * e) * L * 0.1 * amp
                 stroking = math.sin(math.pi * min(1.0, e * 1.1)) * amp
             # its own idle life: slow wander of the tip
             tgt = tgt + (rad * math.sin(t * 1.7 * S['gk'] + S['ph']) + tan * math.sin(t * 2.3 * S['gk'] + S['ph'] * 1.7)) * 0.9
