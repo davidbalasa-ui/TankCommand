@@ -81,10 +81,14 @@ def lancer():
             # Cheek block carrying each lance, tight against the needle nose.
             prism([(0.2, gz - 0.3), (1.5, gz - 0.24), (1.9, gz), (1.5, gz + 0.24), (0.2, gz + 0.34)], min(s * 0.3, s * 0.74), max(s * 0.3, s * 0.74), 'plate', bevel=0.035)
             V.neon((0.9, s * 0.75, gz), (0.45, 0.012, 0.02))
-            V.tele_cannon(1.2, 6.2, gz, 0.2, 4, y=s * 0.52, piston=False)
+            sd = 'L' if s > 0 else 'R'
+            V.tele_cannon(1.2, 6.2, gz, 0.2, 4, y=s * 0.52, piston=False, prefix='Barrel' + sd, flash_group='Flash' + sd)
     p = (1.2, 0, gz)
-    return dict(pivot=[('Turret', (-0.35, 0, tz))] + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Turret') for k in (1, 2, 3, 4)]
-                + [('Flash', p, 'FlashPivot', 'Barrel4')])
+    piv = [('Turret', (-0.35, 0, tz))]
+    for sd, sy in (('L', 1), ('R', -1)):
+        piv += [(f'Barrel{sd}{k}', p, f'Barrel{sd}{k}Pivot', 'Turret') for k in (1, 2, 3, 4)]
+        piv += [('Flash' + sd, p, f'Flash{sd}Pivot', f'Barrel{sd}4'), ('Blade' + sd, (-1.4, sy * 0.756, tz + 0.49), f'Blade{sd}Pivot', 'Turret')]
+    return dict(pivot=piv)
 
 
 @asset('human/outrider.glb', 'Terran Outrider (scout)')

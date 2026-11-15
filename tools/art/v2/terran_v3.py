@@ -188,11 +188,14 @@ def arrow_turret(x0, x1, w, tz, h, zone='armor'):
         F.move_all(m, (x0 + L * 0.78, s * w * 0.6, tz + h * 0.42))
         neon((x0 + L * 0.3, s * w * 1.07, tz + h * 0.4), (L * 0.2, 0.012, 0.018))
         # Swept sensor blade leaning out from each shoulder.
-        p = prism([(x0 + 0.1, tz + h * 0.7), (x0 + 0.95, tz + h * 0.7), (x0 + 0.3, tz + h + 0.5), (x0 - 0.7, tz + h + 0.95)], -0.025, 0.025, 'plate', bevel=0.01)
-        F.rot(p, 'X', -24, about=(0, 0, tz + h * 0.7))
-        F.move(p, (0, w * 0.72, 0))
+        mb = F.mark()   # its own part (BladeL / BladeR): the blades sweep slowly while the unit scans
+        prism([(x0 + 0.1, tz + h * 0.7), (x0 + 0.95, tz + h * 0.7), (x0 + 0.3, tz + h + 0.5), (x0 - 0.7, tz + h + 0.95)], -0.025, 0.025, 'plate', bevel=0.01)
+        box((x0 + 0.1, 0.03, tz + h + 0.42), (0.22, 0.006, 0.014), 'hot')
+        F.rot_all(mb, 'X', -24, about=(0, 0, tz + h * 0.7))
+        F.move_all(mb, (0, w * 0.72, 0))
         if s < 0:
-            F.mirror(p)
+            F.mirror_all(mb)
+        F.regroup(mb, 'BladeL' if s > 0 else 'BladeR')
         box((x0 - 0.45, s * w * 0.3, tz + h * 0.5), (0.02, 0.07, 0.03), 'amber')
     box((x0 - 0.46, 0, tz + h * 0.5), (0.02, w * 0.16, 0.05), 'coilhot')
     for s in (1, -1):   # layered cheek armour, louvres and bolts
@@ -209,7 +212,7 @@ def arrow_turret(x0, x1, w, tz, h, zone='armor'):
         box((x0 + 0.25, s * w * 0.3, tz + h * 0.93), (0.16, w * 0.14, 0.02), 'vent')
 
 
-def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True):
+def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, prefix='Barrel'):
     """Telescoping rail cannon along +X from x0 to x1: n nested box sleeves (groups Barrel1..n, widest first)
     that slam into each other when it fires, a jaw emitter at the muzzle and a recoil piston out the back.
     Returns the travel of one sleeve relative to the next."""
@@ -244,6 +247,6 @@ def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True):
                 prism([(b - rr * 1.1, z - rr * 0.6), (b + rr * 0.6, z - rr * 0.25), (b + rr * 0.6, z + rr * 0.25), (b - rr * 1.1, z + rr * 0.6)],
                       y + min(sy * rr * 0.85, sy * (rr * 0.85 + 0.06)), y + max(sy * rr * 0.85, sy * (rr * 0.85 + 0.06)), 'plate', bevel=0.015)
             cyl((b - 0.1, y, z), (b + rr * 0.8, y, z), rr * 0.3, 8, 'hot')
-        F.regroup(m, f'Barrel{k + 1}')
+        F.regroup(m, f'{prefix}{k + 1}')
     K.flash(x1 + r * 2.6, y, z, r * 0.6, flash_group)
     return step

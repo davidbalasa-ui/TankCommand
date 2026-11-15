@@ -133,19 +133,24 @@ for _n in ('stinger', 'darter', 'glider', 'carapace', 'spitter', 'mortar_beast',
 # Firing: recoil, muzzle flash, hull kick, missile ripples.
 _h = lambda n: SPEC.setdefault('human/' + n, {})
 _a = lambda n: SPEC.setdefault('alien/' + n, {})
-_h('lancer')['FlashPivot'] = flash(FWD, 0.1, 0.0)
-for _k in (1, 2, 3, 4):
-    _h('lancer')[f'Barrel{_k}Pivot'] = recoil(FWD, 1.0 * _k, attack=0.05, recover=0.9)
-_h('lancer')['@fire'] = dict(kick=0.04, slide=0.14, attack=0.05, recover=0.7)
+# Lancer (light tank): the two lances fire in turn, one shot every 0.6 s; sensor blades sweep while idle.
+for _sd, _d in (('L', 0.0), ('R', 0.6)):
+    _h('lancer')[f'Flash{_sd}Pivot'] = flash(FWD, 0.09, _d)
+    for _k in (1, 2, 3, 4):
+        _h('lancer')[f'Barrel{_sd}{_k}Pivot'] = recoil(FWD, 1.0 * _k, attack=0.05, recover=0.5, delay=_d)
+_h('lancer')['BladeLPivot'] = swing(FWD, 0.16, 0.3)
+_h('lancer')['BladeRPivot'] = swing(FWD, 0.16, 0.3, phase=2.1)
+_h('lancer')['@fire'] = dict(kick=0.03, slide=0.1, attack=0.05, recover=0.4, period=1.2, repeat=2, every=0.6)
 gun(_h('outrider'), dist=0.14, kick=(0.012, 0.03, 0.3), recover=0.1, fdur=0.05, repeat=3, every=0.13)
 gun(_h('skimmer'), 'L', dist=0.3, kick=(0.02, 0.08))
 gun(_h('skimmer'), 'R', dist=0.3, delay=0.18)
 gun(_h('bulwark'), 'L', dist=0.5, kick=(0.035, 0.1, 0.7), recover=0.6)
 gun(_h('bulwark'), 'R', dist=0.5, delay=0.22, recover=0.6)
-_h('longbow')['FlashPivot'] = flash(up(26), 0.14, 0.0)
+# Longbow (artillery): three blasts inside one second, then a three second reload.
+_h('longbow')['FlashPivot'] = flash(up(26), 0.1, 0.0, repeat=3, every=0.33)
 for _k in (1, 2, 3, 4):   # telescoping cannon: every sleeve slams into the one behind (80% of the barrel length)
-    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.76 * _k, attack=0.07, recover=1.5)
-_h('longbow')['@fire'] = dict(kick=0.1, slide=0.4, attack=0.06, recover=1.2)
+    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.76 * _k, attack=0.05, recover=0.27, repeat=3, every=0.33)
+_h('longbow')['@fire'] = dict(kick=0.09, slide=0.35, attack=0.05, recover=0.5, period=4.0, repeat=3, every=0.33)
 _order = [(s, i, j) for j in (1, 0) for i, s in ((0, 'L'), (2, 'R'), (1, 'L'), (0, 'R'), (2, 'L'), (1, 'R'))]
 for _k, (_s, _i, _j) in enumerate(_order):   # pause, then a ripple hopping back and forth between the two pods
     _h('javelin')[f'Msl{_s}{_i}{_j}Pivot'] = launch(up(16), 0.5 + 0.09 * _k)

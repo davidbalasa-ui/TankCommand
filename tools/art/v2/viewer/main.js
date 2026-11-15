@@ -75,15 +75,24 @@ const hit = (x, a, r) => (x < 0 ? 0 : x < a ? x / a : Math.max(0, 1 - (x - a) / 
 const rep = (spec, tf, fn) => { let v = 0; for (let k = 0; k < (spec.repeat || 1); k += 1) v = Math.max(v, fn(tf - (spec.delay || 0) - k * (spec.every || 0))); return v; };
 const roots = [];
 window.__setTime = (t) => {
-  const tf = firePeriod ? (t % firePeriod) : 1e9;
+  // Every unit fires on its own clock: scene extras fire.period (s) overrides the viewer's fire= period.
+  const clock = (fire) => (firePeriod ? (t % ((fire && fire.period) || firePeriod)) : 1e9);
   for (const { root, fire } of roots) {
     if (!fire) continue;
-    const x = tf - fire.attack;
-    const k = tf < fire.attack ? tf / fire.attack : Math.exp(-4 * x / fire.recover) * Math.cos(6 * x / fire.recover);
+    const tf0 = clock(fire);
+    let k = 0;
+    for (let i = 0; i < (fire.repeat || 1); i += 1) {
+      const tf = tf0 - i * (fire.every || 0);
+      if (tf < 0) continue;
+      const x = tf - fire.attack;
+      const v = tf < fire.attack ? tf / fire.attack : Math.exp(-4 * x / fire.recover) * Math.cos(6 * x / fire.recover);
+      if (Math.abs(v) > Math.abs(k)) k = v;
+    }
     root.rotation.z = firePeriod ? fire.kick * k : 0;
     root.position.x = firePeriod ? -fire.slide * k : 0;
   }
-  for (const { node, spec, rest, pos } of parts) {
+  for (const { node, spec, rest, pos, fire } of parts) {
+    const tf = clock(fire);
     if (spec.type === 'scroll') { if (moving && node.material && node.material.map) node.material.map.offset.x = spec.speed * t; continue; }
     if (spec.type === 'recoil') {
       const a = new THREE.Vector3(...spec.axis).normalize();
@@ -143,7 +152,8 @@ files.forEach((file, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     holder.position.set((col - (Math.min(cols, files.length) - 1) / 2) * gap - centre.x, -box.min.y + Number(q.get('lift') || 0), row * gap - centre.z);
-    root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone(), pos: o.position.clone() }); });
+    const unitFire = gltf.scene.userData && gltf.scene.userData.fire;
+    root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone(), pos: o.position.clone(), fire: unitFire }); });
     roots.push({ root, fire: gltf.scene.userData && gltf.scene.userData.fire });
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(holder);
