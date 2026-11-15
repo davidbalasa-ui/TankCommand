@@ -133,7 +133,10 @@ for _n in ('stinger', 'darter', 'glider', 'carapace', 'spitter', 'mortar_beast',
 # Firing: recoil, muzzle flash, hull kick, missile ripples.
 _h = lambda n: SPEC.setdefault('human/' + n, {})
 _a = lambda n: SPEC.setdefault('alien/' + n, {})
-gun(_h('lancer'), dist=0.35, kick=(0.025, 0.06))
+_h('lancer')['FlashPivot'] = flash(FWD, 0.1, 0.0)
+for _k in (1, 2, 3, 4):
+    _h('lancer')[f'Barrel{_k}Pivot'] = recoil(FWD, 1.0 * _k, attack=0.05, recover=0.9)
+_h('lancer')['@fire'] = dict(kick=0.04, slide=0.14, attack=0.05, recover=0.7)
 gun(_h('outrider'), dist=0.14, kick=(0.012, 0.03, 0.3), recover=0.1, fdur=0.05, repeat=3, every=0.13)
 gun(_h('skimmer'), 'L', dist=0.3, kick=(0.02, 0.08))
 gun(_h('skimmer'), 'R', dist=0.3, delay=0.18)

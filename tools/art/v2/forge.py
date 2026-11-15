@@ -612,7 +612,7 @@ class N:
 
 
 UV_PRIORITY = {'track': 0.5, 'wheel': 0.6, 'dark': 0.6, 'under': 0.6, 'slat': 0.6, 'glow': 0.45, 'amber': 0.45,
-               'red': 0.45, 'coil': 0.7}
+               'red': 0.45, 'coil': 0.7, 'neon': 0.45, 'hot': 0.45, 'coilhot': 0.7, 'black': 0.5}
 EDGE = {'terran': (0.27, 0.28, 0.3, 2.5), 'kesh': (0.5, 0.45, 0.36, 1.2), 'nature': (0.06, 0.055, 0.05, 1.5)}
 CYAN = (0.03, 0.62, 1.0)
 AMBER = (1.0, 0.2, 0.012)
@@ -631,6 +631,10 @@ ZONES = {
         'grille': dict(kind='slats', base=(0.05, 0.055, 0.06), freq=9.0, axis=1),
         'glow': dict(kind='glow', emit=CYAN, strength=3.2),
         'flash': dict(kind='glow', emit=CYAN, strength=3.2),
+        'neon': dict(kind='glow', emit=(0.0, 0.5, 1.0), strength=1.6),
+        'hot': dict(kind='glow', emit=(0.5, 0.82, 1.0), strength=1.25),
+        'coilhot': dict(kind='coil', emit=(0.05, 0.6, 1.0), strength=2.2, freq=9.0),
+        'black': dict(kind='panel', base=(0.006, 0.007, 0.009), rough=0.35, metal=0.8, scale=3.0, var=0.2, wear=0.5, dirt=0.0),
         'flashw': dict(kind='glow', emit=(0.8, 0.95, 1.0), strength=3.0),
         'amber': dict(kind='glow', emit=AMBER, strength=3.2),
         'red': dict(kind='glow', emit=(1.0, 0.03, 0.02), strength=1.3),

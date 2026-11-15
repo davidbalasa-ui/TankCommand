@@ -80,9 +80,11 @@ def lancer():
         for s in (1, -1):
             # Cheek block carrying each lance, tight against the needle nose.
             prism([(0.2, gz - 0.3), (1.5, gz - 0.24), (1.9, gz), (1.5, gz + 0.24), (0.2, gz + 0.34)], min(s * 0.3, s * 0.74), max(s * 0.3, s * 0.74), 'plate', bevel=0.035)
-            box((0.9, s * 0.75, gz), (0.45, 0.012, 0.02), 'glow')
-            V.rail_lance(1.2, 6.0, s * 0.52, gz, 0.15, group='Barrel', flash_group='Flash')
-    return dict(pivot=[('Turret', (-0.35, 0, tz))] + K.gun_pivots([('', (1.45, 0, gz), (6.6, 0, gz))]))
+            V.neon((0.9, s * 0.75, gz), (0.45, 0.012, 0.02))
+            V.tele_cannon(1.2, 6.2, gz, 0.2, 4, y=s * 0.52, piston=False)
+    p = (1.2, 0, gz)
+    return dict(pivot=[('Turret', (-0.35, 0, tz))] + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Turret') for k in (1, 2, 3, 4)]
+                + [('Flash', p, 'FlashPivot', 'Barrel4')])
 
 
 @asset('human/outrider.glb', 'Terran Outrider (scout)')
@@ -395,16 +397,18 @@ def longbow():
             prism([(-2.2, tz + 0.5), (0.5, tz + 0.5), (-0.1, tz + 1.5), (-0.9, tz + 2.05), (-2.6, tz + 2.75), (-1.75, tz + 1.5)],
                   min(s * 0.72, s * 0.9), max(s * 0.72, s * 0.9), 'plate', bevel=0.03)
             cyl((-0.8, s * 0.7, gz), (-0.8, s * 0.97, gz), 0.3, 8, 'steel')
-            cyl((-0.8, s * 0.97, gz), (-0.8, s * 1.0, gz), 0.17, 8, 'glow')
-            box((-1.1, s * 0.905, tz + 0.82), (0.5, 0.012, 0.022), 'glow')
+            cyl((-0.8, s * 0.97, gz), (-0.8, s * 1.0, gz), 0.17, 8, 'hot')
+            V.neon((-1.1, s * 0.905, tz + 0.82), (0.5, 0.012, 0.022))
             box((-2.1, s * 0.905, tz + 2.2), (0.16, 0.012, 0.03), 'amber')
         m = F.mark()
         # Cradle housing the first sleeve slams back into.
         box((-1.35, 0, gz), (1.55, 0.62, 0.52), 'armor', bevel=0.07)
         box((-1.35, 0, gz + 0.53), (1.2, 0.2, 0.03), 'dark')
-        box((-1.35, 0, gz + 0.56), (1.1, 0.06, 0.012), 'glow')
+        V.neon((-1.35, 0, gz + 0.56), (1.1, 0.06, 0.012))
         for s in (1, -1):
-            box((-1.6, s * 0.63, gz), (0.9, 0.012, 0.14), 'coil')
+            box((-1.6, s * 0.63, gz), (0.9, 0.012, 0.14), 'coilhot')
+            for q in range(4):
+                box((-2.3 + q * 0.45, s * 0.64, gz), (0.04, 0.02, 0.3), 'black')
         box((0.22, 0, gz), (0.06, 0.66, 0.56), 'plate', bevel=0.02)
         step = V.tele_cannon(0.2, 9.0, gz, 0.44, 4)
         F.rot_all(m, 'Y', -26, about=(-0.8, 0, gz))
