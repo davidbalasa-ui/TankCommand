@@ -69,16 +69,46 @@ let loaded = 0;
 const parts = [];
 const turn = new THREE.Quaternion();
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const firePeriod = Number(q.get('fire') || 0);
+const moving = q.get('move') === '1';
+const hit = (x, a, r) => (x < 0 ? 0 : x < a ? x / a : Math.max(0, 1 - (x - a) / r) ** 2);
+const rep = (spec, tf, fn) => { let v = 0; for (let k = 0; k < (spec.repeat || 1); k += 1) v = Math.max(v, fn(tf - (spec.delay || 0) - k * (spec.every || 0))); return v; };
+const roots = [];
 window.__setTime = (t) => {
-  for (const { node, spec, rest } of parts) {
+  const tf = firePeriod ? (t % firePeriod) : 1e9;
+  for (const { root, fire } of roots) {
+    if (!fire) continue;
+    const x = tf - fire.attack;
+    const k = tf < fire.attack ? tf / fire.attack : Math.exp(-4 * x / fire.recover) * Math.cos(6 * x / fire.recover);
+    root.rotation.z = firePeriod ? fire.kick * k : 0;
+    root.position.x = firePeriod ? -fire.slide * k : 0;
+  }
+  for (const { node, spec, rest, pos } of parts) {
+    if (spec.type === 'scroll') { if (moving && node.material && node.material.map) node.material.map.offset.x = spec.speed * t; continue; }
+    if (spec.type === 'recoil') {
+      const a = new THREE.Vector3(...spec.axis).normalize();
+      node.position.copy(pos).addScaledVector(a, -spec.dist * rep(spec, tf, (x) => hit(x, spec.attack, spec.recover)));
+      continue;
+    }
+    if (spec.type === 'flash') {
+      node.visible = rep(spec, tf, (x) => (x >= 0 && x < spec.dur ? 1 : 0)) > 0;
+      continue;
+    }
+    if (spec.type === 'launch') {
+      const x = tf - spec.delay;
+      const a = new THREE.Vector3(...spec.axis).normalize();
+      node.visible = !(x >= spec.dur && tf < spec.reload);
+      node.position.copy(pos).addScaledVector(a, x > 0 && x < spec.dur ? spec.travel * (x / spec.dur) ** 2 : 0);
+      continue;
+    }
     const axis = spec.axis ? new THREE.Vector3(...spec.axis).normalize() : null;
     if (spec.type === 'spin') {
       node.quaternion.copy(rest).multiply(turn.setFromAxisAngle(axis, spec.speed * t));
     } else if (spec.type === 'swing') {
-      node.quaternion.copy(rest).multiply(turn.setFromAxisAngle(axis, spec.amp * Math.sin(Math.PI * 2 * spec.speed * t + (spec.phase || 0))));
+      node.quaternion.copy(rest).multiply(turn.setFromAxisAngle(axis, spec.amp * Math.sin(Math.PI * 2 * spec.speed * t + (spec.phase || 0)) + (spec.snap ? spec.snap * hit(tf, spec.attack, spec.recover) : 0)));
     } else if (spec.type === 'flicker') {
       const tick = Math.floor(t * spec.rate);
-      node.visible = hash(tick) < spec.duty && Math.floor(hash(tick + 0.5) * spec.slots) === spec.slot;
+      node.visible = (spec.fireOn && tf < spec.fireOn) || (hash(tick) < spec.duty && Math.floor(hash(tick + 0.5) * spec.slots) === spec.slot);
     }
   }
   renderer.render(scene, camera);
@@ -113,7 +143,8 @@ files.forEach((file, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     holder.position.set((col - (Math.min(cols, files.length) - 1) / 2) * gap - centre.x, -box.min.y + Number(q.get('lift') || 0), row * gap - centre.z);
-    root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone() }); });
+    root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone(), pos: o.position.clone() }); });
+    roots.push({ root, fire: gltf.scene.userData && gltf.scene.userData.fire });
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(holder);
     loaded += 1;

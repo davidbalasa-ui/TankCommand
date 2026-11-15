@@ -16,7 +16,7 @@ await page.waitForTimeout(1000);
 const n = Math.round(Number(secs) * Number(fps));
 for (let i = 0; i < n; i += 1) {
   await page.evaluate((t) => window.__setTime(t), i / Number(fps));
-  await page.screenshot({ path: join(dir, `f${String(i).padStart(4, '0')}.png`) });
+  await page.screenshot({ path: join(dir, `f${String(i).padStart(4, '0')}.png`), timeout: 180000 });
 }
 await browser.close();
 execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', fps, '-i', join(dir, 'f%04d.png'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', out]);
