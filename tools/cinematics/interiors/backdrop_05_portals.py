@@ -7,14 +7,15 @@ terran:   a Terran tear (violent, jagged, blue-white rip in space, opening/porta
           and thin until they clear the edge: a broadside battleship half out, a frigate snapping back to
           shape ahead of it, corvettes still streaks inside.
 arcadian: an Arcadian portal (black, crisp thin rings with tick marks, electric, opening/portals.arcadian_portal)
-          behind a Terran battleship and its screen; a crescent mothership slides out of it stretched, a
-          corvette and stingrays ahead of it.
+          behind a Terran battleship and its screen; a crescent mothership is drawn out of it (its own hull
+          tapered to a gold thread in the throat, backdrop_stretch.py), corvettes at other stages on side lanes.
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import backdrop_kit as K  # noqa: E402
+import backdrop_stretch as ST  # noqa: E402
 import bpy  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
@@ -101,38 +102,30 @@ def arcadian():
     k.camera((0, 0, 0), (0, 100, -4), lens=24)
     P = k.cam_pt
     # ------------------------------------------------ the portal
-    AT = P(-0.06, 0.40, 520)
-    n = Vector((0.40, -1.0, -0.03)).normalized()
+    AT = P(float(K.ARGS.get('atx', -0.24)), 0.37, 520)
+    n = Vector((0.80, -0.60, -0.03)).normalized()
     S = 215.0
-    rf = K.PO.arcadian_portal(frames=k.sc.nf + 1)
-    rf.location = AT
-    rf.rotation_mode = 'QUATERNION'
-    rf.rotation_quaternion = n.to_track_quat('Z', 'Y')
-    rf.scale = (S, S, 1)
-    K.PO.arcadian_arcs(AT, n, S * 0.5, 1, k.sc.nf, seed=11, every=2)
-    for i in range(4):                                     # the instrument rings read too faint at still size: lift them
-        nt = bpy.data.materials[f'RiftRingM{i}'].node_tree
-        for nd in nt.nodes:
-            if nd.type == 'EMISSION' and nd.inputs['Strength'].links:
-                s0 = nd.inputs['Strength'].links[0].from_socket
-                mul = nt.nodes.new('ShaderNodeMath')
-                mul.operation = 'MULTIPLY'
-                mul.inputs[1].default_value = 3.5
-                nt.links.new(s0, mul.inputs[0])
-                nt.links.new(mul.outputs[0], nd.inputs['Strength'])
-    k.light(AT + n * 380 + Vector((0, 0, 50)), (1.0, 0.85, 0.6), 3e7, 30)
-    stretched(k, 'crescent', AT + n * 150 + Vector((0, 0, -6)), n, 2.3, K.HOTGOLD, scale=2.3, roll=-48)
-    ac = stretched(k, 'acorv', AT + n * 330 + Vector((40, 0, -6)), n, 1.0, K.HOTGOLD, scale=2.6, roll=15)
+    DZ = 0.45                                              # a short throat: its far end stays hidden behind the mouth
+    rf = ST.portal(k, AT, n, S, k.sc.nf, seed=11)
+    rf.scale = (S, S, DZ)
+    k.light(AT + n * 260 + Vector((0, 0, 60)), (1.0, 0.85, 0.6), 3e7, 30)
+    # the crescent mothership at the most dramatic moment: horns and core out and opening, the hull behind
+    # them still a drawn-out gold thread in the throat (backdrop_stretch.py: its own geometry, tapered)
+    cr = ST.Stretcher(k, 'crescent', AT, n, S, scale=2.5, roll=-80, depth=240 * DZ, seed=3, lines=12, glow=2.2,
+                      zf=0.55, w=0.2)
+    cr.set(float(K.ARGS.get('nose', 1.0)) * cr.L, tick=3)
+    # corvettes on side lanes at other moments: thread-thin, half out, almost free
+    for i, (off, xn, roll) in enumerate((((-0.5, 0.86), 0.50, 20), ((-0.3, -0.88), 1.50, -15))):
+        cv = ST.Stretcher(k, 'acorv', AT, n, S, scale=2.8, roll=roll, off=off, a=7.0, zf=0.7, w=0.17,
+                          depth=240 * DZ, seed=20 + i, lines=6, line_r=S * 0.0009, bolt_w=0.09, glow=2.2)
+        cv.set(xn * cv.L, tick=5 + i)
+    ac = k.ship('acorv', scale=2.6)                         # one already through and fighting
+    k.place(ac, AT + n * 330 + Vector((30, 0, -34)), fwd=n, roll=15)
     k.engines(ac, 0.5)
-    stretched(k, 'acorv', AT + n * 200 + Vector((-125, 0, 60)), n, 2.4, K.HOTGOLD, scale=2.4, roll=-10)
-    for off, st in ((Vector((70, 0, 70)), 9.0), (Vector((-80, 0, -60)), 11.0)):
-        stretched(k, 'acorv', AT - n * 10 + off, n, st, K.HOTGOLD, scale=2.0, tail=0.6)
-    for x, y, dpt in ((0.36, -0.06, 200), (0.44, 0.02, 220), (0.30, 0.04, 240)):
-        k.streak(P(x, y, dpt), n, 22, K.GOLD, r=0.35, k=5.0)
     # ------------------------------------------------ the Terrans it is arriving on top of
     bs = k.ship('bship')
     BS = P(-0.52, -0.30, 100)
-    CRP = AT + n * 150
+    CRP = AT + n * 120
     e = CRP - BS
     e.z = 0
     e.normalize()
@@ -144,7 +137,7 @@ def arcadian():
     k.muzzle(bs, loc[2], 'charge', scale=0.5)
     muz = [k.world_pt(bs, m) for m in loc]
     d = (CRP + Vector((0, 0, -20)) - muz[1]).normalized()
-    k.comet(muz[1] + d * 150, d, scale=3.0)
+    k.comet(muz[1] + d * 92, d, scale=3.0)
     k.comet(muz[0] + d * 40 + Vector((0, 0, 4)), d, scale=2.2)
     k.boom(ac.location + Vector((-14, -8, 4)), 16, 'blue', age=5, light=2e5)
     k.shards(ac.location + Vector((-14, -8, 4)), 16, K.CYAN, 0.9, 30, 3, age=7)

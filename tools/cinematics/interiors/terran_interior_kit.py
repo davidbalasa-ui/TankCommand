@@ -194,9 +194,10 @@ class NT:
 
 
 def _panel(name, base, rough=0.42, metal=0.9, S=4.0, w=0.035, var=0.35, line=0.75, fine=0.25, bump=0.5,
-           spec=0.5, coat=0.0):
-    """Gunmetal plating: world-space panel grid (lines darkened and recessed, each panel a slightly
-    different shade) with a finer sub-grid in the bump and noise grunge in the roughness."""
+           spec=0.5, coat=0.0, scuff=0.5, bolts=True):
+    """Gunmetal plating in world space: a panel grid (cut lines darkened and recessed, every panel
+    its own shade, some panels standing proud), irregular sub-panels, bolt heads at the panel
+    corners, chipped bright wear along the cut lines and directional scuffing in colour/roughness."""
     m = bpy.data.materials.new(name)
     t = NT(m)
     geo = t.n('ShaderNodeNewGeometry')
@@ -208,24 +209,33 @@ def _panel(name, base, rough=0.42, metal=0.9, S=4.0, w=0.035, var=0.35, line=0.7
     t.link(P, sp.inputs[0])
     sn = t.n('ShaderNodeSeparateXYZ')
     t.link(geo.outputs['True Normal'], sn.inputs[0])
+    perp = [t.m('GREATER_THAN', t.m('ABSOLUTE', sn.outputs[i]), 0.7) for i in range(3)]
+    inpl = [t.m('SUBTRACT', 1.0, perp[i]) for i in range(3)]
 
-    def lines(scale, width, offs=(0.0, 0.0, 0.0)):
-        acc = None
+    def terms(scale, offs=(0.0, 0.0, 0.0)):       # distance (m) to the nearest grid line, per axis
+        out = []
         for i in range(3):
             f = t.m('FRACT', t.m('ADD', t.m('DIVIDE', sp.outputs[i], scale), offs[i]))
-            d = t.m('ABSOLUTE', t.m('SUBTRACT', f, 0.5))
-            ln = t.m('GREATER_THAN', d, 0.5 - width / scale)
-            mk = t.m('LESS_THAN', t.m('ABSOLUTE', sn.outputs[i]), 0.7)
-            la = t.m('MULTIPLY', ln, mk)
-            acc = la if acc is None else t.m('MAXIMUM', acc, la)
+            out.append(t.m('MULTIPLY', t.m('SUBTRACT', 0.5, t.m('ABSOLUTE', t.m('SUBTRACT', f, 0.5))), scale))
+        return out
+
+    def band(T, lo, hi):
+        acc = None
+        for i in range(3):
+            v = t.m('MULTIPLY', t.m('LESS_THAN', T[i], hi), inpl[i])
+            if lo > 0:
+                v = t.m('MULTIPLY', v, t.m('GREATER_THAN', T[i], lo))
+            acc = v if acc is None else t.m('MAXIMUM', acc, v)
         return acc
 
-    L1 = lines(S, w)
-    L2 = lines(S * fine, w * 0.5, (0.37, 0.37, 0.37))
+    T1 = terms(S)
+    T2 = terms(S * fine, (0.37, 0.37, 0.37))
+    L1 = band(T1, 0, w)
     cell = t.vm('FLOOR', t.vm('DIVIDE', P, (S, S, S)).outputs[0]).outputs[0]
     wn = t.n('ShaderNodeTexWhiteNoise', noise_dimensions='3D')
     t.link(cell, wn.inputs['Vector'])
     rnd = wn.outputs['Value']
+    L2 = t.m('MULTIPLY', band(T2, 0, w * 0.5), t.m('GREATER_THAN', rnd, 0.35))
     cell2 = t.vm('FLOOR', t.vm('DIVIDE', P, (S * fine,) * 3).outputs[0]).outputs[0]
     wn2 = t.n('ShaderNodeTexWhiteNoise', noise_dimensions='3D')
     t.link(cell2, wn2.inputs['Vector'])
@@ -233,10 +243,28 @@ def _panel(name, base, rough=0.42, metal=0.9, S=4.0, w=0.035, var=0.35, line=0.7
     noise.inputs['Scale'].default_value = 0.6
     noise.inputs['Detail'].default_value = 6.0
     t.link(P, noise.inputs['Vector'])
+    stretch = t.vm('MULTIPLY', P, (0.35, 3.0, 3.0))
+    sc = t.n('ShaderNodeTexNoise')
+    sc.inputs['Scale'].default_value = 1.6
+    sc.inputs['Detail'].default_value = 8.0
+    sc.inputs['Roughness'].default_value = 0.7
+    t.link(stretch.outputs[0], sc.inputs['Vector'])
+    scf = t.m('SUBTRACT', sc.outputs[0], 0.5)
     shade = t.m('ADD', 1.0 - var / 2, t.m('MULTIPLY', rnd, var))
     shade = t.m('MULTIPLY', shade, t.m('ADD', 0.9, t.m('MULTIPLY', wn2.outputs['Value'], 0.2)))
+    shade = t.m('MULTIPLY', shade, t.m('ADD', 1.0, t.m('MULTIPLY', scf, 0.9 * scuff)))
     shade = t.m('MULTIPLY', shade, t.m('SUBTRACT', 1.0, t.m('MULTIPLY', L1, line)))
     shade = t.m('MULTIPLY', shade, t.m('SUBTRACT', 1.0, t.m('MULTIPLY', L2, line * 0.5)))
+    # chipped wear next to the cut lines and bolt heads
+    wear = t.m('MULTIPLY', band(T1, w, w + 0.06), t.m('GREATER_THAN', noise.outputs[0], 0.52))
+    extra = t.m('MULTIPLY', wear, 1.6)
+    bolt = None
+    if bolts:
+        for i in range(3):
+            v = t.m('MAXIMUM', t.m('LESS_THAN', t.m('ABSOLUTE', t.m('SUBTRACT', T1[i], w + 0.2)), 0.045), perp[i])
+            bolt = v if bolt is None else t.m('MULTIPLY', bolt, v)
+        extra = t.m('ADD', extra, t.m('MULTIPLY', bolt, 1.2))
+    shade = t.m('MULTIPLY', shade, t.m('ADD', 1.0, extra))
     col = t.vm('SCALE', (*base[:3],))
     col.inputs[0].default_value = base[:3]
     t.link(shade, col.inputs['Scale'])
@@ -244,11 +272,14 @@ def _panel(name, base, rough=0.42, metal=0.9, S=4.0, w=0.035, var=0.35, line=0.7
     t.link(col.outputs[0], bs.inputs['Base Color'])
     bs.inputs['Metallic'].default_value = metal
     r = t.m('ADD', rough - 0.12, t.m('MULTIPLY', noise.outputs[0], 0.24))
-    r = t.m('ADD', r, t.m('MULTIPLY', t.m('SUBTRACT', rnd, 0.5), 0.12), clamp=True)
+    r = t.m('ADD', r, t.m('MULTIPLY', t.m('SUBTRACT', rnd, 0.5), 0.12))
+    r = t.m('ADD', r, t.m('MULTIPLY', scf, 0.5 * scuff), clamp=True)
     t.link(r, bs.inputs['Roughness'])
     if coat:
         bs.inputs['Coat Weight'].default_value = coat
-    h = t.m('SUBTRACT', 0.0, t.m('ADD', L1, t.m('MULTIPLY', L2, 0.4)))
+    h = t.m('SUBTRACT', t.m('MULTIPLY', t.m('GREATER_THAN', rnd, 0.62), 0.5), t.m('ADD', L1, t.m('MULTIPLY', L2, 0.4)))
+    if bolts:
+        h = t.m('ADD', h, t.m('MULTIPLY', bolt, 0.6))
     bp = t.n('ShaderNodeBump')
     bp.inputs['Strength'].default_value = bump
     bp.inputs['Distance'].default_value = 0.08
@@ -341,7 +372,8 @@ MATDEF = {
     'hull_big': lambda n: _panel(n, (0.04, 0.045, 0.055), rough=0.45, S=8.0, w=0.06, fine=0.25),
     'hull_lt': lambda n: _panel(n, (0.11, 0.12, 0.14), rough=0.4, S=3.0),
     'armor': lambda n: _panel(n, (0.022, 0.025, 0.032), rough=0.36, S=2.5, var=0.5),
-    'floor': lambda n: _panel(n, (0.075, 0.082, 0.095), rough=0.34, S=4.0, w=0.04, var=0.3, metal=0.85, fine=0.5),
+    'floor': lambda n: _panel(n, (0.075, 0.082, 0.095), rough=0.34, S=4.0, w=0.04, var=0.3, metal=0.85, fine=0.5,
+                              scuff=1.0),
     'floor_dk': lambda n: _panel(n, (0.035, 0.04, 0.048), rough=0.3, S=2.0, w=0.03, var=0.4, metal=0.85, fine=0.5),
     'floor_lt': lambda n: _panel(n, (0.16, 0.175, 0.2), rough=0.42, S=4.0, w=0.045, var=0.22, metal=0.6, fine=0.5,
                                  line=0.8),

@@ -798,7 +798,7 @@ def arc_band(pts, chord, thick, zone, up, edge=True, taper=0.75):
     with glowing gold hairlines along both edges."""
     n = len(pts)
     upv = Vector(up).normalized()
-    sect = [(thick, chord * max(0.1, math.sin(math.pi * (0.08 + 0.92 * k / (n - 1)) if taper else 1.0) ** taper)) for k in range(n)]
+    sect = [(thick, chord * max(0.1, max(0.0, math.sin(math.pi * (0.08 + 0.92 * k / (n - 1)) if taper else 1.0)) ** taper)) for k in range(n)]
     F.sweep([tuple(p) for p in pts], sect, zone, sides=6, up=tuple(upv), power=0.6)
     if edge:
         for s in (-1, 1):

@@ -16,6 +16,7 @@ from mathutils import Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import terran_interior_kit as K  # noqa: E402
+import terran_detail_kit as D  # noqa: E402
 
 A = K.args()
 OUT = A.get('out', '/home/user/work/terran-interiors')
@@ -123,8 +124,6 @@ def gallery():
             else:
                 K.box2('armor', (s * (W2 - 0.5), y0 + 2, 9.6), (s * W2, y0 + 5, 12.0))
                 K.box('orange', (s * (W2 - 0.52), y0 + 3.5, 12.1), (0.06, 1.2, 0.1))
-        K.greeble_wall(rnd, s * (W2 - 0.2), -8, LEN - 4, 13.6, 18.4, 90, facing=-s, depth=0.9)
-        K.greeble_wall(rnd, s * (W2 - 0.2), -8, LEN - 4, 3.6, 8.4, 70, facing=-s, depth=0.7)
         # upper control room (one per side, different places)
         y0 = 62 if s > 0 else 32
         K.prism('armor', [(s * W2, 13.4), (s * 28.4, 14.4), (s * 28.0, 18.0), (s * W2, 18.6)], y0, y0 + 11)
@@ -317,6 +316,132 @@ def props():
             K.box('steel', (s * 27.2, y, 0.6 + k * 0.42), (0.06, 0.8, 0.06))
 
 
+def detail():
+    """Film-set pass: dressed walls, ceiling trusses and looms, maintenance props, umbilicals, drones."""
+    L = LEN - 2.6 + 10
+    for s in (-1, 1):
+        ctrl = 62 if s > 0 else 32
+        ycoord = (lambda u, s=s: (-10 + u) if s > 0 else (LEN - 2.6 - u))
+        skip_hi = (lambda u, z, yc=ycoord, c=ctrl: c - 1 < yc(u) < c + 12)
+        if s > 0:
+            org, ang = (W2 - 0.05, -10), 90
+        else:
+            org, ang = (-W2 + 0.05, LEN - 2.6), -90
+        D.dress_wall(org, ang, L, 3.3, 8.6, seed=11 + s, cell=(3.0, 2.65))
+        D.dress_wall(org, ang, L, 13.5, 18.5, seed=13 + s, cell=(3.0, 2.5), skip=skip_hi)
+        D.dress_wall(org, ang, L, 20.1, HT - 0.2, seed=15 + s, cell=(3.0, 3.7), trim=False,
+                     weights=[(D._pipes, 3), (D._plate, 3), (D._vent, 2), (D._cables, 2)])
+        # door-wall buttress faces
+        D.dress_wall((s * 32 if s > 0 else -26, LEN - 4.75), 180, 6.0, 0.2, 18.0, seed=17 + s, cell=(3.0, 2.55))
+        # longitudinal ceiling trusses + hanging looms
+        for x in (3.2, 19.6):
+            D.truss((s * x, -10, 23.0), (s * x, LEN - 3, 23.0), depth=1.7, width=1.0, mat='armor', r=0.1, bay=2.5)
+        for k, y in enumerate(range(4, int(LEN) - 8, 15)):
+            D.cable_loom((s * 19.6, y + 3, 21.4), (s * 26.5, y + 3 + (k % 2) * 2, 19.0), n=4, sag=1.6, r=0.06, seed=k + s)
+            D.cable_loom((s * 5.5, y + 6, 22.6), (s * 15.2, y + 9, 22.8), n=4, sag=1.3, r=0.06, seed=20 + k + s)
+            D.cable_loom((s * 27.4, y + 1, 9.0), (s * 27.4, y + 7.5, 9.0), n=3, sag=0.9, r=0.045, seed=40 + k + s, spread=0.12)
+        # gallery furniture: stations under the lit windows, lockers, crates
+        for i, y0 in enumerate([a + 3.2 for a in RIBS[:-1]]):
+            if (i + (s > 0)) % 2 == 0:
+                for q in range(2):
+                    D.crew_station((s * 31.0, y0 + 2.4 + q * 3.8, 9.6), -90 if s > 0 else 90, 3.0, 'screen_c', seed=i * 2 + q)
+            else:
+                K.crate((s * 30.4, y0 + 7.0, 10.5), (1.6, 1.6, 1.8), 'crate', rot=4)
+                K.barrel((s * 30.6, y0 + 1.0, 9.6), r=0.35, h=1.0)
+        # bay front trenches with strip lights
+        D.floor_trench((s * 10.4, -8), (s * 10.4, LEN - 9), w=0.7)
+    # wall washes so the dressed walls and roof structure read
+    for y0 in [RIBS[0] - 15] + RIBS:
+        yc = y0 + 7.5
+        for s in (-1, 1):
+            K.area('WashLo', (s * 27.0, yc, 2.2), (0.6, 9.0), 2600, (0.35, 0.6, 1.0), rot=(0, s * 125, 0), spread=150)
+            K.area('WashHi', (s * 25.5, yc, 12.4), (0.6, 9.0), 6000, (0.35, 0.6, 1.0), rot=(0, s * 118, 0), spread=150)
+            K.box('dark', (s * 27.3, yc, 12.1), (0.5, 9.2, 0.3))
+            K.box('slot', (s * 27.5, yc, 12.28), (0.2, 8.6, 0.05))
+            K.point('Roof', (s * 22.5, yc, 20.6), 1500, (0.4, 0.62, 1.0), r=0.6)
+    # track and tyre marks, scuffed turn-ins to the bays
+    K.MATDEF['scuffmark'] = lambda n: K._plain(n, (0.018, 0.019, 0.022), rough=0.8)
+    rs = random.Random(21)
+    for x in (-4.6, -1.9, 1.3, 4.0, -6.4, 6.3):
+        y = -8.0
+        while y < LEN - 12:
+            Lm = rs.uniform(6, 22)
+            K.box('scuffmark', (x + rs.uniform(-0.15, 0.15), y + Lm / 2, 0.021), (rs.uniform(0.35, 0.6), Lm, 0.004), rot=rs.uniform(-1.2, 1.2))
+            y += Lm + rs.uniform(1, 9)
+    for y0 in RIBS[:-1]:
+        for s in (-1, 1):
+            for dy in (-1.3, 1.3):
+                for q in range(5):
+                    a = q * 16
+                    K.box('scuffmark', (s * (7.2 + q * 1.7), y0 + 7.5 + dy - (4 - q) * 1.5, 0.021), (0.5, 2.6, 0.004), rot=-s * (20 + a))
+    for y in range(-4, int(LEN) - 14, 6):
+        for s in (-1, 1):
+            K.box('dark', (s * 6.6, y, 0.02), (0.5, 0.5, 0.04))
+            K.box('cyan' if (y // 6) % 3 else 'orange', (s * 6.6, y, 0.045), (0.26, 0.26, 0.03))
+    # every parked tank is on charge: socket box by the bay wall, umbilicals to the hull
+    i = 0
+    for y0 in RIBS[:-1]:
+        yc = y0 + 7.5
+        for s in (-1, 1):
+            if (y0, s) == (55, -1):
+                continue
+            D.umbilical((s * 24.2, yc - 3.4, 0), (s * 20.6, yc - 1.9, 1.5), seed=i)
+            for sd in (-1, 1):                                     # wheel chocks
+                K.box('paint_y', (s * 14.2, yc + sd * 2.4, 0.15), (0.5, 0.9, 0.3), taper=(0.4, 1))
+            if i % 3 == 0:
+                D.ammo_rack((s * 23.6, yc + 3.3, 0), 90 if s < 0 else -90, seed=i)
+            elif i % 3 == 1:
+                D.fuel_rack((s * 24.0, yc + 3.4, 0), 90 if s < 0 else -90, n=3)
+            else:
+                D.tool_cart((s * 22.8, yc + 3.6, 0), 20 * s, seed=i)
+            D.chevrons((s * 11.6, yc, 0), 180 if s > 0 else 0, n=2, s=0.9)
+            i += 1
+    # the empty bay (port side, y 62.5) is a maintenance pit: loader arm with a module, racks, parts
+    D.loader_arm((-21.5, 60.5, 0), -60, reach=5.5, lift=4.6, seed=1)
+    D.ammo_rack((-15.5, 66.2, 0), 180, seed=3)
+    D.ammo_rack((-19.2, 66.4, 0), 180, rows=2, seed=4)
+    D.fuel_rack((-23.5, 66.0, 0), 180, n=4)
+    D.tool_cart((-14.0, 60.0, 0), 75, seed=5)
+    K.crate((-16.5, 62.0, 0.7), (2.6, 1.8, 1.4), 'crate_b', rot=12)
+    D.umbilical((-24.2, 59.2, 0), (-18.0, 62.2, 1.5), seed=9)
+    # second arm on the starboard side working over a parked tank
+    D.loader_arm((23.4, 51.5, 0), 125, reach=5.0, lift=5.2, seed=2, load=False)
+    # hero tank in the foreground: cart, umbilical, drone with a work light
+    D.tool_cart((9.6, 50.5, 0), -15, seed=6)
+    D.umbilical((10.2, 55.5, 0), (7.6, 54.0, 1.5), seed=7)
+    D.drone((6.5, 56.0, 6.2), 200, s=1.2, beam=(5.6, 54.5, 2.0))
+    D.drone((-17.0, 64.0, 7.0), 30, s=1.1, beam=(-17.5, 62.0, 1.0))
+    D.drone((15.5, 78.5, 6.0), -60, s=1.0, beam=(18.0, 77.5, 2.5))
+    D.drone((-9.0, 92.0, 9.5), 80, s=1.0)
+    D.drone((-15.0, 79.0, 5.6), -30, s=1.0, beam=(-17.5, 77.5, 2.5))
+    # apron clutter along the lane edges
+    for k, (x, y, r) in enumerate([(-10.9, 55.0, 5), (10.9, 66.0, -6), (-10.9, 73.0, 3), (10.9, 88.0, 0), (-10.9, 44.0, 0), (10.9, 44.5, 8)]):
+        if k % 2:
+            D.tool_cart((x, y, 0), 90 + r, seed=k)
+        else:
+            D.fuel_rack((x, y, 0), 90 if x < 0 else -90, n=2)
+    # crane: maintenance cab, cable festoon along the girder, more beacons
+    for x in range(-18, 19, 4):
+        D.cable_loom((x, 70 + 2.1, 18.0), (x + 4, 70 + 2.1, 18.0), n=2, sag=0.9, r=0.05, seed=x, spread=0.05)
+    K.box('armor', (-15.5, 70, 16.9), (3.0, 3.2, 1.9))
+    K.box('screen_bg', (-15.5, 68.38, 17.0), (2.4, 0.04, 0.9))
+    K.box('screen_c', (-15.5, 68.35, 17.2), (1.6, 0.02, 0.08))
+    K.box('screen_o', (-15.9, 68.35, 16.9), (0.8, 0.02, 0.08))
+    K.box('orange', (-15.5, 70, 15.9), (1.0, 1.0, 0.12))
+    D.ladder((-15.5, 71.7, 17.9), 0, 1.6, cage=False)
+    # door frame: maintenance platforms either side of the opening with railings and consoles
+    for s in (-1, 1):
+        K.box2('hull_lt', (min(s * 23.5, s * 31.5), LEN - 9.5, 5.6), (max(s * 23.5, s * 31.5), LEN - 3.6, 6.0))
+        D.handrail((s * 23.7, LEN - 9.4, 6.0), (s * 31.3, LEN - 9.4, 6.0))
+        D.handrail((s * 23.7, LEN - 9.4, 6.0), (s * 23.7, LEN - 3.8, 6.0))
+        D.crew_station((s * 27.5, LEN - 5.0, 6.0), 180, 3.4, 'screen_c', seed=70 + s)
+        for x in (24.0, 31.0):
+            K.box('armor', (s * x, LEN - 9.2, 2.8), (0.5, 0.5, 5.6))
+        D.ladder((s * 29.5, LEN - 9.6, 0), 180, 5.8)
+        K.box('slot', (s * 27.5, LEN - 6.5, 5.55), (5.0, 0.4, 0.05))
+        K.area('PlatU', (s * 27.5, LEN - 6.5, 5.4), (6, 3), 1500, (0.3, 0.55, 1.0))
+
+
 def vehicles():
     kinds = ['bulwark', 'lancer', 'javelin', 'lancer', 'longbow', 'bulwark', 'outrider', 'javelin', 'lancer', 'skimmer',
              'bulwark', 'longbow']
@@ -372,7 +497,10 @@ def outside(sc):
 
 
 def main():
-    K.E.update(neon=1.0, cyan=1.0, orange=1.6, white=1.0)
+    K.E.update(neon=1.0, cyan=1.0, orange=1.8, white=1.0)
+    K.MATDEF['neon'] = lambda n: K._emit(n, (0.012, 0.19, 1.0), 4.5)
+    K.MATDEF['neon_dim'] = lambda n: K._emit(n, (0.012, 0.19, 1.0), 2.0)
+    K.MATDEF['slot'] = lambda n: K._emit(n, (0.2, 0.5, 1.0), 4.0)
     sc, cam = K.reset(samples=int(A.get('samples', 20)), exposure=float(A.get('exposure', 0.6)))
     outside(sc)
     shell()
@@ -383,6 +511,7 @@ def main():
     bay_door()
     floor_marks()
     props()
+    detail()
     K.flush()
     vehicles()
     if VIEW == 'door':
@@ -393,8 +522,8 @@ def main():
         K.look(cam, (0, 40, 60), (0, 70, 0), lens=18)
     raw = os.path.join(OUT, '_raw', NAME + '.png')
     K.render(sc, raw, RES, depth_far=130.0)
-    K.post(raw, A.get('final', os.path.join(OUT, NAME + '.jpg')), haze=float(A.get('haze', 0.4)),
-           scatter=float(A.get('scatter', 0.18)), haze_col=(0.08, 0.25, 0.6))
+    K.post(raw, A.get('final', os.path.join(OUT, NAME + '.jpg')), haze=float(A.get('haze', 0.45)),
+           scatter=float(A.get('scatter', 0.22)), haze_col=(0.08, 0.25, 0.6))
 
 
 main()

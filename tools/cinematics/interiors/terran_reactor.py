@@ -17,6 +17,7 @@ from mathutils import Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import terran_interior_kit as K  # noqa: E402
+import terran_detail_kit as D  # noqa: E402
 
 A = K.args()
 OUT = A.get('out', '/home/user/work/terran-interiors')
@@ -118,8 +119,8 @@ def core():
     K.cyl('hull_lt', (0, 0, 2.0), (0, 0, 3.4), 6.0, 16, r1=4.6, smooth=False)
     K.cyl('cyan', (0, 0, 3.4), (0, 0, 3.5), 4.2, 32, smooth=False)
     # plasma column
-    K.MATDEF['plasma'] = lambda n: K._emit(n, (0.1, 0.65, 1.0), 4.0)
-    K.MATDEF['plasma_core'] = lambda n: K._emit(n, (0.5, 0.9, 1.0), 8.0)
+    K.MATDEF['plasma'] = lambda n: K._emit(n, (0.06, 0.5, 1.0), 3.2)
+    K.MATDEF['plasma_core'] = lambda n: K._emit(n, (0.3, 0.8, 1.0), 6.0)
     K.cyl('plasma', (0, 0, 3.4), (0, 0, 28.6), 1.7, 20)
     K.cyl('plasma_core', (0, 0, 3.4), (0, 0, 28.6), 0.7, 12)
     # collars
@@ -230,13 +231,135 @@ def deck_props():
         K.cyl('cyan', (p[0], p[1], 3.0), (p[0], p[1], 3.5), 2.44, 16)
 
 
+def detail():
+    """Film-set pass: dressed wall facets, catwalk stations and ladders, looms, conduits, props, drones."""
+    step = 360 / N
+    chord = 2 * (R - 0.05) * math.sin(math.radians(step / 2))
+    for i in range(N):
+        a0 = i * step - step / 2
+        am = a0 + step / 2
+        o = P(R - 0.05, a0)
+        k = i % 4
+        zones = [(19.2, 23.4), (24.6, 30.8)]
+        if k == 2:
+            zones.append((2.7, 11.4))
+        if k == 3:
+            zones.append((7.2, 11.4))
+        if k in (0, 3):
+            zones.append((12.3, 17.4))
+        if k == 0:
+            zones.append((9.9, 11.4))
+        for j, (za, zb) in enumerate(zones):
+            D.dress_wall((o[0], o[1]), am + 90, chord, za, zb, seed=i * 7 + j, cell=(2.6, 2.3 if zb - za < 6 else 2.9))
+        # catwalk furniture
+        for z in (12.0, 24.0):
+            if (i + (z > 20)) % 2 == 0:
+                pc = P(R - 1.5, am, z)
+                D.crew_station(pc, am - 90, 3.0, ['screen', 'screen_c', 'screen_o'][i % 3], seed=i + int(z))
+            else:
+                pc = P(R - 1.2, am + 3, z + 0.8)
+                K.crate(pc, (1.4, 1.4, 1.6), 'crate', rot=am)
+            K.prism('armor', [(0, 0)] * 3, 0, 0) if False else None
+            b0, b1 = P(R - 0.2, a0 + 2.2, z - 3.0), P(R - 3.4, a0 + 2.2, z - 0.45)
+            bar('armor', b0, b1, 0.16)
+            bar('armor', P(R - 0.2, a0 + step - 2.2, z - 3.0), P(R - 3.4, a0 + step - 2.2, z - 0.45), 0.16)
+            for q in range(4):
+                K.box('orange' if q % 2 else 'cyan', P(R - 3.7, a0 + (q + 0.5) * step / 4, z - 0.2), (0.12, 0.4, 0.1), rot=am)
+        if i % 4 == 1:
+            lb = P(R - 3.9, am - 6, 0)
+            D.ladder((lb[0], lb[1], 0), am + 90, 11.6)
+            lb = P(R - 3.9, am + 6, 12)
+            D.ladder((lb[0], lb[1], 12.0), am + 90, 11.6)
+        # looms sagging between the catwalk levels and from the roof ribs
+        D.cable_loom(P(R - 3.4, a0 + 1.5, 23.4), P(R - 3.4, a0 + step - 1.5, 23.4), n=3, sag=1.8, r=0.06, seed=i)
+        if i % 2 == 0:
+            D.cable_loom(P(R - 13, a0, HT - 2.2), P(7.5, a0 + step, 33.0), n=5, sag=3.0, r=0.08, seed=20 + i)
+            D.cable_loom(P(R - 1.2, am, 31.0), P(R - 9, am, HT - 1.2), n=4, sag=1.6, r=0.07, seed=40 + i)
+        # wall wash
+        K.area('Wash', P(R - 4.6, am, 1.2), (8.0, 0.5), 2200, (0.3, 0.6, 1.0), rot=(55, 0, am - 90), spread=150)
+        K.area('WashHi', P(R - 5.0, am, 25.6), (8.0, 0.5), 3200, (0.3, 0.6, 1.0), rot=(60, 0, am - 90), spread=150)
+    # core dressing: conduits up the base housing, collar indicator rows, vent rings
+    for k in range(16):
+        a = 22.5 * k
+        K.cyl('hull_lt' if k % 2 else 'steel', P(6.6, a, -3.0), P(5.2, a, 3.2), 0.22, 8)
+        K.box('dark', P(6.25, a, 0.6), (0.7, 0.7, 0.4), rot=a)
+        for z in (9.0, 16.0, 23.0):
+            K.box('cyan' if k % 4 else 'orange', P(5.47, a + 11, z - 0.45), (0.06, 0.5, 0.12), rot=a + 11)
+            K.box('dark', P(5.2, a, z + 1.15), (0.9, 1.0, 0.3), rot=a)
+        K.box('dark', P(8.2 - 0.0, a, 34.0), (0.5, 1.6, 2.6), rot=a)
+        K.box('neon_dim', P(8.5, a + 6, 36.5), (0.08, 0.3, 1.6), rot=a + 6)
+    for k in range(8):
+        a = 45 * k + 22.5
+        K.cyl('crate_o' if k % 2 else 'crate_b', P(6.9, a, 30.4), P(5.6, a, 23.9), 0.16, 6)
+        K.cyl('rubber', P(6.9, a + 5, 30.4), P(5.6, a + 5, 23.9), 0.1, 6)
+    # clamp arms: service catwalk + rail + conduits along each
+    for k in range(4):
+        a = 45 + 90 * k
+        p0, p1 = Vector(P(R - 1, a - 3.5, 23.6)), Vector(P(7.0, a - 14, 17.3))
+        bar('steel', p0, p1, 0.12)
+        bar('crate_o', p0 + Vector((0, 0, -4.9)), p1 + Vector((0, 0, -2.0)), 0.14)
+        for q in range(8):
+            pp = p0 + (p1 - p0) * ((q + 0.5) / 8)
+            K.box('orange' if q % 2 else 'cyan', (pp.x, pp.y, pp.z + 0.2), (0.3, 0.3, 0.14))
+    # ring deck: stations, trenches, racks, loader, drones, umbilicals to the guard tanks
+    for a in (232, 308, 200, 340, 110, 70):
+        pc = P(PIT + 6.3, a, 0)
+        D.seat(pc, a + 90)
+    for k in range(8):
+        a = 22.5 + 45 * k
+        p0, p1 = P(PIT + 2.2, a, 0), P(R - 3.2, a, 0)
+        K.box('dark', P((PIT + R) / 2 - 0.5, a, 0.012), (R - PIT - 5.4, 0.8, 0.024), rot=a)
+        K.box('neon_dim', P((PIT + R) / 2 - 0.5, a, 0.03), (R - PIT - 5.4, 0.08, 0.02), rot=a)
+        for q in range(int((R - PIT - 5.4) / 0.4)):
+            K.box('steel', P(PIT + 2.9 + q * 0.4, a, 0.045), (0.06, 0.8, 0.03), rot=a)
+    D.chevrons((0, -27.5, 0), 90, n=4, s=1.5)
+    D.chevrons((-4.5, -24, 0), 90, n=2, s=0.9, mat='paint_w')
+    D.chevrons((4.5, -24, 0), 90, n=2, s=0.9, mat='paint_w')
+    for (r_, a, kind) in [(25.5, 252, 'fuel'), (25.5, 288, 'cart'), (24.5, 222, 'ammo'), (24.5, 318, 'fuel'), (20.5, 178, 'cart'),
+                          (21.0, 5, 'fuel'), (26, 95, 'cart'), (25, 128, 'fuel'), (26, 60, 'ammo')]:
+        pc = P(r_, a, 0)
+        if kind == 'fuel':
+            D.fuel_rack(pc, a + 90, n=3)
+        elif kind == 'cart':
+            D.tool_cart(pc, a + 70, seed=int(a))
+        else:
+            D.ammo_rack(pc, a + 90, rows=2, cols=5, seed=int(a))
+    lp = P(21.5, 212, 0)
+    D.loader_arm(lp, 212 + 110, reach=5.0, lift=5.0, seed=3)
+    lp = P(20.5, 330, 0)
+    D.loader_arm(lp, 330 + 90, reach=4.5, lift=6.0, seed=4, load=False)
+    D.umbilical((12.5, -21.0, 0), (9.8, -19.3, 1.5), seed=1)
+    D.umbilical((-13.5, -18.5, 0), (-11.0, -16.6, 1.5), seed=2)
+    D.drone((6.5, -9.5, 9.0), 150, s=1.3, beam=(3.5, -4.0, 9.0))
+    D.drone((-8.5, -8.0, 14.5), 210, s=1.2, beam=(-4.0, -3.5, 16.0))
+    D.drone((11.0, -3.0, 20.0), 120, s=1.2, beam=(5.0, 0, 23.0))
+    D.drone((-14.0, -19.0, 6.0), 20, s=1.1, beam=(-11.0, -15.5, 2.5))
+    # injector towers: hazard bands, indicator ladders, coolant feed
+    for k in range(6):
+        a = 60 * k
+        b, t = Vector(P(15.5, a, 0)), Vector(P(11.5, a, 11.5))
+        d = t - (b + Vector((0, 0, 2.2)))
+        for f_ in (0.2, 0.5, 0.8):
+            c = b + Vector((0, 0, 2.2)) + d * f_
+            K.cyl('hazard' if f_ == 0.5 else 'hull_lt', c - d.normalized() * 0.25, c + d.normalized() * 0.25, 1.35 - 0.55 * f_, 4, smooth=False)
+        out = Vector(P(1.0, a, 0))
+        for q in range(7):
+            c = b + Vector((0, 0, 3.0)) + d * (q / 8) + out * (1.05 - 0.4 * q / 8)
+            K.box('orange' if q % 3 == 0 else 'cyan', tuple(c), (0.1, 0.4, 0.14), rot=a)
+        K.cyl('crate_b', b + out * 1.9 + Vector((0, 0, 0.3)), t + out * 0.7, 0.14, 6)
+        K.cyl('rubber', b + out * 1.7 + Vector((0.3, 0.3, 0.3)), t + out * 0.6, 0.09, 6)
+
+
 def main():
-    K.E.update(neon=1.1, cyan=1.0, orange=2.0, white=0.8)
+    K.E.update(neon=1.1, cyan=1.0, orange=2.2, white=0.8)
+    K.MATDEF['neon'] = lambda n: K._emit(n, (0.012, 0.19, 1.0), 4.8)
+    K.MATDEF['neon_dim'] = lambda n: K._emit(n, (0.012, 0.19, 1.0), 2.2)
     sc, cam = K.reset(samples=int(A.get('samples', 20)), exposure=float(A.get('exposure', 0.5)))
     K.space_world(sc)
     chamber()
     core()
     deck_props()
+    detail()
     K.flush()
     for i in range(N):
         a = (i + 0.5) * 360 / N - 360 / N / 2
