@@ -36,6 +36,12 @@ test('[LAY-01] orders show in the top queue strip; tapping one cancels it and Un
   await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 1)).toBe(0);
   expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0)).toBeGreaterThan(ore);
+  const cost = await page.evaluate((id) => window.__TC_TEST__?.buildItems().find((entry) => entry.id === id)?.ore ?? 0, item);
+  expect(cost).toBeGreaterThan(0);
+  const unearnedAfterCancel = await page.evaluate(() => {
+    const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+    return side ? side.ore - side.oreGathered : 0;
+  });
   // Undo lasts 3 s; slow software frames can eat that, so it is pressed from the page itself.
   const undone = await page.evaluate(() => {
     const undo = document.querySelector<HTMLButtonElement>('[data-control-id="inGame.queueUndo"]');
@@ -44,7 +50,17 @@ test('[LAY-01] orders show in the top queue strip; tapping one cancels it and Un
     return true;
   });
   expect(undone).toBe(true);
-  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBe(1);
+  // Undo orders the unit again, which pays for it again. Checked on the money rather than the queue:
+  // on a slow runner the re-ordered unit can be built and gone from the queue before the next read.
+  // Ore minus everything gathered is untouched by deliveries landing meanwhile.
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+        return side ? side.ore - side.oreGathered : 0;
+      }),
+    )
+    .toBe(unearnedAfterCancel - cost);
 });
 
 test('[LAY-02] the drop menu is a bottom strip; card order stays fixed and the tab is remembered', async ({ page }, testInfo) => {
