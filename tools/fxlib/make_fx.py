@@ -165,18 +165,18 @@ def smoke_plume(work, frames=120, seed=17, res=1.0):
     """Lingering dark-grey smoke column from a wreck, drifting with wind. Loop by crossfade."""
     h = 0.06 / res; n = (int(70 * res), int(70 * res), int(130 * res))
     s = _base(n, h, seed)
-    s.buoy = 5.0; s.cool = 0.5; s.vort = 20.0; s.weight = -0.25; s.drag = 0.3
-    s.wind[:] = (0.6, 0, 0)
+    s.buoy = 5.0; s.cool = 0.5; s.vort = 20.0; s.weight = -0.25; s.drag = 0.3; s.dens_decay = 0.3
+    s.wind[:] = (1.3, 0, 0)
     cx, cy = n[0] * h * 0.4, n[1] * h / 2
     base_m = None
 
     def emit(sim, t, dt):
         nonlocal base_m
         if base_m is None:
-            m, _ = sim.sphere((cx, cy, 0.2), 0.45)
+            m, _ = sim.sphere((cx, cy, 0.2), 0.3)
             base_m = m
         puls = np.clip(1 + 0.8 * sim.noise(2.0), 0, 2)
-        sim.dens += base_m * puls * 14.0 * dt
+        sim.dens += base_m * puls * 9.0 * dt
         sim.temp = np.maximum(sim.temp, base_m * 0.5)
         sim.u[2] += base_m * 3.0 * dt * 10
     run(s, work, frames, 2, per_step=emit)
