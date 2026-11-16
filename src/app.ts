@@ -158,11 +158,18 @@ function isPlayerOrder(command: Command): boolean {
 }
 
 /** How far the title camera's target sits to the screen-left of the fight, keeping it clear of the menu. */
-const TITLE_SIDE_OFFSET = 12;
+const TITLE_SIDE_OFFSET = 11;
 /** Where the title fight centres, metres from the pad toward the raiders. */
-const TITLE_FIGHT_REACH = 14;
+const TITLE_FIGHT_REACH = 12;
 /** The title camera's pitch: well below the in-match range, for a cinematic, near-ground view. */
-const TITLE_PITCH = (24 * Math.PI) / 180;
+const TITLE_PITCH = (15 * Math.PI) / 180;
+/** Camera distance at the start of the slow push-in, and where it settles. */
+const TITLE_DISTANCE_FROM = 34;
+const TITLE_DISTANCE_TO = 25;
+/** Seconds the opening push-in takes. */
+const TITLE_PUSH_SEC = 9;
+/** The low sun sits this far (radians) off the camera heading (negative: right of centre), behind the fight. */
+const TITLE_SUN_SIDE = -0.22;
 
 export class App {
   public readonly router: ScreenRouter;
@@ -1705,12 +1712,16 @@ export class App {
         // Low and side-on, so the hills behind the fight show; no health bars on scenery.
         view.setShotPitch(TITLE_PITCH);
         view.setHealthBarsHidden(true);
+        view.setEnemyTint(false);
+        const { x: padX, z: padZ, approach } = battle.focus;
+        const baseYaw = Math.atan2(-Math.sin(approach), Math.cos(approach));
+        // Golden hour, the sun low behind the fight so every hull gets a warm rim.
+        view.setDuskMood(baseYaw + TITLE_SUN_SIDE);
         // The canvas stays invisible (CSS) until the models are in, then fades up; the gradient
         // behind it shows meanwhile, never the grey placeholder tanks.
         void view.whenReady().then(() => {
           canvas.classList.add('ready');
         });
-        const { x: padX, z: padZ, approach } = battle.focus;
         // The middle of the fight: a little past the defenders' line, toward the raiders.
         const fightX = padX + Math.cos(approach) * TITLE_FIGHT_REACH;
         const fightZ = padZ + Math.sin(approach) * TITLE_FIGHT_REACH;
@@ -1728,8 +1739,12 @@ export class App {
           if (this.router.current() === 'title' && document.visibilityState === 'visible') {
             const t = (now - started) / 1000;
             // Side-on to the raid line, swaying slowly so both sides and the pad stay in shot.
-            const sway = Math.sin(t * 0.045) * 0.45;
-            const yaw = Math.atan2(-Math.sin(approach), Math.cos(approach)) + sway;
+            const sway = Math.sin(t * 0.045) * 0.3;
+            const yaw = baseYaw + sway;
+            // Eased push-in from a wide establishing view to the close cinematic one.
+            const push = Math.min(1, t / TITLE_PUSH_SEC);
+            const eased = 1 - (1 - push) ** 3;
+            const distance = TITLE_DISTANCE_FROM + (TITLE_DISTANCE_TO - TITLE_DISTANCE_FROM) * eased;
             // The camera's screen-left, in world x/z (the camera looks along (sin yaw, cos yaw)).
             const leftX = Math.cos(yaw);
             const leftZ = -Math.sin(yaw);
@@ -1737,7 +1752,7 @@ export class App {
             view.setCamera({
               targetX: fightX + leftX * TITLE_SIDE_OFFSET,
               targetZ: fightZ + leftZ * TITLE_SIDE_OFFSET,
-              distance: 36,
+              distance,
               yaw,
             });
             view.render(alpha, battle.current());

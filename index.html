@@ -6,11 +6,71 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1B365D" />
+    <meta name="theme-color" content="#04070c" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>TankCommand</title>
+    <style>
+      /* Loading splash: shown from the first paint until the app takes over (see main.ts). */
+      html,
+      body {
+        background: #04070c;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at 50% 45%, #0c1626 0%, #04070c 70%);
+        transition: opacity 0.35s ease;
+      }
+      #splash.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash svg {
+        width: 104px;
+        height: 104px;
+        color: #5fe3ff;
+        opacity: 0.22;
+        animation: splash-breathe 1.8s ease-in-out infinite alternate;
+      }
+      #splash path {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #splash .c {
+        stroke: #ffb15c;
+        stroke-width: 3.2;
+      }
+      @keyframes splash-breathe {
+        to {
+          opacity: 0.4;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash svg {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <!-- Same strokes as src/ui/emblem.ts. -->
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 64 64">
+        <path d="M32 3 L58 14 L58 38 L32 61 L6 38 L6 14 Z" />
+        <path d="M32 9 L52 17.5 L52 35.5 L32 53.5 L12 35.5 L12 17.5 Z" stroke-width="1.2" opacity="0.55" />
+        <path d="M32 22 L32 11" />
+        <path d="M37 25 A5 5 0 1 1 27 25 A5 5 0 1 1 37 25 Z" />
+        <path class="c" d="M19 38 L32 31 L45 38" />
+        <path class="c" d="M19 46 L32 39 L45 46" />
+      </svg>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

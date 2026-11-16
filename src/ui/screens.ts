@@ -2,6 +2,7 @@ import { button } from './controls';
 import { Hud } from './hud';
 import { drawMapPreview } from './mapPreview';
 import { icon, type IconName } from './icons';
+import { emblem } from './emblem';
 import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './widgets';
 import { APP_VERSION } from '../platform/appInfo';
 import type {
@@ -136,6 +137,119 @@ function formatClock(seconds: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/** The opening (emblem trace and reveal) plays once per launch, not on every return to the title. */
+let titleIntroPlayed = false;
+
+/** Whether this launch should play the title opening. Automated browsers skip it unless asked. */
+function wantTitleIntro(): boolean {
+  if (titleIntroPlayed) {
+    return false;
+  }
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return false;
+    }
+    if (navigator.webdriver) {
+      return window.localStorage.getItem('tc.titleIntro') === 'on';
+    }
+  } catch {
+    return !navigator.webdriver;
+  }
+  return true;
+}
+
+/** Glowing motes drifting up through the title scene, like sparks off the fight. */
+function titleEmbers(): HTMLDivElement {
+  const layer = document.createElement('div');
+  layer.className = 'title-embers';
+  layer.setAttribute('aria-hidden', 'true');
+  // Fixed positions and timings (no randomness), so every launch looks the same.
+  const motes: readonly [number, number, number, number][] = [
+    [46, 9, 0, 1],
+    [55, 12, 3.2, 0.7],
+    [62, 10, 6.5, 1.2],
+    [68, 14, 1.4, 0.8],
+    [74, 11, 4.8, 1],
+    [81, 13, 2.2, 0.6],
+    [87, 10, 7.4, 0.9],
+    [93, 15, 5.6, 0.7],
+    [58, 16, 9.1, 0.5],
+    [78, 12, 8.3, 1.1],
+  ];
+  for (const [left, duration, delay, size] of motes) {
+    const mote = document.createElement('i');
+    mote.style.left = `${left}%`;
+    mote.style.animationDuration = `${duration}s`;
+    mote.style.animationDelay = `${delay}s`;
+    mote.style.setProperty('--s', String(size));
+    layer.append(mote);
+  }
+  return layer;
+}
+
+/**
+ * The opening: on black, the emblem traces itself line by line, the name settles in under it, a
+ * light line cuts across, and the black lifts on the live scene. Tap anywhere to skip.
+ */
+function titleIntro(root: HTMLElement): { veil: HTMLDivElement; lifted: Promise<void> } {
+  let onLift: () => void = () => undefined;
+  const liftedPromise = new Promise<void>((resolve) => {
+    onLift = resolve;
+  });
+  titleIntroPlayed = true;
+  root.classList.add('intro');
+  const veil = document.createElement('div');
+  veil.className = 'title-intro';
+  veil.setAttribute('aria-hidden', 'true');
+  const mark = emblem('emblem title-intro-emblem');
+  const word = document.createElement('div');
+  word.className = 'title-intro-word';
+  const accent = document.createElement('span');
+  accent.textContent = 'COMMAND';
+  word.append('TANK', accent);
+  const flare = document.createElement('div');
+  flare.className = 'title-intro-flare';
+  veil.append(flare, mark, word);
+  let finished = false;
+  let lifted = false;
+  const lift = (): void => {
+    if (!lifted) {
+      lifted = true;
+      onLift();
+    }
+  };
+  // The veil starts lifting at 2 s (see .title-intro in styles.css).
+  const liftTimer = window.setTimeout(lift, 1950);
+  const finish = (): void => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    window.clearTimeout(liftTimer);
+    lift();
+    root.classList.remove('intro');
+    veil.remove();
+  };
+  const skip = (): void => {
+    if (finished) {
+      return;
+    }
+    // Jump to the reveal: the veil fades now and the menu comes in straight away.
+    root.classList.add('intro-skipped');
+    veil.classList.add('skip');
+    window.clearTimeout(liftTimer);
+    lift();
+    window.setTimeout(finish, 350);
+  };
+  veil.addEventListener('pointerdown', skip);
+  veil.addEventListener('animationend', (event) => {
+    if (event.target === veil) {
+      finish();
+    }
+  });
+  return { veil, lifted: liftedPromise };
+}
+
 export function createScreens(): Record<ScreenId, ScreenModule> {
   const screens: Record<ScreenId, ScreenModule> = {
     title: makeScreen('title', 'TankCommand', (root, ctx) => {
@@ -146,6 +260,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       shade.className = 'title-shade';
       const logo = document.createElement('div');
       logo.className = 'title-logo';
+      const mark = emblem('emblem title-emblem');
       const name = document.createElement('h1');
       name.className = 'title-name';
       const accent = document.createElement('span');
@@ -156,7 +271,10 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const rule = document.createElement('div');
       rule.className = 'title-rule';
       rule.setAttribute('aria-hidden', 'true');
-      logo.append(name, rule);
+      const wordmark = document.createElement('div');
+      wordmark.className = 'title-wordmark';
+      wordmark.append(name, rule);
+      logo.append(mark, wordmark);
 
       const menu = document.createElement('div');
       menu.className = 'title-menu';
@@ -209,7 +327,32 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const version = document.createElement('div');
       version.className = 'title-version';
       version.textContent = `v${APP_VERSION}`;
-      root.append(backdrop, shade, logo, menu, small, version);
+      // Under the live scene: a still frame of it, so the first thing seen is never an empty
+      // gradient (and low quality, which skips the live scene, still gets the picture).
+      const still = document.createElement('img');
+      still.className = 'title-still';
+      still.alt = '';
+      still.decoding = 'async';
+      still.addEventListener('load', () => {
+        still.classList.add('ready');
+      });
+      still.addEventListener('error', () => {
+        still.remove();
+      });
+      still.src = `${import.meta.env.BASE_URL}title/still.webp`;
+      backdrop.append(still);
+      const grade = document.createElement('div');
+      grade.className = 'title-grade';
+      const grain = document.createElement('div');
+      grain.className = 'title-grain';
+      root.append(backdrop, grade, titleEmbers(), shade, grain, logo, menu, small, version);
+      // The opening plays first; the 3D scene starts loading only as it lifts, so loading never
+      // stutters the trace. The still frame carries the reveal until the live scene fades up.
+      const intro = wantTitleIntro() ? titleIntro(root) : null;
+      const introDone = intro ? intro.lifted : Promise.resolve();
+      if (intro) {
+        root.append(intro.veil);
+      }
 
       // Live 3D background. Automated browsers skip it unless asked (keeps e2e runs fast).
       let disposeBackdrop: (() => void) | null = null;
@@ -220,12 +363,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       } catch {
         wanted = !navigator.webdriver;
       }
-      if (wanted && ctx.attachTitleBackdrop) {
+      const attach = ctx.attachTitleBackdrop;
+      if (wanted && attach) {
         const canvas = document.createElement('canvas');
         canvas.className = 'title-canvas';
         backdrop.append(canvas);
-        void ctx
-          .attachTitleBackdrop(canvas)
+        void introDone
+          .then(() => (closed ? () => undefined : attach(canvas)))
           .then((dispose) => {
             if (closed) {
               dispose();

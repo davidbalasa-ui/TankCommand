@@ -621,6 +621,12 @@ export class RenderView {
   private qualityPreference: 'auto' | 'low' | 'medium' | 'high' = 'auto';
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
   private healthBarsHidden = false;
+  /** Off for scenery views: the title shows both factions in their own colours. */
+  private enemyTint = true;
+  private hemisphere: THREE.HemisphereLight | null = null;
+  private fill: THREE.DirectionalLight | null = null;
+  /** Where the sun sits relative to the light target (metres). */
+  private readonly sunOffset = new THREE.Vector3(42, 60, 26);
   private colorBlind = false;
 
   constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
@@ -739,7 +745,75 @@ export class RenderView {
     this.rtsCamera.pitchOverride = pitch;
   }
 
-  /** Hides health bars entirely (scenery views such as the title backdrop). */
+  /** Turns the red enemy tint off or on (scenery views show each faction's own colours). */
+  setEnemyTint(enabled: boolean): void {
+    if (this.enemyTint === enabled) {
+      return;
+    }
+    this.enemyTint = enabled;
+    this.rebuildUnitVisuals();
+  }
+
+  /**
+   * Golden-hour lighting for cinematic views (the title backdrop): a low warm sun at `sunYaw`
+   * (radians, same convention as the camera yaw) glowing on the horizon, a cool sky fill, warm
+   * haze over the far hills and filmic tone mapping. The match itself always uses the day look.
+   */
+  setDuskMood(sunYaw: number): void {
+    const elevation = (11 * Math.PI) / 180;
+    const dir = new THREE.Vector3(
+      Math.sin(sunYaw) * Math.cos(elevation),
+      Math.sin(elevation),
+      Math.cos(sunYaw) * Math.cos(elevation),
+    );
+    this.sunOffset.copy(dir).multiplyScalar(110);
+    this.directional.color.set(0xffb070);
+    this.directional.intensity = 3.0;
+    if (this.hemisphere) {
+      this.hemisphere.color.set(0x7d93c9);
+      this.hemisphere.groundColor.set(0x3a2a22);
+      this.hemisphere.intensity = 0.6;
+    }
+    if (!this.fill) {
+      // A cool bounce from the camera's side, so faces turned away from the sun still read.
+      this.fill = new THREE.DirectionalLight(0x9fbcff, 1.05);
+      this.fill.position.copy(dir).multiplyScalar(-80).setY(40);
+      this.scene.add(this.fill);
+    }
+    if (this.sky) {
+      const uniforms = (this.sky.material as THREE.ShaderMaterial).uniforms;
+      (uniforms.uZenith?.value as THREE.Color | undefined)?.set('#0b1230');
+      (uniforms.uMid?.value as THREE.Color | undefined)?.set('#3b3f6a');
+      (uniforms.uHorizon?.value as THREE.Color | undefined)?.set('#e8915a');
+      if (uniforms.uSunDir) {
+        // The visible disc sits a little lower than the light, so it clears the top of the frame.
+        const disc = (5 * Math.PI) / 180;
+        (uniforms.uSunDir.value as THREE.Vector3).set(
+          Math.sin(sunYaw) * Math.cos(disc),
+          Math.sin(disc),
+          Math.cos(sunYaw) * Math.cos(disc),
+        );
+      }
+      if (uniforms.uSunGlow) {
+        uniforms.uSunGlow.value = 1;
+      }
+    }
+    // Late light: the meadow greens go olive and a touch darker.
+    for (const mesh of [this.terrain, this.outerLand, this.skirt]) {
+      const material = mesh?.material;
+      if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshLambertMaterial) {
+        material.color.setRGB(0.86, 0.74, 0.6);
+      }
+    }
+    this.scene.background = new THREE.Color('#d98a58');
+    this.scene.fog = new THREE.Fog(0xb0745a, 70, 420);
+    this.scene.environmentIntensity = ENVIRONMENT_INTENSITY * 0.8;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 0.92;
+    this.updateLight();
+  }
+
+  /** Hides health bars and worker tags entirely (scenery views such as the title backdrop). */
   setHealthBarsHidden(hidden: boolean): void {
     this.healthBarsHidden = hidden;
   }
@@ -1381,6 +1455,7 @@ export class RenderView {
     this.scene.background = new THREE.Color(SKY_HORIZON);
 
     const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
+    this.hemisphere = hemisphere;
     this.scene.add(hemisphere);
 
     // Soft reflected light for metal surfaces. Without an environment, metallic materials only
@@ -1451,6 +1526,8 @@ export class RenderView {
         uZenith: { value: new THREE.Color(SKY_ZENITH) },
         uMid: { value: new THREE.Color(SKY_MID) },
         uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+        uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+        uSunGlow: { value: 0 },
       },
       vertexShader: `
         varying vec3 vDir;
@@ -1463,11 +1540,21 @@ export class RenderView {
         uniform vec3 uZenith;
         uniform vec3 uMid;
         uniform vec3 uHorizon;
+        uniform vec3 uSunDir;
+        uniform float uSunGlow;
         varying vec3 vDir;
         void main() {
-          float h = normalize(vDir).y;
+          vec3 d = normalize(vDir);
+          float h = d.y;
           vec3 color = mix(uHorizon, uMid, smoothstep(0.0, 0.32, h));
           color = mix(color, uZenith, smoothstep(0.32, 0.95, h));
+          if (uSunGlow > 0.0) {
+            float s = max(dot(d, normalize(uSunDir)), 0.0);
+            // Wide warm bloom on the horizon, a tighter halo, and the sun's disc.
+            color += uSunGlow * (vec3(1.0, 0.55, 0.25) * pow(s, 6.0) * 0.55
+              + vec3(1.0, 0.75, 0.45) * pow(s, 60.0) * 0.8
+              + vec3(1.0, 0.92, 0.78) * smoothstep(0.9994, 0.9998, s) * 2.0);
+          }
           gl_FragColor = vec4(color, 1.0);
           #include <colorspace_fragment>
         }
@@ -1719,7 +1806,11 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const targetZ = this.rtsCamera.targetZ;
     const targetY = heightAt(this.world.map, targetX, targetZ);
     this.lightTarget.position.set(targetX, targetY, targetZ);
-    this.directional.position.set(targetX + 42, targetY + 60, targetZ + 26);
+    this.directional.position.set(
+      targetX + this.sunOffset.x,
+      targetY + this.sunOffset.y,
+      targetZ + this.sunOffset.z,
+    );
     this.directional.shadow.camera.left = -30;
     this.directional.shadow.camera.right = 30;
     this.directional.shadow.camera.top = 30;
@@ -2133,14 +2224,14 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     } else {
       root = this.prepareFallback();
     }
-    cloneMaterials(root, isHostile(this.world, 1, unit.owner), this.colorBlind);
+    cloneMaterials(root, this.enemyTint && isHostile(this.world, 1, unit.owner), this.colorBlind);
     root.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.castShadow = true;
         object.receiveShadow = true;
       }
     });
-    const enemy = isHostile(this.world, 1, unit.owner);
+    const enemy = this.enemyTint && isHostile(this.world, 1, unit.owner);
     markInstanced(root);
     const modelId = this.world.unitTypes.get(unit.typeId)?.modelId;
     let lod = template && modelId ? (this.lodGeometry.get(modelId) ?? null) : null;
@@ -2362,7 +2453,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           model = template.clone(true);
           // The Shard is a neutral force of nature: it keeps its own violet, never the enemy tint.
           const shard = type.modelId.startsWith('structure.shard.');
-          cloneMaterials(model, !shard && isHostile(this.world, 1, structure.owner), this.colorBlind);
+          cloneMaterials(model, !shard && this.enemyTint && isHostile(this.world, 1, structure.owner), this.colorBlind);
           model.scale.setScalar(size * 0.96);
           model.position.y = -height / 2;
           model.traverse((object) => {
@@ -3148,7 +3239,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         continue;
       }
       const type = this.world.unitTypes.get(unit.typeId);
-      if (!type?.workerKind || (!zoomedIn && !this.selection.includes(unit.id))) {
+      if (this.healthBarsHidden || !type?.workerKind || (!zoomedIn && !this.selection.includes(unit.id))) {
         continue;
       }
       const screen = this.projectPoint(unit.x, heightAt(this.world.map, unit.x, unit.z) + 3.2, unit.z);
