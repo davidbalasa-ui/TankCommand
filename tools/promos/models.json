@@ -1,0 +1,389 @@
+{
+ "lancer": {
+  "file": "human/lancer.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "outrider": {
+  "file": "human/outrider.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "prospector": {
+  "file": "human/prospector.glb",
+  "kind": "unit",
+  "size": 4.95
+ },
+ "hauler": {
+  "file": "human/hauler.glb",
+  "kind": "unit",
+  "size": 4.725
+ },
+ "mender": {
+  "file": "human/mender.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "watchman": {
+  "file": "human/watchman.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "skimmer": {
+  "file": "human/skimmer.glb",
+  "kind": "unit",
+  "size": 4.275
+ },
+ "bulwark": {
+  "file": "human/bulwark.glb",
+  "kind": "unit",
+  "size": 5.85
+ },
+ "javelin": {
+  "file": "human/javelin.glb",
+  "kind": "unit",
+  "size": 4.725
+ },
+ "longbow": {
+  "file": "human/longbow.glb",
+  "kind": "unit",
+  "size": 6.075
+ },
+ "falcon": {
+  "file": "human/falcon.glb",
+  "kind": "unit",
+  "size": 5.175
+ },
+ "condor": {
+  "file": "human/condor.glb",
+  "kind": "unit",
+  "size": 7.65
+ },
+ "bastion_packed": {
+  "file": "human/bastion_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "harpoon_packed": {
+  "file": "human/spire_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "terran_radar_packed": {
+  "file": "human/radar_tower_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "terran_metal_packed": {
+  "file": "human/metal_station_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "terran_airfield_packed": {
+  "file": "human/air_base_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "lumen": {
+  "file": "alien/stinger.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "darter": {
+  "file": "alien/darter.glb",
+  "kind": "unit",
+  "size": 4.05
+ },
+ "sifter": {
+  "file": "alien/gorger.glb",
+  "kind": "unit",
+  "size": 4.95
+ },
+ "ferrier": {
+  "file": "alien/ferrier.glb",
+  "kind": "unit",
+  "size": 4.725
+ },
+ "weaver": {
+  "file": "alien/weaver.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "seer": {
+  "file": "alien/seer.glb",
+  "kind": "unit",
+  "size": 4.5
+ },
+ "glider": {
+  "file": "alien/glider.glb",
+  "kind": "unit",
+  "size": 5.175
+ },
+ "aegis": {
+  "file": "alien/carapace.glb",
+  "kind": "unit",
+  "size": 5.85
+ },
+ "flare": {
+  "file": "alien/spitter.glb",
+  "kind": "unit",
+  "size": 4.725
+ },
+ "sunfall": {
+  "file": "alien/mortar_beast.glb",
+  "kind": "unit",
+  "size": 6.075
+ },
+ "disc": {
+  "file": "alien/disc.glb",
+  "kind": "unit",
+  "size": 5.625
+ },
+ "halo": {
+  "file": "alien/halo.glb",
+  "kind": "unit",
+  "size": 5.4
+ },
+ "dragonfly": {
+  "file": "alien/dragonfly.glb",
+  "kind": "unit",
+  "size": 5.4
+ },
+ "sentinel_packed": {
+  "file": "alien/thornmound_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "corona_packed": {
+  "file": "alien/spore_tower_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "oracle_packed": {
+  "file": "alien/radar_tower_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "siphon_packed": {
+  "file": "alien/metal_station_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "aerie_packed": {
+  "file": "alien/air_base_packed.glb",
+  "kind": "unit",
+  "size": 3.825
+ },
+ "bastion": {
+  "file": "structures/terran_turret.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "bastion_packed"
+ },
+ "harpoon": {
+  "file": "structures/terran_missile_battery.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "harpoon_packed"
+ },
+ "terran_radar": {
+  "file": "structures/terran_radar.glb",
+  "kind": "structure",
+  "size": 3.5,
+  "packed_unit": "terran_radar_packed"
+ },
+ "terran_metal_station": {
+  "file": "structures/terran_metal_station.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "terran_metal_packed"
+ },
+ "terran_airfield": {
+  "file": "structures/terran_air_base.glb",
+  "kind": "structure",
+  "size": 7.5,
+  "packed_unit": "terran_airfield_packed"
+ },
+ "terran_lab": {
+  "file": "structures/terran_lab.glb",
+  "kind": "structure",
+  "size": 5.0
+ },
+ "terran_landing_pad": {
+  "file": "structures/terran_landing_pad.glb",
+  "kind": "structure",
+  "size": 15.0
+ },
+ "sentinel": {
+  "file": "structures/kesh_thornmound.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "sentinel_packed"
+ },
+ "corona": {
+  "file": "structures/kesh_spore_tower.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "corona_packed"
+ },
+ "oracle": {
+  "file": "structures/kesh_seer_spire.glb",
+  "kind": "structure",
+  "size": 3.5,
+  "packed_unit": "oracle_packed"
+ },
+ "metal_siphon": {
+  "file": "structures/kesh_metal_siphon.glb",
+  "kind": "structure",
+  "size": 5.0,
+  "packed_unit": "siphon_packed"
+ },
+ "aerie": {
+  "file": "structures/kesh_hive_roost.glb",
+  "kind": "structure",
+  "size": 7.5,
+  "packed_unit": "aerie_packed"
+ },
+ "star_vault": {
+  "file": "structures/kesh_gene_vault.glb",
+  "kind": "structure",
+  "size": 5.0
+ },
+ "landing_ring": {
+  "file": "structures/kesh_landing_nest.glb",
+  "kind": "structure",
+  "size": 15.0
+ },
+ "shard": {
+  "file": "structures/shard_core.glb",
+  "kind": "structure",
+  "size": 10.0
+ },
+ "shard_spire": {
+  "file": "structures/shard_spire.glb",
+  "kind": "structure",
+  "size": 5.0
+ },
+ "boulder": {
+  "file": "props/boulder.glb",
+  "kind": "prop",
+  "size": 2.5
+ },
+ "cliff": {
+  "file": "props/cliff.glb",
+  "kind": "prop",
+  "size": 14
+ },
+ "dead_tree": {
+  "file": "props/dead_tree.glb",
+  "kind": "prop",
+  "size": 5
+ },
+ "deposit_metal": {
+  "file": "props/deposit_metal.glb",
+  "kind": "prop",
+  "size": 6
+ },
+ "deposit_ore": {
+  "file": "props/deposit_ore.glb",
+  "kind": "prop",
+  "size": 6
+ },
+ "grass": {
+  "file": "props/grass.glb",
+  "kind": "prop",
+  "size": 1.2
+ },
+ "rock_cluster": {
+  "file": "props/rock_cluster.glb",
+  "kind": "prop",
+  "size": 4
+ },
+ "shrub": {
+  "file": "props/shrub.glb",
+  "kind": "prop",
+  "size": 1.6
+ },
+ "slab": {
+  "file": "props/slab.glb",
+  "kind": "prop",
+  "size": 3
+ },
+ "tendril": {
+  "file": "props/tendril.glb",
+  "kind": "prop",
+  "size": 3
+ },
+ "terran_dreadnought": {
+  "file": "fleet/terran_dreadnought.blend",
+  "object": "Dreadnought",
+  "kind": "ship",
+  "size": 400
+ },
+ "terran_broadside": {
+  "file": "fleet/terran_broadside_battleship.blend",
+  "object": "Broadside",
+  "kind": "ship",
+  "size": 260
+ },
+ "terran_frigate": {
+  "file": "fleet/terran_frigate.blend",
+  "object": "FrigateV2",
+  "kind": "ship",
+  "size": 120
+ },
+ "terran_missile_ship": {
+  "file": "fleet/terran_missile_ship.blend",
+  "object": "MissileShip",
+  "kind": "ship",
+  "size": 90
+ },
+ "terran_corvette": {
+  "file": "fleet/terran_corvette.blend",
+  "object": "Corvette",
+  "kind": "ship",
+  "size": 45
+ },
+ "terran_twinx": {
+  "file": "fleet/terran_twinx_fighter.blend",
+  "object": "TwinX",
+  "kind": "ship",
+  "size": 9
+ },
+ "arcadian_crescent": {
+  "file": "fleet/arcadian_crescent_mothership.blend",
+  "object": "CrescentMothershipV2",
+  "kind": "ship",
+  "size": 500
+ },
+ "arcadian_shell": {
+  "file": "fleet/arcadian_shell_mothership.blend",
+  "object": "ShellMothershipV2",
+  "kind": "ship",
+  "size": 380
+ },
+ "arcadian_lens": {
+  "file": "fleet/arcadian_lens_mothership.blend",
+  "object": "LensMothershipV2",
+  "kind": "ship",
+  "size": 300
+ },
+ "arcadian_corvette": {
+  "file": "fleet/arcadian_corvette.blend",
+  "object": "ArcadianCorvette",
+  "kind": "ship",
+  "size": 50
+ },
+ "arcadian_stingray": {
+  "file": "fleet/arcadian_stingray_fighter.blend",
+  "object": "StingrayFighter",
+  "kind": "ship",
+  "size": 10
+ },
+ "arcadian_orb": {
+  "file": "fleet/arcadian_orb_rigged_animated.blend",
+  "object": "*",
+  "kind": "ship",
+  "size": 14
+ }
+}
