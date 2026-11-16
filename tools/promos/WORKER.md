@@ -33,3 +33,11 @@ called inspect.py breaks the glTF importer).
 
 Final report (short): the clip second by second, what each pass changed, paths of the final stills
 sheet and preview mp4, honest remaining weaknesses, kit problems you hit.
+
+More lessons from finished clips:
+- sun=(a, 0, az): `a` is tilt from straight down (small = high sun, ~70-80 = low dusk sun).
+- Put camera cuts on whole frames (k/24 s).
+- P.copy shares mesh data: don't split_barrels on a copy; load a second actor instead.
+- Structure turrets: unfold() keys TurretPivot as a quaternion; don't use aim()/spin() on them,
+  add a yaw empty (see scenes/terran_harpoon.py).
+- P.explosion adds a ground scorch: delete it for air bursts. Turn shadows off on emissive FX.

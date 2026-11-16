@@ -25,7 +25,7 @@ Finals land in `/mnt/project-files/promos/clips/<id>/` (`<id>.mp4`, a contact sh
 
 ```python
 P = Promo('clip_id', seconds=6.0)
-P.env('desert'|'highland'|'alien'|'dusk'|'ash', sun=(elev_deg, 0, azimuth_deg), clear=[(x,y,r)], props=35,
+P.env("desert"|"highland"|"alien"|"dusk"|"ash", sun=(tilt_from_vertical_deg, 0, azimuth_deg), clear=[(x,y,r)], props=35,
       deposits=[('ore', (x, y), scale)])
 P.flatten(x, y, r)                      # keep the action area flat
 P.space(planet=(x, y, z, r, rgb))       # space scenes instead of env()
