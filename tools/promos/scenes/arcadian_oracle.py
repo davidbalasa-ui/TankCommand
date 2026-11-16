@@ -149,6 +149,7 @@ def quiet_explosion(pos, t, size, debris=8):
 T_LAND = 1.45
 T_UF0, T_UF1 = 1.55, 3.0
 GLIDE_Z = 1.25
+SKID = 0.25        # the packed carrier hull floats this far above the root
 
 ora = P.load('oracle', at=(0, 0), heading=0, label='oracle')
 bpy.context.view_layer.update()
@@ -196,10 +197,10 @@ key_part('Base', T_UF0 + 0.55, scale_mul=1.06)
 key_part('Base', T_UF0 + 0.75)
 # Carrier: shrinks under the growing base, then hides (hideWhenDeployed)
 key_part('Carrier', T_UF0, packed=True)
-key_part('Carrier', T_UF0 + 0.6, packed=True, scale_mul=0.55)
+key_part('Carrier', T_UF0 + 0.45, packed=True, scale_mul=0.4, dz=-0.25)
 for c in [parts['Carrier']] + list(parts['Carrier'].children_recursive):
     K.key_hide(c, 0, False)
-    K.key_hide(c, P.T(T_UF0 + 0.62), True)
+    K.key_hide(c, P.T(T_UF0 + 0.46), True)
 # Horns: lift off the stack, drift up high and swing round, then sink into place over an air gap
 key_part('Horns', T_UF0 + 0.1, packed=True)
 key_part('Horns', T_UF0 + 0.7, dz=HORN_GAP + 1.0 / NORM_K, yaw=-70, scale_mul=0.92)
@@ -248,16 +249,19 @@ root = ora.root
 root.rotation_mode = 'XYZ'
 glide = [(0.0, (-27.0, -11.0, GLIDE_Z), 3, -3, 20), (0.65, (-15.5, -6.4, GLIDE_Z), -3, -4, 22),
          (1.1, (-5.5, -2.2, GLIDE_Z - 0.1), 2, -1, 14), (1.33, (-1.0, -0.4, 0.55), 0, 4, 4),
-         (T_LAND, (0, 0, 0), 0, 0, 0)]
+         (T_LAND, (0, 0, -SKID), 0, 0, 0)]
 for t, p, rx, ry, rz in glide:
     root.location = p
     root.rotation_euler = (math.radians(rx), math.radians(ry), math.radians(rz))
     root.keyframe_insert('location', frame=P.T(t))
     root.keyframe_insert('rotation_euler', frame=P.T(t))
-root.location = (0, 0, -0.06)
+root.location = (0, 0, -SKID - 0.06)
 root.keyframe_insert('location', frame=P.T(T_LAND + 0.06))
+root.location = (0, 0, -SKID)
+root.keyframe_insert('location', frame=P.T(T_LAND + 0.2))
+root.keyframe_insert('location', frame=P.T(T_UF0))
 root.location = (0, 0, 0)
-root.keyframe_insert('location', frame=P.T(T_LAND + 0.25))
+root.keyframe_insert('location', frame=P.T(T_UF0 + 0.5))
 K.set_interp(root, 'BEZIER')
 m = ora.model_root
 for i in range(0, 9):
@@ -265,7 +269,7 @@ for i in range(0, 9):
     m.location.z = 0.07 * math.sin(2 * math.pi * 1.3 * t) * (1 - t / T_LAND)
     m.keyframe_insert('location', index=2, frame=P.T(t))
 
-LIFT = 0.08
+LIFT = SKID + 0.04
 gl = K.link(bpy.data.objects.new('LiftLight', bpy.data.lights.new('LiftLight', 'POINT')))
 gl.parent = root
 gl.location = (0, 0, -0.2)
@@ -279,7 +283,7 @@ f_end = int(round(P.T(T_LAND + 0.06)))
 for f in range(1, f_end + 1):
     t = (f - 1) / FPS
     c = ora.pos_at(t)
-    h = max(0.1, c.z)
+    h = max(0.1, c.z + SKID)
     fade = 1.0 if t < T_LAND - 0.15 else max(0.0, (T_LAND + 0.06 - t) / 0.21)
     nlegs = 4 if fade > 0.6 else 2
     for k in range(nlegs):
@@ -595,7 +599,7 @@ def curtain(t0, spd, t_end, height, alpha):
 
 
 curtain(T_PULSE, SPD1, T_PULSE + 1.6, 2.2, 0.55)
-curtain(T_PULSE2, SPD2, 6.1, 1.9, 0.5)
+curtain(T_PULSE2, SPD2, 6.1, 1.9, 0.38)
 
 # ring of light bursting off the eye at the pulse
 M_HALO = mat('Halo', PALE, 2.2, alpha=0.6)
@@ -753,13 +757,13 @@ P.camera([
     (0.0, (-21.0, -17.0, 1.1), ora.pos_at(0.0) + Vector((0, 0, 0.9)), 30),
     (0.7, (-13.0, -12.0, 1.2), ora.pos_at(0.7) + Vector((0, 0, 0.9)), 30),
     (1.4, (-4.6, -6.4, 1.0), (0.0, 0.0, 1.0), 30),
-    (2.2, (-3.6, -8.6, 0.7), (0.0, 0.0, 2.6), 27),
+    (2.2, (-3.6, -8.6, 0.7), (0.0, 0.0, 3.2), 24),
     (2.9, (1.2, -7.4, 0.8), (0.0, 0.0, 3.0), 28),
     (3.25, (1.6, -6.2, 1.4), (0.2, 0.0, 3.0), 29),
     (3.75, (-4.5, -8.0, 5.0), (10.0, 5.0, 0.8), 24),
     (4.3, (-6.0, -7.0, 5.6), (15.0, 7.5, 0.6), 26),
     (4.85, (-5.5, -6.5, 4.6), (16.0, 8.5, 1.0), 28),
-    (6.0, (-5.6, -4.6, 1.1), (3.0, 2.2, 2.3), 24),
+    (6.0, (-3.5, -5.0, 1.0), (2.45, 0.35, 2.6), 22),
 ], shake=0.015)
 P.cam_shake(T_LAND, 0.15, 0.35)
 P.cam_shake(T_PULSE, 0.06, 0.3)
