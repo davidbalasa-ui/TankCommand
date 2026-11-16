@@ -1667,6 +1667,7 @@ class Promo:
             subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', lst,
                             '-vf', f'fps={self.fps},format=yuv420p', '-c:v', 'libx264', '-crf', '18',
                             '-movflags', '+faststart', mp4], check=True)
+            _audio.mix_and_mux(self, mp4)  # sound mix muxed in (promo_audio.py); PROMO_AUDIO=0 = off
             # contact sheet of 8 frames for review
             pick = [files[int(i * (len(files) - 1) / 7)] for i in range(8)]
             sheet = os.path.join(out, f'{self.id}_{q}_sheet.jpg')
@@ -1678,3 +1679,8 @@ class Promo:
                             '-q:v', '3', sheet], check=True)
         print('PROMO_OUT', out)
         return out
+
+
+# Sound: wraps the methods above to record sound events; mixed and muxed in render() (promo_audio.py).
+import promo_audio as _audio  # noqa: E402
+_audio.install(sys.modules[__name__])
