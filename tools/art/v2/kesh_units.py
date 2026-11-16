@@ -31,6 +31,26 @@ def asset(path, label, size=512, role=None):
     return deco
 
 
+def light_rail(pts, w=0.11, beads=6, zone='glow', bead_zone='core'):
+    """A line of light as a set gem channel: dark trough, gold lips, a rounded glow seam and a chain of bright beads."""
+    sweep([(x, y, z - 0.01) for x, y, z in pts], [(w * 1.25, 0.05)] * len(pts), 'under', sides=6)
+    for s in (1, -1):
+        sweep([(x, y + s * w * 1.2, z + 0.02) for x, y, z in pts], [(0.022, 0.022)] * len(pts), 'gold', sides=5)
+    sweep([(x, y, z + 0.04) for x, y, z in pts], [(w * 0.7, 0.045)] * len(pts), zone, sides=8)
+    seg = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    tot = sum(seg)
+    for b in range(beads):
+        d = tot * (b + 0.5) / beads
+        i = 0
+        while i < len(seg) - 1 and d > seg[i]:
+            d -= seg[i]; i += 1
+        t = d / seg[i]
+        p = [pts[i][j] + (pts[i + 1][j] - pts[i][j]) * t for j in range(3)]
+        dx, dy = pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]
+        o = orb((p[0], p[1], p[2] + 0.08), w * 0.7, bead_zone, seg=(10, 6), sq=(1.9, 1.0, 0.8))
+        F.rot(o, 'Z', math.degrees(math.atan2(dy, dx)), about=tuple(p))
+
+
 def turret(tz, L=2.9, w=0.85, h=0.62, x0=-1.6, gun=(5.4, 0.15), crest=True, prongs=3, halo=False):
     """Low layered turret with a gold collar ring, a sensor slit, an energy lance and a small crest fin."""
     tf = lensfn(x0, x0 + L, w, tz + h, tz - 0.1, tz + 0.16, nose=0.85)
@@ -76,7 +96,7 @@ def darter():
     K.layered_hull(fn, sides=False)
     K.lifters([(1.5, 0, 0.68), (-1.3, 0, 0.7)], 0.28)
     for u0, u1 in ((0.05, 0.4), (0.74, 0.97)):   # spine of light, fore and aft of the turret
-        sweep([tuple(fn(u0 + (u1 - u0) * k / 5, 90, 0.2)) for k in range(6)], [(0.11, 0.05)] * 6, 'glow', sides=4)
+        light_rail([tuple(fn(u0 + (u1 - u0) * k / 5, 90, 0.2)) for k in range(6)], w=0.1, beads=3)
     for s in (1, -1):
         # Forward-swept pincer blade reaching well past the nose, slim and raised, and a raked tail fin.
         b = K.blade((1.6, s * 3.4, 1.12), 3.0, s * -104, s * -48, 0.46, 0.09, sq=(1.6, 1.0), zone='shell')
@@ -275,7 +295,7 @@ def ferrier():
     for s in (1, -1):   # cargo rails: long floating tusks held off each flank, a line of ember light along each
         pts = [(-3.9, s * 1.55, 1.5), (-2.2, s * 1.98, 1.42), (-0.4, s * 2.1, 1.4), (1.4, s * 1.98, 1.42), (3.1, s * 1.55, 1.5)]
         sweep(pts, [(0.03, 0.03), (0.2, 0.11), (0.24, 0.13), (0.2, 0.11), (0.03, 0.03)], 'bronze', sides=6)
-        sweep([(x, y, z + 0.13) for x, y, z in pts[1:-1]], [(0.11, 0.035)] * 3, 'glow', sides=4)
+        light_rail([(x, y, z + 0.17) for x, y, z in pts[1:-1]], w=0.1, beads=5)
         sweep([(x, y + s * 0.2, z) for x, y, z in pts], [(0.02, 0.02), (0.05, 0.03), (0.05, 0.03), (0.05, 0.03), (0.02, 0.02)], 'gold', sides=4)
         for x in (-1.9, 0.9):   # struts holding the rail off the hull
             sweep([(x, s * 1.1, 1.15), (x, s * 1.95, 1.38)], [(0.08, 0.08), (0.05, 0.05)], 'bronze', sides=5)
