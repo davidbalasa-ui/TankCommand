@@ -74,6 +74,7 @@ const moving = q.get('move') === '1';
 const hit = (x, a, r) => (x < 0 ? 0 : x < a ? x / a : Math.max(0, 1 - (x - a) / r) ** 2);
 const rep = (spec, tf, fn) => { let v = 0; for (let k = 0; k < (spec.repeat || 1); k += 1) v = Math.max(v, fn(tf - (spec.delay || 0) - k * (spec.every || 0))); return v; };
 const roots = [];
+const holders = [];
 window.__setTime = (t) => {
   // Every unit fires on its own clock: scene extras fire.period (s) overrides the viewer's fire= period.
   const clock = (fire) => (firePeriod ? (t % ((fire && fire.period) || firePeriod)) : 1e9);
@@ -156,11 +157,18 @@ files.forEach((file, i) => {
     root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone(), pos: o.position.clone(), fire: unitFire }); });
     roots.push({ root, fire: gltf.scene.userData && gltf.scene.userData.fire });
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    holders[i] = holder;
     scene.add(holder);
     loaded += 1;
   }, () => { loaded += 1; });
 });
 window.__ready = () => loaded === files.length;
+// Label anchors for line-up sheets: the point on the ground just in front of each model, as screen fractions.
+window.__anchors = () => holders.flatMap((h) => {
+  const bx = new THREE.Box3().setFromObject(h);
+  const p = new THREE.Vector3((bx.min.x + bx.max.x) / 2, 0, bx.max.z + 0.6).project(camera);
+  return [(p.x + 1) / 2, (1 - p.y) / 2];
+});
 if (q.has('t')) { const wait = setInterval(() => { if (window.__ready()) { window.__setTime(Number(q.get('t'))); clearInterval(wait); } }, 100); }
 function loop() {
   renderer.render(scene, camera);
