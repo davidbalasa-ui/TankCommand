@@ -365,12 +365,12 @@ class Skin:
         mr.inputs[1].default_value, mr.inputs[2].default_value = 26.0, 44.0
         mr.inputs[3].default_value, mr.inputs[4].default_value = 1.0, 0.0
         nt.links.new(M(nt, 'ABSOLUTE', sp.outputs['Z']), mr.inputs[0])
-        lk = M(nt, 'ADD', 0.55, M(nt, 'MULTIPLY', flare, 4.0))
+        lk = M(nt, 'ADD', 0.55, M(nt, 'MULTIPLY', flare, float(A.get('flarek', 1.6))))
         st = M(nt, 'MULTIPLY', l0, lk)
         fine = M(nt, 'ADD', M(nt, 'MULTIPLY', l1, M(nt, 'MINIMUM', M(nt, 'MULTIPLY', split, 2.0), 1.0)),
                  M(nt, 'MULTIPLY', l2, M(nt, 'MAXIMUM', M(nt, 'SUBTRACT', M(nt, 'MULTIPLY', split, 2.0), 0.8), 0.0)))
-        st = M(nt, 'ADD', st, M(nt, 'MULTIPLY', fine, M(nt, 'MULTIPLY', lk, 0.75)))
-        st = M(nt, 'ADD', st, M(nt, 'ADD', M(nt, 'MULTIPLY', fill, 0.16), M(nt, 'MULTIPLY', flare, float(A.get('facek', 1.3)))))
+        st = M(nt, 'ADD', st, M(nt, 'MULTIPLY', fine, M(nt, 'MULTIPLY', lk, 0.45)))
+        st = M(nt, 'ADD', st, M(nt, 'ADD', M(nt, 'MULTIPLY', fill, 0.16), M(nt, 'MULTIPLY', flare, float(A.get('facek', 0.6)))))
         st = M(nt, 'MULTIPLY', M(nt, 'MULTIPLY', st, mr.outputs[0]), float(A.get('trik', 1.0)))
         mix = nt.nodes.new('ShaderNodeMix')
         mix.data_type = 'RGBA'
@@ -392,11 +392,15 @@ class Skin:
     def dent(r, s):
         """How far the skin is pushed in at distance r from a pod's lane."""
         if s['eng']:
-            sig = 1.1 + 0.35 * s['D']
-            return s['D'] * np.exp(-np.clip(r - s['rc'], 0, None) / sig)
+            # glove fit: the skin hugs the hull and fillets into the sphere within a short wall (no funnel)
+            w = float(A.get('glove_w', 0.7)) + 0.12 * s['D']
+            x = np.clip(1 - np.clip(r - s['rc'], 0, None) / w, 0, 1)
+            return s['D'] * x * x * (1.6 - 0.6 * x)
         tau = s['t'] - TP
         if 0 < tau < 40:                                           # the tail is clear: spring back, ringing
-            return DMAX * 0.9 * math.exp(-tau / 3.2) * math.cos(tau * 0.95) * np.exp(-r / 2.4) \
+            # snap: the released sleeve whips back, overshoots outward hard and rings (widening as it goes)
+            wid = 1.6 + 0.35 * tau
+            return DMAX * 1.05 * math.exp(-tau / 4.5) * math.cos(tau * 0.62) * np.exp(-(r / wid) ** 2) \
                 + 0.35 * math.exp(-tau / 9.0) * np.sin(np.clip(1.5 * tau - r, 0, None) * 1.3) * np.exp(-r / 9.0) * (r < 1.5 * tau)
         return np.zeros_like(r)
 
@@ -456,7 +460,8 @@ class Skin:
                 tau = t - TP
                 R = 1.5 * tau                                               # the release ripple
                 flare += np.clip(1 - np.abs(r1 - R) / 1.7, 0, 1) * 1.1 * math.exp(-R / 14.0)
-                flare += 0.8 * math.exp(-tau / 4.0) * np.exp(-(r1 / 2.2) ** 2)
+                flare += 1.4 * math.exp(-tau / 3.0) * np.exp(-(r1 / 2.6) ** 2)      # snap flash
+                flare += 0.6 * abs(math.cos(tau * 0.62)) * math.exp(-tau / 5.0) * np.exp(-(r1 / 3.5) ** 2)
                 split = np.maximum(split, math.exp(-tau / 5.0) * np.exp(-(r / 3.6) ** 2))
                 light = 2.5e3 * math.exp(-tau / 3.0)
             self.lights[i].data.energy = light
