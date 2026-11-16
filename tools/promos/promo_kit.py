@@ -1182,7 +1182,8 @@ class Promo:
         return W.missile(self, p0, p1, t0, speed=speed, color=color, arc=arc, wobble=wobble, trail=trail)
 
     def lightning(self, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, segs=10, glow=True):
-        """Arcadian lightning: jagged bolt p0 -> p1, re-shaped every frame, with a few forks."""
+        """Arcadian gold lightning p0 -> p1, re-striking every 2-3 frames with forks. p0/p1 may be
+        points, Actors, Objects or callables t -> point (moving ends are followed per frame)."""
         import promo_fx_weapons as W
         return W.lightning(self, p0, p1, t0, t1, color=color, width=width, jag=jag, branches=branches,
                            segs=segs, glow=glow)

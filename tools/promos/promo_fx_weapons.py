@@ -396,7 +396,7 @@ def smoke_puff(P, pos, t, r0=0.15, r1=0.8, life=1.6, vel=(0, 0, 0), color=None, 
     o['fx_d'] = 3.0 * dens
     o['fx_w'] = 0.0
     vel = Vector(vel)
-    wind = Vector(wind)
+    wind = Vector(wind) * (1.0 if getattr(P, 'ground', None) else 0.25)
     pos = Vector(pos)
     o.rotation_mode = 'QUATERNION'
     if stretch is not None:
@@ -439,6 +439,8 @@ def sparks(P, pos, t, n=10, speed=10.0, color=None, axis=UP, spread=70, life=(0.
     pos = Vector(pos)
     col = color or (1.0, 0.5, 0.12)
     gz = _gz(P, pos.x, pos.y)
+    if not getattr(P, 'ground', None):   # space: no gravity, nothing to bounce on
+        gravity, bounce = 0.0, False
     f0 = P.T(t)
     dt = 1.0 / P.fps
     out = []
@@ -588,7 +590,7 @@ def impact(P, pos, t, size=1.0, color=None):
     pos = Vector(pos)
     energy = color is not None and not _is_ballistic_col(color)
     gz = _gz(P, pos.x, pos.y)
-    ground = (pos.z - gz) < 0.35 + 0.3 * size
+    ground = bool(getattr(P, 'ground', None)) and (pos.z - gz) < 0.35 + 0.3 * size
     fcol = color if energy else (1.0, 0.5, 0.14)
     lift = Vector((0, 0, 0.4 * size)) if ground else Vector()
     flash(P, pos + lift, t, 0.5 * size, fcol, frames=(1, 2, 4), e=3.2, hot=0.9)
@@ -896,32 +898,98 @@ def _curve(P, name, pts, radius, radii=None, res=2):
     return _fxobj(o)
 
 
-def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=True, flick=None):
-    """One lightning strike visible for frames [f0, f0+nframes): white-gold core, gold glow,
-    wide haze on the trunk, tapered jagged forks. Returns the objects."""
+def _endpoint(P, x, lift=True):
+    """Endpoint -> function(frame) -> world Vector. Accepts a point, an Actor (its body centre,
+    following it), an Object (its world origin, following it) or a callable f(t_seconds)."""
+    if hasattr(x, 'pos_at') and hasattr(x, 'root'):          # Actor
+        off = Vector((0, 0, x.size * 0.18 if lift else 0.0))
+        return (lambda f: _world_at_frame(x.root, f) + off), True
+    if isinstance(x, bpy.types.Object):
+        return (lambda f: _world_at_frame(x, f)), True
+    if callable(x):
+        return (lambda f: Vector(x((f - 1) / P.fps))), True
+    v = K.V(x)
+    return (lambda f: v), False
+
+
+def _world_at_frame(obj, f):
+    sc = bpy.context.scene
+    if sc.frame_current != f:
+        sc.frame_set(int(f))
+    return obj.matrix_world.translation.copy()
+
+
+def _pool_light(P, f0, f1, color, energy, radius, pos_fn, lo=0.5, hi=1.0):
+    """Borrow one of at most 4 shared point lights for frames f0..f1 (lightning is called
+    every few frames by some scenes; one light per call is too heavy). Skips when all busy."""
+    c = _c(P)
+    pool = c.setdefault('lpool', [])
+    L = None
+    for ent in pool:
+        if ent[1] < f0 - 1:
+            L = ent
+            break
+    if L is None:
+        if len(pool) >= 4:
+            return None
+        ob = K.link(bpy.data.objects.new('FxBoltLight', bpy.data.lights.new('FxBoltLight', 'POINT')))
+        ob.data.energy = 0
+        ob.data.keyframe_insert('energy', frame=0)
+        L = [ob, -99]
+        pool.append(L)
+    ob, _ = L
+    L[1] = f1 + 1
+    d = ob.data
+    d.color = color
+    d.shadow_soft_size = radius
+    d.keyframe_insert('color', frame=f0 - 1)
+    d.energy = 0
+    d.keyframe_insert('energy', frame=f0 - 1)
+    for f in range(f0, f1 + 1):
+        ob.location = pos_fn(f)
+        ob.keyframe_insert('location', frame=f)
+        d.energy = energy * P.rnd.uniform(lo, hi)
+        d.keyframe_insert('energy', frame=f)
+    d.energy = 0
+    d.keyframe_insert('energy', frame=f1 + 1)
+    for idb, path in ((ob, 'location'), (d, 'energy'), (d, 'color')):
+        ad = idb.animation_data
+        for fc in K._fcurves(ad.action):
+            if fc.data_path == path:
+                for k in fc.keyframe_points:
+                    k.interpolation = 'CONSTANT'
+    return ob
+
+
+def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=True, flick=None,
+         follow=None):
+    """One lightning strike visible for frames [f0, f0+nframes): thin white-gold core, gold
+    glow, soft haze on the trunk, tapered jagged forks and twigs. follow=(fn0, fn1) frame ->
+    point: the strike is re-aimed every frame so it stays attached to moving ends."""
     p0, p1 = Vector(p0), Vector(p1)
     L = (p1 - p0).length
     depth = max(3, min(7, int(math.log2(max(2.0, L / 0.15)))))
     trunk = _jag(P, p0, p1, jag * 0.6, depth)
-    for q in trunk:      # never dive into the ground between the ends
-        q.z = max(q.z, _gz(P, q.x, q.y) + 0.06)
+    if getattr(P, 'ground', None):
+        for q in trunk:      # never dive into the ground between the ends
+            q.z = max(q.z, _gz(P, q.x, q.y) + 0.06)
     hot = tuple(0.3 * c + 0.7 * w for c, w in zip(color, HOT_WHITE))
     objs = []
     nn = len(trunk)
     taper = [0.75 + 0.25 * math.sin(math.pi * i / (nn - 1)) for i in range(nn)]
-    core = _curve(P, 'BoltCore', trunk, width * 0.45, taper, res=1)
+    core = _curve(P, 'BoltCore', trunk, width * 0.4, taper, res=1)
     core.color = (*hot, 1)
     core['fx_e'], core['fx_p'], core['fx_hot'] = 3.4, 0.5, 1.0
     objs.append(core)
     if glow_:
-        g = _curve(P, 'BoltGlow', trunk, width * 2.4, taper)
+        g = _curve(P, 'BoltGlow', trunk, width * 2.8, taper, res=3)
         g.color = (*color, 1)
-        g['fx_e'], g['fx_p'] = 2.0, 2.0
-        h = _curve(P, 'BoltGlow', trunk, width * 7.0, taper)
-        h.color = (*color, 0.55)
-        h['fx_e'], h['fx_p'] = 1.0, 3.0
+        g['fx_e'], g['fx_p'] = 2.2, 3.0
+        h = _curve(P, 'BoltGlow', trunk, width * 8.0, taper, res=3)
+        h.color = (*color, 0.5)
+        h['fx_e'], h['fx_p'] = 0.8, 3.5
         objs += [g, h]
-    nb = branches + P.rnd.randint(0, 2)
+    nb = branches + P.rnd.randint(0, 2) if branches else 0
     for b in range(nb):
         k = P.rnd.randint(int(nn * 0.15), int(nn * 0.8))
         a = trunk[k]
@@ -931,24 +999,45 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
         bp = _jag(P, a, a + dirb * bl, jag * 0.7, max(2, depth - 2))
         m = len(bp)
         rad = [1.0 - 0.85 * i / (m - 1) for i in range(m)]
-        c2 = _curve(P, 'BoltFork', bp, width * 0.32, rad, res=1)
+        c2 = _curve(P, 'BoltFork', bp, width * 0.3, rad, res=1)
         c2.color = (*hot, 1)
-        c2['fx_e'], c2['fx_p'], c2['fx_hot'] = 3.0, 0.6, 0.4
+        c2['fx_e'], c2['fx_p'], c2['fx_hot'] = 3.0, 0.6, 0.6
         objs.append(c2)
         if glow_:
-            g2 = _curve(P, 'BoltForkGlow', bp, width * 1.6, rad)
+            g2 = _curve(P, 'BoltForkGlow', bp, width * 1.5, rad)
             g2.color = (*color, 0.8)
-            g2['fx_e'], g2['fx_p'] = 2.0, 2.0
+            g2['fx_e'], g2['fx_p'] = 1.8, 2.0
             objs.append(g2)
         if P.rnd.random() < 0.5 and m > 4:   # twig
             k2 = P.rnd.randint(1, m - 3)
             a2 = bp[k2]
             d2 = (dirb + _rand_perp(P, dirb)).normalized()
             tw = _jag(P, a2, a2 + d2 * bl * 0.45, jag * 0.7, 2)
-            c3 = _curve(P, 'BoltFork', tw, width * 0.22, [1.0 - 0.9 * i / (len(tw) - 1) for i in range(len(tw))], res=1)
+            c3 = _curve(P, 'BoltFork', tw, width * 0.2, [1.0 - 0.9 * i / (len(tw) - 1) for i in range(len(tw))], res=1)
             c3.color = (*hot, 1)
             c3['fx_e'], c3['fx_p'] = 2.6, 0.6
             objs.append(c3)
+    if follow is not None and nframes > 1:
+        # rig: maps the strike's own p0->p1 onto the live ends each frame (stretch along X)
+        fn0, fn1 = follow
+        q0 = (p1 - p0).to_track_quat('X', 'Z')
+        T0 = Matrix.LocRotScale(p0, q0, Vector((1, 1, 1)))
+        rig = K.empty('BoltRig')
+        rig.rotation_mode = 'QUATERNION'
+        for f in range(f0, f0 + nframes):
+            a, b_ = fn0(f), fn1(f)
+            d = b_ - a
+            rig.location = a
+            rig.rotation_quaternion = d.to_track_quat('X', 'Z') if d.length > 1e-5 else q0
+            rig.scale = (d.length / max(L, 1e-4), 1, 1)
+            for path in ('location', 'rotation_quaternion', 'scale'):
+                rig.keyframe_insert(path, frame=f)
+        for path in ('location', 'rotation_quaternion', 'scale'):
+            _const(rig, path)
+        inv = T0.inverted()
+        for o in objs:
+            o.parent = rig
+            o.matrix_parent_inverse = inv
     # brightness: snap on, then flicker down (constant per frame)
     for o in objs:
         base = o['fx_e']
@@ -959,34 +1048,83 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
     return objs
 
 
-def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, segs=10, glow=True):
+def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, segs=10, glow=True,
+              sparks_=True, light=True):
     """Arcadian gold lightning p0 -> p1: re-strikes every 2-3 frames with a new jagged,
-    branching shape; contact glow + sparks each strike; flickering light. Shared materials."""
-    p0, p1 = K.V(p0), K.V(p1)
+    branching shape; contact glow + sparks each strike; flickering pooled light. p0 / p1 may
+    be points, Actors, Objects or callables t -> point: moving ends are followed per frame.
+    All bolts share the FxGlow material, so calling this every frame stays cheap."""
     color = color or K.COL['arc_gold']
+    fn0, mv0 = _endpoint(P, p0, lift=False)
+    fn1, mv1 = _endpoint(P, p1)
+    moving = mv0 or mv1
+    cur = bpy.context.scene.frame_current
     f0 = int(round(P.T(t0)))
     f1 = max(f0 + 1, int(round(P.T(t1))))
-    L = (p1 - p0).length
     f = f0
     first = True
     while f < f1:
         nfr = min(f1 - f, P.rnd.choice((2, 2, 3)))
-        bolt(P, p0, p1, f, nfr, color, width=width, jag=jag, branches=branches, glow_=glow,
-             flick=[1.0, 0.55, 0.8] if not first else [1.0, 0.7, 0.9])
-        tt = (f - 1) / P.fps
-        sparks(P, p1, tt, n=4 if not first else 7, speed=6.0, color=color, axis=UP, spread=80,
-               life=(0.15, 0.4), width=0.018)
+        a, b = fn0(f), fn1(f)
+        bolt(P, a, b, f, nfr, color, width=width, jag=jag, branches=branches, glow_=glow,
+             flick=[1.0, 0.55, 0.8] if not first else [1.0, 0.7, 0.9],
+             follow=(fn0, fn1) if moving else None)
+        if sparks_ and width >= 0.03:
+            sparks(P, b, (f - 1) / P.fps, n=4 if not first else 7, speed=6.0, color=color,
+                   axis=UP if getattr(P, 'ground', None) else (b - a), spread=80,
+                   life=(0.15, 0.4), width=0.018, gravity=9.8 if getattr(P, 'ground', None) else 0.0)
         first = False
         f += nfr
-    # contact + source glows (flickering)
-    for pos, r, nm in ((p1, 0.2 + width * 3, 'BoltContact'), (p0, 0.12 + width * 2, 'BoltSource')):
-        o = _glow(P, nm, color, loc=pos, scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
+    # contact + source glows (flickering, following the ends)
+    for fn, r, nm in ((fn1, 0.2 + width * 3, 'BoltContact'), (fn0, 0.12 + width * 2, 'BoltSource')):
+        o = _glow(P, nm, color, loc=fn(f0), scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
         for fr in range(f0, f1 + 2):
             kprop(o, 'fx_e', fr, 3.0 * P.rnd.uniform(0.55, 1.0) if fr < f1 else 1.2, const=True)
+            if moving:
+                o.location = fn(fr)
+                o.keyframe_insert('location', frame=fr)
         K.show_between(o, f0, f1 + 2)
-    flicker_light(P, (p0 + p1) / 2, t0, t1, color, energy=500 + 50 * L, radius=L * 0.15, lo=0.4, hi=1.0)
-    flicker_light(P, p1 + Vector((0, 0, 0.4)), t0, t1, color, energy=700, radius=0.3, lo=0.5, hi=1.0)
+    if light:
+        L = (fn1(f0) - fn0(f0)).length
+        _pool_light(P, f0, f1, color, 600 + 30 * L, 0.3, lambda fr: fn1(fr) + Vector((0, 0, 0.4)), lo=0.45, hi=1.0)
+    bpy.context.scene.frame_set(cur)
     return t1
+
+
+def lightning_thruster(P, obj, t0, t1, local=(0, 0, 0), axis=(-1, 0, 0), length=1.6, width=0.03,
+                       n=2, spread=0.35, color=None, light=True):
+    """Arcadian thrust: n short crackling gold bolts streaming from a point on `obj` (Object
+    or Actor; local offset/axis in its space) and re-striking every 2 frames, following the
+    ship. Same shared materials as lightning(); one pooled light."""
+    color = color or K.COL['arc_gold']
+    ob = obj.root if hasattr(obj, 'root') else obj
+    loc = Vector(local)
+    ax = Vector(axis).normalized()
+
+    def start(f):
+        _world_at_frame(ob, f)
+        return ob.matrix_world @ loc
+    cur = bpy.context.scene.frame_current
+    f0, f1 = int(round(P.T(t0))), int(round(P.T(t1)))
+    for k in range(n):
+        f = f0 + k % 2
+        while f < f1:
+            nfr = min(f1 - f, P.rnd.choice((2, 2, 3)))
+            end_local = loc + (ax + _rand_perp(P, ax) * P.rnd.uniform(0, spread)).normalized() * length * P.rnd.uniform(0.6, 1.1)
+
+            def endf(fr, e=end_local):
+                _world_at_frame(ob, fr)
+                return ob.matrix_world @ e
+            bolt(P, start(f), endf(f), f, nfr, color, width=width, jag=0.22, branches=1, glow_=True,
+                 flick=[1.0, 0.65, 0.85], follow=(start, endf))
+            f += nfr
+    o = _glow(P, 'ThrustCore', color, scale=(width * 6,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.9)
+    o.parent = ob
+    o.location = loc
+    K.show_between(o, f0, f1)
+    if light:
+        _pool_light(P, f0, f1, color, 300, 0.2, start, lo=0.6, hi=1.0)
+    bpy.context.scene.frame_set(cur)
 
 
 # ----------------------------------------------------------------------------- beams

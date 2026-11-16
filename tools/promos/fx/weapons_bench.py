@@ -13,8 +13,11 @@ from promo_kit import COL, Promo  # noqa: E402
 
 CASE = os.environ.get('FXCASE', 'cannon')
 P = Promo('fxbench_' + CASE, seconds=3.0)
-P.env('desert', sun=(48, 0, -40), clear=[(0, 0, 30)], props=0)
-P.flatten(0, 0, 30)
+if CASE == 'space':
+    P.space()
+else:
+    P.env('desert', sun=(48, 0, -40), clear=[(0, 0, 30)], props=0)
+    P.flatten(0, 0, 30)
 
 if CASE in ('cannon', 'autocannon'):
     a = P.load('lancer', at=(0, 0), heading=0)
@@ -63,6 +66,24 @@ elif CASE == 'shield_push':
     a.path([(0.0, (-2, 0)), (2.2, (11, 0))])
     W.shield_push(P, sh, a, 0.3, 2.2)
     P.camera([(0, (4, -17, 4.5), (5, 0, 1.6), 30)])
+elif CASE == 'space':
+    # Arcadian fighters lashing a moving Terran frigate: moving-end lightning + lightning thrust
+    import promo_fx_weapons as W
+    tw = []
+    for i, (y, z) in enumerate([(6, 2.0), (-5, -1.5)]):
+        e = P.load('terran_twinx', at=(30, y, z), heading=180, label=f'twinx{i}')
+        e.path([(0.0, (34, y, z)), (3.0, (16, y * 0.6, z + 1))])
+        tw.append(e)
+    rays = []
+    for i, (y, z) in enumerate([(-4, 1.5), (4, -1.0)]):
+        a = P.load('arcadian_stingray', at=(-6, y, z), heading=0, label=f'ray{i}')
+        a.path([(0.0, (-10, y, z)), (3.0, (2, y * 1.3, z))])
+        rays.append(a)
+        W.lightning_thruster(P, a, 0.0, 3.0, local=(-a.size * 0.4, 0, 0), length=a.size * 0.45, width=0.05)
+    for k in range(6):   # lashes from the moving rays onto the moving fighters
+        t = 0.4 + 0.35 * k
+        P.lightning(rays[k % 2], tw[(k // 2) % 2], t, t + 0.22, width=0.08)
+    P.camera([(0, (4, -40, 8), (8, 0, 0), 32), (3.0, (8, -38, 7), (10, 0, 0), 32)])
 elif CASE == 'shell':
     a = P.load('longbow', at=(0, 0), heading=0)
     a.fire(0.3, (40, 4, 0.1), kind='shell')
