@@ -473,7 +473,9 @@ class Actor:
             front = [c for c in vs if c.x > mx - 0.08]
             loc = Vector((mx, sum(c.y for c in front) / len(front), sum(c.z for c in front) / len(front)))
         m = empty(self.name + '_Muzzle')
-        m.parent = host
+        # ride on the barrel when it is split (raises / recoils with it; the barrel shares the
+        # host's local frame), else on the turret/hull mesh
+        m.parent = self.barrels[0] if self.barrels else host
         m.location = loc
         self._muzzles = [m]
         return m
@@ -519,12 +521,15 @@ class Actor:
         return self
 
     def fire(self, t, target, kind='cannon', color=None, speed=None, size=1.0, recoil=True,
-             kick=None, impact=True, impact_size=None, arc=None, muzzle=None, spread=0.0):
+             kick=None, impact=True, impact_size=None, arc=None, muzzle=None, spread=0.0,
+             jag=None, branches=None, width=None):
         """Fire one shot at `target` (point or Actor) at time t. Returns the impact time.
-        kind: cannon | heavy | autocannon | laser | missile | shell | lightning | beam | bomb"""
+        kind: cannon | heavy | autocannon | laser | missile | shell | lightning | beam | bomb
+        jag / branches / width: lightning shape (defaults 0.18 / 2 / 0.05 x size); width also
+        sets beam and laser thickness."""
         P = self.P
         mz = muzzle or self.muzzle()
-        p0 = self.world_at(mz, t)
+        p0 = self.world_at(mz, t - 1.0 / P.fps)   # the muzzle just before recoil starts
         if isinstance(target, Actor):
             p1 = target.pos_at(t + 0.15) + Vector((0, 0, target.size * 0.18))
         else:
@@ -552,17 +557,25 @@ class Actor:
         if recoil and kk > 0:
             self.recoil(t, kick=kk, back=0.05 * kk)
         if kind in ('lightning',):
-            P.lightning(p0, p1, t, t + 0.18, color=col, width=0.05 * size)
+            P.lightning(p0, p1, t, t + 0.18, color=col, width=width if width is not None else 0.05 * size,
+                        jag=0.18 if jag is None else jag, branches=2 if branches is None else branches)
             t_hit = t + 0.02
         elif kind == 'beam':
-            P.beam(p0, p1, t, t + 0.45, color=col, width=0.18 * size)
+            P.beam(p0, p1, t, t + 0.45, color=col, width=width if width is not None else 0.18 * size)
             t_hit = t + 0.05
         elif kind == 'missile':
             t_hit = P.missile(p0, p1, t, speed=spd, color=col, arc=arc if arc is not None else 2.5)
+        elif kind == 'laser':
+            # Terran laser: a short beam zap that lands instantly (core + glow + scrolling energy)
+            import promo_fx_weapons as W
+            t_hit = t + 0.02
+            W.beam(P, p0, p1, t, t + 0.14 * max(1.0, size), color=col,
+                   width=width if width is not None else 0.07 * size, strength=9)
         elif kind in ('shell', 'bomb'):
-            t_hit = P.projectile(p0, p1, t, speed=spd, color=col, size=0.18 * size,
+            import promo_fx_weapons as W
+            t_hit = W.projectile(P, p0, p1, t, spd, col, size=0.18 * size,
                                  arc=arc if arc is not None else (0.35 * (p1 - p0).length if kind == 'shell' else 0),
-                                 streak=kind == 'shell')
+                                 streak=kind == 'shell', style=kind)
         else:
             t_hit = P.projectile(p0, p1, t, speed=spd, color=col, size=(0.1 if kind == 'autocannon' else 0.16) * size)
         if impact:
@@ -1168,139 +1181,38 @@ class Promo:
 
     def muzzle_flash(self, muzzle_obj, t, color, size=1.0):
         """Short star-shaped flash at a muzzle empty (follows it)."""
-        f = sphere('Flash', 1.0, self.soft_fire_mat(), seg=(10, 8))
-        f.color = (*color, 1.0)
-        f.parent = muzzle_obj
-        f.location = (0.25 * size, 0, 0)
-        f0 = self.T(t)
-        f.scale = (0.01, 0.01, 0.01)
-        f.keyframe_insert('scale', frame=f0 - 1)
-        f.scale = (0.9 * size, 0.35 * size, 0.35 * size)
-        f.keyframe_insert('scale', frame=f0)
-        f.scale = (0.5 * size, 0.2 * size, 0.2 * size)
-        f.keyframe_insert('scale', frame=f0 + 1)
-        f.scale = (0.01, 0.01, 0.01)
-        f.keyframe_insert('scale', frame=f0 + 3)
-        show_between(f, f0 - 1, f0 + 3)
-        bpy.context.scene.frame_set(int(f0))
-        self.light(muzzle_obj.matrix_world.translation, t, color, energy=900 * size, dur=0.1)
-        # smoke puff
-        self.puff(muzzle_obj.matrix_world.translation, t + 0.03, size=0.45 * size, n=2, rise=0.6,
-                  color=(0.32, 0.3, 0.28), opacity=0.4)
+        import promo_fx_weapons as W
+        return W.muzzle_flash(self, muzzle_obj, t, color, size)
 
     def projectile(self, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True):
         """Glowing slug flying p0 -> p1 (with an optional ballistic arc). Returns hit time."""
-        p0, p1 = V(p0), V(p1)
-        d = p1 - p0
-        dur = max(0.04, d.length / speed)
-        m = emit_mat('Slug', color, 3)
-        o = sphere('Slug', 1.0, m, seg=(8, 6))
-        o.rotation_mode = 'QUATERNION'
-        n = max(2, int(dur * self.fps) + 1)
-        for i in range(n + 1):
-            u = i / n
-            p = p0 + d * u + Vector((0, 0, 4 * arc * u * (1 - u)))
-            u2 = min(1.0, u + 0.02)
-            p2 = p0 + d * u2 + Vector((0, 0, 4 * arc * u2 * (1 - u2)))
-            o.location = p
-            o.rotation_quaternion = (p2 - p).to_track_quat('X', 'Z') if (p2 - p).length > 1e-5 else d.to_track_quat('X', 'Z')
-            o.scale = ((size * 6 if streak else size * 2.5), size, size)
-            fr = self.T(t0 + dur * u)
-            o.keyframe_insert('location', frame=fr)
-            o.keyframe_insert('rotation_quaternion', frame=fr)
-            o.keyframe_insert('scale', frame=fr)
-        set_interp(o, 'LINEAR')
-        show_between(o, self.T(t0), self.T(t0 + dur) + 1)
-        return t0 + dur
+        import promo_fx_weapons as W
+        return W.projectile(self, p0, p1, t0, speed, color, size=size, arc=arc, streak=streak)
 
     def missile(self, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True):
         """Missile with a smoke trail, flying a lofted path. Returns hit time."""
-        p0, p1 = V(p0), V(p1)
-        d = p1 - p0
-        dur = max(0.15, d.length / speed)
-        body = sphere('Missile', 1.0, pbr_mat('MissileBody', (0.6, 0.6, 0.62), 0.4, 0.6), seg=(8, 6))
-        body.scale = (0.35, 0.07, 0.07)
-        body.rotation_mode = 'QUATERNION'
-        fl = sphere('MissileFlame', 1.0, emit_mat('MFlame', color or COL['fire'], 14), seg=(8, 6))
-        fl.parent = body
-        fl.location = (-1.3, 0, 0)
-        fl.scale = (1.0, 1.4, 1.4)
-        n = max(3, int(dur * self.fps))
-        ph = self.rnd.uniform(0, 6)
-        pts = []
-        side = d.cross(Vector((0, 0, 1)))
-        side = side.normalized() if side.length > 1e-4 else Vector((0, 1, 0))
-        for i in range(n + 1):
-            u = i / n
-            p = p0 + d * u + Vector((0, 0, 4 * arc * u * (1 - u))) + side * wobble * math.sin(ph + u * 9) * u * (1 - u) * 4
-            pts.append((u, p))
-        for i, (u, p) in enumerate(pts):
-            q = pts[min(i + 1, n)][1] - pts[max(i - 1, 0)][1]
-            body.location = p
-            body.rotation_quaternion = q.to_track_quat('X', 'Z')
-            fr = self.T(t0 + dur * u)
-            body.keyframe_insert('location', frame=fr)
-            body.keyframe_insert('rotation_quaternion', frame=fr)
-        set_interp(body, 'LINEAR')
-        show_between(body, self.T(t0), self.T(t0 + dur) + 1)
-        if trail:
-            for i, (u, p) in enumerate(pts[1:-1]):
-                self.puff(p, t0 + dur * u, size=0.35, n=1, rise=0.3, life=1.6, color=(0.55, 0.55, 0.55))
-        return t0 + dur
+        import promo_fx_weapons as W
+        return W.missile(self, p0, p1, t0, speed=speed, color=color, arc=arc, wobble=wobble, trail=trail)
 
     def lightning(self, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, segs=10, glow=True):
-        """Arcadian lightning: jagged bolt p0 -> p1, re-shaped every frame, with a few forks."""
-        p0, p1 = V(p0), V(p1)
-        color = color or COL['arc_gold']
-        m = emit_mat('Bolt', color, 4)
-        mw = emit_mat('BoltCore', (1.0, 0.8, 0.45), 5)
-        glow_m = emit_mat('BoltGlowM', color, 3, alpha=0.3)
-        d = p1 - p0
-        L = d.length
-        side = d.cross(Vector((0, 0, 1)))
-        side = side.normalized() if side.length > 1e-4 else Vector((0, 1, 0))
-        up = side.cross(d).normalized()
-        f0 = int(round(self.T(t0)))
-        f1 = max(f0 + 1, int(round(self.T(t1))))
-        for f in range(f0, f1):
-            pts = []
-            for i in range(segs + 1):
-                u = i / segs
-                env_ = math.sin(math.pi * u)
-                off = (side * self.rnd.uniform(-1, 1) + up * self.rnd.uniform(-1, 1)) * jag * L * 0.25 * env_ if 0 < i < segs else Vector()
-                pts.append(p0 + d * u + off)
-            o = polyline('Bolt', pts, width * 0.6, mw if self.rnd.random() < 0.3 else m)
-            outer = polyline('BoltGlow', pts, width * 2.2, glow_m) if glow else None
-            for ob in filter(None, [o, outer]):
-                show_between(ob, f, f + 1)
-            for b in range(branches):
-                k = self.rnd.randint(2, segs - 2)
-                a = pts[k]
-                dirb = (d.normalized() * 0.6 + side * self.rnd.uniform(-1, 1) + up * self.rnd.uniform(-0.5, 0.5)).normalized()
-                bl = L * self.rnd.uniform(0.08, 0.2)
-                bp = [a, a + dirb * bl * 0.5 + side * self.rnd.uniform(-.1, .1) * bl, a + dirb * bl]
-                ob = polyline('BoltFork', bp, width * 0.6, m)
-                show_between(ob, f, f + 1)
-        self.light((p0 + p1) / 2, t0, color, energy=600 + 60 * L, dur=t1 - t0 + 0.05, radius=L * 0.2)
-        return t1
+        """Arcadian gold lightning p0 -> p1, re-striking every 2-3 frames with forks. p0/p1 may be
+        points, Actors, Objects or callables t -> point (moving ends are followed per frame)."""
+        import promo_fx_weapons as W
+        return W.lightning(self, p0, p1, t0, t1, color=color, width=width, jag=jag, branches=branches,
+                           segs=segs, glow=glow)
 
     def beam(self, p0, p1, t0, t1, color, width=0.15, strength=10):
         """Solid energy beam with a flickering width."""
-        p0, p1 = V(p0), V(p1)
-        d = p1 - p0
-        m = emit_mat('Beam', color, strength)
-        o = sphere('Beam', 1.0, m, seg=(10, 6))
-        o.rotation_mode = 'QUATERNION'
-        o.rotation_quaternion = d.to_track_quat('X', 'Z')
-        o.location = (p0 + p1) / 2
-        f0, f1 = self.T(t0), self.T(t1)
-        for f in range(int(f0), int(f1) + 1):
-            w = width * (self.rnd.uniform(0.7, 1.2) if f < f1 else 0.01)
-            o.scale = (d.length / 2, w, w)
-            o.keyframe_insert('scale', frame=f)
-        show_between(o, f0, f1 + 1)
-        self.light(p1, t0, color, energy=1500, dur=t1 - t0)
-        return t1
+        import promo_fx_weapons as W
+        return W.beam(self, p0, p1, t0, t1, color, width=width, strength=strength)
+
+    def shot(self, p0, target, kind, t, color=None, **kw):
+        """Fire from a point (ships without turrets): p0 = point, Actor, Object or
+        (actor, local_offset) riding a moving ship; target = point, Actor or Object. Kinds and
+        keywords as Actor.fire (size, speed, impact, impact_size, arc, spread, jag, branches,
+        width, flash, dur). Returns the hit time."""
+        import promo_fx_weapons as W
+        return W.shot(self, p0, target, kind, t, color=color, **kw)
 
     def soft_mat(self):
         """Shared soft smoke/dust material: colour and opacity come from each object's
@@ -1474,33 +1386,8 @@ class Promo:
 
     def impact(self, pos, t, size=1.0, color=None):
         """Smaller hit: spark burst + dirt kick + flash. color tints energy hits."""
-        pos = V(pos)
-        f0 = self.T(t)
-        m = emit_mat('Spark', color or (1.0, 0.45, 0.1), 6)
-        o = sphere('Hit', 1.0, self.soft_fire_mat(), seg=(12, 8))
-        o.color = (*(color or (1.0, 0.4, 0.08)), 1.0)
-        o.location = pos
-        o.scale = (0.05,) * 3
-        o.keyframe_insert('scale', frame=f0)
-        o.scale = (size * 0.6,) * 3
-        o.keyframe_insert('scale', frame=f0 + 2)
-        o.scale = (0.01,) * 3
-        o.keyframe_insert('scale', frame=f0 + 5)
-        show_between(o, f0, f0 + 5)
-        for i in range(6):
-            sp = sphere('Spk', 1.0, m, seg=(6, 4))
-            v = Vector((self.rnd.uniform(-1, 1), self.rnd.uniform(-1, 1), self.rnd.uniform(0.2, 1.4))).normalized() * size * 3
-            sp.scale = (0.12 * size, 0.03 * size, 0.03 * size)
-            sp.rotation_mode = 'QUATERNION'
-            sp.rotation_quaternion = v.to_track_quat('X', 'Z')
-            sp.location = pos
-            sp.keyframe_insert('location', frame=f0)
-            sp.location = pos + v * 0.25 + Vector((0, 0, -0.1))
-            sp.keyframe_insert('location', frame=f0 + 0.25 * self.fps)
-            show_between(sp, f0, f0 + 0.25 * self.fps)
-        self.light(pos + Vector((0, 0, 0.5)), t, color or (1.0, 0.6, 0.25), energy=1200 * size, dur=0.15)
-        self.puff(pos, t + 0.02, size=size * 0.8, n=2, rise=size * 0.8, life=1.0,
-                  color=tuple(min(1, c * 1.3) for c in self.palette['g1']) if hasattr(self, 'palette') else None)
+        import promo_fx_weapons as W
+        return W.impact(self, pos, t, size=size, color=color)
 
     def smoke_column(self, pos, t0, t1, size=1.0, every=0.3):
         import promo_fx
@@ -1566,26 +1453,8 @@ class Promo:
     def shield_dome(self, center, radius, t0, t1, color=None, hits=()):
         """Terran shield: translucent blue triangulated dome. hits: [(t, point)] ripple flashes.
         Shields NEVER shatter."""
-        color = color or COL['shield_blue']
-        me = bpy.data.meshes.new('Shield')
-        bm = bmesh.new()
-        bmesh.ops.create_icosphere(bm, subdivisions=2, radius=radius)
-        bm.to_mesh(me)
-        bm.free()
-        o = link(bpy.data.objects.new('Shield', me))
-        o.location = V(center)
-        m = emit_mat('ShieldM', color, 1.5, alpha=0.18)
-        me.materials.append(m)
-        wf = o.modifiers.new('Wire', 'WIREFRAME')
-        wf.thickness = 0.03
-        wf.use_replace = False
-        show_between(o, self.T(t0), self.T(t1))
-        for t, p in hits:
-            key_strength(m, self.T(t) - 1, 1.5)
-            key_strength(m, self.T(t), 8)
-            key_strength(m, self.T(t + 0.3), 1.5)
-            self.impact(p, t, size=0.8, color=color)
-        return o
+        import promo_fx_weapons as W
+        return W.shield_dome(self, center, radius, t0, t1, color=color, hits=hits)
 
     def label(self, text, t0=0.0, t1=None):
         """No on-screen words in promo clips (David: no words). Kept as a no-op on purpose."""
