@@ -82,6 +82,7 @@ def air_blast(work, frames=48, seed=5, res=1.0):
     s = _base(n, h, seed); rng = np.random.default_rng(seed)
     c = (n[0] * h / 2, n[1] * h / 2, 2.6)
     s.wind[:] = (0.8, 0, 0)
+    s.buoy = 4.0; s.weight = -0.1
 
     def boom(sim):
         sim.add_blast(c, 0.6, fuel=1.6, heat=1.0, speed=9.0, noise=0.9, soot=0.15)
@@ -191,9 +192,9 @@ def dust_burst(work, frames=40, seed=19, res=1.0):
     def boom(sim):
         m, d = sim.sphere((cx, cy, 0.0), 0.7)
         ring = m * np.clip(1 + 0.9 * sim.noise(2.0), 0, 2)
-        sim.dens += ring * 1.5
-        sim.pulse += ring * 12.0
-        sim.u[2] += ring * 2.5
+        sim.dens += ring * 1.2
+        sim.pulse += ring * 24.0
+        sim.u[2] += ring * 1.5
     run(s, work, frames, 2, events=[(0.0, boom)])
 
 
