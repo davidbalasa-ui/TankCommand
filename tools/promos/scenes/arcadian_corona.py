@@ -255,7 +255,7 @@ for t, v in [(0, 0.0), (T_UF1 - 0.35, 0.0), (T_UF1, 1.0), (2.9, 1.0), (3.04, 1.8
 
 T_RIP = [3.10, 3.17, 3.24, 3.31, 3.38, 3.45]
 ORDER = [0, 3, 2, 5, 1, 4]          # which pod fires on each shot (alternate rows/sides)
-TGT = [0, 1, 0, 1, 0, 1]            # 0 = lead Falcon, 1 = wingman
+TGT = [0, 0, 0, 1, 1, 1]            # 0 = lead Falcon, 1 = wingman
 pod_orbs = []
 for k, e in enumerate(tip_e):
     o = K.sphere('PodOrb', 1.0, M_POD, seg=(12, 8))
@@ -267,7 +267,7 @@ for k, e in enumerate(tip_e):
     g.scale = (2.0,) * 3
     tf = T_RIP[ORDER.index(k)]
     for ob in (o, g):
-        K.show_between(ob, 0, P.T(tf))
+        K.show_between(ob, P.T(T_UF1 - 0.35), P.T(tf))
     pod_orbs.append(o)
 
 # --------------------------------------------------------------------------- Falcons
@@ -303,12 +303,12 @@ def catmull(keys):
 FAL_KEYS = [
     # lead: screams over the claw, then a climbing left break
     [(0.0, (-92, -40, 10.5)), (1.0, (-52, -23, 9.5)), (2.0, (-14, -5.5, 8.4)), (2.45, (2.5, 1.0, 8.2)),
-     (2.95, (19, 6.5, 9.2)), (3.45, (31, 13, 12.0)), (3.95, (38, 23, 15.5)), (4.6, (40, 37, 19.0)),
-     (5.4, (34, 52, 22.0))],
+     (2.95, (17, 6, 9.5)), (3.4, (27, 12, 13.0)), (3.9, (33, 22, 17.0)), (4.5, (33, 36, 21.0)),
+     (5.4, (26, 50, 24.0))],
     # wingman: lower, offset to the right, breaks left and down for the deck
     [(0.0, (-96, -46, 9.5)), (1.0, (-56, -29, 8.8)), (2.0, (-18, -11, 7.8)), (2.55, (1.0, -3.6, 7.4)),
-     (3.05, (18, -1.5, 6.6)), (3.55, (29, 5, 5.2)), (4.05, (36, 13, 4.2)), (4.6, (40, 23, 3.8)),
-     (5.4, (41, 37, 4.0))],
+     (3.05, (17, -2, 6.5)), (3.5, (27, 3, 5.0)), (4.0, (33, 10, 4.0)), (4.6, (36, 20, 3.8)),
+     (5.4, (37, 34, 4.0))],
 ]
 fal_pos = [catmull(k) for k in FAL_KEYS]
 
@@ -437,7 +437,7 @@ yA = world_yaw_to(fal_pos[0](3.5), 2.9)
 yB = world_yaw_to(fal_pos[1](3.7), 3.2)
 print('YAW A', yA, 'B', yB)
 for t, v in [(0.0, 0.0), (2.62, 0.0), (2.95, yA + 6.0), (3.05, yA - 1.5), (3.15, yA), (3.28, (yA + yB) / 2),
-             (3.5, yB), (4.2, yB + 4), (6.0, yB + 4)]:
+             (3.5, yB), (4.2, yB + 4), (4.7, yB + 4), (5.6, -18.0), (6.0, -20.0)]:
     yaw.rotation_euler.z = math.radians(v)
     yaw.keyframe_insert('rotation_euler', index=2, frame=P.T(t))
 K.set_interp(yaw, 'BEZIER')
@@ -453,8 +453,8 @@ for f in range(int(P.T(2.75)), int(P.T(3.1)) + 1, 2):
 P.light(Vector((1.5, 0, 5.0)), 2.78, GOLD, energy=700, dur=0.35, radius=0.8)
 
 # --------------------------------------------------------------------------- seeker orbs
-M_ORB = mat('Orb', (1.0, 0.62, 0.18), 3.0)
-M_ORB_GLOW = mat('OrbGlow', GOLD, 1.4, alpha=0.3)
+M_ORB = mat('Orb', (1.0, 0.55, 0.1), 2.4)
+M_ORB_GLOW = mat('OrbGlow', DEEP, 1.2, alpha=0.22)
 M_TRAIL = mat('Trail', GOLD, 1.8, alpha=0.55)
 M_TRAIL_GLOW = mat('TrailGlow', DEEP, 0.9, alpha=0.14)
 HAZE = (0.95, 0.8, 0.6)
@@ -491,7 +491,7 @@ def seeker(k, t0, tgt_i):
         want = (tgt - p)
         dist = want.length
         want.normalize()
-        speed = min(62.0, 16.0 + 75.0 * age)
+        speed = min(80.0, 18.0 + 110.0 * age)
         turn = (1.6 if age < 0.18 else 3.0 + 9.0 * ss((age - 0.18) / 0.4))
         vn = v.normalized()
         ang = vn.angle(want) if vn.dot(want) < 0.99999 else 0.0
@@ -523,10 +523,10 @@ def seeker(k, t0, tgt_i):
 def draw_orb(frames, t_hit):
     f0 = int(round(P.T(frames[0][0])))
     o = K.sphere('Seeker', 1.0, M_ORB, seg=(12, 8))
-    o.scale = (0.24,) * 3
+    o.scale = (0.3,) * 3
     g = K.sphere('SeekerGlow', 1.0, M_ORB_GLOW, seg=(12, 8))
     g.parent = o
-    g.scale = (2.4,) * 3
+    g.scale = (2.0,) * 3
     for i, (t, p) in enumerate(frames):
         o.location = p
         o.keyframe_insert('location', frame=f0 + i)
@@ -545,7 +545,7 @@ def draw_orb(frames, t_hit):
         return
     # bright comet tail: a short window of the path that slides along with the orb
     n = len(pts) - 1
-    for name, width, m, tail in (('OrbTrail', 0.07, M_TRAIL, 6), ('OrbTrailGlow', 0.22, M_TRAIL_GLOW, 9)):
+    for name, width, m, tail in (('OrbTrail', 0.09, M_TRAIL, 6), ('OrbTrailGlow', 0.28, M_TRAIL_GLOW, 9)):
         tr = K.polyline(name, pts, width, m)
         cu = tr.data
         cu.bevel_factor_mapping_start = 'SPLINE'
@@ -624,7 +624,8 @@ FLAME_M = mat('WreckFlame', (1.0, 0.25, 0.03), 1.6)
 def kill(i, t, crash_t, spin):
     a = falcons[i]
     p = fal_pos[i](t)
-    quiet_explosion(p, t, 2.2, debris=14, scorch=False)
+    quiet_explosion(p, t, 3.0, debris=16, scorch=False, smoke=False)
+    P.puff(p, t + 0.2, size=2.2, n=3, rise=1.5, life=1.8, color=(0.36, 0.33, 0.31), opacity=0.35)
     gold_sparks(p, t, 1.2, n=10)
     P.light(p, t, GOLD, energy=5000, dur=0.2, radius=1.2)
     P.cam_shake(t, 0.06, dur=0.3)
@@ -671,17 +672,17 @@ def kill(i, t, crash_t, spin):
         fl.keyframe_insert('scale', frame=f)
         if f % 2 == 0:
             P.puff(ph + Vector((0, 0, 0.3)), (f - 1) / FPS, size=1.2, n=1, rise=0.6, life=1.6,
-                   color=(0.1, 0.09, 0.09), opacity=0.5)
+                   color=(0.3, 0.27, 0.26), opacity=0.4)
     K.set_interp(w, 'LINEAR')
     K.show_between(w, fA + 1, fB + 1)
     K.show_between(fl, fA + 1, fB + 1)
     c = Vector((ph.x, ph.y, end.z))
-    quiet_explosion(c + Vector((0, 0, 0.3)), crash_t, 2.6, debris=10, scorch=True)
+    quiet_explosion(c + Vector((0, 0, 0.3)), crash_t, 2.6, debris=10, scorch=True, smoke=False)
     P.fire_patch(c + Vector((0, 0, 0.3)), crash_t + 0.05, 6.0, size=1.0)
     t_ = crash_t + 0.15
     while t_ < 6.0:
-        P.puff(c + Vector((0, 0, 0.8)), t_, size=1.6, n=1, rise=4.0, life=2.0, color=(0.16, 0.14, 0.14), opacity=0.45)
-        t_ += 0.2
+        P.puff(c + Vector((0, 0, 0.8)), t_, size=1.4, n=1, rise=4.5, life=2.0, color=(0.32, 0.29, 0.28), opacity=0.35)
+        t_ += 0.18
     return c
 
 
@@ -697,13 +698,13 @@ P.camera([
     (0.0, (8.0, -13.0, 0.8), cor_pos(0.0) + Vector((0, 0, 0.4)), 30),
     (0.7, (6.5, -12.0, 0.9), cor_pos(0.7) + Vector((0, 0, 0.6)), 30),
     (1.5, (3.5, -11.0, 1.0), (0, 0, 1.3), 30),
-    (2.15, (-1.5, -10.0, 0.9), (0.5, 0, 3.2), 28),
-    (2.6, (-5.0, -9.0, 1.1), (2.0, 0.5, 4.6), 26),
-    (3.05, (-9.0, -6.5, 2.4), (12.0, 4.0, 6.5), 28),
-    (3.6, (-10.5, -5.0, 3.0), (20.0, 8.0, 9.0), 28),
-    (4.3, (-10.0, -6.0, 2.8), (24.0, 10.0, 8.0), 28),
-    (5.1, (-6.5, -10.0, 1.3), (8.0, 2.0, 4.5), 26),
-    (6.0, (-4.0, -11.5, 0.8), (5.0, 2.5, 3.6), 24),
+    (2.1, (-1.5, -9.5, 0.8), (0.5, 0, 3.4), 26),
+    (2.55, (-3.8, -10.5, 1.0), (2.0, 1.0, 5.4), 21),
+    (3.15, (-4.0, -15.0, 1.5), (14.0, 8.0, 7.5), 22),
+    (3.8, (-4.5, -16.0, 1.7), (19.0, 12.0, 9.5), 22),
+    (4.4, (-4.5, -15.5, 1.5), (18.0, 10.0, 6.0), 22),
+    (5.1, (-4.0, -12.0, 1.0), (10.0, 5.0, 4.2), 24),
+    (6.0, (-3.0, -10.5, 0.7), (8.0, 5.5, 4.4), 23),
 ], shake=0.02)
 P.cam_shake(T_LAND, 0.2, 0.4)
 P.cam_shake(2.5, 0.08, 0.35)   # Falcons rip overhead

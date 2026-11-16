@@ -420,6 +420,6 @@ for mat in bpy.data.materials:
     if mat.name.startswith('Core'):
         em = mat.node_tree.nodes[mat['emit_node']]
         em.inputs['Color'].default_value = (1.0, 0.35, 0.05, 1)
-        em.inputs['Strength'].default_value = 4.0
+        em.inputs['Strength'].default_value = 2.4
 
 P.render()
