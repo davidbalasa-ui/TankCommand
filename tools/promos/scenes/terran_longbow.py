@@ -179,12 +179,20 @@ keys = [
     (1.15, (5.9, -6.6, 0.7), (1.5, 0.0, 3.2), 29),
     (T_C1 - 1 / FPS, (5.6, -6.4, 0.7), S1, 28),
 ]
-# ride: beside and a little behind the middle shell, then brake and settle on the outpost
+# ride: just behind and beside the middle shell, looking past it at the outpost on a long
+# lens so the outpost fills about a third of the frame while the salvo flies in
+OUTPOST = Vector((TX, TY + 0.5, 2.0))
+OUT_W = 14.0                     # rough visible width of the outpost cluster (m)
 for t in (T_C1, 2.0, 2.35):
     p = shell_pos(1, t)
-    keys.append((t, (p.x - 9.0, p.y - 11.0, p.z + 1.5), shell_pos(1, t + 0.35), 28))
+    dvec = Vector((OUTPOST.x - p.x, OUTPOST.y - p.y, 0)).normalized()
+    side = Vector((dvec.y, -dvec.x, 0))      # to the right of travel (toward -y)
+    c = p - dvec * 10.0 + side * 3.5 + Vector((0, 0, 1.2))
+    dist = (OUTPOST - c).length
+    lens = max(32.0, min(110.0, 36.0 * dist / (3.0 * OUT_W)))
+    keys.append((t, tuple(c), OUTPOST - Vector((0, 0, 1.3)), lens))
 keys += [
-    (2.75, (76.0, -18.0, 9.0), (TX - 1.5, TY + 0.5, 2.0), 32),
+    (2.75, (77.0, -16.0, 8.0), (TX - 1.0, TY + 0.5, 2.0), 32),
     (3.6, (80.0, -17.0, 7.6), (TX, TY + 0.5, 2.0), 34),
     (T_C2 - 1 / FPS, (82.0, -16.5, 6.8), (TX + 1.0, TY + 1.0, 2.0), 35),
     (T_C2, (-11.5, -6.8, 1.5), (30.0, 5.0, 2.6), 34),
