@@ -27,7 +27,7 @@ ORANGE = COL['terran_orange']
 SAND = (0.5, 0.36, 0.26)
 
 DEP = (0.0, -6.6)          # the big metal outcrop, south of the station (hopper faces -y)
-P.env('dusk', sun=(58, 0, -100), sun_energy=3.8, props=34,
+P.env('dusk', sun=(58, 0, -100), sun_energy=3.8, props=22,
       clear=[(0, 0, 9), (-9, 0.5, 6), (-16, 1.5, 5), (-6, -6, 8), (-9, -3, 5), DEP + (5,)])
 P.flatten(0, -2, 13)
 P.flatten(-14, 1, 8)
@@ -53,7 +53,7 @@ gem_mat = gem_mat or K.pbr_mat('GemFallback', (0.35, 0.55, 1.0), rough=0.15)
 T_STOP = 1.75
 T_UF0, T_UF1 = 1.85, 3.0
 st = P.load('terran_metal_station', at=(0, 0), heading=0, label='station')
-route = [(0.0, (-17.0, 1.6)), (0.6, (-11.0, 1.3)), (1.2, (-5.0, 0.5)), (1.55, (-1.6, 0.08)),
+route = [(0.0, (-14.5, 1.5)), (0.6, (-9.6, 1.2)), (1.2, (-5.0, 0.5)), (1.55, (-1.6, 0.08)),
          (T_STOP, (0.0, 0.0))]
 st.path([(t, (x, y, 0.0)) for t, (x, y) in route])
 # hold the final heading exactly 0 once stopped
@@ -131,7 +131,7 @@ def arc_pts(p0, p1, lift, n=14):
     return [p0.lerp(p1, i / n) + Vector((0, 0, 4 * lift * (i / n) * (1 - i / n))) for i in range(n + 1)]
 
 
-ARC_LIFT = 1.1
+ARC_LIFT = 0.75
 beam_pts = arc_pts(dep_face, HOPPER_MOUTH, ARC_LIFT)
 for mat_, rad_ in ((M_BEAM, 0.1), (M_BEAMC, 0.025)):
     b = K.polyline('Intake', beam_pts, rad_, mat_)
@@ -154,7 +154,7 @@ M_SHARD = K.pbr_mat('ShardM', (0.35, 0.55, 1.0), rough=0.2, emit=NEON, emit_stre
 shard_ts = [3.3 + 0.27 * k for k in range(10)]
 for k, t0 in enumerate(shard_ts):
     o = K.ico('Shard', 1.0, M_SHARD, sub=0)
-    s = R.uniform(0.11, 0.17)
+    s = R.uniform(0.15, 0.21)
     o.scale = (s, s, s * 2.4)
     off = Vector((R.uniform(-0.5, 0.5), R.uniform(-0.2, 0.2), R.uniform(-0.4, 0.3)))
     p0 = dep_face + off
@@ -203,9 +203,9 @@ M_SPARK = K.emit_mat('IngotSpark', (1.0, 0.55, 0.15), 3.0)
 
 
 def ingot(t0, slot):
-    mat = K.pbr_mat('Ingot', (0.42, 0.45, 0.5), rough=0.3, metal=0.9, emit=(1.0, 0.3, 0.03), emit_strength=0)
+    mat = K.pbr_mat('Ingot', (0.24, 0.27, 0.31), rough=0.35, metal=0.7, emit=(1.0, 0.22, 0.02), emit_strength=0)
     b = mat.node_tree.nodes['Principled BSDF']
-    for t_, v in [(t0 - 0.05, 0.0), (t0, 1.8), (t0 + 0.6, 1.2), (t0 + 1.6, 0.15)]:
+    for t_, v in [(t0 - 0.05, 0.0), (t0, 1.2), (t0 + 0.6, 0.8), (t0 + 1.6, 0.1)]:
         b.inputs['Emission Strength'].default_value = v
         b.inputs['Emission Strength'].keyframe_insert('default_value', frame=P.T(t_))
     o = K.cube('Ingot', 1.0, mat)
@@ -232,8 +232,6 @@ def ingot(t0, slot):
             sp.keyframe_insert('location', frame=P.T(ts + tt))
         K.show_between(sp, P.T(ts), P.T(ts + life))
     P.light(OUT + Vector((-0.4, 0, 0.3)), t0, ORANGE, energy=300, dur=0.3, radius=0.4)
-    P.puff(OUT + Vector((-0.3, 0, 0.3)), t0 + 0.1, size=0.3, n=1, rise=0.8, life=0.9,
-           color=(0.4, 0.38, 0.36), opacity=0.18)
 
 
 ingot(4.1, Vector((0.0, -0.27, 0.0)))
@@ -248,7 +246,7 @@ P.camera([
     (2.9, (-6.0, -6.0, 2.4), (0.0, -0.6, 1.3), 30),
     (3.9, (-7.5, -8.0, 2.6), (-0.3, -3.2, 1.3), 26),
     (4.7, (-5.2, -4.2, 1.3), (-1.8, -1.4, 0.7), 34),
-    (6.0, (-5.8, -7.4, 0.8), (-0.4, -1.8, 1.6), 24),
+    (6.0, (-6.6, -5.2, 0.9), (-0.4, -2.6, 1.35), 24),
 ], shake=0.015)
 P.cam_shake(1.8, 0.06, 0.3)
 

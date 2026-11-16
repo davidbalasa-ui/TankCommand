@@ -194,7 +194,7 @@ def mat(key, col, strength, alpha=None):
 
 
 HULL = K.pbr_mat('BayDoor', (0.05, 0.052, 0.058), rough=0.45, metal=0.6)
-BAY_IN = K.pbr_mat('BayInside', (0.012, 0.012, 0.014), rough=0.8)
+BAY_IN = K.emit_mat('BayInside', COL['terran_orange'], 0.9)
 BOMB_M = K.pbr_mat('BombBody', (0.16, 0.165, 0.17), rough=0.4, metal=0.7)
 BAND = mat('BombBand', COL['terran_orange'], 2.0)
 TIP = mat('BombTip', NEON, 2.0)
@@ -391,13 +391,13 @@ def lumen_shot(lum, t, aim_t, reach=0.55, dur=0.2):
         for _ in range(3):
             dv = ((p1 - p0).normalized() + Vector((R.uniform(-.9, .9), R.uniform(-.9, .9), R.uniform(-.3, .4)))).normalized()
             bolt_objs(jag(p1, p1 + dv * R.uniform(1.2, 2.5), 4, 0.5), f, 0.035, glow=False, core=False)
-    P.light(p0 + Vector((0, 0, 0.5)), t, GOLD, energy=1200, dur=dur, radius=0.5)
+    P.light(p0 + Vector((0, 0, 1.2)), t, GOLD, energy=350, dur=dur, radius=0.5)
     P.light(p1, t, GOLD, energy=900, dur=dur, radius=1.0)
     # turret glow flash
     o = K.sphere('LumFlash', 1.0, P.soft_fire_mat(), seg=(10, 8))
-    o.color = (*GOLD, 0.9)
+    o.color = (*GOLD, 0.55)
     o.location = p0
-    for df_, s in ((0, 0.05), (1, 0.6), (4, 0.02)):
+    for df_, s in ((0, 0.05), (1, 0.3), (4, 0.02)):
         o.scale = (s, s, s)
         o.keyframe_insert('scale', frame=f0 + df_)
     K.show_between(o, f0, f0 + 4)
@@ -433,6 +433,28 @@ def quiet_destroy(actor, t, size, debris=10):
             o.scale = o.scale * 0.6
         elif o.name.split('.')[0] == 'Scorch':
             o.scale = (o.scale.x * 0.55, o.scale.y * 0.55, o.scale.z)
+        elif o.name.split('.')[0] == 'Flame':
+            bpy.data.objects.remove(o)      # kit wreck fire glows like a bulb: own flames below
+
+
+def flames(pos, t0, size, n=8):
+    """Low-opacity orange-red flames licking up off the top of a wreck."""
+    fm = P.soft_fire_mat()
+    for i in range(n):
+        o = K.sphere('WFlame', 1.0, fm, seg=(12, 8))
+        base = Vector(pos) + Vector((R.uniform(-1, 1), R.uniform(-1, 1), 0)) * size * 0.8
+        f = P.T(t0 + R.uniform(0, 0.15))
+        f_s = f
+        while f < NF + 2:
+            s_ = size * R.uniform(0.14, 0.3)
+            o.location = base + Vector((R.uniform(-.1, .1), R.uniform(-.1, .1), s_ * 1.4))
+            o.scale = (s_, s_, s_ * R.uniform(1.6, 2.4))
+            o.color = (1.0, R.uniform(0.14, 0.28), 0.02, R.uniform(0.3, 0.55))
+            o.keyframe_insert('scale', frame=f)
+            o.keyframe_insert('location', frame=f)
+            o.keyframe_insert('color', frame=f)
+            f += 2
+        K.show_between(o, f_s, NF + 2)
 
 
 SAND = (0.42, 0.3, 0.3)
@@ -485,21 +507,23 @@ for i, (t_hit, p_hit) in enumerate(IMPACTS):
     # secondary blast a beat later, off to one side
     off = Vector((R.uniform(-1.5, 1.5), R.choice((-1, 1)) * R.uniform(1.5, 2.5), 0.4))
     quiet_explosion(gp + off, t_hit + 0.32, 2.4, debris=6, smoke=True)
-    P.fire_patch(gp + Vector((0, 0, 0.6)), t_hit + 0.15, 6.0, size=0.7)
+    flames(gp + Vector((0, 0, TARGET_H[i] * 0.55)), t_hit + 0.15, 1.3)
     P.cam_shake(t_hit, 0.28, dur=0.45)
 
 # units caught by the blasts
 quiet_destroy(sifter, IMPACTS[1][0] + 0.1, 2.2, debris=8)
 quiet_destroy(lumen_base, IMPACTS[2][0] + 0.12, 2.0, debris=8)
+flames(sifter.pos_at(0) + Vector((0, 0, 0.8)), IMPACTS[1][0] + 0.2, 0.7, n=3)
+flames(lumen_base.pos_at(0) + Vector((0, 0, 0.9)), IMPACTS[2][0] + 0.2, 0.7, n=3)
 
 # ------------------------------------------------------------------------------- camera
 T_C1 = 1.45
 T_C2 = 2.85
 keys = []
 # shot A: on the ground among the lumens, looking up; the bomber passes over, bay opening
-CA = Vector((-24.0, -10.0, 0.8))
+CA = Vector((-22.0, -11.5, 1.3))
 keys += [
-    (0.0, tuple(CA), (-40.0, -2.5, 7.5), 20),
+    (0.0, tuple(CA), (-40.0, -2.5, 5.6), 20),
     (0.6, tuple(CA + Vector((0.5, -0.2, 0.1))), plane_pos(0.6) * 0.6 + Vector((-34.0, -3.0, 2.0)) * 0.4, 20),
     (1.05, tuple(CA + Vector((1.0, -0.4, 0.2))), plane_pos(1.05) * 0.85 + Vector((-30.0, -3.0, 2.0)) * 0.15, 22),
     (T_C1 - 1 / FPS, tuple(CA + Vector((1.3, -0.6, 0.3))), plane_pos(T_C1) + Vector((-0.5, 0, -1.0)), 24),
