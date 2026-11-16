@@ -372,7 +372,7 @@ for t, e in [(0, 0), (T_UF0 + 0.8, 0), (T_UF1, 160), (T_PULSE - 0.05, 700), (T_P
     eye_light.data.keyframe_insert('energy', frame=P.T(t))
 
 # floating shards: loose stones that rise out of the dust and orbit the horns
-M_SHARD = K.pbr_mat('ShardStone', (0.55, 0.5, 0.46), rough=0.45, metal=0.3)
+M_SHARD = K.pbr_mat('ShardStone', (0.4, 0.36, 0.33), rough=0.45, metal=0.3)
 M_SHARD_RIM = mat('ShardRim', GOLD, 1.6)
 shards = []
 for i in range(5):
@@ -588,10 +588,10 @@ def curtain(t0, spd, t_end, height, alpha):
         u = (f - t0) / (t_end - t0)
         c.scale = (r, r, height * (1 - 0.4 * u))
         c.location = (0, 0, -0.1)
-        c.color = (1, 1, 1, alpha * (1 - u) ** 1.3)
+        c.color = (1, 1, 1, alpha * (1 - u) ** 1.3 * min(1.0, (f - t0) / 0.15))
         c.keyframe_insert('scale', frame=P.T(f))
         c.keyframe_insert('color', frame=P.T(f))
-        f += 0.1
+        f += 0.05
     c.keyframe_insert('location', frame=P.T(t0))
     K.set_interp(c, 'LINEAR')
     K.show_between(c, P.T(t0), P.T(t_end))
@@ -602,7 +602,7 @@ curtain(T_PULSE, SPD1, T_PULSE + 1.6, 2.2, 0.55)
 curtain(T_PULSE2, SPD2, 6.1, 1.9, 0.38)
 
 # ring of light bursting off the eye at the pulse
-M_HALO = mat('Halo', PALE, 2.2, alpha=0.6)
+M_HALO = mat('Halo', PALE, 1.6, alpha=0.5)
 for tp_ in (T_PULSE, T_PULSE2):
     pe = ws_point(eye_anchor, tp_)
     bpy.ops.mesh.primitive_torus_add(major_radius=1.0, minor_radius=0.025, major_segments=64, minor_segments=6,
@@ -706,7 +706,7 @@ T_HITS = {0: 4.45, 2: 4.62, 1: 4.8}
 for i, th in T_HITS.items():
     a = units[i]
     tgt = a.pos_at(th) + Vector((0, 0, 0.7))
-    src = Vector((-60.0 + 6 * i, -38.0, 26.0))
+    src = Vector((-34.0 + 5 * i, -20.0, 17.0))
     dur = 0.5
     M_SH = mat('Strike', GOLD, 2.6)
     sh = K.sphere('StrikeOrb', 1.0, M_SH, seg=(10, 8))
@@ -720,7 +720,7 @@ for i, th in T_HITS.items():
         p2 = src.lerp(tgt, u2) + Vector((0, 0, 9.0 * u2 * (1 - u2)))
         sh.location = p
         sh.rotation_quaternion = (p2 - p).to_track_quat('X', 'Z') if (p2 - p).length > 1e-5 else Quaternion()
-        sh.scale = (1.1, 0.16, 0.16)
+        sh.scale = (1.6, 0.22, 0.22)
         sh.keyframe_insert('location', frame=P.T(th - dur + dur * u))
         sh.keyframe_insert('rotation_quaternion', frame=P.T(th - dur + dur * u))
     K.set_interp(sh, 'LINEAR')
@@ -757,7 +757,7 @@ P.camera([
     (0.0, (-21.0, -17.0, 1.1), ora.pos_at(0.0) + Vector((0, 0, 0.9)), 30),
     (0.7, (-13.0, -12.0, 1.2), ora.pos_at(0.7) + Vector((0, 0, 0.9)), 30),
     (1.4, (-4.6, -6.4, 1.0), (0.0, 0.0, 1.0), 30),
-    (2.2, (-3.6, -8.6, 0.7), (0.0, 0.0, 3.2), 24),
+    (2.2, (-4.4, -10.6, 0.9), (0.0, 0.0, 3.5), 24),
     (2.9, (1.2, -7.4, 0.8), (0.0, 0.0, 3.0), 28),
     (3.25, (1.6, -6.2, 1.4), (0.2, 0.0, 3.0), 29),
     (3.75, (-4.5, -8.0, 5.0), (10.0, 5.0, 0.8), 24),

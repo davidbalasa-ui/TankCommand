@@ -206,10 +206,10 @@ if mat and mat.node_tree:
 
 # ------------------------------------------------------------------------------ hangar interior
 il = K.link(bpy.data.objects.new('HangarLight', bpy.data.lights.new('HangarLight', 'POINT')))
-il.location = (LANE_X, MOUTH_Y - 1.2, 1.3)
+il.location = (LANE_X, MOUTH_Y - 1.9, 1.5)
 il.data.color = (0.55, 0.78, 1.0)
 il.data.shadow_soft_size = 0.6
-for t, e in [(0, 0), (T_DOOR0, 0), (T_DOOR0 + 0.25, 260), (6, 220)]:
+for t, e in [(0, 0), (T_DOOR0, 0), (T_DOOR0 + 0.25, 140), (6, 120)]:
     il.data.energy = e
     il.data.keyframe_insert('energy', frame=P.T(t))
 # neon lintel across the hangar mouth (lit once the door is down)
@@ -224,8 +224,8 @@ K.key_strength(M_LINTEL, P.T(T_DOOR0 + 0.2), 3.0)
 FS = 2.2
 KF = FS / 5.175
 M_ENG = K.emit_mat('FalconEngine', NEON, 2.2)
-M_ENG_HOT = K.emit_mat('FalconEngineHot', (0.3, 0.7, 1.0), 2.2)
-M_ENG_GLOW = K.emit_mat('FalconEngineGlow', NEON, 1.2, alpha=0.15)
+M_ENG_HOT = K.emit_mat('FalconEngineHot', (0.25, 0.62, 1.0), 2.0)
+M_ENG_GLOW = K.emit_mat('FalconEngineGlow', NEON, 0.9, alpha=0.12)
 M_VAPOR = K.emit_mat('Vapor', (0.9, 0.93, 1.0), 0.9, alpha=0.11)
 M_TRAIL = K.emit_mat('Trail', (0.85, 0.9, 1.0), 0.8, alpha=0.08)
 ENG = Vector((-2.62 * KF, 0.0, 0.52 * KF))
@@ -483,8 +483,8 @@ for f in range(int(P.T(4.92)), NF + 2):
 #   the sky, the next one nosing out of the hangar.
 cpos_c = Vector((LANE_X + 0.7, 7.3, 1.25))
 keys = [
-    (0.0, (-15.0, -7.5, 1.1), (-21.0, -3.0, 0.9), 26),
-    (0.5, (-12.0, -7.8, 1.3), (-13.5, -1.8, 1.0), 26),
+    (0.0, (-16.5, -7.2, 1.0), (-21.5, -3.0, 0.9), 32),
+    (0.5, (-12.5, -7.6, 1.3), (-13.5, -1.8, 1.0), 28),
     (1.0, (-8.5, -8.6, 1.9), (-4.5, -0.4, 1.0), 26),
     (1.5, (-7.5, -8.4, 2.8), (0.0, 0.0, 1.0), 26),
     (2.2, (-10.0, -1.8, 3.6), (-0.6, -0.8, 1.1), 26),
@@ -508,7 +508,7 @@ for i in range(7):
     u = i / 6
     t = T_CUT + (6.0 - T_CUT) * u
     look = fpos1(t).lerp(HOME, 0.35 + 0.15 * u)
-    keys.append((t, tuple(camD0.lerp(camD1, ss(u))), tuple(look), 24))
+    keys.append((t, tuple(camD0.lerp(camD1, ss(u))), tuple(look), 24 + 4 * ss(u)))
 P.camera(keys, shake=0.015, cuts=[T_CUT])
 P.cam_shake(T_STOP, 0.1, dur=0.35)
 P.cam_shake(T_LAUNCH + 0.05, 0.05, dur=0.3)
