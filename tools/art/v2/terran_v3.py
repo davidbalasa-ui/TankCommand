@@ -167,7 +167,7 @@ def rail_lance(x0, x1, y, z, r=0.12, group=None, flash_group=None):
         K.flash(x1 + 0.5, y, z, r, flash_group)
 
 
-def arrow_turret(x0, x1, w, tz, h, zone='armor'):
+def arrow_turret(x0, x1, w, tz, h, zone='armor', bs=1.0):
     """Low arrowhead turret: wide faceted shoulders narrowing to a needle nose, twin swept sensor blades."""
     L = x1 - x0
     hull([
@@ -189,8 +189,8 @@ def arrow_turret(x0, x1, w, tz, h, zone='armor'):
         neon((x0 + L * 0.3, s * w * 1.07, tz + h * 0.4), (L * 0.2, 0.012, 0.018))
         # Swept sensor blade leaning out from each shoulder.
         mb = F.mark()   # its own part (BladeL / BladeR): the blades sweep slowly while the unit scans
-        prism([(x0 + 0.1, tz + h * 0.7), (x0 + 0.95, tz + h * 0.7), (x0 + 0.3, tz + h + 0.5), (x0 - 0.7, tz + h + 0.95)], -0.025, 0.025, 'plate', bevel=0.01)
-        box((x0 + 0.1, 0.03, tz + h + 0.42), (0.22, 0.006, 0.014), 'hot')
+        prism([(x0 + 0.1 * bs, tz + h * 0.7), (x0 + 0.95 * bs, tz + h * 0.7), (x0 + 0.3 * bs, tz + h * 0.7 + 0.71 * bs), (x0 - 0.7 * bs, tz + h * 0.7 + 1.16 * bs)], -0.025, 0.025, 'plate', bevel=0.01)
+        box((x0 + 0.1 * bs, 0.03, tz + h * 0.7 + 0.63 * bs), (0.22 * bs, 0.006, 0.014), 'hot')
         F.rot_all(mb, 'X', -24, about=(0, 0, tz + h * 0.7))
         F.move_all(mb, (0, w * 0.72, 0))
         if s < 0:
@@ -201,20 +201,20 @@ def arrow_turret(x0, x1, w, tz, h, zone='armor'):
     for s in (1, -1):   # layered cheek armour, louvres and bolts
         m = F.mark()
         prism([(x0 + 0.5, tz + 0.12), (x0 + L * 0.62, tz + 0.12), (x0 + L * 0.5, tz + h * 0.5), (x0 + 0.3, tz + h * 0.5)], 0, 0.05, 'plate', bevel=0.02)
-        for k in range(4):
+        for k in range(max(0, min(5, int((L * 0.62 - 0.6) / 0.3)))):
             px = x0 + 0.7 + k * 0.3
             prism([(px, tz + 0.18), (px + 0.14, tz + 0.18), (px + 0.04, tz + h * 0.42), (px - 0.1, tz + h * 0.42)], 0.05, 0.062, 'black')
         F.rot_all(m, 'X', -8, about=(0, 0, tz + 0.12))
         F.move_all(m, (0, w * 1.03, 0))
         if s < 0:
             F.mirror_all(m)
-        bolts([(x0 + 0.6 + k * 0.3, s * w * 0.42, tz + h) for k in range(4)], 0.026)
+        bolts([(x0 + 0.6 + k * 0.3, s * w * 0.42, tz + h) for k in range(max(1, min(5, int((L * 0.6 - 0.5) / 0.3))))], 0.026)
         box((x0 + 0.25, s * w * 0.3, tz + h * 0.93), (0.16, w * 0.14, 0.02), 'vent')
 
 
 def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, prefix='Barrel'):
-    """Telescoping rail cannon along +X from x0 to x1: n nested box sleeves (groups Barrel1..n, widest first)
-    that slam into each other when it fires, a jaw emitter at the muzzle and a recoil piston out the back.
+    """Telescoping rail cannon along +X from x0 to x1: n nested round sleeves (groups Barrel1..n, widest first)
+    that slam into each other when it fires, a clawed round emitter at the muzzle and a recoil piston out the back.
     Returns the travel of one sleeve relative to the next."""
     seg = (x1 - x0) / n
     step = seg * 0.8
@@ -222,31 +222,95 @@ def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, 
         m = F.mark()
         rr = r * (1 - 0.17 * k)
         a, b = x0 + seg * k - (0.35 if k else 0.0), x0 + seg * (k + 1)
-        box(((a + b) / 2, y, z), ((b - a) / 2, rr, rr * 0.82), 'armor', bevel=0.035)
-        box(((a + b) / 2, y, z), ((b - a) / 2 - 0.2, rr + 0.012, rr * 0.36), 'coilhot')           # side energy windows
-        box(((a + b) / 2, y, z + rr * 0.84), ((b - a) / 2 - 0.12, rr * 0.3, 0.03), 'dark')    # top rail
-        box(((a + b) / 2, y, z - rr * 0.84), ((b - a) / 2 - 0.12, rr * 0.3, 0.03), 'dark')
-        box((b - 0.09, y, z), (0.09, rr + 0.07, rr * 0.82 + 0.07), 'plate', bevel=0.03)       # front collar
-        nr = max(2, int((b - a) / 0.45))
-        for q in range(nr):   # clamp ribs over the energy window
-            qx = a + 0.3 + (b - a - 0.6) * q / (nr - 1)
-            box((qx, y, z), (0.025, rr + 0.03, rr * 0.5), 'black')
-        box((b - 0.2, y, z), (0.035, rr + 0.075, rr * 0.82 + 0.075), 'neon')
-        box((b - 0.2, y, z), (0.01, rr + 0.08, rr * 0.82 + 0.08), 'hot')
+        # Round sleeve: a glowing accelerator core wrapped in armoured rings, with the core showing in the gaps.
+        cyl((a, y, z), (b, y, z), rr * 0.86, 14, 'coilhot')
+        ring = max(0.22, min(0.5, rr * 1.3))
+        gap = ring * 0.3
+        cnt = max(2, int((b - a - 0.3) / (ring + gap)))
+        pitch = (b - a - 0.3) / cnt
+        for q in range(cnt):
+            qa = a + 0.06 + q * pitch
+            tube((qa, y, z), (qa + pitch - gap, y, z), [(0, rr * 0.9), (0.12, rr), (0.88, rr), (1, rr * 0.9)], 14, 'armor' if q % 2 else 'plate', sharp=30)
+        for ang in (45, 135, 225, 315):   # four tie rails along the sleeve
+            t = box(((a + b) / 2, y, z + rr * 1.0), ((b - a) / 2 - 0.1, rr * 0.13, rr * 0.07), 'black')
+            F.rot(t, 'X', ang, about=(0, y, z))
+        # Front collar with a fierce energy ring.
+        tube((b - 0.2, y, z), (b, y, z), [(0, rr * 1.05), (0.2, rr * 1.2), (0.8, rr * 1.2), (1, rr * 1.05)], 14, 'plate', sharp=30)
+        cyl((b - 0.27, y, z), (b - 0.2, y, z), rr * 1.13, 14, 'neon')
+        cyl((b - 0.245, y, z), (b - 0.225, y, z), rr * 1.16, 14, 'hot')
         if k == 0 and piston:   # recoil piston, hidden in the housing until the gun fires
-            cyl((x0 - 1.75, y, z), (x0 + 0.1, y, z), r * 0.5, 8, 'steel')
-            cyl((x0 - 1.8, y, z), (x0 - 1.75, y, z), r * 0.56, 8, 'heat')
+            cyl((x0 - 1.75, y, z), (x0 + 0.1, y, z), r * 0.5, 10, 'steel')
+            cyl((x0 - 1.8, y, z), (x0 - 1.75, y, z), r * 0.56, 10, 'heat')
             for q in range(3):
-                cyl((x0 - 1.5 + q * 0.4, y, z), (x0 - 1.44 + q * 0.4, y, z), r * 0.53, 8, 'hot')
-        if k == n - 1:   # jaw emitter: upper and lower fangs round a bright core
-            for sg in (1, -1):
-                pf = [(b - rr * 1.2, z + sg * rr * 0.5), (b + rr * 3.2, z + sg * rr * 0.42), (b + rr * 1.3, z + sg * rr * 1.6), (b - rr * 1.2, z + sg * rr * 1.75)]
-                prism(pf if sg > 0 else pf[::-1], y - rr * 0.85, y + rr * 0.85, 'armor', bevel=0.03)
-                box((b + rr * 0.6, y, z + sg * rr * 0.44), (rr * 1.3, rr * 0.5, 0.015), 'hot')
-            for sy in (1, -1):
-                prism([(b - rr * 1.1, z - rr * 0.6), (b + rr * 0.6, z - rr * 0.25), (b + rr * 0.6, z + rr * 0.25), (b - rr * 1.1, z + rr * 0.6)],
-                      y + min(sy * rr * 0.85, sy * (rr * 0.85 + 0.06)), y + max(sy * rr * 0.85, sy * (rr * 0.85 + 0.06)), 'plate', bevel=0.015)
-            cyl((b - 0.1, y, z), (b + rr * 0.8, y, z), rr * 0.3, 8, 'hot')
+                cyl((x0 - 1.5 + q * 0.4, y, z), (x0 - 1.44 + q * 0.4, y, z), r * 0.53, 10, 'hot')
+        if k == n - 1:   # round emitter crown: flared muzzle ring, bright bore, three raked claws
+            tube((b, y, z), (b + rr * 2.2, y, z), [(0, rr * 1.0), (0.15, rr * 1.45), (0.75, rr * 1.45), (1, rr * 1.15)], 14, 'armor', sharp=30)
+            cyl((b + rr * 2.2, y, z), (b + rr * 2.24, y, z), rr * 0.95, 14, 'black')
+            cyl((b + rr * 2.2, y, z), (b + rr * 2.27, y, z), rr * 0.62, 12, 'hot')
+            cyl((b + rr * 0.9, y, z), (b + rr * 1.1, y, z), rr * 1.5, 14, 'neon')
+            for ang in (90, 210, 330):
+                c = prism([(b + rr * 0.3, z + rr * 1.35), (b + rr * 2.3, z + rr * 1.3), (b + rr * 4.2, z + rr * 0.95), (b + rr * 2.2, z + rr * 1.85), (b + rr * 0.3, z + rr * 1.95)],
+                          y - rr * 0.22, y + rr * 0.22, 'plate', bevel=0.012)
+                F.rot(c, 'X', ang - 90, about=(0, y, z))
         F.regroup(m, f'{prefix}{k + 1}')
     K.flash(x1 + r * 2.6, y, z, r * 0.6, flash_group)
     return step
+
+
+def blade_pivots(x0, w, tz, h, parent='Turret'):
+    """Pivot entries for the two sensor blades of an arrow_turret."""
+    return [('Blade' + sd, (x0 + 0.5, sy * w * 0.72, tz + h * 0.7), f'Blade{sd}Pivot', parent) for sd, sy in (('L', 1), ('R', -1))]
+
+
+def cannon_pivots(p, sides=('',), n=4, parent='Turret'):
+    """Pivot entries for tele_cannon sleeves Barrel{side}{1..n} and the flash riding on the last sleeve."""
+    out = []
+    for sd in sides:
+        out += [(f'Barrel{sd}{k}', p, f'Barrel{sd}{k}Pivot', parent) for k in range(1, n + 1)]
+        out.append(('Flash' + sd, p, f'Flash{sd}Pivot', f'Barrel{sd}{n}'))
+    return out
+
+
+def eye(c, pitch=0.0, yaw=0.0, L=0.46, w=0.12):
+    """Slanted glowing sensor eye lying on a top surface (no crew, no windows)."""
+    m = F.mark()
+    box((0, 0, 0), (L, w, 0.012), 'black')
+    box((0.02, 0, 0.008), (L * 0.87, w * 0.42, 0.012), 'neon')
+    box((0.05, 0, 0.012), (L * 0.74, w * 0.15, 0.012), 'hot')
+    F.rot_all(m, 'Y', pitch)
+    F.rot_all(m, 'Z', yaw)
+    F.move_all(m, c)
+
+
+def reactor(x, z, hw, n=6, L=1.1):
+    """Cooling blades over a glowing core, at the rear of a deck (x = rear edge, z = deck height)."""
+    box((x + L * 0.5, 0, z + 0.07), (L * 0.46, hw * 0.44, 0.07), 'dark')
+    box((x + L * 0.5, 0, z + 0.1), (L * 0.42, hw * 0.4, 0.05), 'coilhot')
+    for k in range(n):
+        fy = (k - (n - 1) / 2) * hw * 0.9 / n
+        prism([(x - 0.05, z), (x + L, z), (x + L * 0.75, z + 0.25), (x - 0.3, z + 0.31)], fy - 0.022, fy + 0.022, 'plate', bevel=0.008)
+
+
+def fan_pod(x, y, s, r, name, z0=0.4):
+    """Ducted lift fan (rotor in group `name`): faceted shroud, neon lip, bright downwash ring."""
+    tube((x, y, z0), (x, y, z0 + 0.64), [(0, r * 0.92), (0.12, r * 1.1), (0.88, r * 1.1), (1, r), (1, r * 0.86), (0.3, r * 0.84), (0.28, r * 0.15)], 12, 'armor', sharp=20, bevel=0.015)
+    tube((x, y, z0 + 0.52), (x, y, z0 + 0.56), [(0, r * 0.87), (1, r * 0.87), (1, r * 0.8), (0, r * 0.8)], 16, 'neon')
+    tube((x, y, z0 + 0.535), (x, y, z0 + 0.565), [(0, r * 0.845), (1, r * 0.845), (1, r * 0.825), (0, r * 0.825)], 16, 'hot')
+    with F.group(name):
+        tube((x, y, z0 + 0.22), (x, y, z0 + 0.46), [(0, r * 0.22), (0.7, r * 0.22), (1, r * 0.1)], 10, 'steel')
+        for k in range(7):
+            b = box((r * 0.52, 0, 0), (r * 0.3, r * 0.14, 0.012), 'plate')
+            F.rot(b, 'X', 28)
+            F.rot(b, 'Z', 360.0 * k / 7)
+            F.move(b, (x, y, z0 + 0.32))
+    for k in range(3):
+        b = box((0, 0, 0), (r * 0.86, 0.022, 0.018), 'black')
+        F.rot(b, 'Z', 60 * k)
+        F.move(b, (x, y, z0 + 0.6))
+    cyl((x, y, z0 - 0.02), (x, y, z0 + 0.02), r * 0.82, 14, 'neon')
+    cyl((x, y, z0 - 0.03), (x, y, z0 + 0.0), r * 0.5, 12, 'hot')
+    # Four claws gripping the shroud.
+    for a in (45, 135, 225, 315):
+        c = prism([(r * 1.05, z0 + 0.1), (r * 1.3, z0 + 0.3), (r * 1.22, z0 + 0.72), (r * 0.95, z0 + 0.66)], -0.06, 0.06, 'plate', bevel=0.015)
+        F.rot(c, 'Z', a)
+        F.move(c, (x, y, 0))
