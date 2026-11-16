@@ -273,7 +273,7 @@ class Puff:
 
     def __init__(self, mat, t0, pos, vel, r0, r1, grow, heat, cool, dens=1.0, soot0=0.0,
                  buoy=2.0, drag=3.0, spin=None, evolve=0.9, fade=None, life=99, rnd=None,
-                 ground=True, soot_rate=1.6, wind=(0, 0, 0)):
+                 ground=True, soot_rate=1.6, wind=(0, 0, 0), drag_late=1.2, spread=0.0):
         self.o = puff_obj(mat)
         self.t0, self.p, self.v = t0, Vector(pos), Vector(vel)
         self.r0, self.r1, self.grow = r0, r1, grow
@@ -287,6 +287,8 @@ class Puff:
         self.ground = ground
         self.soot_rate = soot_rate
         self.wind = Vector(wind)
+        self.drag_late = drag_late
+        self.spread = spread
 
     def state(self, t):
         a = t - self.t0
@@ -309,7 +311,8 @@ class Puff:
             while t < tf - 1e-6:
                 age = t - self.t0
                 heat = self.heat0 * math.exp(-age / self.cool) if self.cool > 0 else 0
-                acc = Vector((0, 0, self.buoy * (0.35 + heat))) - (v - self.wind) * self.drag
+                dr = self.drag * math.exp(-age / 0.35) + min(self.drag, self.drag_late)
+                acc = Vector((0, 0, self.buoy * (0.5 + heat))) - (v - self.wind) * dr
                 v += acc * h
                 p += v * h
                 if self.ground:
@@ -342,7 +345,7 @@ class Puff:
                     k.interpolation = 'CONSTANT' if fc.data_path == 'hide_render' else 'LINEAR'
 
     def radius(self, age):
-        return self.r1 + (self.r0 - self.r1) * math.exp(-age / self.grow)
+        return self.r1 + (self.r0 - self.r1) * math.exp(-age / self.grow) + self.spread * age
 
 
 def fcurves(action):
@@ -393,20 +396,20 @@ def fx_ground_explosion(seed, n, scale=1.0, smoke_body=True):
         Puff(fm, rnd.uniform(0, 0.06), (d.x * 0.2 * s, d.y * 0.2 * s, 0.25 * s), d * sp,
              r0=0.15 * s, r1=rnd.uniform(0.55, 0.9) * s, grow=0.12, heat=rnd.uniform(0.85, 1.0),
              cool=rnd.uniform(0.22, 0.42), dens=1.0, buoy=rnd.uniform(2.5, 4.0) * s, drag=rnd.uniform(5, 7),
-             spin=None, evolve=1.1, rnd=rnd, fade=(1.2, 2.4)).run(fr)
+             spin=None, evolve=1.1, rnd=rnd, fade=(1.2, 2.4), spread=0.3 * s).run(fr)
     # hot core column that punches up (mushroom stem)
     for i in range(7):
         Puff(fm, 0.02 + i * 0.03, (rnd.uniform(-.15, .15) * s, rnd.uniform(-.15, .15) * s, 0.3 * s),
              (rnd.uniform(-1, 1) * s, rnd.uniform(-1, 1) * s, rnd.uniform(9, 13) * s),
              r0=0.2 * s, r1=rnd.uniform(0.5, 0.75) * s, grow=0.18, heat=1.0, cool=rnd.uniform(0.3, 0.5),
-             buoy=4.0 * s, drag=4.0, evolve=1.2, rnd=rnd, fade=(1.3, 2.4)).run(fr)
+             buoy=4.0 * s, drag=4.0, evolve=1.2, rnd=rnd, fade=(1.3, 2.4), spread=0.3 * s).run(fr)
     if smoke_body:
         # dark smoke that takes over as the fire dies, rising and spreading
         for i in range(12):
             d = hemi(rnd, up=0.6)
             Puff(fm, rnd.uniform(0.12, 0.35), (d.x * 0.6 * s, d.y * 0.6 * s, rnd.uniform(0.6, 1.4) * s), d * 3 * s,
                  r0=0.4 * s, r1=rnd.uniform(0.8, 1.15) * s, grow=0.5, heat=0.35, cool=0.12, soot0=0.55,
-                 dens=0.8, buoy=2.2 * s, drag=2.5, evolve=0.7, rnd=rnd, fade=(0.9, 1.9)).run(fr)
+                 dens=0.8, buoy=2.2 * s, drag=2.5, evolve=0.7, rnd=rnd, fade=(0.9, 1.9), spread=0.35 * s).run(fr)
     # ground skirt of dust shooting sideways
     for i in range(12):
         a = rnd.uniform(0, 2 * math.pi)
@@ -426,7 +429,7 @@ def fx_air_explosion(seed, n):
         Puff(fm, rnd.uniform(0, 0.05), d * 0.15, d * rnd.uniform(8, 13),
              r0=0.15, r1=rnd.uniform(0.5, 0.8), grow=0.12, heat=rnd.uniform(0.85, 1.0),
              cool=rnd.uniform(0.2, 0.38), buoy=2.0, drag=rnd.uniform(5.5, 7.5), evolve=1.1, rnd=rnd,
-             ground=False, fade=(0.9, 1.7)).run(fr)
+             ground=False, fade=(0.9, 1.7), spread=0.3).run(fr)
     for i in range(8):
         d = sphere_dir(rnd)
         Puff(fm, rnd.uniform(0.1, 0.25), d * 0.6, d * 2.5, r0=0.4, r1=rnd.uniform(0.8, 1.05), grow=0.4,
