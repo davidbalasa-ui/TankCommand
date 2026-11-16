@@ -278,7 +278,7 @@ for i in range(9):
 bpy.ops.mesh.primitive_torus_add(major_radius=1.0, minor_radius=0.018, major_segments=64, minor_segments=8,
                                  location=(SHARD_AT.x, SHARD_AT.y, 0.25))
 ring = bpy.context.active_object
-ring.data.materials.append(emat('Ring', VIOLET, 1.1, alpha=0.5))
+ring.data.materials.append(emat('Ring', VIOLET, 1.0, alpha=0.28))
 fr = P.T(T_WAKE + 0.2)
 ring.scale = (4, 4, 6)
 ring.keyframe_insert('scale', frame=fr)
@@ -817,7 +817,7 @@ for m in bpy.data.materials:
     if m.name.startswith('Core') and 'emit_node' in m.keys():
         em = m.node_tree.nodes[m['emit_node']]
         em.inputs['Color'].default_value = (1.0, 0.35, 0.05, 1)
-        em.inputs['Strength'].default_value = 3.0
+        em.inputs['Strength'].default_value = 1.2
 for m in bpy.data.materials:   # cannon slugs: tracer orange, not white
     if m.name.startswith('Slug') and 'emit_node' in m.keys():
         m.node_tree.nodes[m['emit_node']].inputs['Strength'].default_value = 2.2

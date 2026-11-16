@@ -43,7 +43,7 @@ def hill(x, y):
 
 
 P.env('dusk', sun=(24, 0, -70), sun_energy=3.6, props=40,
-      clear=[(0, 0, 8), (-9, -4, 6), (-16, -7, 6), (28, 2, 15)])
+      clear=[(0, 0, 21), (-12, -16, 9), (-20, -8, 7), (24, 6, 15)])
 g = P.ground
 for v in g.data.vertices:
     v.co.z += hill(v.co.x, v.co.y)
@@ -52,7 +52,7 @@ for o in bpy.data.objects:          # props were dropped on the flat ground: lif
     if o.name.startswith('prop_'):
         o.location.z += hill(o.location.x, o.location.y)
 P.flatten(0, 0, 6.5)
-P.flatten(28, 2, 14)
+P.flatten(24, 6, 13)
 bpy.context.view_layer.update()
 
 
@@ -229,8 +229,8 @@ def ring(Rv, width, tail):
     return edge, tl
 
 
-e1, t1_ = ring(Rp1, 1.1, 14.0)
-e2, t2_ = ring(Rp2, 1.0, 10.0)
+e1, t1_ = ring(Rp1, 1.7, 14.0)
+e2, t2_ = ring(Rp2, 1.5, 10.0)
 
 
 def grid_line(c, spacing, w):
@@ -251,8 +251,8 @@ in_range = math_n('LESS_THAN', dist, Rp1)
 wedge = math_n('MULTIPLY', wedge, in_range)
 wedge = math_n('MULTIPLY', wedge, math_n('ADD', 0.25, grid))
 
-s1 = math_n('MULTIPLY', math_n('ADD', math_n('MULTIPLY', e1, 2.2), math_n('MULTIPLY', math_n('MULTIPLY', t1_, grid), 1.1)), A1)
-s2 = math_n('MULTIPLY', math_n('ADD', math_n('MULTIPLY', e2, 1.8), math_n('MULTIPLY', math_n('MULTIPLY', t2_, grid), 0.8)), A2)
+s1 = math_n('MULTIPLY', math_n('ADD', math_n('MULTIPLY', e1, 2.6), math_n('MULTIPLY', math_n('MULTIPLY', t1_, grid), 0.7)), A1)
+s2 = math_n('MULTIPLY', math_n('ADD', math_n('MULTIPLY', e2, 2.2), math_n('MULTIPLY', math_n('MULTIPLY', t2_, grid), 0.5)), A2)
 sw = math_n('MULTIPLY', wedge, 0.9)
 total = math_n('ADD', math_n('ADD', s1, s2), sw)
 # keep it off the hilltop pad right under the tower
@@ -268,11 +268,11 @@ def ping_time(d, t0=T_P1, spd=SPD1):
 # --------------------------------------------------------------------------- the Arcadian column
 # moving through the valley below, heading south-west across the foot of the hill
 COLUMN = [
-    ('lumen', (31.0, 15.0), (25.5, -1.0)),
-    ('lumen', (34.5, 12.0), (29.0, -4.0)),
-    ('aegis', (28.0, 20.0), (23.0, 5.0)),
-    ('lumen', (37.0, 18.0), (31.5, 2.5)),
-    ('sunfall', (33.0, 24.0), (28.5, 10.0)),
+    ('lumen', (24.0, 9.0), (21.0, -3.0)),
+    ('lumen', (30.5, 5.0), (27.5, -7.0)),
+    ('aegis', (25.5, 18.0), (22.5, 7.5)),
+    ('lumen', (31.0, 16.0), (28.0, 4.5)),
+    ('sunfall', (28.0, 25.0), (25.5, 14.0)),
 ]
 contacts = []
 loaded = {}
@@ -378,7 +378,7 @@ M_SHELL = K.emit_mat('ShellGlow', ORANGE, 2.6)
 for k, (vi, th) in enumerate(zip(VICTIMS, T_HITS)):
     a = contacts[vi]
     tgt = a.pos_at(th) + Vector((0, 0, 0.6))
-    src = Vector((-70.0, -18.0 + 10 * k, 40.0))
+    src = Vector((-15.0 + 8 * k, 70.0, 60.0))
     dur = 0.55
     # incoming shell: falling streak along a steep line from high behind the hill
     sh = K.sphere('Shell', 1.0, M_SHELL, seg=(8, 6))
@@ -386,7 +386,7 @@ for k, (vi, th) in enumerate(zip(VICTIMS, T_HITS)):
     d = tgt - src
     p_start = tgt - d.normalized() * 34.0
     sh.rotation_quaternion = d.to_track_quat('X', 'Z')
-    sh.scale = (1.4, 0.12, 0.12)
+    sh.scale = (2.2, 0.07, 0.07)
     sh.location = p_start
     sh.keyframe_insert('location', frame=P.T(th - dur))
     sh.location = tgt
@@ -403,14 +403,15 @@ for i, a in enumerate(contacts):
 # --------------------------------------------------------------------------- camera
 C = Vector((0, 0, H))
 P.camera([
-    (0.0, (-12.5, -14.0, gz(-12.5, -14.0) + 1.2), rad.pos_at(0.0) + Vector((0, 0, 1.4)), 30),
-    (0.9, (-8.0, -11.5, gz(-8.0, -11.5) + 1.3), rad.pos_at(0.9) + Vector((0, 0, 1.6)), 30),
-    (1.9, (-2.5, -9.0, H + 0.9), (0.0, 0.0, H + 1.8), 28),
-    (2.8, (3.5, -8.0, H + 0.6), (0.0, 0.0, H + 3.4), 24),
-    (3.3, (1.0, -9.0, H + 2.4), (5.0, 1.0, H + 1.5), 24),
-    (4.0, (-8.0, -7.0, H + 6.5), (22.0, 6.0, 0.5), 26),
-    (4.8, (-8.5, -5.0, H + 6.0), (25.0, 5.0, 0.5), 26),
-    (6.0, (-6.0, -6.8, H + 2.2), (14.0, 3.5, H - 0.5), 24),
+    (0.0, (-9.0, -19.0, gz(-9.0, -19.0) + 1.0), rad.pos_at(0.0) + Vector((0, 0, 1.6)), 30),
+    (1.0, (-5.0, -15.5, gz(-5.0, -15.5) + 1.2), rad.pos_at(1.0) + Vector((0, 0, 1.8)), 30),
+    (1.9, (1.0, -11.5, H + 0.5), (0.0, 0.0, H + 2.0), 26),
+    (2.8, (3.6, -5.6, H + 0.35), (0.0, 0.0, H + 3.7), 21),
+    (3.35, (2.0, -9.0, H + 2.2), (4.0, 1.0, H + 3.2), 21),
+    (4.0, (-7.5, -10.0, H + 5.0), (16.0, 5.0, 3.6), 23),
+    (4.7, (-5.5, -9.5, H + 4.8), (21.0, 5.0, 1.6), 32),
+    (5.2, (-6.5, -9.5, H + 4.6), (16.0, 5.0, 5.6), 27),
+    (6.0, (-8.5, -9.0, H + 4.5), (10.0, 4.0, H + 1.2), 23),
 ], shake=0.02)
 P.cam_shake(1.95, 0.08, 0.35)
 
