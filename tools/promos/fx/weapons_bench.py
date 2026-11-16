@@ -56,6 +56,13 @@ elif CASE in ('shield', 'shield_gold'):
         else:
             P.lightning(s.world_at(s.muzzle(), t - 0.05), p, t - 0.05, t + 0.12)
     P.camera([(0, (-17, -17, 4.5), (-1, 0, 2.6), 30)])
+elif CASE == 'shield_push':
+    import promo_fx_weapons as W
+    sh = P.shield_dome((0, 0, 0), 6.0, 0.0, 3.0, hits=[(0.4, (4, -4, 2.5))])
+    a = P.load('lancer', at=(-2, 0), heading=0)
+    a.path([(0.0, (-2, 0)), (2.2, (11, 0))])
+    W.shield_push(P, sh, a, 0.3, 2.2)
+    P.camera([(0, (4, -17, 4.5), (5, 0, 1.6), 30)])
 elif CASE == 'shell':
     a = P.load('longbow', at=(0, 0), heading=0)
     a.fire(0.3, (40, 4, 0.1), kind='shell')

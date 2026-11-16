@@ -715,7 +715,7 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
         glo.parent = rig
         glo.scale = (size * 3.2, size * 1.7, size * 1.7)
         # motion streak: about one frame of travel (plus motion blur in finals)
-        Ls = min(max(size * 4, v_frame * (0.9 if streak else 0.5)), 6.0) * 0.5
+        Ls = min(max(size * 4, v_frame * (0.6 if streak else 0.4)), 4.0) * 0.5
         st = glow(P, 'SlugStreak', col, fx_e=2.6, fx_p=1.4, fx_tail=1.0, fx_hot=0.35)
         st.parent = rig
         st.location = (-Ls + size, 0, 0)
@@ -736,12 +736,10 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
         K.show_between(o, f0, f1)
     if style == 'shell':      # faint smoke wake behind an arcing shell
         k = 0
-        for i in range(1, n):
-            if i % 2:
-                continue
-            u = i / n
+        for i in range(1, 2 * n):
+            u = i / (2 * n)
             p = at(u)
-            smoke_puff(P, p, t0 + dur * u, r0=0.06, r1=0.35, life=1.1, dens=0.35, wind=(0.3, 0.1, 0.2))
+            smoke_puff(P, p, t0 + dur * u, r0=0.08, r1=0.55, life=1.4, dens=0.9, wind=(0.3, 0.1, 0.2))
             k += 1
     elif style == 'bomb':
         for i in range(1, n, 2):
@@ -856,7 +854,7 @@ def _jag(P, a, b, jag, depth, perp_bias=None):
             m = (p + q) / 2 + _rand_perp(P, q - p) * amp * P.rnd.uniform(-1, 1)
             new += [m, q]
         pts = new
-        amp *= 0.52
+        amp *= 0.62
     return pts
 
 
@@ -884,8 +882,10 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
     wide haze on the trunk, tapered jagged forks. Returns the objects."""
     p0, p1 = Vector(p0), Vector(p1)
     L = (p1 - p0).length
-    depth = max(3, min(6, int(math.log2(max(2.0, L / 0.25)))))
-    trunk = _jag(P, p0, p1, jag * 0.75, depth)
+    depth = max(3, min(7, int(math.log2(max(2.0, L / 0.15)))))
+    trunk = _jag(P, p0, p1, jag * 0.6, depth)
+    for q in trunk:      # never dive into the ground between the ends
+        q.z = max(q.z, _gz(P, q.x, q.y) + 0.06)
     hot = tuple(0.3 * c + 0.7 * w for c, w in zip(color, HOT_WHITE))
     objs = []
     nn = len(trunk)
@@ -1203,6 +1203,7 @@ def shield_dome(P, center, radius, t0, t1, color=None, hits=()):
     shell['fx_e'] = 1.4 if not arc else 0.8
     shell['fx_dark'] = 0.0 if not arc else 0.75
     shell['fx_facek'] = 0.22 if not arc else 0.04
+    shell['fx_R'] = float(R)
     lat_me.materials.append(shield_lattice_mat(P))
     lat = _fxobj(K.link(bpy.data.objects.new('ShieldLattice', lat_me)))
     lat.parent = shell
@@ -1236,7 +1237,11 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
     f0 = P.T(t)
     f1 = min(P.T(t + life), P.T(t_end))
     rip = shield_ripple_mat(P)
-    for src, scale, e, a, spot, local in ((shell, 1.004, 2.4, 0.85, 1.0, 0.25), (lat, 1.006, 3.2, 1.0, 1.4, 0.9)):
+    if arc:   # Arcadian: crisper, thinner rings, the honeycomb carries the light
+        layers = ((shell, 1.004, 1.5, 0.8, 0.5, 0.1, 0.045), (lat, 1.006, 3.2, 1.0, 1.0, 0.7, 0.06))
+    else:
+        layers = ((shell, 1.004, 2.2, 0.85, 0.6, 0.25, 0.07), (lat, 1.006, 3.0, 1.0, 1.0, 0.9, 0.07))
+    for src, scale, e, a, spot, local, wk in layers:
         o = src.copy()
         K.link(o)
         o.animation_data_clear()
@@ -1252,7 +1257,7 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         o['fx_hit'] = tuple(n)
         o['fx_R'] = float(R)
         o['fx_v'] = R * 2.4
-        o['fx_w'] = R * 0.07
+        o['fx_w'] = R * wk
         o['fx_life'] = life
         o['fx_sr'] = R * 0.05
         o['fx_e'] = e
@@ -1269,3 +1274,66 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
     sparks(P, surf, t, n=10, speed=8.0, color=color, axis=n, spread=75, life=(0.15, 0.45), width=0.02,
            gravity=4.0)
     P.light(surf + n * 0.6, t, color, energy=1600, dur=0.2, radius=0.4)
+
+
+def shield_push(P, shell, actor, t0, t1, release=0.6, reach=None, stretch=None):
+    """A unit pushing out through a shield stretches it instead of breaking it: where the unit
+    meets the membrane, the surface is pulled outward with it (Warp modifier), until the
+    stretch reaches `stretch` metres (default ~0.7 x unit size) or time t1; then the membrane
+    lets go behind the unit and snaps back with a damped wobble. shell: the object
+    shield_dome() returned; actor: an Actor (or a callable t -> Vector). Scan window t0..t1."""
+    pos = actor.pos_at if hasattr(actor, 'pos_at') else actor
+    size = getattr(actor, 'size', 4.0)
+    up_off = Vector((0, 0, size * 0.15))
+    c = shell.matrix_world.translation.copy()
+    R = shell.get('fx_R') or (max(shell.dimensions) / 2) or 5.0
+    stretch = stretch or size * 0.7
+    f0, f1 = int(P.T(t0)), int(P.T(t1))
+    track = [(fr, pos((fr - 1) / P.fps) + up_off) for fr in range(f0, f1 + 1)]
+    hit = next((k for k, (fr, p) in enumerate(track) if (p - c).length >= R - size * 0.35), None)
+    if hit is None:
+        return None
+    n = (track[hit][1] - c).normalized()
+    contact = c + n * R
+    src = K.empty('ShieldPushFrom', contact)
+    tgt = K.empty('ShieldPushTo', contact)
+    fr_hit = track[hit][0]
+    fr_rel = f1
+    for fr, p in track[hit:]:
+        out = (p - c).dot(n) - R + size * 0.35       # how far the unit's nose is past the surface
+        lat = (p - c) - n * (p - c).dot(n)
+        lat = lat - (contact - c - n * (contact - c).dot(n))
+        tgt.location = contact + n * max(0.0, min(out, stretch)) + lat * 0.8
+        tgt.keyframe_insert('location', frame=fr)
+        if out >= stretch:
+            fr_rel = fr
+            break
+    mods = []
+    for o in [shell] + list(shell.children_recursive):
+        if o.type != 'MESH':
+            continue
+        w = o.modifiers.new('Push', 'WARP')
+        w.object_from = src
+        w.object_to = tgt
+        w.falloff_radius = reach or size * 0.75
+        w.falloff_type = 'SMOOTH'
+        w.use_volume_preserve = False
+        while o.modifiers[0] != w:
+            with bpy.context.temp_override(object=o):
+                bpy.ops.object.modifier_move_up(modifier=w.name)
+        mods.append(w)
+    for w in mods:   # on at contact, hold while it stretches, then let go with a damped wobble
+        w.strength = 0.0
+        w.keyframe_insert('strength', frame=fr_hit - 1)
+        w.strength = 1.0
+        w.keyframe_insert('strength', frame=fr_hit + 1)
+        w.keyframe_insert('strength', frame=fr_rel)
+        for i, v in enumerate((-0.3, 0.15, -0.06, 0.0)):
+            w.strength = v
+            w.keyframe_insert('strength', frame=fr_rel + (i + 1) * release * P.fps / 4)
+    # a ripple ring where the membrane lets go
+    lat_o = next((ch for ch in shell.children if ch.name.startswith('ShieldLattice')), None)
+    if lat_o is not None:
+        col = tuple(shell.color)[:3]
+        shield_hit(P, shell, lat_o, c, R, (fr_rel - 1) / P.fps, contact, col, _is_gold(col), P.seconds)
+    return tgt
