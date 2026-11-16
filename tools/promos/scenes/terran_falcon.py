@@ -382,9 +382,9 @@ def vapor(actor):
         load = 1 - abs(upv.z)
         if t > T_PU:
             load = max(load, ss((t - T_PU) / 0.3) * (1 - ss((t - 5.6) / 0.4)))
-        if load < 0.28:
+        if load < 0.4:
             continue
-        n = int(4 + 6 * min(1.0, load))
+        n = int(3 + 4 * min(1.0, load))
         for k in range(2):
             pts = [hist[max(0, f - j)][k] for j in range(n)]
             o = K.polyline('Vapor', pts, 0.03, M_VAPOR)
@@ -570,12 +570,12 @@ def back_bolt(t, dur, target_fn):
         p0 = W(halo, tt, Vector((-2.0, 0, 0.1)))
         p1 = target_fn(tt)
         ctrl = (p0 + p1) / 2 + Vector((0, 0, 3.0))
-        bolt_frame(jag_pts(p0, p1, 14, 0.2, ctrl=ctrl), f, 0.045, forks=2)
+        bolt_frame(jag_pts(p0, p1, 14, 0.2, ctrl=ctrl), f, 0.032, forks=2)
     P.light(W(halo, t, Vector((-2.0, 0, 0))), t, COL['arc_gold'], energy=3500, dur=dur, radius=0.6)
 
 
-back_bolt(2.3, 0.2, lambda t: falcon_pos(1, t) + Vector((-6.0, 3.5, 2.8)))
-back_bolt(3.05, 0.16, lambda t: falcon_pos(0, t) + Vector((-7.0, -2.5, 3.5)))
+back_bolt(2.3, 0.2, lambda t: falcon_pos(0, t) + Vector((-4.0, 6.5, 2.2)))
+back_bolt(3.05, 0.16, lambda t: falcon_pos(0, t) + Vector((-5.0, 5.0, 3.0)))
 
 
 # wounded halo: smoke and flame from the hit
@@ -724,11 +724,12 @@ def chase(t):
     lead = falcon_pos(0, t)
     h = heading(lead.x)
     side = Vector((-h.y, h.x, 0))
-    back = 15.0 - 2.5 * ss((t - 2.6) / 1.0)
+    back = 15.5 + 2.5 * ss((t - 3.0) / 0.8)
     cpos = lead - h * back + side * 4.5 + Vector((0, 0, 4.6))
-    tgt = halo_pos(min(t, T_BREAK)) * 0.65 + lead * 0.35 + Vector((0, 0, -0.8)) - side * 1.0
+    w = 0.65 + 0.15 * ss((t - 3.0) / 0.5)
+    tgt = halo_pos(min(t, T_BREAK)) * w + lead * (1 - w) + Vector((0, 0, -0.8)) - side * 1.0
     if t > T_BREAK:
-        tgt = tgt + Vector((0, 0, -2.5 * ss((t - T_BREAK) / 0.4)))
+        tgt = tgt + Vector((0, 0, -2.0 * ss((t - T_BREAK - 0.15) / 0.45)))
     return cpos, tgt
 
 
