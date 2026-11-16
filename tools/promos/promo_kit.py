@@ -49,7 +49,7 @@ COL = {
     'terran_orange': (1.0, 0.42, 0.08),
     'tracer': (1.0, 0.62, 0.22),
     'laser_blue': (0.25, 0.65, 1.0),
-    'arc_gold': (1.0, 0.72, 0.22),
+    'arc_gold': (1.0, 0.5, 0.06),
     'arc_white': (1.0, 0.92, 0.7),
     'arc_ember': (1.0, 0.38, 0.08),
     'fire': (1.0, 0.45, 0.1),
@@ -481,9 +481,12 @@ class Actor:
         back out, turret jolts back, hull pitches nose-up by `kick` degrees and settles."""
         P = self.P
         f = P.T(t)
+        last = getattr(self, '_last_recoil', -99)
+        burst = (t - last) < settle  # previous shot still settling: don't key a rest pose before
+        self._last_recoil = t
         for b in self.barrels:
             L = b['barrel_len'] * collapse
-            b.location.x = 0
+            b.location.x = -L * 0.3 if burst else 0
             b.keyframe_insert('location', index=0, frame=f - 1)
             b.location.x = -L
             b.keyframe_insert('location', index=0, frame=f + 1)
@@ -491,10 +494,16 @@ class Actor:
             b.keyframe_insert('location', index=0, frame=f + P.fps * settle)
         m = self.model_root
         m.rotation_mode = 'XYZ'
-        base_y = m.rotation_euler.y
-        base_x = m.location.x
-        m.keyframe_insert('rotation_euler', index=1, frame=f - 1)
-        m.keyframe_insert('location', index=0, frame=f - 1)
+        base_y = getattr(self, '_rest_pitch', None)
+        if base_y is None:
+            base_y = self._rest_pitch = m.rotation_euler.y
+            self._rest_x = m.location.x
+        base_x = self._rest_x
+        if not burst:
+            m.rotation_euler.y = base_y
+            m.location.x = base_x
+            m.keyframe_insert('rotation_euler', index=1, frame=f - 1)
+            m.keyframe_insert('location', index=0, frame=f - 1)
         m.rotation_euler.y = base_y - math.radians(kick)
         m.location.x = base_x - back
         m.keyframe_insert('rotation_euler', index=1, frame=f + 2)
@@ -527,7 +536,7 @@ class Actor:
             laser=(COL['laser_blue'], 140, 0.6, 1.5, 0.5),
             missile=(COL['fire'], 32, 0.7, 2.5, 1.2),
             shell=(COL['tracer'], 35, 1.0, 5.0, 1.6),
-            lightning=(COL['arc_gold'], 0, 0.9, 1.5, 0.9),
+            lightning=(COL['arc_gold'], 0, 0.6, 1.5, 0.45),
             beam=(COL['arc_gold'], 0, 1.0, 1.0, 1.4),
             bomb=(COL['fire'], 18, 0.0, 0.0, 2.2),
         )[kind]
@@ -600,7 +609,7 @@ class Actor:
             for o in [w] + list(w.children_recursive):
                 key_hide(o, 0, True)
                 key_hide(o, P.T(t) + 1, False)
-            P.smoke_column(p, t + 0.2, P.seconds, size=size * 0.6)
+            P.smoke_column(p, t + 0.2, P.seconds, size=size * 0.35)
             P.fire_patch(p + Vector((0, 0, 0.4)), t + 0.1, P.seconds, size=size * 0.35)
         self.vanish(t + 1 / P.fps)
         self.alive_until = t
@@ -627,7 +636,7 @@ class Actor:
         return self
 
     # -- structures ---------------------------------------------------------------------------
-    def unfold(self, t0, t1, stagger=0.25):
+    def unfold(self, t0, t1, stagger=0.0):
         """Animate a structure from its packed pose (glTF extras) to deployed. Parts unfold one
         after another (`stagger` of the span each), the folded Carrier hull hides at the end."""
         P = self.P
@@ -653,9 +662,10 @@ class Actor:
             o.rotation_quaternion = (r[3], r[0], -r[2], r[1])
             o.scale = (s[0], s[2], s[1])
             n = len(order)
-            a = t0 + span * (i / max(1, n)) * (1 - stagger) if n > 1 else t0
-            b = a + span * (1 - (1 - stagger) * (n - 1) / max(1, n)) if n > 1 else t1
-            b = min(b, t1)
+            # stagger 0: all parts move together (no floating gaps); >0: each part starts
+            # stagger*span after the previous one.
+            a = t0 + min(span * 0.8, span * stagger * i)
+            b = t1
             for attr in ('location', 'rotation_quaternion', 'scale'):
                 o.keyframe_insert(attr, frame=0)
                 o.keyframe_insert(attr, frame=P.T(a))
@@ -1046,7 +1056,7 @@ class Promo:
         return self
 
     # -- camera ----------------------------------------------------------------------------
-    def camera(self, keys, lens=35, shake=0.0, interp='BEZIER'):
+    def camera(self, keys, lens=35, shake=0.0, interp='BEZIER', cuts=()):
         """keys: [(sec, (x,y,z) position, (x,y,z) look-at[, lens])]. Look-at may also be an Actor
         (tracks it with a z offset of 1 m). shake: handheld wobble in metres."""
         sc = bpy.context.scene
@@ -1073,6 +1083,19 @@ class Promo:
                 cam.data.keyframe_insert('lens', frame=self.T(t))
         set_interp(cam, interp)
         set_interp(tgt, interp)
+        # hard cuts: give a key just before the cut (e.g. t-1/24) and one at the cut; the
+        # segment before it then holds still instead of drifting/overshooting into the next.
+        for ob in (cam, tgt, cam.data):
+            ad = ob.animation_data
+            if not ad or not ad.action:
+                continue
+            for fc in _fcurves(ad.action):
+                for k in fc.keyframe_points:
+                    k.handle_left_type = k.handle_right_type = 'AUTO_CLAMPED'
+                    for c in cuts:
+                        fcut = self.T(c)
+                        if fcut - 1.5 <= k.co.x < fcut - 0.01:
+                            k.interpolation = 'CONSTANT'
         if shake:
             for i in range(3):
                 fc = cam.animation_data.action and [f for f in _fcurves(cam.animation_data.action)
@@ -1136,8 +1159,8 @@ class Promo:
 
     def muzzle_flash(self, muzzle_obj, t, color, size=1.0):
         """Short star-shaped flash at a muzzle empty (follows it)."""
-        m = emit_mat('Flash', color, 25)
-        f = sphere('Flash', 1.0, m, seg=(8, 6))
+        f = sphere('Flash', 1.0, self.soft_fire_mat(), seg=(10, 8))
+        f.color = (*color, 1.0)
         f.parent = muzzle_obj
         f.location = (0.25 * size, 0, 0)
         f0 = self.T(t)
@@ -1153,14 +1176,15 @@ class Promo:
         bpy.context.scene.frame_set(int(f0))
         self.light(muzzle_obj.matrix_world.translation, t, color, energy=900 * size, dur=0.1)
         # smoke puff
-        self.puff(muzzle_obj.matrix_world.translation, t + 0.03, size=0.5 * size, n=2, rise=0.6)
+        self.puff(muzzle_obj.matrix_world.translation, t + 0.03, size=0.45 * size, n=2, rise=0.6,
+                  color=(0.32, 0.3, 0.28), opacity=0.4)
 
     def projectile(self, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True):
         """Glowing slug flying p0 -> p1 (with an optional ballistic arc). Returns hit time."""
         p0, p1 = V(p0), V(p1)
         d = p1 - p0
         dur = max(0.04, d.length / speed)
-        m = emit_mat('Slug', color, 30)
+        m = emit_mat('Slug', color, 12)
         o = sphere('Slug', 1.0, m, seg=(8, 6))
         o.rotation_mode = 'QUATERNION'
         n = max(2, int(dur * self.fps) + 1)
@@ -1188,7 +1212,7 @@ class Promo:
         body = sphere('Missile', 1.0, pbr_mat('MissileBody', (0.6, 0.6, 0.62), 0.4, 0.6), seg=(8, 6))
         body.scale = (0.35, 0.07, 0.07)
         body.rotation_mode = 'QUATERNION'
-        fl = sphere('MissileFlame', 1.0, emit_mat('MFlame', color or COL['fire'], 40), seg=(8, 6))
+        fl = sphere('MissileFlame', 1.0, emit_mat('MFlame', color or COL['fire'], 14), seg=(8, 6))
         fl.parent = body
         fl.location = (-1.3, 0, 0)
         fl.scale = (1.0, 1.4, 1.4)
@@ -1219,8 +1243,9 @@ class Promo:
         """Arcadian lightning: jagged bolt p0 -> p1, re-shaped every frame, with a few forks."""
         p0, p1 = V(p0), V(p1)
         color = color or COL['arc_gold']
-        m = emit_mat('Bolt', color, 40)
-        mw = emit_mat('BoltCore', COL['arc_white'], 60)
+        m = emit_mat('Bolt', color, 4)
+        mw = emit_mat('BoltCore', (1.0, 0.8, 0.45), 5)
+        glow_m = emit_mat('BoltGlowM', color, 3, alpha=0.3)
         d = p1 - p0
         L = d.length
         side = d.cross(Vector((0, 0, 1)))
@@ -1235,8 +1260,8 @@ class Promo:
                 env_ = math.sin(math.pi * u)
                 off = (side * self.rnd.uniform(-1, 1) + up * self.rnd.uniform(-1, 1)) * jag * L * 0.25 * env_ if 0 < i < segs else Vector()
                 pts.append(p0 + d * u + off)
-            o = polyline('Bolt', pts, width, mw if self.rnd.random() < 0.5 else m)
-            outer = polyline('BoltGlow', pts, width * 3, emit_mat('BoltGlowM', color, 6, alpha=0.35)) if glow else None
+            o = polyline('Bolt', pts, width * 0.6, mw if self.rnd.random() < 0.3 else m)
+            outer = polyline('BoltGlow', pts, width * 2.2, glow_m) if glow else None
             for ob in filter(None, [o, outer]):
                 show_between(ob, f, f + 1)
             for b in range(branches):
@@ -1250,11 +1275,11 @@ class Promo:
         self.light((p0 + p1) / 2, t0, color, energy=600 + 60 * L, dur=t1 - t0 + 0.05, radius=L * 0.2)
         return t1
 
-    def beam(self, p0, p1, t0, t1, color, width=0.15):
+    def beam(self, p0, p1, t0, t1, color, width=0.15, strength=10):
         """Solid energy beam with a flickering width."""
         p0, p1 = V(p0), V(p1)
         d = p1 - p0
-        m = emit_mat('Beam', color, 30)
+        m = emit_mat('Beam', color, strength)
         o = sphere('Beam', 1.0, m, seg=(10, 6))
         o.rotation_mode = 'QUATERNION'
         o.rotation_quaternion = d.to_track_quat('X', 'Z')
@@ -1363,19 +1388,19 @@ class Promo:
         nz.inputs['Scale'].default_value = 3.0
         nz.inputs['Detail'].default_value = 4
         cr = nt.nodes.new('ShaderNodeValToRGB')
-        cr.color_ramp.elements[0].color = (1.0, 0.25, 0.03, 1)
-        cr.color_ramp.elements[1].color = (1.0, 0.85, 0.45, 1)
+        cr.color_ramp.elements[0].color = (0.9, 0.12, 0.01, 1)
+        cr.color_ramp.elements[1].color = (1.0, 0.55, 0.12, 1)
         cr.color_ramp.elements[0].position = 0.4
         cr.color_ramp.elements[1].position = 0.7
         nt.links.new(nz.outputs['Fac'], cr.inputs['Fac'])
         nt.links.new(cr.outputs['Color'], em.inputs['Color'])
-        em.inputs['Strength'].default_value = 18
+        em.inputs['Strength'].default_value = 3.5
         nt.links.new(em.outputs[0], out.inputs['Surface'])
         m['emit_node'] = em.name
         self._fireball = m
         return m
 
-    def explosion(self, pos, t, size=2.0, debris=10, smoke=True, light=True):
+    def explosion(self, pos, t, size=2.0, debris=8, smoke=True, light=True):
         """Fireball + flash + smoke + flying debris + scorch."""
         pos = V(pos)
         fm = self.fireball_mat()
@@ -1396,7 +1421,7 @@ class Promo:
             o.keyframe_insert('scale', frame=f0 + (d + 0.55) * self.fps)
             show_between(o, f0 + d * self.fps, f0 + (d + 0.56) * self.fps)
         # white-hot core flash
-        core = ico('Core', 1.0, emit_mat('Core', (1, 0.95, 0.8), 60), sub=2)
+        core = ico('Core', 1.0, emit_mat('Core', (1, 0.75, 0.4), 20), sub=2)
         core.location = pos
         core.scale = (0.1,) * 3
         core.keyframe_insert('scale', frame=f0)
@@ -1410,8 +1435,8 @@ class Promo:
         if smoke:
             self.puff(pos + Vector((0, 0, size * 0.3)), t + 0.25, size=size * 0.9, n=4, rise=size * 1.2, life=2.2)
         for i in range(debris):
-            o = cube('Debris', 1.0, self.charred)
-            s = size * self.rnd.uniform(0.04, 0.12)
+            o = ico('Debris', 1.0, self.charred, sub=0)
+            s = size * self.rnd.uniform(0.02, 0.06)
             o.scale = (s, s * self.rnd.uniform(0.5, 1.5), s * self.rnd.uniform(0.3, 1))
             v = Vector((self.rnd.uniform(-1, 1), self.rnd.uniform(-1, 1), self.rnd.uniform(0.8, 2.2))) * size * 2.2
             life = self.rnd.uniform(0.6, 1.2)
@@ -1434,8 +1459,9 @@ class Promo:
         """Smaller hit: spark burst + dirt kick + flash. color tints energy hits."""
         pos = V(pos)
         f0 = self.T(t)
-        m = emit_mat('Spark', color or (1.0, 0.55, 0.2), 12)
-        o = ico('Hit', 1.0, m, sub=2)
+        m = emit_mat('Spark', color or (1.0, 0.45, 0.1), 6)
+        o = sphere('Hit', 1.0, self.soft_fire_mat(), seg=(12, 8))
+        o.color = (*(color or (1.0, 0.4, 0.08)), 1.0)
         o.location = pos
         o.scale = (0.05,) * 3
         o.keyframe_insert('scale', frame=f0)
@@ -1465,17 +1491,52 @@ class Promo:
             self.puff(V(pos) + Vector((0, 0, 0.6)), t, size=size, n=1, rise=size * 3, life=2.0)
             t += every
 
+    def soft_fire_mat(self):
+        """Soft-edged emissive flame: colour from Object Color rgb, brightness from its alpha."""
+        if getattr(self, '_softfire', None):
+            return self._softfire
+        m = bpy.data.materials.new('SoftFire')
+        m.use_nodes = True
+        nt = m.node_tree
+        nt.nodes.clear()
+        out = nt.nodes.new('ShaderNodeOutputMaterial')
+        oi = nt.nodes.new('ShaderNodeObjectInfo')
+        lw = nt.nodes.new('ShaderNodeLayerWeight')
+        lw.inputs['Blend'].default_value = 0.6
+        inv = nt.nodes.new('ShaderNodeMath')
+        inv.operation = 'SUBTRACT'
+        inv.inputs[0].default_value = 1.0
+        nt.links.new(lw.outputs['Facing'], inv.inputs[1])
+        mul = nt.nodes.new('ShaderNodeMath')
+        mul.operation = 'MULTIPLY'
+        mul.use_clamp = True
+        nt.links.new(inv.outputs[0], mul.inputs[0])
+        nt.links.new(oi.outputs['Alpha'], mul.inputs[1])
+        em = nt.nodes.new('ShaderNodeEmission')
+        em.inputs['Strength'].default_value = 3.0
+        nt.links.new(oi.outputs['Color'], em.inputs['Color'])
+        tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+        mix = nt.nodes.new('ShaderNodeMixShader')
+        nt.links.new(mul.outputs[0], mix.inputs[0])
+        nt.links.new(tr.outputs[0], mix.inputs[1])
+        nt.links.new(em.outputs[0], mix.inputs[2])
+        nt.links.new(mix.outputs[0], out.inputs['Surface'])
+        self._softfire = m
+        return m
+
     def fire_patch(self, pos, t0, t1, size=0.6):
-        """Flickering flames on a wreck."""
-        fm = emit_mat('WreckFlame', (1.0, 0.35, 0.06), 6)
-        for i in range(3):
+        """Flickering soft flames licking up off a wreck."""
+        fm = self.soft_fire_mat()
+        for i in range(4):
             o = sphere('Flame', 1.0, fm, seg=(12, 8))
             o.location = V(pos) + Vector((self.rnd.uniform(-.4, .4), self.rnd.uniform(-.4, .4), 0)) * size * 2
             f = self.T(t0)
             while f < self.T(t1):
-                s = size * self.rnd.uniform(0.3, 0.6)
-                o.scale = (s, s, s * 1.6)
+                s_ = size * self.rnd.uniform(0.25, 0.45)
+                o.scale = (s_, s_, s_ * 2.0)
+                o.color = (1.0, self.rnd.uniform(0.22, 0.4), 0.04, self.rnd.uniform(0.5, 0.9))
                 o.keyframe_insert('scale', frame=f)
+                o.keyframe_insert('color', frame=f)
                 f += 2
             show_between(o, self.T(t0), self.T(t1) + 1)
 
@@ -1534,8 +1595,8 @@ class Promo:
         r.use_motion_blur = blur
         r.motion_blur_shutter = 0.4
         r.image_settings.file_format = 'PNG'
-        sc.view_settings.view_transform = 'AgX'
-        sc.view_settings.look = 'AgX - Punchy' if 'AgX - Punchy' in [i.identifier for i in sc.view_settings.bl_rna.properties['look'].enum_items] else 'None'
+        sc.view_settings.view_transform = os.environ.get('PROMO_VIEW', 'Standard')
+        sc.view_settings.look = 'None'
         sc.frame_step = step
         out = a.out or os.path.join(OUT_ROOT, 'clips' if q == 'final' else 'previews', self.id)
         os.makedirs(out, exist_ok=True)

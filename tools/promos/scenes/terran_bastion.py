@@ -25,15 +25,15 @@ lumens = []
 for i, (sx, sy) in enumerate([(34, 16), (37, 9), (31, 22)]):
     a = P.load('lumen', at=(sx, sy), label=f'lumen{i}')
     lumens.append(a)
-lumens[0].path([(0.0, (34, 16)), (3.0, (18, 9)), (6.0, (12, 6))])
-lumens[1].path([(0.0, (37, 9)), (3.0, (21, 4)), (6.0, (15, 1))])
-lumens[2].path([(0.0, (31, 22)), (3.2, (19, 15)), (4.6, (22, 19)), (6.0, (34, 26))])
+lumens[0].path([(0.0, (30, 14)), (2.8, (14, 7)), (6.0, (9, 5))])
+lumens[1].path([(0.0, (33, 6)), (3.9, (15, 2)), (6.0, (12, 0))])
+lumens[2].path([(0.0, (27, 20)), (3.6, (13, 12)), (4.8, (15, 15)), (6.0, (26, 22))])
 for a in lumens:
     a.hover_bob(0.08, 0.9)
 
 # Lumens shoot back: lightning bolts landing short / on the tower
 lumens[0].fire(2.7, (2.5, 1.5, 0.3), kind='lightning')
-lumens[2].fire(3.4, (1.5, -1.5, 0.3), kind='lightning')
+lumens[2].fire(3.4, (3.0, 2.8, 0.3), kind='lightning')
 
 # Bastion: one devastating shot about every 1.1 s once deployed
 bastion.split_barrels()
@@ -45,16 +45,16 @@ bastion.aim(3.9, lumens[1], dur=0.4)
 th = bastion.fire(3.95, lumens[1], kind='heavy', size=1.1)
 lumens[1].destroy(th)
 bastion.aim(5.1, lumens[2], dur=0.35)
-bastion.fire(5.15, (24, 21, 0.2), kind='heavy', size=1.1)
+bastion.fire(5.15, (17.5, 16.5, 0.2), kind='heavy', size=1.1)
 
 # Camera: low, close start on the rolling tower, swing round behind the gun as it opens,
 # end over its shoulder looking down the firing line.
 P.camera([
     (0.0, (-4, -11, 2.0), (-4, -1.5, 1.0), 32),
     (1.6, (5, -10, 3.2), (0, 0, 1.6), 32),
-    (3.0, (-7, -6, 4.5), (8, 4, 1.5), 30),
-    (4.5, (-8, 2, 4.0), (14, 6, 1.0), 34),
-    (6.0, (-6, 6, 3.6), (18, 10, 1.0), 38),
+    (2.6, (-5, -6.5, 3.6), (7, 4, 1.4), 32),
+    (4.2, (-5.5, 0.5, 3.4), (10, 6, 1.0), 34),
+    (6.0, (-3.5, -7.5, 2.8), (6, 6, 1.2), 26),
 ], shake=0.02)
 
 P.render()
