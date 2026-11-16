@@ -141,11 +141,16 @@ def _card_mat(man, f_start, loop, rate, f_end, tint, opacity, emission, phase):
     tex.interpolation = 'Linear'
     iu = tex.image_user
     iu.frame_duration = man['frames']
-    iu.frame_start = int(round(f_start))
+    # loop phase: start the sequence earlier (frame_offset is applied after the cyclic wrap and
+    # would run past the last file)
+    ph = int(phase * man['frames']) if loop else 0
+    iu.frame_start = int(round(f_start)) - ph
     iu.use_cyclic = loop
     iu.use_auto_refresh = True
-    off0 = int(phase * man['frames']) if loop else 0
-    iu.frame_offset = off0
+    off0 = 0
+    iu.frame_offset = 0
+    if loop:
+        rate = 1.0
     if abs(rate - 1.0) > 1e-3:
         # displayed = (f - start) + 1 + offset; want 1 + rate * (f - start)
         span = max(1, int(f_end - f_start))
@@ -410,7 +415,7 @@ def soot_variant(P, m):
     nt.links.new(nz.outputs['Fac'], mr.inputs['Value'])
     # soot: noise mask scaled by G, plus an overall darkening by G
     k1 = _math(nt, 'MULTIPLY', mr.outputs['Result'], sep.outputs['Green'])
-    k2 = _math(nt, 'MULTIPLY', sep.outputs['Green'], 0.6)
+    k2 = _math(nt, 'MULTIPLY', sep.outputs['Green'], 0.3)
     fac = _math(nt, 'MAXIMUM', k1, k2, clamp=True)
     ch = nt.nodes.new('ShaderNodeBsdfPrincipled')
     ch.inputs['Base Color'].default_value = (0.018, 0.016, 0.014, 1)
@@ -765,6 +770,11 @@ def _group_bmesh(objs):
         me.polygons.foreach_set('material_index', idx)
         bm.from_mesh(me)
         bpy.data.meshes.remove(me)
+    # game meshes are split at every UV seam / hard edge: weld so cuts produce closed loops
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-4)
+    for e in bm.edges:      # keep the hard edges the split encoded
+        if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > 0.6:
+            e.smooth = False
     return bm, mats
 
 
@@ -958,7 +968,7 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
         card(P, 'flash', pos, t, size=size * 1.1 / fl['extent_m'], tint=(1.0, 0.55, 0.2), emission=1.4,
              push=size * 0.3)
     if light:
-        P.light(pos + Vector((0, 0, size * 0.6)), t, (1.0, 0.5, 0.18), energy=900 * size * size, dur=0.4,
+        P.light(pos + Vector((0, 0, size * 0.6)), t, (1.0, 0.5, 0.18), energy=500 * size * size, dur=0.4,
                 radius=size * 0.5)
     sparks(P, pos + Vector((0, 0, size * 0.1)), t, n=int(10 + 6 * size), speed=5 + 3 * size, size=size * 0.6)
     if debris:
@@ -983,7 +993,7 @@ def _dirt_chunks(P, pos, t, size, n, air):
     mat = P.charred if air else _dirt_mat(P)
     bodies, objs = [], []
     for i in range(n):
-        s = size * rnd.uniform(0.03, 0.08)
+        s = min(size, 3.0) * rnd.uniform(0.03, 0.075)
         bm = bmesh.new()
         bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0)
         sx, sy, sz = rnd.uniform(0.6, 1.4), rnd.uniform(0.5, 1.2), rnd.uniform(0.3, 0.8)
@@ -996,7 +1006,7 @@ def _dirt_chunks(P, pos, t, size, n, air):
         me.materials.append(mat)
         o = K.link(bpy.data.objects.new('Debris', me))
         d = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(0.7, 2.0) if not air else rnd.uniform(-1, 1)))
-        v = d.normalized() * size * rnd.uniform(2.5, 5.5)
+        v = d.normalized() * (size ** 0.5) * rnd.uniform(2.2, 5.0)
         w = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))) * 8
         b = Body(pts, [], max(0.01, s ** 3 * 8), pos + d * 0.1 * size, v, w)
         bodies.append(b)
@@ -1052,7 +1062,7 @@ def smoke_column(P, pos, t0, t1, size=1.0):
     if man is None:
         return False
     k = size * 3.0 / man['extent_m']
-    card(P, 'smoke_plume', K.V(pos), t0, size=k, t1=t1, opacity=0.85, mode='camera')
+    card(P, 'smoke_plume', K.V(pos), t0, size=k, t1=t1, opacity=0.75, mode='camera')
     return True
 
 
@@ -1111,6 +1121,8 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         inner = len(mats_ext) - 1
         if g != 'hull':
             role = 'turret' if g == 'TurretPivot' else 'part'
+            if kind == 'structure':
+                role = 'topple'
             nseed = 2 if gsize > 0.75 * actor.size and kind != 'structure' else 1
             if nseed == 1:
                 pieces.append(dict(bm=bm, mats=mats_ext, role=role))
@@ -1175,10 +1187,10 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
             axis = Vector((0, 0, 1)).cross(dirn)
             w = (axis.normalized() if axis.length > 1e-4 else Vector((1, 0, 0))) * rnd.uniform(0.6, 1.6)
         elif small or role == 'small':
-            v = dirn * rnd.uniform(5.0, 10.0) * S + Vector((0, 0, rnd.uniform(3.0, 8.0) * S ** 0.5))
+            v = dirn * rnd.uniform(3.0, 7.0) * S + Vector((0, 0, rnd.uniform(2.5, 6.5) * S ** 0.5))
             w = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized() * rnd.uniform(6, 14)
         else:
-            v = dirn * rnd.uniform(2.5, 6.0) * S + Vector((0, 0, rnd.uniform(3.0, 6.5) * S ** 0.5))
+            v = dirn * rnd.uniform(1.5, 4.0) * S + Vector((0, 0, rnd.uniform(2.5, 5.5) * S ** 0.5))
             w = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized() * rnd.uniform(2.5, 7)
         if air:
             v = v_unit * rnd.uniform(0.75, 1.0) + dirn * (v.length * 0.6) + Vector((0, 0, rnd.uniform(0, 2)))
@@ -1225,8 +1237,11 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         objs.append(o)
     # ---------------------------------------------------------------- fx
     col = _fx_col(accent)
-    blast_w = blast if not air else center
-    explosion(P, blast_w + Vector((0, 0, H * 0.25)), t, size=size, debris=0, smoke=False, light=True)
+    if air:
+        epos = center
+    else:
+        epos = Vector((blast.x, blast.y, gz + min(0.5, H * 0.2)))
+    explosion(P, epos, t, size=size, debris=0, smoke=False, light=True)
     sparks(P, center, t, n=int(26 * S + 10), speed=10 * S, color=col, size=S, terr=terr,
            extra_v=v_unit if air else None)
     if accent == 'orange':   # a few cyan electrical sparks as Terran power systems short out
@@ -1241,7 +1256,10 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         # secondary fires on the next big pieces
         for pc in order[1:3]:
             if pc['vol'] > vmax * 0.25 and rnd.random() < 0.7:
-                _burn(P, pc, t + rnd.uniform(0.2, 0.6), size * 0.45, terr, air, smoke=False, light=False)
+                b2 = pc['body']
+                t2 = max(t + rnd.uniform(0.2, 0.6), (b2.settle_t or b2.landed or t) + 0.05)
+                if t2 < P.seconds - 0.3:
+                    _burn(P, pc, t2, size * 0.45, terr, air, smoke=False, light=False, delay=False)
     if air:
         for pc in order[:4]:
             _smoke_trail(P, pc, t, size)
@@ -1263,9 +1281,9 @@ def _hull_seeds(rnd, verts, gc, glo, ghi, R, H, kind, air, wreck, debris, blast,
     if kind == 'structure':
         z_cut = glo.z + (ghi.z - glo.z) * 0.38
         seeds.append(Vector((gc.x, gc.y, glo.z + (ghi.z - glo.z) * 0.12)))
-        weights.append((0.9 * max(R, (ghi.z - glo.z) * 0.4)) ** 2)
+        weights.append((0.62 * max(R, (ghi.z - glo.z) * 0.35)) ** 2)
         roles.append('core')
-        for _ in range(4):
+        for _ in range(5):
             seeds.append(sample(lambda p: p.z > z_cut, 0.15))
             weights.append(0.0)
             roles.append('topple')
@@ -1323,13 +1341,13 @@ def _top_point(pc, frame):
     return Vector((c.x, c.y, zt)), x, q
 
 
-def _burn(P, pc, t, size, terr, air, smoke=True, light=True):
+def _burn(P, pc, t, size, terr, air, smoke=True, light=True, delay=True):
     """Fire riding on a piece (local to it) from just after the blast; smoke plume from where it
     comes to rest."""
     b = pc['body']
     o = pc['obj']
     f_end = P.T(P.seconds) + 1
-    t_fire = t + 0.12
+    t_fire = t + 0.12 if delay else t
     if air:
         t_fire = b.landed if b.landed is not None else t + 0.2
     rest_f = P.T(b.settle_t) if b.settle_t is not None else f_end
@@ -1353,7 +1371,7 @@ def _smoke_trail(P, pc, t, size):
     k = max(0.25, pc['ext'] * 0.35)
     while tt < min(t_land, P.seconds):
         x, q = pose_at(b, P.T(tt))
-        e = card(P, name, x, tt, size=k, t1=min(P.seconds + 0.5, tt + 1.4), opacity=0.55,
+        e = card(P, name, x, tt, size=k * 0.8, t1=min(P.seconds + 0.5, tt + 1.4), opacity=0.4,
                  fade_in=1, fade_out=0.8 * P.fps)
         if e is not None:
             e.scale = (0.5,) * 3
