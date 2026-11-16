@@ -31,7 +31,7 @@ MODE = A.get('mode', 'frames')
 RES = tuple(int(v) for v in A.get('res', '960x540').split('x'))
 FPS = 24.0
 T_TOUCH = 0.6
-DUR = float(A.get('dur', 5.0))
+DUR = float(A.get('dur', 4.7))
 GOLD = (1.0, 0.36, 0.02)
 INFL = 0.13          # the skin rides this far proud of the hull
 SLEEVE_W = float(A.get('sleeve_w', 0.75))   # how far the sleeve wall reaches out from the hull before it meets the plane
@@ -701,6 +701,7 @@ def build_hangar(full):
 
 CUT = 2.7        # shot A -> shot B
 T_CLEAR_CAM = 99.0
+ATT_X = [0.0]
 
 
 def camera(cam, name, t, yf):
@@ -718,8 +719,9 @@ def camera(cam, name, t, yf):
         lens = 23
     elif name == 'B':      # among the defenders: tail clears, the skin snaps flat, the boarder settles
         s = (t - CUT) / (DUR - CUT)
-        loc = Vector((10.4 - 0.6 * s, yf - 30.0 - 1.2 * s, float(A.get('bz', 6.6))))
-        tgt = Vector((-0.5, yf - 6.0, float(A.get('btz', 3.6))))
+        fx = 0.45 * ATT_X[0]                              # drift with the boarder as it peels off
+        loc = Vector((10.4 - 0.6 * s + 0.5 * fx, yf - 30.0 - 1.2 * s, float(A.get('bz', 6.6))))
+        tgt = Vector((-0.5 + fx, yf - 6.0, float(A.get('btz', 3.6))))
         lens = 29
     else:                  # hero
         loc = Vector((-11.4, yf - 10.3, 1.85))
@@ -730,6 +732,7 @@ def camera(cam, name, t, yf):
 
 def still(sc, cam, update, info, t, name, tag, depth=False):
     update(t)
+    ATT_X[0] = info['att'].cx_now - info['att'].x
     camera(cam, name if name != 'auto' else ('A' if t < CUT else 'B'), t, info['yf'])
     raw = os.path.join(OUT, '_raw', tag + '.png')
     K.render(sc, raw, RES, depth_far=130.0 if depth else None)
