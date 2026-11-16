@@ -3,7 +3,8 @@
 0:35    the camera carries on the tilt down from 07d until Vesper fills the frame, then falls in
         behind one drop ship; Terran drop ships and Arcadian seed pods fall side by side, one pod
         level with our ship
-0:36    both hit the air: orange fire round the ship, gold-white round the pod, long burning trails;
+0:36    both hit the air: orange fire round the ship and a long burning trail; a gold re-entry glow round
+        the pod and a wake of crackling gold lightning (Arcadian craft never trail fire);
         the camera shakes
 0:37    they punch into the cloud tops (the stitch whites the screen out from 0:36.85)
 Fixed seeds, all motion baked on the global clock.
@@ -111,6 +112,91 @@ def fire_tail(parent, name, L, R, x0, seed, hot=(1.0, 0.78, 0.4), mid=(1.0, 0.32
     return out
 
 
+N_LT = 4                          # lightning trail variants per pod, flickered between
+
+
+def _lt_mats():
+    """Shared materials for the pods' lightning trails: a hot gold-white core, a gold sleeve and a soft
+    gold halo (kept near 1 so AgX keeps them gold instead of bleaching them beige)."""
+    import shard_fx as SFX
+    return (SFX._emit('PodBoltCoreM', (1.0, 0.7, 0.28), 2.2),
+            SFX._halo('PodBoltSleeveM', (1.0, 0.56, 0.12), 1.4, 1.5),
+            SFX._halo('PodBoltHaloM', (1.0, 0.55, 0.14), 0.25, 3.0))
+
+
+def lightning_tail(parent, name, L, R, x0, seed, f_on, f_off):
+    """Arcadian pods leave no fire (owner rule: Arcadian propulsion is lightning, never flame): a wake of
+    crackling gold bolts streaming back (-X, parent-local) from x0, flickering between N_LT variants every
+    global frame from f_on to f_off. Returns the root empty (scale x = how far grown, 0..1)."""
+    import shard_fx as SFX
+    from mathutils import Quaternion
+    core_m, sleeve_m, halo_m = _lt_mats()
+    rnd = random.Random(seed)
+    root = bpy.data.objects.new(name + 'Bolts', None)
+    SP.link(root)
+    root.parent = parent
+    root.location = (x0, 0, 0)
+    variants = []
+    for v in range(N_LT):
+        objs = []
+        for b in range(4):
+            ang = rnd.uniform(0, 2 * math.pi)
+            off = Vector((0, math.cos(ang), math.sin(ang))) * R * rnd.uniform(0.0, 0.5) * (b > 0)
+            end = Vector((-L * rnd.uniform(0.65, 1.0), 0, 0)) + \
+                Vector((0, math.cos(ang), math.sin(ang))) * L * rnd.uniform(0.12, 0.3)
+            pts = SFX._jag(off, end, rnd, 5, 0.15)
+            n = len(pts)
+            w = (0.32 if b == 0 else 0.2) * R / 2.2
+            tp = [w * (1 - 0.8 * i / (n - 1)) for i in range(n)]
+            objs.append(SFX._tube_path(f'{name}LtV{v}B{b}C', pts, [t * 0.4 for t in tp], core_m))
+            objs.append(SFX._tube_path(f'{name}LtV{v}B{b}S', pts, [t * 1.4 for t in tp], sleeve_m, sides=8))
+            if b < 2:
+                objs.append(SFX._tube_path(f'{name}LtV{v}B{b}H', pts, [t * 5.0 for t in tp], halo_m, sides=10))
+            d = (end - off).normalized()
+            for fk in range(3):
+                j = rnd.randint(3, n - 4)
+                side = d.orthogonal().normalized()
+                side.rotate(Quaternion(d, rnd.uniform(0, 2 * math.pi)))
+                e = pts[j] + (d * 0.6 + side).normalized() * L * rnd.uniform(0.08, 0.18)
+                br = SFX._jag(pts[j], e, rnd, 3, 0.22)
+                objs.append(SFX._tube_path(f'{name}LtV{v}B{b}F{fk}', br,
+                                           [tp[j] * 0.7 * (1 - k / len(br)) + 0.02 for k in range(len(br))],
+                                           sleeve_m))
+        for a in range(3):        # arcs crawling over the re-entry glow, nose to tail
+            ang = rnd.uniform(0, 2 * math.pi)
+            ang2 = ang + rnd.uniform(-0.9, 0.9)
+            p0 = Vector((rnd.uniform(1.5, 3.5), math.cos(ang) * R * 0.75, math.sin(ang) * R * 0.75))
+            p1 = Vector((x0 + rnd.uniform(0.0, 2.0), math.cos(ang2) * R, math.sin(ang2) * R))
+            pts = SFX._jag(p0, p1, rnd, 4, 0.2)
+            for nm, rr, mm in (('C', 0.02, core_m), ('S', 0.055, sleeve_m)):
+                arc = SFX._tube_path(f'{name}LtV{v}A{a}{nm}', pts, rr * R, mm, sides=8)
+                arc.parent = parent              # pod-local, not on the growing root
+                arc.visible_shadow = False
+                objs.append(arc)
+        for o in objs:
+            if o.parent is None:
+                o.parent = root
+            o.visible_shadow = False
+        variants.append(objs)
+    cur = rnd.randrange(N_LT)
+    for vi, objs in enumerate(variants):
+        for o in objs:
+            o.hide_render = True
+            o.keyframe_insert('hide_render', frame=1)
+    for f in range(f_on, f_off + 1):
+        cur = (cur + 1 + rnd.randrange(N_LT - 1)) % N_LT
+        for vi, objs in enumerate(variants):
+            for o in objs:
+                o.hide_render = vi != cur
+                o.keyframe_insert('hide_render', frame=f)
+    for objs in variants:
+        for o in objs:
+            o.hide_render = True
+            o.keyframe_insert('hide_render', frame=f_off + 1)
+            SP._interp_where(o, 'hide_render', 'CONSTANT')
+    return root
+
+
 class Drop:
     def __init__(self, S):
         self.S = S
@@ -143,13 +229,19 @@ class Drop:
         q = D.to_track_quat('X', 'Z')
         ship_src = NP.drop_ship('DropSpaceSrc', cargo=True, hot=True)
         pod_src = NP.seed_pod('PodSpaceSrc', hot=True)
+        psh = next(c for c in pod_src.children if '_Sheath' in c.name)   # gold re-entry glow, not orange
+        psh.data.materials.clear()
+        pm = NP._sheath_mat((1.0, 0.7, 0.3), 5.0)
+        pr = next(nd for nd in pm.node_tree.nodes if nd.type == 'VALTORGB')
+        pr.color_ramp.elements[0].color = (0.45, 0.28, 0.08, 1)  # dull gold at the open end, not fire red
+        psh.data.materials.append(pm)
         for src in (ship_src, pod_src):
             src.location = (0, 0, -9000)
             for o in [src] + list(src.children_recursive):
                 o.hide_render = True
         self.ships = []
         # (kind, lateral e1, lateral e2, lag s, speed k)
-        plan = [('ship', 0, 0, 0.0, 1.0), ('pod', 48, -26, 0.0, 1.0),
+        plan = [('ship', 0, 0, 0.0, 1.0), ('pod', 38, -18, 0.0, 1.0),   # pod nudged in so its lightning is in frame
                 ('ship', -70, 25, 0.25, 0.98), ('pod', 95, -30, 0.15, 1.02), ('ship', -150, -40, 0.4, 0.97),
                 ('pod', 170, 50, 0.3, 1.0), ('ship', 60, 90, 0.5, 0.99), ('pod', -110, -95, 0.55, 1.01),
                 ('ship', 210, -80, 0.65, 0.98), ('pod', -230, 60, 0.7, 1.0), ('ship', -40, -160, 0.8, 1.0),
@@ -182,12 +274,16 @@ class Drop:
                 SP.key_scale(sh, [(T0, (s0.x * 0.3, s0.y * 0.3, 0.01)), (fi, (s0.x * 0.3, s0.y * 0.3, 0.01)),
                                   (fi + 8, tuple(s0))], 'BEZIER')
                 SP.show(sh, fi, T1 + 2, tree=False)
-                for tl in fire_tail(o, o.name, 26.0 if kind == 'ship' else 30.0, 2.8 if kind == 'ship' else 2.2,
-                                    sh.location.x - 13.0, 3600 + i,
-                                    hot=(1.0, 0.55, 0.18) if kind == "ship" else (1.0, 0.75, 0.35),
-                                    mid=ORANGE if kind == 'ship' else (1.0, 0.6, 0.15)):
-                    SP.key_scale(tl, [(fi + 1, (1, 1, 0.02)), (fi + 14, (1, 1, 0.6)), (fi + 30, (1, 1, 1))], 'BEZIER')
-                    SP.show(tl, fi + 1, T1 + 2, tree=False)
+                if kind == 'ship':
+                    for tl in fire_tail(o, o.name, 26.0, 2.8, sh.location.x - 13.0, 3600 + i,
+                                        hot=(1.0, 0.55, 0.18), mid=ORANGE):
+                        SP.key_scale(tl, [(fi + 1, (1, 1, 0.02)), (fi + 14, (1, 1, 0.6)), (fi + 30, (1, 1, 1))],
+                                     'BEZIER')
+                        SP.show(tl, fi + 1, T1 + 2, tree=False)
+                else:                                # Arcadian: a lightning wake, never fire
+                    lt = lightning_tail(o, o.name, 30.0, 2.2, -3.0, 3600 + i, fi + 1, T1 + 2)
+                    SP.key_scale(lt, [(fi + 1, (0.02, 1, 1)), (fi + 14, (0.6, 1, 1)), (fi + 30, (1, 1, 1))],
+                                 'BEZIER')
             # fire light on the hull, blue engine dots / gold glow before the fire
             L = bpy.data.objects.new(o.name + '_FireL', bpy.data.lights.new(o.name + '_FireL', 'POINT'))
             SP.link(L)
