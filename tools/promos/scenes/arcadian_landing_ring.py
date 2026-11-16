@@ -305,7 +305,7 @@ print('petals', [(p['kind'], round(p['az']), [round(x, 2) for x in p['foot']]) f
 # ---- descent: a closed bud dropping on lightning legs, turning slowly as it brakes
 T_LAND = 1.4
 root.rotation_mode = 'XYZ'
-DESC = [(0.0, (-15.0, 7.0, 15.0), 4, -5, -75), (0.6, (-5.5, 2.4, 6.5), -4, 3, -32),
+DESC = [(0.0, (-15.0, 7.0, 15.0), 1, -1.5, -75), (0.6, (-5.5, 2.4, 6.5), -4, 3, -32),
         (1.05, (-1.0, 0.4, 1.8), 1.5, -1, -8), (T_LAND, (0, 0, 0.0), 0, 0, 0)]
 for t, p, rx, ry, rz in DESC:
     root.location = p
@@ -761,10 +761,10 @@ def drop_rings(u):
     a = u['a']
     for k in range(3):
         o2 = K.polyline('DropRing', [(math.cos(2 * math.pi * i / 40), math.sin(2 * math.pi * i / 40), 0) for i in range(41)],
-                        0.035, M_RING)
+                        0.024, M_RING)
         o2.visible_shadow = False
         f0 = int(P.T(u['ta']))
-        f1 = int(P.T(u['th'] + 0.22))
+        f1 = int(P.T(u['th'] + 0.12))
         for f in range(f0, f1 + 1):
             t = (f - 1) / FPS
             p = u['pos'](t)
@@ -772,7 +772,7 @@ def drop_rings(u):
             rr = COL_R * (1.05 - 0.12 * k)
             if t > u['th'] - 0.05:
                 w = ss((t - u['th'] + 0.05) / 0.27)
-                rr *= 1 + 0.35 * w
+                rr *= 1 + 0.6 * w
                 z = lerp(z, p.z + 0.4, w)
             o2.location = (AX, 0, z)
             o2.scale = (rr, rr, rr)
@@ -826,15 +826,15 @@ lumen.turret_yaw([(0.0, 0), (4.4, 0), (5.0, 35), (5.6, -20), (6.0, -15)])
 cam_keys = []
 for t in (0.0, 0.45, 0.9):
     c = ring.pos_at(t)
-    cam_keys.append((t, (-2.0 + 0.8 * t, -17.0, 3.6 - 1.0 * t), (c.x + AX, c.y, c.z + 3.2), 26))
+    cam_keys.append((t, (-2.0 + 0.8 * t, -17.0, 6.5 - 3.6 * t), (c.x + AX, c.y, c.z + 3.2), 26))
 cam_keys += [
     (1.4, (-1.0, -16.5, 2.6), (AX, 0, 2.6), 26),
     (2.0, (1.0, -16.0, 3.0), (AX, 0, 4.6), 24),
     (2.6, (5.0, -15.0, 3.4), (AX + 1.0, 0, 3.8), 26),
     (3.4, (10.0, -13.0, 3.3), (AX + 2.5, 0, 3.0), 26),
     (4.2, (14.0, -10.0, 3.0), (AX + 3.0, 0, 3.2), 26),
-    (5.0, (15.5, -6.5, 2.3), (3.0, 1.0, 3.3), 25),
-    (6.0, (14.5, -4.5, 1.8), (4.0, 1.5, 3.2), 24),
+    (5.0, (16.5, -7.5, 2.4), (2.6, 0.8, 3.3), 24),
+    (6.0, (16.0, -6.0, 2.0), (3.0, 1.2, 3.3), 22),
 ]
 P.camera(cam_keys, shake=0.02)
 
