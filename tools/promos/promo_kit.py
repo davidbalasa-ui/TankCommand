@@ -693,6 +693,7 @@ class Promo:
         ap.add_argument('--frames', default=None, help='a-b, or a single frame for a still')
         ap.add_argument('--no-render', action='store_true')
         ap.add_argument('--blend', action='store_true', help='also save the .blend')
+        ap.add_argument('--resume', action='store_true', help='keep already rendered frames, render only missing ones')
         self.args, _ = ap.parse_known_args(sys.argv[1:])
         self.id = clip_id
         self.seconds = seconds
@@ -1184,7 +1185,7 @@ class Promo:
         p0, p1 = V(p0), V(p1)
         d = p1 - p0
         dur = max(0.04, d.length / speed)
-        m = emit_mat('Slug', color, 12)
+        m = emit_mat('Slug', color, 3)
         o = sphere('Slug', 1.0, m, seg=(8, 6))
         o.rotation_mode = 'QUATERNION'
         n = max(2, int(dur * self.fps) + 1)
@@ -1421,7 +1422,7 @@ class Promo:
             o.keyframe_insert('scale', frame=f0 + (d + 0.55) * self.fps)
             show_between(o, f0 + d * self.fps, f0 + (d + 0.56) * self.fps)
         # white-hot core flash
-        core = ico('Core', 1.0, emit_mat('Core', (1, 0.75, 0.4), 20), sub=2)
+        core = ico('Core', 1.0, emit_mat('Core', (1, 0.45, 0.1), 5), sub=2)
         core.location = pos
         core.scale = (0.1,) * 3
         core.keyframe_insert('scale', frame=f0)
@@ -1601,11 +1602,14 @@ class Promo:
         out = a.out or os.path.join(OUT_ROOT, 'clips' if q == 'final' else 'previews', self.id)
         os.makedirs(out, exist_ok=True)
         frames = os.path.join(out, 'frames')
-        if os.path.isdir(frames):
+        if os.path.isdir(frames) and not a.resume:
             shutil.rmtree(frames)
+        r.use_overwrite = not a.resume
         os.makedirs(frames, exist_ok=True)
         if a.blend or q == 'final':
             bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, self.id + '.blend'), compress=True)
+            if os.path.exists(os.path.join(out, self.id + '.blend1')):
+                os.remove(os.path.join(out, self.id + '.blend1'))
         if a.no_render:
             return out
         if a.frames and ',' in a.frames:
