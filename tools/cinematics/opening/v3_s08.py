@@ -285,9 +285,29 @@ def build(draft=True):
     s0 = tf.matrix_world @ Vector((12, 0, 1))
     s1 = rig.matrix_world.translation.copy()
     d = (s1 - s0).normalized()
-    SP.beam(s0, d, 'TFLance', BLUE, (0.85, 0.95, 1.0), 1.2,
-            [(fr(T_HIT), 0.5, 1.0), (fr(T_HIT) + 3, (s1 - s0).length + 20, 1.0), (fr(T_DIE) - 2, (s1 - s0).length + 20, 1.1),
-             (fr(T_DIE) + 2, (s1 - s0).length + 20, 0.0)], strength=20.0, glow=4.0)
+    # a lean lance that stops in the Orb (not a fat pipe running on past it), pulsing as it burns
+    Ll = (s1 - s0).length + 3
+    lk = [(fr(T_HIT), 0.5, 1.0), (fr(T_HIT) + 3, Ll, 1.0)]
+    for i_, f_ in enumerate(range(fr(T_HIT) + 5, fr(T_DIE) - 2, 2)):
+        lk.append((f_, Ll, 1.0 if i_ % 2 else 0.72))
+    lk += [(fr(T_DIE) - 2, Ll, 1.25), (fr(T_DIE) + 2, Ll, 0.0)]
+    lance = SP.beam(s0, d, 'TFLance', BLUE, (0.85, 0.95, 1.0), 0.55, lk, strength=20.0, glow=4.0)
+    # the lance stays locked on: every frame it runs from the frigate's gun to the Orb, wherever both have moved
+    rk_ = {f_: k_ for f_, _, k_ in lk}
+    pul = 1.0
+    for f_ in range(fr(T_HIT), fr(T_DIE) + 3):
+        pul = rk_.get(f_, pul)
+        sc_.frame_set(f_)
+        g_ = tf.matrix_world @ Vector((12, 0, 1))
+        o_ = rig.matrix_world.translation.copy()
+        v_ = o_ - g_
+        grow = min(1.0, (f_ - fr(T_HIT)) / 3.0)
+        lance.location = g_
+        lance.rotation_quaternion = SP.aim_quat(v_.normalized())
+        lance.scale = (max(0.5, (v_.length + 1.5) * grow), 0.55 * 0.45 * pul + 1e-4, 0.55 * 0.45 * pul + 1e-4)
+        for dp in ('location', 'rotation_quaternion', 'scale'):
+            lance.keyframe_insert(dp, frame=f_)
+    sc_.frame_set(1)
     sc_.frame_set(fr(T_DIE))
     pd = rig.matrix_world.translation.copy()
     sc_.frame_set(1)
@@ -347,9 +367,18 @@ def build(draft=True):
             [(fr(T_HIT) - 1, at(rig, T_HIT - 1 / 24.0) - lane * 42 + s1_ * 24 + s2_ * 10, at(rig, T_HIT) + lane * 18, 28)],
             shake=[(fr(T_HIT - 0.55), 0.8, 20)])
     # D2: over the frigate's shoulder as its lance connects, and the Orb dies
-    sc.shot('D2', fr(T_HIT), fr(16.0) - 1,
-            [(fr(T_HIT), at(tf, T_HIT) + Vector((-46, 40, 58)), at(rig, T_HIT) * 0.7 + at(tf, T_HIT) * 0.3, 34),
-             (fr(16.0) - 1, at(tf, 16.0) + Vector((-50, 44, 62)), pd * 0.7 + at(tf, 16.0) * 0.3, 32)],
+    # D2: side-on to the lance, so the beam spans the frame from the frigate's gun to the Orb (looking down
+    # the beam flattened the depth and made the Orb look skewered on the frigate)
+    perp = d.cross(UP).normalized()
+    if perp.dot(Vector((-1, -1, 0))) < 0:
+        perp = -perp
+
+    def d2cam(t, o_pos):
+        mid = o_pos * 0.52 + at(tf, t) * 0.48
+        return mid + perp * 125 + UP * 30 - d * 25, mid
+    c0_, l0_ = d2cam(T_HIT, at(rig, T_HIT))
+    c1_, l1_ = d2cam(16.0, pd)
+    sc.shot('D2', fr(T_HIT), fr(16.0) - 1, [(fr(T_HIT), c0_, l0_, 36), (fr(16.0) - 1, c1_ + perp * 8, l1_, 36)],
             shake=[(fr(T_HIT), 1.5, 14), (fr(T_DIE), 4.0, 24)])
     sc.shot('E', fr(16.0), nf,
             [(fr(16.0), pd + Vector((-70, -60, 20)), pd, 26), (nf, pd + Vector((-80, -75, 24)), at(tf, 18.0) * 0.4 + pd * 0.6, 26)])
