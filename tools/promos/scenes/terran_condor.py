@@ -32,9 +32,9 @@ NEON = COL['terran_neon']
 
 # ------------------------------------------------------------------------------- flight plan
 SPEED = 20.0
-ALT = 16.0
+ALT = 20.0
 X0 = -54.0
-T_DROP = [1.55, 2.0, 2.45]
+T_DROP = [1.6, 2.05, 2.5]
 G = 16.0              # a touch heavier than real gravity: keeps the fall inside the clip
 DRAG = 5.0            # bombs lose forward speed and trail behind the bomber
 T_BAY0, T_BAY1 = 0.75, 1.15
@@ -54,86 +54,6 @@ C_H = None  # set after load
 TARGET_H = [2.4, 3.6, 2.6]   # sentinel / aerie / star vault roof heights where bombs burst
 
 
-def bomb_state(i, t, z0):
-    """Bomb i world position + velocity at time t (after release)."""
-    td = T_DROP[i]
-    tau = max(0.0, t - td)
-    x0 = plane_pos(td).x
-    x = x0 + SPEED * tau - 0.5 * DRAG * tau * tau
-    z = z0 - 0.5 * G * tau * tau - 1.2 * tau
-    vel = Vector((SPEED - DRAG * tau, 0.0, -G * tau - 1.2))
-    return Vector((x, 0.0, z)), vel
-
-
-def bomb_impact(i, z0, h):
-    t = T_DROP[i]
-    while True:
-        p, _ = bomb_state(i, t, z0)
-        if p.z <= h:
-            return t, p
-        t += 1 / 240
-
-
-# ------------------------------------------------------------------------------- world
-condor = P.load('condor', label='condor')
-C_H = condor.entry['height']
-condor.model_root.location.z = -C_H / 2
-ZC = -C_H / 2
-BELLY = 0.37 + ZC                       # fuselage underside between the nacelles
-BOMB_Z0 = ALT + BELLY - 0.2
-IMPACTS = [bomb_impact(i, BOMB_Z0, TARGET_H[i]) for i in range(3)]
-print('IMPACTS', IMPACTS)
-TX = [p.x for _, p in IMPACTS]
-
-P.env('alien', sun=(55, 0, 140), sun_energy=4.2, props=30,
-      clear=[(TX[1], 0, 22), (-26, 0, 14)])
-P.flatten(TX[1], 0, 22)
-P.flatten(-26, 0, 12)
-
-# ------------------------------------------------------------------------------- the base
-sentinel = P.load('sentinel', at=(TX[0], 0.0), heading=20, label='sentinel')
-aerie = P.load('aerie', at=(TX[1], 0.0), heading=-15, label='aerie')
-vault = P.load('star_vault', at=(TX[2], 0.0), heading=40, label='star_vault')
-sifter = P.load('sifter', at=(TX[1] + 1.5, -6.6), heading=160, label='sifter')
-sifter.spin('GrinderPivot', 540, 0.0, 6.0, axis=1)
-lumen_base = P.load('lumen', at=(TX[2] + 1.0, 6.4), heading=-120, label='lumen_base')
-lumen_base.hover_bob(0.07, 0.8)
-print('target heights', sentinel.entry['height'], aerie.entry['height'], vault.entry['height'])
-
-# gold glow on the domes (living base before the strike)
-for s_, h_ in ((sentinel, 2.0), (aerie, 3.2), (vault, 2.4)):
-    L = K.link(bpy.data.objects.new('DomeGlow', bpy.data.lights.new('DomeGlow', 'POINT')))
-    L.location = s_.pos_at(0) + Vector((0, 0, h_))
-    L.data.color = GOLD
-    L.data.energy = 250
-    L.data.shadow_soft_size = 1.0
-
-# two lumens on the outskirts, under the bomber's approach
-lumA = P.load('lumen', at=(-29.0, -6.5), heading=170, label='lumenA')
-lumB = P.copy(lumA, at=(-24.5, 5.0), heading=-160, label='lumenB')
-for a in (lumA, lumB):
-    a.hover_bob(0.08, 0.9)
-
-# ------------------------------------------------------------------------------- materials
-_mats = {}
-
-
-def mat(key, col, strength, alpha=None):
-    if key not in _mats:
-        _mats[key] = K.emit_mat('C_' + key, col, strength, alpha=alpha)
-    return _mats[key]
-
-
-HULL = K.pbr_mat('BayDoor', (0.05, 0.052, 0.058), rough=0.45, metal=0.6)
-BAY_IN = K.pbr_mat('BayInside', (0.012, 0.012, 0.014), rough=0.8)
-BOMB_M = K.pbr_mat('BombBody', (0.16, 0.165, 0.17), rough=0.4, metal=0.7)
-BAND = mat('BombBand', COL['terran_orange'], 2.0)
-TIP = mat('BombTip', NEON, 2.0)
-M_ENG = mat('Eng', NEON, 2.0)
-M_ENG_GLOW = mat('EngGlow', NEON, 1.0, alpha=0.15)
-BOLT_M = mat('Bolt', GOLD, 2.4)
-BOLT_CORE = mat('BoltCore', (1.0, 0.72, 0.35), 3.0)
-BOLT_GLOW = mat('BoltGlow', GOLD, 1.2, alpha=0.3)
 
 
 # ------------------------------------------------------------------------------- flight
@@ -195,7 +115,96 @@ def c_pos(t):
     return p
 
 
+
+
+# ------------------------------------------------------------------------------- world
+condor = P.load('condor', label='condor')
+C_H = condor.entry['height']
+condor.model_root.location.z = -C_H / 2
+ZC = -C_H / 2
+BELLY = 0.37 + ZC                       # fuselage underside between the nacelles
+BOMB_L = 1.25
+BOMB_R = 0.19
+SLOTS = [-1.25, -0.7, -0.15]   # rack positions along the bay (model x); dropped rear first
+RACK_Z = BELLY - BOMB_R * 0.55
+
+
 fly(condor, c_pos, c_roll, c_pitch)
+
+
+def bomb_sim(i, t):
+    """World pos/vel of bomb i at time t >= its drop (falls from its rack)."""
+    td = T_DROP[i]
+    f_drop = int(round(P.T(td)))
+    p0 = condor.mats[f_drop] @ Vector((SLOTS[i], 0.0, RACK_Z))
+    tau = t - td
+    p = Vector((p0.x + SPEED * tau - 0.5 * DRAG * tau * tau, 0.0, p0.z - 0.5 * G * tau * tau - 1.2 * tau))
+    vel = Vector((SPEED - DRAG * tau, 0.0, -G * tau - 1.2))
+    return p, vel
+
+
+def impact(i, h):
+    t = T_DROP[i]
+    while bomb_sim(i, t)[0].z > h:
+        t += 1 / 480
+    return t, bomb_sim(i, t)[0]
+
+
+IMPACTS = [impact(i, TARGET_H[i]) for i in range(3)]
+print('IMPACTS', IMPACTS)
+TX = [p.x for _, p in IMPACTS]
+
+P.env('alien', sun=(55, 0, 140), sun_energy=4.2, props=30,
+      clear=[(TX[1], 0, 22), (-26, 0, 14)])
+P.flatten(TX[1], 0, 22)
+P.flatten(-26, 0, 12)
+
+# ------------------------------------------------------------------------------- the base
+sentinel = P.load('sentinel', at=(TX[0], 0.0), heading=20, label='sentinel')
+aerie = P.load('aerie', at=(TX[1], 0.0), heading=-15, label='aerie')
+vault = P.load('star_vault', at=(TX[2], 0.0), heading=40, label='star_vault')
+sifter = P.load('sifter', at=(TX[1] + 1.5, -6.6), heading=160, label='sifter')
+sifter.spin('GrinderPivot', 540, 0.0, 6.0, axis=1)
+lumen_base = P.load('lumen', at=(TX[2] + 1.0, 6.4), heading=-120, label='lumen_base')
+lumen_base.hover_bob(0.07, 0.8)
+print('target heights', sentinel.entry['height'], aerie.entry['height'], vault.entry['height'])
+
+# gold glow on the domes (living base before the strike)
+for s_, h_ in ((sentinel, 2.0), (aerie, 3.2), (vault, 2.4)):
+    L = K.link(bpy.data.objects.new('DomeGlow', bpy.data.lights.new('DomeGlow', 'POINT')))
+    L.location = s_.pos_at(0) + Vector((0, 0, h_))
+    L.data.color = GOLD
+    L.data.energy = 80
+    L.data.shadow_soft_size = 1.0
+
+# two lumens on the outskirts, under the bomber's approach
+lumA = P.load('lumen', at=(-29.0, -6.5), heading=170, label='lumenA')
+lumB = P.copy(lumA, at=(-24.5, 5.0), heading=-160, label='lumenB')
+for a in (lumA, lumB):
+    a.hover_bob(0.08, 0.9)
+
+# ------------------------------------------------------------------------------- materials
+_mats = {}
+
+
+def mat(key, col, strength, alpha=None):
+    if key not in _mats:
+        _mats[key] = K.emit_mat('C_' + key, col, strength, alpha=alpha)
+    return _mats[key]
+
+
+HULL = K.pbr_mat('BayDoor', (0.05, 0.052, 0.058), rough=0.45, metal=0.6)
+BAY_IN = K.pbr_mat('BayInside', (0.012, 0.012, 0.014), rough=0.8)
+BOMB_M = K.pbr_mat('BombBody', (0.16, 0.165, 0.17), rough=0.4, metal=0.7)
+BAND = mat('BombBand', COL['terran_orange'], 2.0)
+TIP = mat('BombTip', NEON, 2.0)
+M_ENG = mat('Eng', NEON, 2.0)
+M_ENG_GLOW = mat('EngGlow', NEON, 1.0, alpha=0.15)
+BOLT_M = mat('Bolt', GOLD, 2.4)
+BOLT_CORE = mat('BoltCore', (1.0, 0.72, 0.35), 3.0)
+BOLT_GLOW = mat('BoltGlow', GOLD, 1.2, alpha=0.3)
+
+
 
 
 def W(t, local):
@@ -252,9 +261,6 @@ for sgn in (1, -1):
     doors.append(hinge)
 
 # ------------------------------------------------------------------------------- bombs
-BOMB_L = 1.25
-BOMB_R = 0.19
-SLOTS = [-1.25, -0.7, -0.15]   # rack positions along the bay (model x); dropped rear first
 BOMB_Y = [0.0, 0.0, 0.0]
 
 
@@ -304,11 +310,7 @@ for i in range(3):
                 z0 = p.z
         else:
             tau = t - td
-            x0w = (condor.mats[f_drop] @ local).x
-            x = x0w + SPEED * tau - 0.5 * DRAG * tau * tau
-            z = z0 - 0.5 * G * tau * tau - 1.2 * tau
-            p = Vector((x, 0.0, z))
-            vel = Vector((SPEED - DRAG * tau, 0.0, -G * tau - 1.2))
+            p, vel = bomb_sim(i, t)
             # nose follows velocity, lagging a little at first; slight wobble
             dirv = Vector((1, 0, 0)).lerp(vel.normalized(), min(1.0, tau / 0.5) * 0.9 + 0.1 * min(1.0, tau / 1.2))
             q = dirv.to_track_quat('X', 'Z')
@@ -325,8 +327,8 @@ for i in range(3):
         K.key_hide(o, 0, True)
         K.key_hide(o, f_vis, False)
         K.key_hide(o, f_hit + 1, True)
-    # actual impact point of this bomb (it dropped from the rack, not the bay centre)
-    tau_h = (f_hit - 1) / FPS - td
+
+
     bombs.append(b)
     # release: clamp clunk puff of hot air + small light
     P.light(W(td, (SLOTS[i], 0, BELLY - 0.3)), td, COL['terran_orange'], energy=300, dur=0.1)
@@ -341,9 +343,9 @@ for sgn in (1, -1):
     for f in range(0, NF + 2, 2):
         fl = R.uniform(0.85, 1.12)
         plume.location = eng + Vector((-0.45 * fl, 0, 0))
-        plume.scale = (0.55 * fl, 0.16, 0.16)
+        plume.scale = (0.4 * fl, 0.11, 0.11)
         glow.location = eng + Vector((-0.5 * fl, 0, 0))
-        glow.scale = (1.0 * fl, 0.38, 0.38)
+        glow.scale = (0.7 * fl, 0.2, 0.2)
         for o in (plume, glow):
             o.keyframe_insert('location', frame=f)
             o.keyframe_insert('scale', frame=f)
@@ -418,6 +420,8 @@ def quiet_explosion(pos, t, size, debris=8, scorch=True, smoke=True):
             o.scale = o.scale * 0.6
         elif nm == 'Scorch' and not scorch:
             bpy.data.objects.remove(o)
+        elif nm == 'Scorch':
+            o.scale = (o.scale.x * 0.55, o.scale.y * 0.55, o.scale.z)
 
 
 def quiet_destroy(actor, t, size, debris=10):
@@ -427,6 +431,8 @@ def quiet_destroy(actor, t, size, debris=10):
         if o.name.split('.')[0] == 'Core' and o.type == 'MESH':
             o.data.materials[0] = mat('CoreSoft', (1.0, 0.42, 0.06), 2.5)
             o.scale = o.scale * 0.6
+        elif o.name.split('.')[0] == 'Scorch':
+            o.scale = (o.scale.x * 0.55, o.scale.y * 0.55, o.scale.z)
 
 
 SAND = (0.42, 0.3, 0.3)
@@ -467,11 +473,11 @@ def flash_ring(pos, t, r1):
 
 
 TARGETS = [sentinel, aerie, vault]
-SIZES = [4.2, 5.4, 4.6]
+SIZES = [3.6, 4.5, 3.9]
 for i, (t_hit, p_hit) in enumerate(IMPACTS):
     tgt = TARGETS[i]
     gp = Vector((p_hit.x, 0, P.ground_z(p_hit.x, 0)))
-    quiet_explosion(p_hit, t_hit, SIZES[i] * 0.75, debris=6, scorch=False, smoke=False)
+    quiet_explosion(p_hit, t_hit, SIZES[i] * 0.6, debris=6, scorch=False, smoke=False)
     quiet_destroy(tgt, t_hit + 0.04, SIZES[i], debris=16)
     flash_ring(gp, t_hit, SIZES[i] * 1.6)
     core_rupture(gp + Vector((0, 0, TARGET_H[i] * 0.6)), t_hit + 0.12)
@@ -479,7 +485,7 @@ for i, (t_hit, p_hit) in enumerate(IMPACTS):
     # secondary blast a beat later, off to one side
     off = Vector((R.uniform(-1.5, 1.5), R.choice((-1, 1)) * R.uniform(1.5, 2.5), 0.4))
     quiet_explosion(gp + off, t_hit + 0.32, 2.4, debris=6, smoke=True)
-    P.fire_patch(gp + Vector((0, 0, 0.6)), t_hit + 0.15, 6.0, size=1.6)
+    P.fire_patch(gp + Vector((0, 0, 0.6)), t_hit + 0.15, 6.0, size=0.7)
     P.cam_shake(t_hit, 0.28, dur=0.45)
 
 # units caught by the blasts
@@ -491,12 +497,12 @@ T_C1 = 1.45
 T_C2 = 2.85
 keys = []
 # shot A: on the ground among the lumens, looking up; the bomber passes over, bay opening
-CA = Vector((-31.0, -8.5, 1.3))
+CA = Vector((-24.0, -10.0, 0.8))
 keys += [
-    (0.0, tuple(CA), plane_pos(0.0) * 0.55 + lumA.pos_at(0.0) * 0.45 + Vector((0, 0, 1.0)), 22),
-    (0.5, tuple(CA + Vector((0.3, 0.2, 0.05))), plane_pos(0.5) * 0.75 + lumA.pos_at(0.5) * 0.25, 22),
-    (1.0, tuple(CA + Vector((0.6, 0.4, 0.1))), plane_pos(1.0) + Vector((0, 0, -0.5)), 24),
-    (T_C1 - 1 / FPS, tuple(CA + Vector((0.9, 0.6, 0.1))), plane_pos(T_C1) + Vector((-1.0, 0, -0.5)), 26),
+    (0.0, tuple(CA), (-40.0, -2.5, 7.5), 20),
+    (0.6, tuple(CA + Vector((0.5, -0.2, 0.1))), plane_pos(0.6) * 0.6 + Vector((-34.0, -3.0, 2.0)) * 0.4, 20),
+    (1.05, tuple(CA + Vector((1.0, -0.4, 0.2))), plane_pos(1.05) * 0.85 + Vector((-30.0, -3.0, 2.0)) * 0.15, 22),
+    (T_C1 - 1 / FPS, tuple(CA + Vector((1.3, -0.6, 0.3))), plane_pos(T_C1) + Vector((-0.5, 0, -1.0)), 24),
 ]
 
 
@@ -521,7 +527,7 @@ keys += [
     (T_C2, (mid - 20.0, -19.0, 15.0), (mid - 2.0, 0.0, 2.0), 26),
     (3.6, (mid - 22.0, -16.0, 10.0), (mid + 1.0, 0.0, 2.5), 26),
     (4.6, (mid - 23.0, -11.5, 5.0), (mid + 7.0, 0.0, 4.5), 27),
-    (6.0, (mid - 24.0, -8.5, 2.6), (mid + 20.0, 0.0, 8.0), 28),
+    (6.0, (mid - 24.0, -8.5, 2.6), (mid + 22.0, 0.0, 8.5), 31),
 ]
 P.camera(keys, shake=0.02, cuts=(T_C1, T_C2))
 P.cam_shake(1.1, 0.06, dur=0.6)   # engine rumble as it passes over

@@ -28,7 +28,7 @@ P = Promo('arcadian_halo', seconds=6.0, seed=23)
 FPS = P.fps
 NF = P.nf
 R = P.rnd
-P.env('dusk', sun=(74, 0, 125), sun_energy=4.0, props=60, radius=230)
+P.env('dusk', sun=(74, 0, 125), sun_energy=4.0, props=150, radius=400)
 
 
 def ss(x):
@@ -152,10 +152,10 @@ halo_pos = hermite([
     (1.9, (44, 4.5, 50), (-34, -3, -14)),
     (2.45, (25, 4.0, 44.5), (-36, -2, -8)),     # jink sideways around the lasers
     (T_PASS, (4, 1.0, 41.8), (-38, -4, -2)),
-    (3.6, (-17, -4, 44), (-30, -14, 10)),
-    (4.4, (-34, -19, 51), (-11, -22, 7)),
-    (5.2, (-38, -37, 55), (4, -21, 3)),
-    (6.0, (-30, -52, 56.5), (14, -16, 1)),
+    (3.6, (-17, -3.5, 44), (-30, -11, 9)),
+    (4.4, (-35, -15, 50), (-13, -21, 5)),
+    (5.2, (-34, -31, 51), (12, -17, -2)),
+    (6.0, (-14, -35, 47.5), (26, 1, -5)),
 ])
 _halo_base = halo_pos
 
@@ -181,7 +181,7 @@ def falcon_pos(t):
     if t <= T_PASS:
         return falcon_base(t)
     d = t - T_PASS
-    p = F_PASS + F_V * d + Vector((-2.5 * d * d, 1.2 * d * d, -G_FALL * d * d))
+    p = F_PASS + F_V * d + Vector((-5.0 * d * d, 1.2 * d * d, -G_FALL * d * d))
     r = 3.0 * ss(d / 1.2)
     w = 5.5 * d + 1.2 * d * d
     return p + Vector((0, r * math.sin(w), r * (1 - math.cos(w)) * 0.8))
@@ -550,13 +550,14 @@ burst(T_FIRE2, Vector((0, 3.0, -2.8)))
 
 # ------------------------------------------------------------------------------- falcon death
 def falcon_damage():
-    fl = K.ico('FalconFire', 1.0, M_FLAME, sub=2)
+    fl = K.sphere('FalconFire', 1.0, P.soft_fire_mat(), seg=(12, 8))
+    fl.color = (1.0, 0.35, 0.05, 1.0)
     fl.parent = falcon.root
     fl.location = ENG + Vector((0.2, 0, 0.1))
     fl.visible_shadow = False
     t_end = T_CRASH if T_CRASH else 6.1
     for f in range(int(P.T(T_LASH + 0.1)), int(P.T(t_end)) + 2):
-        s = R.uniform(0.22, 0.34) * min(1.0, (f - P.T(T_LASH)) / 4 + 0.3)
+        s = R.uniform(0.16, 0.26) * min(1.0, (f - P.T(T_LASH)) / 4 + 0.3)
         fl.scale = (s * 1.9, s, s)
         fl.keyframe_insert('scale', frame=f)
     K.show_between(fl, P.T(T_LASH + 0.1), P.T(t_end) + 1)
@@ -564,17 +565,18 @@ def falcon_damage():
     while t < t_end:
         sz = 0.9 + 1.0 * ss((t - T_PASS) / 1.0)
         P.puff(W(falcon, t, ENG), t, size=sz, n=1, rise=0.6, life=3.0,
-               color=(0.24, 0.22, 0.21), opacity=0.55)
-        t += 0.04
+               color=(0.24, 0.22, 0.21), opacity=0.45)
+        t += 0.025
 
 
 falcon_damage()
 if T_CRASH:
     falcon.vanish(T_CRASH + 1 / FPS)
     _before = set(bpy.data.objects)
-    P.explosion(CRASH_P, T_CRASH, size=4.0, debris=14)
-    P.fire_patch(CRASH_P + Vector((0, 0, 0.3)), T_CRASH + 0.2, 6.2, size=1.4)
-    P.smoke_column(CRASH_P, T_CRASH + 0.25, 6.2, size=2.0, every=0.2)
+    P.explosion(CRASH_P, T_CRASH, size=6.5, debris=18)
+    P.light(CRASH_P + Vector((0, 0, 3)), T_CRASH, (1.0, 0.45, 0.1), energy=60000, dur=0.5, radius=3)
+    P.fire_patch(CRASH_P + Vector((0, 0, 0.3)), T_CRASH + 0.2, 6.2, size=3.6)
+    P.smoke_column(CRASH_P, T_CRASH + 0.25, 6.2, size=4.0, every=0.15)
 
 
 # ------------------------------------------------------------------------------- halo vapour
@@ -588,7 +590,7 @@ def vapor(actor, pts_local, t0, t1):
             K.show_between(o, f, f + 1)
 
 
-vapor(halo, [ring_pt(math.pi / 2, 0.1), ring_pt(-math.pi / 2, 0.1)], T_ROLL0, T_ROLL1 + 0.2)
+
 
 
 # ------------------------------------------------------------------------------- camera
@@ -601,8 +603,8 @@ keys = []
 for t in [0.0, 0.4, 0.8, 1.15, T_C1 - 1 / FPS]:
     h = halo_pos(t)
     u = ss(t / T_C1)
-    off = Vector((lerp(-13.0, -10.0, u), lerp(-8.0, 7.0, u), lerp(-1.5, 6.5, u)))
-    look = h + Vector((lerp(0.0, -4.0, u), 0, lerp(0.3, -2.5, u)))
+    off = Vector((lerp(-12.0, -10.0, u), lerp(-8.0, 7.0, u), lerp(-4.0, 5.5, u)))
+    look = h + Vector((lerp(0.0, -1.5, u), 0, lerp(0.8, -0.6, u)))
     keys.append((t, tuple(h + off), look, 35))
 
 
@@ -613,8 +615,8 @@ def shoulder(t):
     d = (hp - fp)
     dh = Vector((d.x, d.y, 0)).normalized()
     side = Vector((-dh.y, dh.x, 0))
-    cpos = fp - dh * 11.5 - side * 3.5 + Vector((0, 0, 2.6))
-    w = 0.45 + 0.15 * ss((t - 2.2) / 0.6)
+    cpos = fp - dh * 11.0 - side * 3.5 + Vector((0, 0, 0.6))
+    w = 0.3 + 0.2 * ss((t - 2.2) / 0.6)
     tgt = hp * w + fp * (1 - w)
     return cpos, tgt
 
@@ -622,27 +624,28 @@ def shoulder(t):
 t = T_C1
 while t < T_C2 - 0.05:
     c, g = shoulder(t)
-    keys.append((t, tuple(c), g, 30))
+    keys.append((t, tuple(c), g, 27))
     t += 0.25
 c, g = shoulder(T_C2 - 1 / FPS)
-keys.append((T_C2 - 1 / FPS, tuple(c), g, 30))
+keys.append((T_C2 - 1 / FPS, tuple(c), g, 27))
 
 # shot C: orbit around the Halo as it rolls away and climbs; end looking past it down at the
 # Falcon's smoke trail and the crash fire
 end_h = halo_pos(6.0)
 away = Vector((end_h.x - CRASH_P.x, end_h.y - CRASH_P.y, 0)).normalized()
-th1 = math.atan2(away.y, away.x)
+th1 = math.atan2(away.y, away.x) + math.radians(20)
 th0 = th1 - math.radians(210)
 for i in range(13):
     u = i / 12
     t = T_C2 + (6.0 - T_C2) * u
     h = halo_pos(t)
     th = lerp(th0, th1, ss(u) * 0.35 + u * 0.65)
-    rad = lerp(13.0, 15.0, u)
-    z = lerp(-2.0, 5.5, ss(u))
+    rad = lerp(13.0, 14.0, u)
+    z = lerp(-2.0, 8.5, ss(u))
     cpos = h + Vector((rad * math.cos(th), rad * math.sin(th), z))
-    look = h + (CRASH_P - h).normalized() * 9.0 * ss((u - 0.4) / 0.6)
-    keys.append((t, tuple(cpos), look, lerp(30, 32, u)))
+    look = h + (CRASH_P - h).normalized() * 15.0 * ss((u - 0.4) / 0.6)
+    look = look + Vector((0, 0, -2.5 * math.sin(math.pi * min(1.0, u / 0.8))))
+    keys.append((t, tuple(cpos), look, lerp(30, 40, ss(u))))
 
 P.camera(keys, shake=0.03, cuts=(T_C1, T_C2))
 for tt in (T_FIRE1, T_FIRE2):
