@@ -104,19 +104,21 @@ def outrider():
     loft([[(0.45, -0.8, 1.6), (0.45, 0.8, 1.6), (1.5, 0.72, 1.36), (1.5, -0.72, 1.36)],
           [(0.47, -0.8, 1.65), (0.47, 0.8, 1.65), (1.52, 0.72, 1.41), (1.52, -0.72, 1.41)]], 'armor', bevel=0.02)
     for s in (1, -1):
-        b = box((1.05, s * 0.36, 1.535), (0.14, 0.22, 0.02), 'glass')
+        b = box((1.05, s * 0.36, 1.535), (0.14, 0.22, 0.02), 'dark')
+        F.rot(b, 'Y', 12.5, about=(1.05, 0, 1.52))
+        b = box((1.06, s * 0.36, 1.548), (0.025, 0.18, 0.012), 'glow')
         F.rot(b, 'Y', 12.5, about=(1.05, 0, 1.52))
     box((0.6, 0, 1.63), (0.07, 0.74, 0.04), 'plate', bevel=0.015)
     box((3.02, 0, 0.92), (0.02, 0.5, 0.06), 'grille')
     box((-0.2, 0, 0.55), (2.3, 0.8, 0.1), 'dark', bevel=0.03)
-    # Nose: split hatch, periscopes, winch and hooks.
+    # Nose: armoured radiator plate with a louvred grille, winch and hooks (no hatch: nobody rides inside).
+    b = box((2.02, 0, 1.275), (0.3, 0.52, 0.02), 'armor', bevel=0.012)
+    F.rot(b, 'Y', 11, about=(2.02, 0, 1.27))
+    b = box((2.02, 0, 1.295), (0.22, 0.4, 0.012), 'vent')
+    F.rot(b, 'Y', 11, about=(2.02, 0, 1.27))
     for s in (1, -1):
-        b = box((2.02, s * 0.3, 1.275), (0.3, 0.25, 0.02), 'olive', bevel=0.012)
-        F.rot(b, 'Y', 11, about=(2.02, 0, 1.27))
-        box((1.72, s * 0.3, 1.36), (0.03, 0.1, 0.02), 'steel')
         box((3.04, s * 0.56, 0.88), (0.08, 0.04, 0.06), 'steel', bevel=0.01)
         box((3.06, s * 0.3, 0.9), (0.05, 0.02, 0.1), 'dark')
-    K.periscopes(1.62, 0.0, 1.37, 2, 0.5)
     cyl((3.07, -0.27, 0.9), (3.07, 0.27, 0.9), 0.085, 8, 'steel')
     for s in (1, -1):
         for i, x in enumerate((-1.9, 0.0, 1.9)):
@@ -156,42 +158,34 @@ def outrider():
         tube((-0.5, 0, tz - 0.03), (-0.5, 0, tz + 0.07), [(0, 0.66), (1, 0.62)], 16, 'dark')
         turret_shell(-1.3, 0.55, 0.68, tz, 0.5)
         box((0.62, 0, gz), (0.14, 0.3, 0.16), 'dark', bevel=0.03)
-        # Long autocannon: receiver, perforated cooling shroud, slotted muzzle brake, feed chute, coax sight.
-        box((0.95, 0, gz), (0.36, 0.15, 0.13), 'armor', bevel=0.03)
-        mg = F.mark()
-        K.gun(0.6, 3.5, 0.0, gz, 0.075)
-        tube((1.35, 0, gz), (2.55, 0, gz), [(0, 0.11), (0.04, 0.145), (0.96, 0.145), (1, 0.11)], 8, 'plate', sharp=30)
-        for kk in range(6):
-            for dy, dz in ((0.146, 0), (-0.146, 0), (0, 0.146)):
-                box((1.5 + kk * 0.18, dy, gz + dz), (0.05, 0.012 if dy else 0.035, 0.035 if dy else 0.012), 'dark')
-        tube((3.3, 0, gz), (3.78, 0, gz), [(0, 0.09), (0.15, 0.155), (0.85, 0.155), (1, 0.11)], 8, 'armor', sharp=30)
-        for dx in (3.45, 3.62):
-            box((dx, 0, gz), (0.04, 0.165, 0.05), 'dark')
-        cyl((3.775, 0, gz), (3.785, 0, gz), 0.07, 8, 'dark')
-        F.regroup(mg, 'Barrel')
-        K.flash(3.8, 0, gz, 0.085, 'Flash')
+        # Long autocannon: receiver and a round telescoping barrel that collapses when it fires.
+        box((0.95, 0, gz), (0.36, 0.16, 0.155), 'armor', bevel=0.03)
+        V.tele_cannon(0.6, 3.6, gz, 0.12, 4, piston=False, classic=True)
         sweep([(0.95, 0.15, gz + 0.02), (0.7, 0.42, gz + 0.12), (0.25, 0.56, gz + 0.1)], [(0.03, 0.08)] * 3, 'steel', sides=4)
         box((0.1, 0.58, gz + 0.06), (0.22, 0.1, 0.16), 'olive', bevel=0.02)
         box((0.8, -0.3, gz + 0.14), (0.2, 0.08, 0.07), 'dark', bevel=0.02)
         cyl((1.0, -0.3, gz + 0.14), (1.02, -0.3, gz + 0.14), 0.045, 8, 'amber')
-        # Scout sensor head: telescoping mast, lensed optic ball, rotating radar bar.
-        for kk, (rr, hh) in enumerate(((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))):
-            zb = tz + 0.42 + sum(h for _, h in ((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))[:kk])
-            cyl((-0.95, -0.3, zb), (-0.95, -0.3, zb + hh), rr, 8, 'steel' if kk % 2 else 'dark')
-            cyl((-0.95, -0.3, zb + hh - 0.03), (-0.95, -0.3, zb + hh), rr * 1.3, 8, 'dark')
-        box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
-        orb((-0.8, -0.3, tz + 1.38), 0.1, 'glass', seg=(10, 8))
-        cyl((-0.71, -0.3, tz + 1.38), (-0.7, -0.3, tz + 1.38), 0.04, 8, 'glow')
-        with F.group('Radar'):
-            K.radar_bar(-0.95, -0.3, tz + 1.48, w=0.62, post=0.16)
-        K.cupola(-0.45, 0.28, tz + 0.5, 0.17, mg=False)
+        # Scout sensor head: telescoping mast (the upper part pumps up and down), lensed optic ball, rotating radar bar.
+        cyl((-0.95, -0.3, tz + 0.42), (-0.95, -0.3, tz + 0.8), 0.075, 8, 'dark')
+        cyl((-0.95, -0.3, tz + 0.77), (-0.95, -0.3, tz + 0.8), 0.1, 8, 'dark')
+        with F.group('Mast'):
+            cyl((-0.95, -0.3, tz + 0.5), (-0.95, -0.3, tz + 1.16), 0.055, 8, 'steel')
+            cyl((-0.95, -0.3, tz + 1.13), (-0.95, -0.3, tz + 1.16), 0.072, 8, 'dark')
+            cyl((-0.95, -0.3, tz + 1.16), (-0.95, -0.3, tz + 1.46), 0.038, 8, 'dark')
+            box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
+            orb((-0.8, -0.3, tz + 1.38), 0.1, 'glass', seg=(10, 8))
+            cyl((-0.71, -0.3, tz + 1.38), (-0.7, -0.3, tz + 1.38), 0.04, 8, 'glow')
+            with F.group('Radar'):
+                K.radar_bar(-0.95, -0.3, tz + 1.48, w=0.62, post=0.16)
+        box((-0.45, 0.28, tz + 0.55), (0.2, 0.16, 0.1), 'dark', bevel=0.03)   # sensor block where the hatch was
+        cyl((-0.33, 0.28, tz + 0.56), (-0.32, 0.28, tz + 0.56), 0.04, 8, 'amber')
         for s in (1, -1):
             box((-0.7, s * 0.69, tz + 0.27), (0.2, 0.012, 0.018), 'glow')
             K.id_marks(-1.1, s * 0.6, tz + 0.3, s, 2, 0.1)
     wheels = [(f"Wheel{i}{'L' if sd > 0 else 'R'}", (x, sd * 1.42, 0.6), f"Wheel{i}{'L' if sd > 0 else 'R'}Pivot")
               for sd in (1, -1) for i, x in enumerate((-1.9, 0.0, 1.9))]
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Turret')]
-                + K.gun_pivots([('', (0.6, 0, gz), (3.8, 0, gz))]))
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Mast', (-0.95, -0.3, tz + 0.8), 'MastPivot', 'Turret'), ('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Mast')]
+                + V.cannon_pivots((0.6, 0, gz)))
 
 
 @asset('human/skimmer.glb', 'Terran Skimmer (hover tank)')
@@ -206,7 +200,8 @@ def skimmer():
           (0.8, [(0, 0.18), (1.56, 0.18), (1.64, 0.56), (0, 0.56)]),
           (3.1, [(0, 0.3), (0.56, 0.3), (0.62, 0.7), (0, 0.7)])], 'rubber', bevel=0.03)
     plate([(-1.9, -0.9), (0.6, -0.86), (2.2, -0.5), (2.2, 0.5), (0.6, 0.86), (-1.9, 0.9)], 1.4, 1.5, 'armor', inset=0.06, bevel=0.025)
-    K.periscopes(2.05, 0.0, 1.16, 3, 0.2)
+    box((2.05, 0, 1.17), (0.16, 0.3, 0.06), 'dark', bevel=0.02)   # forward sensor strip
+    box((2.13, 0, 1.17), (0.008, 0.24, 0.025), 'glow')
     for s in (1, -1):
         for x, r in ((1.55, 0.56), (-1.75, 0.64)):
             # Ducted lift fan: round shroud, deep duct, pitched blades on a hub, guard bars, glow ring in the lip.
@@ -234,7 +229,7 @@ def skimmer():
         for i, xa in enumerate((-2.0, -0.92, 0.16)):
             xb = xa + 0.98
             loft([[(xa, s * 1.84, 0.86), (xb, s * 1.84, 0.86), (xb, s * 1.46, 1.38), (xa, s * 1.46, 1.38)],
-                  [(xa + 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.53, 1.4), (xa + 0.04, s * 1.53, 1.4)]], 'plate' if i != 1 else 'olive', bevel=0.02)
+                  [(xa + 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.53, 1.4), (xa + 0.04, s * 1.53, 1.4)]], 'plate' if i != 1 else 'armor', bevel=0.02)
         box((0.0, s * 1.82, 0.77), (0.7, 0.012, 0.02), 'glow')
         K.headlamp(2.62, s * 0.75, 1.0, s)
         box((2.3, s * 1.42, 0.86), (0.12, 0.012, 0.03), 'amber')
@@ -264,13 +259,14 @@ def skimmer():
         tube((-0.4, 0, tz - 0.03), (-0.4, 0, tz + 0.07), [(0, 0.78), (1, 0.74)], 16, 'dark')
         turret_shell(-1.35, 0.75, 0.82, tz, 0.56)
         box((-0.3, 0, tz + 0.58), (0.5, 0.45, 0.025), 'olive', bevel=0.02)
-        K.mantlet(0.82, tz + 0.27, 0.52, 0.19, guns=(0.3, -0.3), r=0.085, length=0.55)
+        K.mantlet(0.82, tz + 0.27, 0.52, 0.19, guns=(0.3, -0.3), r=0.1, length=0.55)
         for s in (1, -1):
-            K.railgun(0.8, 4.3, s * 0.3, tz + 0.27, 0.095, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
+            V.tele_cannon(0.8, 4.3, tz + 0.27, 0.12, 4, y=s * 0.3, piston=False, prefix='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0], classic=True)
             box((-0.3, s * 0.83, tz + 0.3), (0.3, 0.012, 0.02), 'glow')
             K.smoke(-0.1, s * 0.74, tz + 0.36, s, n=3)
             K.id_marks(-1.05, s * 0.72, tz + 0.3, s, 2, 0.1)
-        K.cupola(-0.55, 0.3, tz + 0.6, 0.19, mg=False)
+        box((-0.55, 0.3, tz + 0.64), (0.2, 0.16, 0.08), 'dark', bevel=0.03)   # sensor block where the hatch was
+        cyl((-0.43, 0.3, tz + 0.65), (-0.42, 0.3, tz + 0.65), 0.04, 8, 'amber')
         box((-0.2, -0.3, tz + 0.68), (0.16, 0.13, 0.08), 'dark', bevel=0.03)
         box((-0.04, -0.3, tz + 0.69), (0.012, 0.09, 0.045), 'glass')
         cyl((0.0, -0.3, tz + 0.77), (0.0, -0.3, tz + 0.79), 0.05, 8, 'amber')
@@ -279,7 +275,7 @@ def skimmer():
         K.antenna(-1.1, -0.4, tz + 0.5, 0.75, tip='glow')
     fans = [(f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}", (x, sd * 1.78, 0.84),
              f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}Pivot") for sd in (1, -1) for x in (1.55, -1.75)]
-    return dict(pivot=[('Turret', (-0.4, 0, tz))] + fans + K.gun_pivots([(a, (0.8, y, tz + 0.27), (4.45, y, tz + 0.27)) for a, y in (('L', 0.3), ('R', -0.3))]))
+    return dict(pivot=[('Turret', (-0.4, 0, tz))] + fans + V.cannon_pivots((0.8, 0, tz + 0.27), ('L', 'R')))
 
 
 @asset('human/bulwark.glb', 'Terran Bulwark (heavy tank)', size=1024)
@@ -303,18 +299,20 @@ def bulwark():
     with F.group('Turret'):
         tube((-0.5, 0, tz - 0.03), (-0.5, 0, tz + 0.1), [(0, 1.4), (1, 1.34)], 24, 'dark')
         turret_shell(-2.7, 1.5, 1.45, tz, th)
-        turret_kit(-2.7, 1.5, 1.45, tz, th)
+        turret_kit(-2.7, 1.5, 1.45, tz, th, cupola=False)
         K.mantlet(1.62, tz + 0.46, 1.0, 0.36, guns=(0.52, -0.52), r=0.19, length=1.0)
         for s in (1, -1):
-            K.railgun(1.7, 8.6, s * 0.52, tz + 0.46, 0.19, evac=True, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
+            V.tele_cannon(1.8, 7.6, tz + 0.46, 0.24, 4, y=s * 0.52, piston=False, prefix='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0], classic=True)
             # Side missile pods on hinged arms with struts and an open armoured lid.
             K.missile_box((-0.9, s * 1.86, tz + 0.66), (0.78, 0.3, 0.25), nx=2, nz=2)
             for xx in (-1.35, -0.45):
                 box((xx, s * 1.52, tz + 0.56), (0.07, 0.14, 0.09), 'plate', bevel=0.02)
                 cyl((xx - 0.1, s * 1.42, tz + 0.56), (xx + 0.1, s * 1.42, tz + 0.56), 0.06, 8, 'steel')
             K.ram((-0.9, s * 1.3, tz + 0.25), (-0.9, s * 1.7, tz + 0.42), 0.045)
-            lid = box((-0.9, s * 1.86, tz + 0.95), (0.74, 0.3, 0.02), 'plate', bevel=0.012)
-            F.rot(lid, 'X', s * -24, about=(0, s * 1.58, tz + 0.93))
+            with F.group('Cap' + 'LR'[s < 0]):   # armoured lid on its hinge: kicks open on each blast
+                lid = box((-0.9, s * 1.86, tz + 0.95), (0.74, 0.3, 0.02), 'plate', bevel=0.012)
+                F.rot(lid, 'X', s * -24, about=(0, s * 1.58, tz + 0.93))
+                cyl((-1.55, s * 1.58, tz + 0.93), (-0.25, s * 1.58, tz + 0.93), 0.035, 8, 'steel')
             for k in range(3):   # spare links on the turret rear quarter
                 box((-2.45 + k * 0.22, s * 1.2, tz + 0.5), (0.09, 0.035, 0.12), 'track')
         box((2.9, 0, tz + 0.46), (0.7, 0.36, 0.09), 'armor', bevel=0.02)
@@ -329,14 +327,16 @@ def bulwark():
         box((0.585, -0.75, tz + th + 0.4), (0.008, 0.05, 0.025), 'glass')
         box((0.9, 0.5, tz + th + 0.1), (0.16, 0.16, 0.1), 'dark', bevel=0.03)   # panoramic sight
         box((1.065, 0.5, tz + th + 0.11), (0.008, 0.11, 0.06), 'glass')
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + K.gun_pivots([(a, (1.7, y, tz + 0.46), (8.75, y, tz + 0.46)) for a, y in (('L', 0.52), ('R', -0.52))]))
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + V.cannon_pivots((1.8, 0, tz + 0.46), ('L', 'R'))
+                + [('Cap' + sd, (-0.9, sy * 1.58, tz + 0.93), f'Cap{sd}Pivot', 'Turret') for sd, sy in (('L', 1), ('R', -1))])
 
 
 @asset('human/javelin.glb', 'Terran Javelin (missile tank)')
 def javelin():
     L, hw, top = 6.4, 1.22, 1.42
     K.chassis(L, hw, top, stowage=False)
-    K.hatch(1.2, 0.0, top + 0.02, 0.26, 6)
+    box((1.2, 0.0, top + 0.06), (0.3, 0.3, 0.06), 'armor', bevel=0.02)   # armoured sensor block (unmanned)
+    box((1.36, 0.0, top + 0.07), (0.008, 0.2, 0.025), 'glow')
     for s in (1, -1):   # reload canisters strapped along the fenders
         fy = s * (1.68 - 0.42 * 0.32)
         tube((-2.3, fy, 1.5), (-0.2, fy, 1.5), [(0, 0.1), (0.04, 0.15), (0.96, 0.15), (1, 0.1)], 10, 'olive', sharp=30)
@@ -367,6 +367,9 @@ def javelin():
             box((-0.7, s * 1.975, pz), (1.2, 0.012, 0.018), 'glow')
             box((0.95, s * 1.46, pz + 0.42), (0.14, 0.44, 0.012), 'hazard')
             F.rot_all(m, 'Y', -16, about=(-0.5, 0, pz))
+            for o in F.since(m):   # pod bodies ride one cradle part; the missiles keep their own parts under it
+                if o.get('group') == 'Turret':
+                    o['group'] = 'Pods'
         # Targeting optics and a rotating fire-control panel.
         box((0.25, 0, tz + 1.1), (0.26, 0.2, 0.14), 'dark', bevel=0.04)
         box((0.52, 0, tz + 1.1), (0.012, 0.14, 0.08), 'glass')
@@ -384,7 +387,8 @@ def javelin():
         K.antenna(-1.5, 0.35, tz + 1.05, 1.1)
         K.antenna(-1.5, -0.35, tz + 1.05, 0.8, tip='glow')
         K.beacon(-0.3, -0.3, tz + 1.0)
-    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret')] + [(g, p, g + 'Pivot', 'Turret') for g, p in msl])
+    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret'), ('Pods', (-0.5, 0, pz), 'PodsPivot', 'Turret')]
+                + [(g, p, g + 'Pivot', 'Pods') for g, p in msl])
 
 
 @asset('human/longbow.glb', 'Terran Longbow (artillery)', size=1024)
@@ -453,13 +457,15 @@ def longbow():
 
 
 def cab(x, y, z, sx=0.7, sy=0.6, sz=0.55):
-    """Unmanned control cab: crisp wedge with two armoured sensor slits under a brow, hatch, light bar, beacon."""
+    """Unmanned control cab: crisp wedge with two armoured sensor slits under a brow, light bar, sensor pod, beacon."""
     prism([(x - sx, z), (x + sx, z), (x + sx, z + sz * 0.42), (x + sx * 0.45, z + sz), (x - sx * 0.8, z + sz), (x - sx, z + sz * 0.8)],
           y - sy, y + sy, 'armor', taper=0.84, bevel=0.03)
     ang = math.degrees(math.atan2(sz * 0.58, sx * 0.55))
     m = F.mark()
-    for sg in (1, -1):
-        box((0, sg * sy * 0.36, 0), (sx * 0.2, sy * 0.27, 0.012), 'glass')
+    for sg in (1, -1):   # armoured sensor shutters, each with one narrow lit scanner slit (no windows)
+        box((0, sg * sy * 0.36, 0.006), (sx * 0.2, sy * 0.27, 0.016), 'armor', bevel=0.008)
+        box((-sx * 0.04, sg * sy * 0.36, 0.02), (sx * 0.045, sy * 0.23, 0.008), 'dark')
+        box((-sx * 0.04, sg * sy * 0.36, 0.026), (sx * 0.016, sy * 0.19, 0.006), 'glow')
     box((0, 0, -0.012), (sx * 0.42, sy * 0.74, 0.012), 'dark')
     box((0, 0, 0.006), (sx * 0.3, sy * 0.06, 0.022), 'armor')
     for sg in (1, -1):
@@ -467,16 +473,16 @@ def cab(x, y, z, sx=0.7, sy=0.6, sz=0.55):
     F.rot_all(m, 'Y', ang)
     F.move_all(m, (x + sx * 0.74, y, z + sz * 0.73))
     box((x + sx * 0.42, y, z + sz + 0.035), (sx * 0.12, sy * 0.8, 0.035), 'plate', bevel=0.015)   # visor brow
-    # Roof light bar and hatch.
+    # Roof light bar and a sensor pod (no hatch: nobody rides inside).
     box((x + sx * 0.2, y, z + sz + 0.09), (0.05, sy * 0.6, 0.045), 'dark', bevel=0.012)
     for kk in (-1, 0, 1):
         box((x + sx * 0.2 + 0.052, y + kk * sy * 0.38, z + sz + 0.09), (0.008, sy * 0.13, 0.03), 'glow' if kk else 'amber')
-    K.hatch(x - sx * 0.3, y - sy * 0.25, z + sz, min(sx, sy) * 0.3, 6)
+    box((x - sx * 0.3, y - sy * 0.25, z + sz + 0.05), (min(sx, sy) * 0.3, min(sx, sy) * 0.3, 0.05), 'dark', bevel=0.02)
+    cyl((x - sx * 0.3 + min(sx, sy) * 0.3, y - sy * 0.25, z + sz + 0.06), (x - sx * 0.3 + min(sx, sy) * 0.3 + 0.01, y - sy * 0.25, z + sz + 0.06), 0.035, 8, 'amber')
     for s in (1, -1):
         box((x - sx * 0.1, y + s * sy * 0.93, z + sz * 0.5), (sx * 0.3, 0.012, 0.018), 'glow')
-        box((x + sx * 0.5, y + s * (sy * 0.86 + 0.1), z + sz * 0.7), (0.012, 0.1, 0.012), 'steel')        # mirror stalk
-        box((x + sx * 0.5, y + s * (sy * 0.86 + 0.2), z + sz * 0.7), (0.012, 0.035, 0.07), 'dark')
-        box((x - sx * 0.3, y + s * sy * 0.9, z + sz * 0.86), (sx * 0.45, 0.012, 0.012), 'steel')              # grab rail
+        box((x + sx * 0.5, y + s * (sy * 0.86 + 0.04), z + sz * 0.62), (0.07, 0.05, 0.05), 'dark', bevel=0.012)   # side sensor nub
+        cyl((x + sx * 0.5 + 0.07, y + s * (sy * 0.86 + 0.04), z + sz * 0.62), (x + sx * 0.5 + 0.08, y + s * (sy * 0.86 + 0.04), z + sz * 0.62), 0.028, 8, 'amber')
     K.beacon(x - sx * 0.55, y + sy * 0.45, z + sz)
     box((x - sx - 0.012, y, z + sz * 0.45), (0.012, sy * 0.6, sz * 0.22), 'vent')
 

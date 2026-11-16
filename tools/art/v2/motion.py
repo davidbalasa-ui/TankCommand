@@ -170,10 +170,10 @@ _h('outrider').update({'MastPivot': slide(UP, 0.2, 0.22), 'TurretPivot': swing(U
 _h('lancer').update({'TurretPivot': swing(UP, 0.25, 0.16, 'idle'), '@idle': dict(shake=0.006)})
 # Skimmer: floats. It bobs and rolls on its fans, turret drifting.
 _h('skimmer').update({'TurretPivot': swing(UP, 0.2, 0.12, 'idle'), '@idle': dict(bob=0.09, bobSpeed=0.55, sway=0.035, swaySpeed=0.31)})
-# Bulwark: heavy and slow. Barely turns its turret; the shoulder capacitor blades flare open on each blast and close as they cool.
+# Bulwark: heavy and slow. Barely turns its turret; the armoured lids over the shoulder missile pods kick open on each blast and settle back.
 _h('bulwark').update({'TurretPivot': swing(UP, 0.12, 0.06, 'idle'), '@idle': dict(shake=0.004),
-                      'CapLPivot': swing(FWD, 0.015, 0.7, snap=-0.5, attack=0.1, recover=2.6),
-                      'CapRPivot': swing(FWD, 0.015, 0.7, phase=1.0, snap=0.5, attack=0.1, recover=2.6)})
+                      'CapLPivot': swing(FWD, 0.015, 0.7, snap=0.45, attack=0.08, recover=1.8),
+                      'CapRPivot': swing(FWD, 0.015, 0.7, phase=1.0, snap=-0.45, attack=0.08, recover=1.8)})
 # Longbow: braces itself. Anchor claws slam into the ground for the salvo, the cannon breathes up and down between salvos.
 _h('longbow').update({'ClawPivot': slide(DOWN, 0.0, 0.1, snap=0.22, attack=0.06, recover=2.2),
                       'GunPivot': swing(LEFT, 0.035, 0.11), '@idle': dict(shake=0.004)})
@@ -192,8 +192,8 @@ tele(_h('skimmer'), 0.7, 'R', recover=0.3, delay=0.25)
 blades(_h('skimmer'), 0.12, 0.45)
 _h('skimmer')['@fire'] = dict(kick=0.02, slide=0.12, attack=0.05, recover=0.5, period=2.4, repeat=2, every=0.25)
 # Bulwark (heavy): both cannons together, one devastating blast every 3.5 s, slow heavy recovery.
-tele(_h('bulwark'), 1.36, 'L', attack=0.06, recover=1.6, fdur=0.14)
-tele(_h('bulwark'), 1.36, 'R', attack=0.06, recover=1.6, fdur=0.14)
+tele(_h('bulwark'), 1.16, 'L', attack=0.06, recover=1.6, fdur=0.14)
+tele(_h('bulwark'), 1.16, 'R', attack=0.06, recover=1.6, fdur=0.14)
 blades(_h('bulwark'), 0.08, 0.18)
 _h('bulwark')['@fire'] = dict(kick=0.06, slide=0.3, attack=0.06, recover=1.1, period=3.5)
 # Longbow (artillery): 3 shots 0.4 s apart, then a 3 s reload (3.8 s cycle, build thread's gameplay timing).

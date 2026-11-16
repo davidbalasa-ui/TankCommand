@@ -687,5 +687,5 @@ def condor():
 import os as _os
 if _os.environ.get('TERRAN_STYLE', 'classic') == 'classic':
     import terran_p6 as _p6
-    for _k in ('lancer', 'longbow'):
+    for _k in ('lancer', 'longbow', 'outrider', 'skimmer', 'bulwark', 'javelin', 'prospector', 'hauler', 'mender', 'watchman'):
         ASSETS[_k] = _p6.ASSETS[_k]
