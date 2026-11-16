@@ -179,11 +179,21 @@ def _card_mat(man, f_start, loop, rate, f_end, tint, opacity, emission, phase):
     a1.use_clamp = True
     nt.links.new(tex.outputs['Alpha'], a1.inputs[0])
     nt.links.new(oi.outputs['Alpha'], a1.inputs[1])
+    # soft frame edges: effects that outgrow the baked frame (smoke tops) never show a hard cut
+    tcn = nt.nodes.new('ShaderNodeTexCoord')
+    sx = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(tcn.outputs['UV'], sx.inputs[0])
+    top = _math(nt, 'MULTIPLY', _math(nt, 'SUBTRACT', 1.0, sx.outputs['Y']), 1 / 0.22, clamp=True)
+    lft = _math(nt, 'MULTIPLY', sx.outputs['X'], 1 / 0.1, clamp=True)
+    rgt = _math(nt, 'MULTIPLY', _math(nt, 'SUBTRACT', 1.0, sx.outputs['X']), 1 / 0.1, clamp=True)
+    edge = _math(nt, 'MULTIPLY', _math(nt, 'MULTIPLY', top, lft), rgt)
+    edge = _math(nt, 'MULTIPLY', edge, edge)
+    a1b = _math(nt, 'MULTIPLY', a1.outputs[0], edge)
     a2 = nt.nodes.new('ShaderNodeMath')
     a2.operation = 'MULTIPLY'
     a2.use_clamp = True
     a2.inputs[1].default_value = opacity
-    nt.links.new(a1.outputs[0], a2.inputs[0])
+    nt.links.new(a1b, a2.inputs[0])
     tr = nt.nodes.new('ShaderNodeBsdfTransparent')
     mix = nt.nodes.new('ShaderNodeMixShader')
     nt.links.new(a2.outputs[0], mix.inputs[0])
@@ -269,7 +279,9 @@ def card(P, name, pos, t, size=1.0, mode='camera', speed=1.0, tint=None, rot_jit
         pl.keyframe_insert('color', index=3, frame=f0)
         pl.color[3] = 1.0
         pl.keyframe_insert('color', index=3, frame=f0 + fi)
-    if fo > 0 and t1 is not None and f1 < P.nf + 1:
+    if not loop and fade_out is None:
+        fo = 0.5 * (f1 - f0)       # one-shots dissolve over their second half (no dark leftovers)
+    if fo > 0 and (t1 is not None or not loop):
         pl.color[3] = 1.0
         pl.keyframe_insert('color', index=3, frame=max(f0 + fi, f1 - fo))
         pl.color[3] = 0.0
@@ -718,6 +730,13 @@ def pose_at(b, frame):
 
 
 # ============================================================================ fracture
+def _ancestors(o, stop):
+    p = o.parent
+    while p is not None and p is not stop:
+        yield p
+        p = p.parent
+
+
 def _collect_meshes(actor, t):
     """Visible mesh objects of the actor at time t, grouped: 'hull' and pivot sub-trees."""
     P = actor.P
@@ -727,6 +746,12 @@ def _collect_meshes(actor, t):
         if o.type != 'MESH':
             continue
         if o.hide_render or 'shield' in o.name.lower():
+            continue
+        # the folded carrier / packed-only parts of structures never join the wreck
+        chain = [o] + list(_ancestors(o, actor.model_root))
+        if any(c.get('hideWhenDeployed') or c.hide_render for c in chain):
+            continue
+        if abs(o.matrix_world.to_3x3().determinant()) < 1e-9:
             continue
         if len(o.data.polygons) == 0:
             continue
@@ -954,7 +979,7 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
         return False
     rnd = P.rnd
     # card size: fireball ~ 1.6 * size across
-    k = size * 1.55 / (man['extent_m'] * 0.55)
+    k = size * 1.15 / (man['extent_m'] * 0.55)
     if air:
         card(P, want, pos, t, size=k, mode='camera', push=size * 0.2)
     else:
