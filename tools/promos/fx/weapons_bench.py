@@ -80,9 +80,14 @@ elif CASE == 'space':
         a.path([(0.0, (-10, y, z)), (3.0, (2, y * 1.3, z))])
         rays.append(a)
         W.lightning_thruster(P, a, 0.0, 3.0, local=(-a.size * 0.4, 0, 0), length=a.size * 0.45, width=0.05)
-    for k in range(6):   # lashes from the moving rays onto the moving fighters
-        t = 0.4 + 0.35 * k
-        P.lightning(rays[k % 2], tw[(k // 2) % 2], t, t + 0.22, width=0.08)
+    for k in range(4):   # lashes from the moving rays onto the moving fighters (glow on)
+        t = 0.4 + 0.5 * k
+        P.shot((rays[k % 2], (rays[0].size * 0.4, 0, 0)), tw[(k // 2) % 2], 'lightning', t, width=0.08, dur=0.22)
+    # turret-less Terran fighters answer from hull points: laser, autocannon, missile
+    P.shot((tw[0], (-4.0, 0, 0)), rays[0], 'laser', 0.7, size=1.2)
+    for k in range(4):
+        P.shot((tw[1], (-4.0, 0.6 * (-1) ** k, 0)), rays[1], 'autocannon', 1.1 + 0.1 * k, spread=0.6)
+    P.shot((tw[0], (-3.0, 0, -0.5)), rays[1], 'missile', 1.6, arc=1.0)
     P.camera([(0, (4, -40, 8), (8, 0, 0), 32), (3.0, (8, -38, 7), (10, 0, 0), 32)])
 elif CASE == 'shell':
     a = P.load('longbow', at=(0, 0), heading=0)

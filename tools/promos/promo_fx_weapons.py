@@ -621,6 +621,9 @@ def impact(P, pos, t, size=1.0, color=None):
                        r1=0.7 * size, life=1.4, vel=(0, 0, 1.0), dens=0.7)
 
 
+_impact = impact
+
+
 # ----------------------------------------------------------------------------- muzzle flash
 def muzzle_flash(P, muzzle_obj, t, color, size=1.0):
     """Multi-petal flash along the barrel (+X of the muzzle empty): white-hot core, a long
@@ -902,7 +905,8 @@ def _endpoint(P, x, lift=True):
     """Endpoint -> function(frame) -> world Vector. Accepts a point, an Actor (its body centre,
     following it), an Object (its world origin, following it) or a callable f(t_seconds)."""
     if hasattr(x, 'pos_at') and hasattr(x, 'root'):          # Actor
-        off = Vector((0, 0, x.size * 0.18 if lift else 0.0))
+        ship = getattr(x, 'entry', {}).get('kind') == 'ship'     # ships hang centred on their root
+        off = Vector((0, 0, x.size * 0.18 if (lift and not ship) else 0.0))
         return (lambda f: _world_at_frame(x.root, f) + off), True
     if isinstance(x, bpy.types.Object):
         return (lambda f: _world_at_frame(x, f)), True
@@ -1130,13 +1134,20 @@ def lightning_thruster(P, obj, t0, t1, local=(0, 0, 0), axis=(-1, 0, 0), length=
 # ----------------------------------------------------------------------------- beams
 def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
     """Energy beam: white-hot core, coloured glow with energy scrolling source -> target,
-    wide haze, snap-on / pinch-off, gentle flicker, bright contact with sparks and smoke."""
-    p0, p1 = K.V(p0), K.V(p1)
-    d = p1 - p0
-    Lh = d.length / 2
+    wide haze, snap-on / pinch-off, gentle flicker, bright contact with sparks and smoke.
+    p0 / p1 may be points, Actors, Objects or callables t -> point (followed per frame)."""
+    fn0, mv0 = _endpoint(P, p0, lift=False)
+    fn1, mv1 = _endpoint(P, p1)
+    moving = mv0 or mv1
+    cur = bpy.context.scene.frame_current
+    f0, f1 = P.T(t0), P.T(t1)
+    fa = int(math.floor(f0))
+    a0, b0 = fn0(fa), fn1(fa)
+    d = b0 - a0
+    Lh = max(d.length / 2, 1e-3)
     k = max(0.6, min(1.4, strength / 10.0))
     rig = K.empty('BeamRig')
-    rig.location = (p0 + p1) / 2
+    rig.location = (a0 + b0) / 2
     rig.rotation_mode = 'QUATERNION'
     rig.rotation_quaternion = d.to_track_quat('X', 'Z')
     hot = tuple(0.45 * c + 0.55 * w for c, w in zip(color, HOT_WHITE))
@@ -1150,19 +1161,27 @@ def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
     ]
     for o in parts:
         o.parent = rig
-    f0, f1 = P.T(t0), P.T(t1)
-    # width envelope on the rig (y/z), per-frame flicker, constant length
+    # width envelope on the rig (y/z), per-frame flicker; x stretches to follow moving ends
     rig.scale = (1, 0.05, 0.05)
     rig.keyframe_insert('scale', frame=f0 - 1)
-    fr = int(math.floor(f0))
+    fr = fa
     first = True
     while fr <= int(f1):
         w = 1.35 if first else P.rnd.uniform(0.9, 1.08)
-        rig.scale = (1, w, w)
+        sx = 1.0
+        if moving:
+            a, b = fn0(fr), fn1(fr)
+            rig.location = (a + b) / 2
+            if (b - a).length > 1e-4:
+                rig.rotation_quaternion = (b - a).to_track_quat('X', 'Z')
+            sx = (b - a).length / (2 * Lh)
+            rig.keyframe_insert('location', frame=max(fr, f0))
+            rig.keyframe_insert('rotation_quaternion', frame=max(fr, f0))
+        rig.scale = (sx, w, w)
         rig.keyframe_insert('scale', frame=max(fr, f0))
         first = False
         fr += 1
-    rig.scale = (1, 0.02, 0.02)
+    rig.scale = (rig.scale.x, 0.02, 0.02)
     rig.keyframe_insert('scale', frame=f1 + 2)
     flow = 24.0   # m/s the energy pattern travels source -> target
     for o in parts:
@@ -1174,25 +1193,125 @@ def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
             for kp in fc.keyframe_points:
                 kp.interpolation = 'LINEAR'
         K.show_between(o, int(f0), int(f1) + 3)
-    # end glows
-    src = glow(P, 'BeamSource', color, loc=p0, scale=(width * 1.8,) * 3, fx_e=2.8, fx_p=1.5, fx_hot=0.6)
-    hit = glow(P, 'BeamContact', color, loc=p1 + Vector((0, 0, width)), scale=(width * 3.0,) * 3, fx_e=2.6, fx_p=1.5, fx_hot=0.6)
-    for o in (src, hit):
+    # end glows (follow the ends)
+    src = glow(P, 'BeamSource', color, loc=a0, scale=(width * 1.8,) * 3, fx_e=2.8, fx_p=1.5, fx_hot=0.6)
+    hit = glow(P, 'BeamContact', color, loc=b0 + Vector((0, 0, width)), scale=(width * 3.0,) * 3, fx_e=2.6, fx_p=1.5,
+               fx_hot=0.6)
+    for o, fn in ((src, fn0), (hit, fn1)):
         for fr in range(int(f0), int(f1) + 2):
             kcol(o, fr, a=P.rnd.uniform(0.75, 1.0) if fr <= f1 else 0.3)
+            if moving:
+                o.location = fn(fr)
+                o.keyframe_insert('location', frame=fr)
         _const(o, 'color')
         K.show_between(o, int(f0), int(f1) + 2)
     tt = t0
+    space = not getattr(P, 'ground', None)
     while tt < t1:
-        sparks(P, p1, tt, n=3, speed=7.0, color=color, axis=UP, spread=75, life=(0.15, 0.4), width=0.018)
+        b = fn1(int(round(P.T(tt))))
+        sparks(P, b, tt, n=3, speed=7.0, color=color, axis=(fn0(int(round(P.T(tt)))) - b) if space else UP,
+               spread=75, life=(0.15, 0.4), width=0.018)
         tt += 2.0 / P.fps
     tt = t0 + 0.05
     while tt < t1:
-        smoke_puff(P, p1 + Vector((0, 0, 0.1)), tt, r0=0.08, r1=0.4, life=1.2, vel=(0, 0, 0.8), dens=0.35)
+        b = fn1(int(round(P.T(tt))))
+        smoke_puff(P, b + Vector((0, 0, 0.1)), tt, r0=0.08, r1=0.4, life=1.2, vel=(0, 0, 0.8), dens=0.35)
         tt += 0.12
-    flicker_light(P, p1 + Vector((0, 0, 0.3)), t0, t1, color, energy=600 * k, radius=0.3, lo=0.75, hi=1.0)
-    flicker_light(P, (p0 + p1) / 2, t0, t1, color, energy=400 + 40 * d.length, radius=d.length * 0.2, lo=0.8, hi=1.0)
+    fi0, fi1 = int(round(f0)), int(round(f1))
+    _pool_light(P, fi0, fi1, color, 600 * k, 0.3, lambda fr: fn1(fr) + Vector((0, 0, 0.3)), lo=0.75, hi=1.0)
+    _pool_light(P, fi0, fi1, color, 400 + 40 * d.length, d.length * 0.2,
+                lambda fr: (fn0(fr) + fn1(fr)) / 2, lo=0.8, hi=1.0)
+    bpy.context.scene.frame_set(cur)
     return t1
+
+
+# ----------------------------------------------------------------------------- fire from a point
+SHOT_SPEC = dict(   # colour, speed, flash, impact size  (same table as Actor.fire)
+    cannon=('tracer', 60, 0.9, 1.0), heavy=('tracer', 50, 1.6, 1.8), autocannon=('tracer', 80, 0.45, 0.45),
+    laser=('laser_blue', 140, 0.6, 0.5), missile=('fire', 32, 0.7, 1.2), shell=('tracer', 35, 1.0, 1.6),
+    lightning=('arc_gold', 0, 0.6, 0.45), beam=('arc_gold', 0, 1.0, 1.4), bomb=('fire', 18, 0.0, 2.2))
+
+
+def _source(P, src):
+    """Shot origin -> (fn(frame) -> point, host object or None, local offset)."""
+    if isinstance(src, tuple) and len(src) == 2 and not isinstance(src[0], (int, float)):
+        host, off = src
+        ob = host.root if hasattr(host, 'root') else host
+        off = Vector(off)
+
+        def fn(f):
+            _world_at_frame(ob, f)
+            return ob.matrix_world @ off
+        return fn, ob, off
+    if hasattr(src, 'root'):
+        return (lambda f: _world_at_frame(src.root, f)), src.root, Vector()
+    if isinstance(src, bpy.types.Object):
+        return (lambda f: _world_at_frame(src, f)), src, Vector()
+    v = K.V(src)
+    return (lambda f: v), None, None
+
+
+def shot(P, src, target, kind, t, color=None, size=1.0, speed=None, impact=True, impact_size=None,  # noqa: C901
+         arc=None, spread=0.0, jag=None, branches=None, width=None, flash=True, dur=None):
+    """Fire one shot from a point (no turret needed): src = point, Actor, Object, or
+    (actor_or_object, local_offset) to ride a moving ship; target = point, Actor or Object.
+    Kinds as Actor.fire. Projectiles lead a moving target. Returns the hit time."""
+    cur = bpy.context.scene.frame_current
+    spec = SHOT_SPEC[kind]
+    col = color or K.COL[spec[0]]
+    spd = speed or spec[1]
+    isz = (impact_size or spec[3]) * size
+    fn0, host, off = _source(P, src)
+    fn1, moving_t = _endpoint(P, target)
+    f = int(round(P.T(t)))
+    p0 = fn0(f)
+    # lead the target for travelling shots
+    t_hit = t
+    p1 = fn1(f)
+    if spd:
+        for _ in range(3):
+            t_hit = t + (p1 - p0).length / spd * (1.25 if kind == 'missile' else 1.0)
+            p1 = fn1(int(round(P.T(t_hit))))
+    if spread:
+        p1 = p1 + Vector((P.rnd.uniform(-spread, spread), P.rnd.uniform(-spread, spread), P.rnd.uniform(-spread, spread) * 0.5))
+    # a muzzle empty at the origin, +X toward the target, riding the host
+    if flash and spec[2] > 0:
+        mz = K.empty('ShotMuzzle')
+        d = (p1 - p0)
+        q = d.to_track_quat('X', 'Z') if d.length > 1e-4 else Vector((1, 0, 0)).to_track_quat('X', 'Z')
+        Mw = Matrix.LocRotScale(p0, q, Vector((1, 1, 1)))
+        if host is not None:
+            _world_at_frame(host, f)
+            mz.parent = host
+            mz.matrix_parent_inverse = host.matrix_world.inverted()
+        mz.matrix_basis = Mw
+        energy = kind in ('laser', 'lightning', 'beam')
+        muzzle_flash(P, mz, t + 1.0 / P.fps, col if energy else K.COL['fire'], spec[2] * size)
+    if kind == 'lightning':
+        lightning(P, (lambda tt: fn0(int(round(P.T(tt))))) if host is not None else p0,
+                  target if moving_t else p1, t, t + (dur or 0.18), color=col,
+                  width=width if width is not None else 0.05 * size,
+                  jag=0.18 if jag is None else jag, branches=2 if branches is None else branches)
+        t_hit = t + 0.02
+    elif kind in ('beam', 'laser'):
+        d_ = dur or (0.45 if kind == 'beam' else 0.14 * max(1.0, size))
+        w_ = width if width is not None else (0.18 if kind == 'beam' else 0.07) * size
+        beam(P, (lambda tt: fn0(int(round(P.T(tt))))) if host is not None else p0,
+             target if moving_t else p1, t, t + d_, col, width=w_, strength=10 if kind == 'beam' else 9)
+        t_hit = t + 0.03
+    elif kind == 'missile':
+        t_hit = missile(P, p0, p1, t, speed=spd, color=col, arc=arc if arc is not None else 2.5)
+    elif kind in ('shell', 'bomb'):
+        t_hit = projectile(P, p0, p1, t, spd, col, size=0.18 * size,
+                           arc=arc if arc is not None else (0.35 * (p1 - p0).length if kind == 'shell' else 0),
+                           streak=kind == 'shell', style=kind)
+    else:
+        t_hit = projectile(P, p0, p1, t, spd, col, size=(0.1 if kind == 'autocannon' else 0.16) * size)
+    if impact:
+        hit_at = fn1(int(round(P.T(t_hit)))) if (moving_t and not spd) else p1
+        _impact(P, hit_at, t_hit, size=isz, color=col if kind in ('laser', 'lightning', 'beam') else None)
+    bpy.context.scene.frame_set(cur)
+    return t_hit
 
 
 # ----------------------------------------------------------------------------- shields

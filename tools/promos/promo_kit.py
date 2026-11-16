@@ -1198,6 +1198,14 @@ class Promo:
         import promo_fx_weapons as W
         return W.beam(self, p0, p1, t0, t1, color, width=width, strength=strength)
 
+    def shot(self, p0, target, kind, t, color=None, **kw):
+        """Fire from a point (ships without turrets): p0 = point, Actor, Object or
+        (actor, local_offset) riding a moving ship; target = point, Actor or Object. Kinds and
+        keywords as Actor.fire (size, speed, impact, impact_size, arc, spread, jag, branches,
+        width, flash, dur). Returns the hit time."""
+        import promo_fx_weapons as W
+        return W.shot(self, p0, target, kind, t, color=color, **kw)
+
     def soft_mat(self):
         """Shared soft smoke/dust material: colour and opacity come from each object's
         Object Color (rgba), edges fade with the facing ratio so balls read as puffs."""
