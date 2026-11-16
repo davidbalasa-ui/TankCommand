@@ -612,8 +612,10 @@ def impact(P, pos, t, size=1.0, color=None):
     sparks(P, pos + Vector((0, 0, 0.05)), t, n=int(min(22, 8 + 7 * size)), speed=9 * math.sqrt(size),
            color=fcol if energy else (1.0, 0.45, 0.1), axis=UP if ground else Vector((0, 0, 0.3)),
            spread=65 if ground else 140, life=(0.2, 0.55))
-    P.light(pos + Vector((0, 0, 0.6 * size)), t, fcol, energy=(600 if energy else 1400) * size, dur=0.15,
-            radius=0.3 * size)
+    # energy hits: low, weak light so the ground shows a tight hotspot rather than a soft smear
+    P.light(Vector((pos.x, pos.y, _gz(P, pos.x, pos.y) + 0.1)) if (energy and ground and pos.z - _gz(P, pos.x, pos.y) < 1.2)
+            else pos + Vector((0, 0, (0.25 if energy else 0.6) * size)), t, fcol, energy=(220 if energy else 1400) * size,
+            dur=0.12 if energy else 0.15, radius=(0.15 if energy else 0.3) * size)
     if ground:
         dirt_kick(P, pos, t, size=size * (0.6 if energy else 1.0))
         scorch(P, pos, t, 0.75 * size, ember=fcol if energy else (1.0, 0.33, 0.06),
@@ -1102,7 +1104,10 @@ def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, s
         K.show_between(o, f0, f1 + 2)
     if light:
         L = (fn1(f0) - fn0(f0)).length
-        _pool_light(P, f0, f1, color, 110 + 5 * L, 0.1, lambda fr: fn1(fr) + Vector((0, 0, 0.28)), lo=0.45, hi=1.0)   # low + weak: tight hotspot, no ground smear
+        def _hug(v):   # sit the light just above the ground when the contact is near it: tight hotspot, no smear
+            gz = _gz(P, v.x, v.y)
+            return Vector((v.x, v.y, gz + 0.1)) if getattr(P, 'ground', None) and v.z - gz < 1.2 else v + Vector((0, 0, 0.12))
+        _pool_light(P, f0, f1, color, 70 + 3 * L, 0.06, lambda fr: _hug(fn1(fr)), lo=0.45, hi=1.0)   # low + weak: tight hotspot, no ground smear
     bpy.context.scene.frame_set(cur)
     return t1
 
