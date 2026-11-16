@@ -90,9 +90,12 @@ def _read_manifest(path):
     if not os.path.exists(first):
         return None
     n = m.get('frames') or len(glob.glob(os.path.join(d, '[0-9][0-9][0-9][0-9].png')))
+    px = m.get('size_px', m.get('size', [512, 512]))
+    if isinstance(px, (int, float)):
+        px = [int(px), int(px)]
     return dict(
         name=m.get('name', os.path.basename(d)), dir=d, first=first, frames=int(n),
-        fps=float(m.get('fps', 24)), size_px=m.get('size_px', m.get('size', [512, 512])),
+        fps=float(m.get('fps', 24)), size_px=list(px), tint=m.get('tint', ''),
         extent_m=float(m.get('extent_m', m.get('extent', 6.0))),
         origin_uv=list(m.get('origin_uv', m.get('origin', [0.5, 0.5]))),
         loop=bool(m.get('loop', False)), alpha=m.get('alpha', 'straight'),
@@ -1383,7 +1386,7 @@ def _burn(P, pc, t, size, terr, air, smoke=True, light=True, delay=True):
     top, x, q = _top_point(pc, min(rest_f, f_end))
     local = q.to_matrix().transposed() @ (top - x)
     local.z -= 0.12 * pc['ext']
-    fs = max(0.35, min(1.6, pc['ext'] * 0.45)) * (size / max(size, 1.0)) ** 0.0
+    fs = max(0.4, min(1.8, pc['ext'] * 0.58))
     fire_patch(P, local, t_fire, P.seconds + 0.5, size=fs, parent=o, light=light)
     if smoke:
         smoke_column(P, top + Vector((0, 0, 0.1)), t_fire + 0.25, P.seconds + 0.5, size=max(0.7, fs * 1.4))
