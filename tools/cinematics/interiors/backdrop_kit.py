@@ -434,6 +434,50 @@ class Kit:
         if light:
             self.light(p, col, light, size * 0.4)
 
+    def fx_card(self, p, size, png, tint=(1, 1, 1), strength=6.0, roll=0.0):
+        """A baked flipbook frame (RGBA PNG from the shared effects library) on a camera-facing card,
+        tinted and emissive, alpha-blended. Used in place of the old glowing-ball impacts."""
+        p = Vector(p)
+        nm = self.uid('FxCard')
+        me = bpy.data.meshes.new(nm)
+        me.from_pydata([(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)], [], [(0, 1, 2, 3)])
+        uv = me.uv_layers.new()
+        for i, c in enumerate(((0, 0), (1, 0), (1, 1), (0, 1))):
+            uv.data[i].uv = c
+        m = bpy.data.materials.new(nm + 'M')
+        m.use_nodes = True
+        nt = m.node_tree
+        nt.nodes.clear()
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = bpy.data.images.load(png, check_existing=True)
+        tex.extension = 'CLIP'
+        rgb = nt.nodes.new('ShaderNodeMix')
+        rgb.data_type = 'RGBA'
+        rgb.blend_type = 'MULTIPLY'
+        rgb.inputs[0].default_value = 1.0
+        nt.links.new(tex.outputs['Color'], rgb.inputs[6])
+        rgb.inputs[7].default_value = (*tint, 1)
+        em = nt.nodes.new('ShaderNodeEmission')
+        nt.links.new(rgb.outputs[2], em.inputs['Color'])
+        em.inputs['Strength'].default_value = strength
+        tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+        mix = nt.nodes.new('ShaderNodeMixShader')
+        nt.links.new(tex.outputs['Alpha'], mix.inputs[0])
+        nt.links.new(tr.outputs[0], mix.inputs[1])
+        nt.links.new(em.outputs[0], mix.inputs[2])
+        out = nt.nodes.new('ShaderNodeOutputMaterial')
+        nt.links.new(mix.outputs[0], out.inputs['Surface'])
+        me.materials.append(m)
+        o = bpy.data.objects.new(nm, me)
+        SP.link(o)
+        o.location = p
+        to_cam = (self.cam.location - p).normalized()
+        o.rotation_mode = 'QUATERNION'
+        o.rotation_quaternion = to_cam.to_track_quat('Z', 'Y') @ Quaternion((0, 0, 1), roll)
+        o.scale = (size, size, size)
+        o.visible_shadow = False
+        return o
+
     def light(self, p, col, energy, soft=2.0):
         L = bpy.data.objects.new(self.uid('L'), bpy.data.lights.new(self.uid('L'), 'POINT'))
         SP.link(L)
