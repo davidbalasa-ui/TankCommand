@@ -1144,7 +1144,9 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
     R = max(0.5, max(hi.x - lo.x, hi.y - lo.y) / 2)
     H = max(0.3, hi.z - lo.z)
     gz = terr.ground(center.x, center.y) if terr.has_ground else lo.z
-    air = space or (lo.z - gz > max(0.9, 0.35 * H) and kind != 'structure')
+    # hover units (a metre or two up) are ground units whose wreck drops and crashes; only real
+    # flyers break up in the air
+    air = space or (lo.z - gz > max(2.5, 0.8 * H) and kind != 'structure')
     S = max(0.4, actor.size / 4.5)
     blast_dir = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), 0)).normalized()
     blast = center + blast_dir * R * 0.35 - Vector((0, 0, H * 0.15))
@@ -1287,7 +1289,7 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
     if air:
         epos = center
     else:
-        epos = Vector((blast.x, blast.y, gz + min(0.5, H * 0.2)))
+        epos = Vector((blast.x, blast.y, max(gz + min(0.5, H * 0.2), lo.z + 0.3 * H)))   # hover: at the unit
     explosion(P, epos, t, size=size, debris=0, smoke=False, light=True)
     sparks(P, center, t, n=int(26 * S + 10), speed=10 * S, color=col, size=S, terr=terr,
            extra_v=v_unit if air else None)

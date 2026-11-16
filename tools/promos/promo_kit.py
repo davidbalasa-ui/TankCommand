@@ -613,7 +613,7 @@ class Actor:
                     s.material = P.charred
             for b in self.barrels:
                 pass
-            w.location.z -= 0.15
+            w.location.z = P.ground_z(w.location.x, w.location.y) - 0.15   # hover units crash down
             for o in [w] + list(w.children_recursive):
                 key_hide(o, 0, True)
                 key_hide(o, P.T(t) + 1, False)
