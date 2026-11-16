@@ -33,6 +33,8 @@ def main():
     r.update(vdb_dir=vdb, out_dir=out, domain=simj['domain'], frames=[1, simj['frames']], threads=a.threads, skip_existing=True)
     if a.test:
         r.update(only=J['test_frames'], res=384, samples=32)
+    if a.resim and os.path.isdir(out):
+        import shutil; shutil.rmtree(out)
     cfgp = os.path.join(a.work, tag + '.json')
     json.dump(r, open(cfgp, 'w'))
     subprocess.check_call([PY, os.path.join(HERE, 'render_vdb.py'), cfgp])
