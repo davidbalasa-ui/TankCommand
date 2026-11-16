@@ -14,12 +14,12 @@ STYLE = dict(
     smoke_density=3.0,                # multiplier on the density grid
     detail=0.35,                      # noise modulation of density (upres look)
     detail_scale=6.0,
-    fire_strength=3.2,               # emission strength at heat=1
-    flame_boost=2.0,                 # extra emission from active burning
-    heat_lo=0.4, heat_hi=1.5,        # heat -> ramp position
+    fire_strength=5.0,               # emission strength at heat=1
+    flame_boost=2.5,                 # extra emission from active burning
+    heat_lo=0.5, heat_hi=1.5,        # heat -> ramp position
     # fire ramp: dark red -> orange -> yellow -> near white (no purple ever)
     ramp=[(0.0, (0.0, 0.0, 0.0)), (0.1, (0.4, 0.04, 0.0)), (0.35, (1.0, 0.2, 0.01)),
-          (0.7, (1.0, 0.48, 0.06)), (1.0, (1.0, 0.75, 0.3))],
+          (0.7, (1.0, 0.45, 0.05)), (1.0, (1.0, 0.68, 0.22))],
     sun=3.0, sun_rot=(50, 0, 35), world=0.55, world_color=(0.55, 0.62, 0.75),
     inner_light=0.0,                  # point light inside fireball (W per unit flame)
     dust=False,
@@ -34,9 +34,9 @@ def build_scene(cfg):
     sc.cycles.device = 'CPU'
     sc.cycles.samples = cfg.get('samples', 64)
     sc.cycles.use_denoising = True
-    sc.cycles.volume_bounces = cfg.get('volume_bounces', 1)
+    sc.cycles.volume_bounces = cfg.get('volume_bounces', 0)
     sc.cycles.transparent_max_bounces = 64
-    sc.cycles.volume_step_rate = cfg.get('step_rate', 0.3)
+    sc.cycles.volume_step_rate = cfg.get('step_rate', 0.6)
     sc.cycles.volume_max_steps = 512
     sc.render.film_transparent = True
     sc.render.resolution_x = sc.render.resolution_y = cfg.get('res', 512)
@@ -99,7 +99,6 @@ def build_scene(cfg):
     Lk.new(a_d.outputs['Fac'], md.inputs[0]); Lk.new(det.outputs['Result'], md.inputs[1])
     md2 = N.new('ShaderNodeMath'); md2.operation = 'MULTIPLY'; md2.inputs[1].default_value = st['smoke_density']
     Lk.new(md.outputs[0], md2.inputs[0])
-    Lk.new(md2.outputs[0], pv.inputs['Density'])
     # fire: ramp over heat (+ flame boost)
     hm = N.new('ShaderNodeMapRange')
     hm.inputs['From Min'].default_value = st['heat_lo']; hm.inputs['From Max'].default_value = st['heat_hi']
@@ -133,8 +132,22 @@ def build_scene(cfg):
     Lk.new(nz2.outputs['Fac'], br.inputs['Value'])
     em = N.new('ShaderNodeMath'); em.operation = 'MULTIPLY'
     Lk.new(es.outputs[0], em.inputs[0]); Lk.new(br.outputs['Result'], em.inputs[1])
-    Lk.new(em.outputs[0], pv.inputs['Emission Strength'])
+    # soft clip: x / (1 + x / cap) keeps the hot core from blowing out to flat white
+    sc1 = N.new('ShaderNodeMath'); sc1.operation = 'DIVIDE'; sc1.inputs[1].default_value = st.get('emit_cap', 4.0)
+    Lk.new(em.outputs[0], sc1.inputs[0])
+    sc2 = N.new('ShaderNodeMath'); sc2.operation = 'ADD'; sc2.inputs[1].default_value = 1.0
+    Lk.new(sc1.outputs[0], sc2.inputs[0])
+    sc3 = N.new('ShaderNodeMath'); sc3.operation = 'DIVIDE'
+    Lk.new(em.outputs[0], sc3.inputs[0]); Lk.new(sc2.outputs[0], sc3.inputs[1])
+    Lk.new(sc3.outputs[0], pv.inputs['Emission Strength'])
     nz2.name = 'FireNoise'
+    # soot inside the burning core is thin: fire shows saturated instead of a grey wash
+    inv = N.new('ShaderNodeMath'); inv.operation = 'MULTIPLY_ADD'
+    inv.inputs[1].default_value = -st.get('core_clear', 0.8); inv.inputs[2].default_value = 1.0
+    Lk.new(hm.outputs['Result'], inv.inputs[0])
+    dd = N.new('ShaderNodeMath'); dd.operation = 'MULTIPLY'; dd.use_clamp = False
+    Lk.new(md2.outputs[0], dd.inputs[0]); Lk.new(inv.outputs[0], dd.inputs[1])
+    Lk.new(dd.outputs[0], pv.inputs['Density'])
     # inner light
     il = None
     if st['inner_light'] > 0:
