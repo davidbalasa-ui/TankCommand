@@ -33,8 +33,10 @@ def P(x, y, z):
     return Z0 + Vector((x, y, z))
 
 
-def bake_facing(ob, f0, f1, up=UP, roll_k=0.0, look_ahead=2):
-    """Key ob's rotation every frame so its local +X points along its motion (with optional banking)."""
+def bake_facing(ob, f0, f1, up=UP, roll_k=0.0, look_ahead=2, max_turn=None):
+    """Key ob's rotation every frame so its local +X points along its motion (with optional banking).
+    max_turn (deg/frame): the body never spins faster than this; a dodge that doubles back becomes a
+    sideways slip instead of an instant about-face."""
     sc = bpy.context.scene
     pos = {}
     for f in range(f0 - look_ahead, f1 + look_ahead + 2):
@@ -59,6 +61,10 @@ def bake_facing(ob, f0, f1, up=UP, roll_k=0.0, look_ahead=2):
                 q = q @ V.Quaternion((1, 0, 0), max(-1.2, min(1.2, -turn * roll_k)))
         if prev is not None and q.dot(prev) < 0:
             q = -q
+        if prev is not None and max_turn:
+            a_ = math.degrees(prev.rotation_difference(q).angle)
+            if a_ > max_turn:
+                q = prev.slerp(q, max_turn / a_)
         ob.rotation_quaternion = q
         ob.keyframe_insert('rotation_quaternion', frame=f)
         prev = q
@@ -166,7 +172,7 @@ def build(draft=True):
     jinks = [(T_HIT - 0.55, s1_ * 8 + s2_ * 3), (T_HIT - 0.33, -s1_ * 5 + s2_ * 7), (T_HIT - 0.12, s1_ * 2 - s2_ * 6)]
     rk = rk[:-2] + [(fr(t), on_line(t) + o) for t, o in jinks] + rk[-2:]
     key_loc(rig, rk, 'BEZIER')
-    bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2, roll_k=0.9)
+    bake_facing(rig, 1, fr(T_DIE) + 2, look_ahead=2, roll_k=0.9, max_turn=7.0)
     # leg motion: every leg on its own clock (stroke, reach, clutch, swirl), see orb_fighter.animate_orb
     # every leg on its own physics, stroke clock and thruster; two grabs with different legs
     hold = Vector((OF.ORB_RC + 3.3, 0, 0))

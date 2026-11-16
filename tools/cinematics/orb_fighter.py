@@ -517,8 +517,9 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
     def accel_local(f):
         a = (P[f + 1] - 2 * P[f] + P[f - 1]) / (dt * dt)
         al = M[f].to_3x3().normalized().inverted() @ a / scale
-        if al.length > 900:
-            al = al.normalized() * 900
+        cap = 900 if arm is None else 420      # arms: jinks pull the arms, but never all-at-once flings
+        if al.length > cap:
+            al = al.normalized() * cap
         return al
 
     def vel_local(f):
@@ -662,21 +663,38 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                         jv_ = jv_ + a_ * (dt / 6)
                         jp[j_] = jp[j_] + jv_ * (dt / 6)
                     S['jv'][j_] = jv_
-                # re-chain from the shoulder: exact segment lengths, each joint bends at most 21 degrees (curls, never knots)
+                # spread the curvature: a light smoothing pass so no single joint carries the whole bend
+                for _it in range(2):
+                    jp = [jp[0]] + [jp[i_] * 0.5 + (jp[i_ - 1] + jp[i_ + 1]) * 0.25 for i_ in range(1, NJ)] + [jp[NJ]]
+                # re-chain from the shoulder with exact segment lengths. Each joint bends at most 24 degrees
+                # (curls, never knots), each segment turns at most 13-30 degrees a frame (stiff near the shoulder,
+                # quick at the harpoon: no snaps or pops), and nothing passes through the core.
+                from mathutils import Quaternion as _Q
+
+                def _turn_to(a_, b_, lim_):
+                    ang_ = a_.angle(b_) if a_.dot(b_) < 0.99999 else 0.0
+                    if ang_ <= lim_:
+                        return b_
+                    ax_ = a_.cross(b_)
+                    if ax_.length < 1e-6:
+                        return a_
+                    return _Q(ax_.normalized(), lim_) @ a_
                 out_ = [b.copy()]
-                dprev = (jp[1] - b).normalized()
+                dprev = None
                 for j_ in range(NJ):
                     dj = (jp[j_ + 1] - out_[-1])
-                    dj = dj.normalized() if dj.length > 1e-5 else dprev
-                    if j_ > 0:
-                        ang = dprev.angle(dj) if dprev.dot(dj) < 0.99999 else 0.0
-                        lim = math.radians(21)
-                        if ang > lim:
-                            axis = dprev.cross(dj)
-                            if axis.length > 1e-6:
-                                from mathutils import Quaternion as _Q
-                                dj = _Q(axis.normalized(), lim) @ dprev
-                    out_.append(out_[-1] + dj * lens[j_])
+                    dj = dj.normalized() if dj.length > 1e-5 else (dprev or (prev_pts[1] - b).normalized())
+                    dold = prev_pts[j_ + 1] - prev_pts[j_]
+                    if dold.length > 1e-5:
+                        dj = _turn_to(dold.normalized(), dj, math.radians(13 + 17 * j_ / (NJ - 1)))
+                    if dprev is not None:
+                        dj = _turn_to(dprev, dj, math.radians(24))
+                    nxt = out_[-1] + dj * lens[j_]
+                    if j_ > 0 and avoid is not None and (nxt - cc).length < ORB_RC * 1.7:
+                        push = (nxt - cc).normalized()
+                        dj = (dj + push * 0.8).normalized()
+                        nxt = out_[-1] + dj * lens[j_]
+                    out_.append(nxt)
                     dprev = dj
                 S['pts'] = out_
                 # bones: parallel-transport the crest side down the chain so the arm never twists
