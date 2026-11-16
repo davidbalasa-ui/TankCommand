@@ -400,6 +400,8 @@ class Actor:
             host = max(kids, key=lambda o: len(o.data.vertices)) if kids else None
         if host is None:
             return []
+        if host.data.users > 1:     # P.copy shares mesh data: cut a private copy
+            host.data = host.data.copy()
         me = host.data
         xs = [v.co.x for v in me.vertices]
         x0, x1 = min(xs), max(xs)
@@ -581,8 +583,14 @@ class Actor:
         return self
 
     def destroy(self, t, size=None, wreck=True, debris=14):
-        """Big explosion; the unit is replaced by a charred, smoking wreck (or nothing)."""
+        """Big explosion; the unit breaks into pieces of its own model (promo_fx): a burning,
+        smoking wreck plus flying debris (wreck=False: debris only, no fire)."""
         P = self.P
+        import promo_fx
+        if promo_fx.find_flipbook('explo_ground') and promo_fx.destroy(self, t, size=size, wreck=wreck, debris=debris):
+            self.vanish(t + 1 / P.fps)
+            self.alive_until = t
+            return self
         size = size or self.size * 0.5
         p = self.pos_at(t)
         P.explosion(p + Vector((0, 0, self.size * 0.15)), t, size=size, debris=debris)
@@ -605,7 +613,7 @@ class Actor:
                     s.material = P.charred
             for b in self.barrels:
                 pass
-            w.location.z -= 0.15
+            w.location.z = P.ground_z(w.location.x, w.location.y) - 0.15   # hover units crash down
             for o in [w] + list(w.children_recursive):
                 key_hide(o, 0, True)
                 key_hide(o, P.T(t) + 1, False)
@@ -1402,8 +1410,12 @@ class Promo:
         return m
 
     def explosion(self, pos, t, size=2.0, debris=8, smoke=True, light=True):
-        """Fireball + flash + smoke + flying debris + scorch."""
+        """Fireball + flash + smoke + flying debris + scorch (flipbook cards via promo_fx; the
+        procedural fallback below runs only when the flipbook library is missing)."""
         pos = V(pos)
+        import promo_fx
+        if promo_fx.explosion(self, pos, t, size=size, debris=debris, smoke=smoke, light=light):
+            return self
         fm = self.fireball_mat()
         f0 = self.T(t)
         for i in range(5):
@@ -1449,7 +1461,11 @@ class Promo:
                 o.keyframe_insert('location', frame=f0 + tt * self.fps)
                 o.keyframe_insert('rotation_euler', frame=f0 + tt * self.fps)
             show_between(o, f0, f0 + life * self.fps)
-        # scorch decal
+        # scorch decal (ground bursts only)
+        if hasattr(self, 'ground') and self.ground is None:     # space: no ground, no scorch
+            return self
+        if getattr(self, 'ground', None) and pos.z - self.ground_z(pos.x, pos.y) > max(1.2, size * 0.45):
+            return self
         sc_ = sphere('Scorch', 1.0, pbr_mat('ScorchM', (0.015, 0.012, 0.01), 1.0), seg=(16, 6))
         sc_.location = (pos.x, pos.y, self.ground_z(pos.x, pos.y) + 0.02 if getattr(self, 'ground', None) else pos.z)
         sc_.scale = (size * 0.8, size * 0.8, 0.02)
@@ -1487,6 +1503,9 @@ class Promo:
                   color=tuple(min(1, c * 1.3) for c in self.palette['g1']) if hasattr(self, 'palette') else None)
 
     def smoke_column(self, pos, t0, t1, size=1.0, every=0.3):
+        import promo_fx
+        if promo_fx.smoke_column(self, pos, t0, t1, size=size):
+            return
         t = t0
         while t < t1:
             self.puff(V(pos) + Vector((0, 0, 0.6)), t, size=size, n=1, rise=size * 3, life=2.0)
@@ -1526,7 +1545,10 @@ class Promo:
         return m
 
     def fire_patch(self, pos, t0, t1, size=0.6):
-        """Flickering soft flames licking up off a wreck."""
+        """Flickering flames licking up off a wreck (looping flipbook cards via promo_fx)."""
+        import promo_fx
+        if promo_fx.fire_patch(self, pos, t0, t1, size=size):
+            return
         fm = self.soft_fire_mat()
         for i in range(4):
             o = sphere('Flame', 1.0, fm, seg=(12, 8))
@@ -1575,6 +1597,8 @@ class Promo:
         q = a.quality
         res, spp, step, blur = QUALITY[q]
         sc = bpy.context.scene
+        import promo_fx
+        promo_fx.before_render(self)
         r = sc.render
         r.engine = 'CYCLES'
         sc.cycles.device = 'CPU'
