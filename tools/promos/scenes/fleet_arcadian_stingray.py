@@ -172,6 +172,24 @@ def a_pos(t):
 twA = P.load('terran_twinx', label='twinA')
 twB = P.load('terran_twinx', label='twinB')
 twC = P.load('terran_twinx', label='twinC')
+
+
+def terran_tint():
+    """Scene-local tint: the placeholder Twin-X's orb, haze and arcs are violet; Terran glow is
+    neon blue (the amber accents stay orange)."""
+    tint = {'twinx_orb': (COL['terran_neon'], 3.0), 'twinx_haze': (COL['terran_neon'], 1.0),
+            'twinx_arc': (COL['terran_neon'], 2.5)}
+    for m in bpy.data.materials:
+        base = m.name.split('.')[0]
+        if base in tint and m.node_tree:
+            col, strength = tint[base]
+            for n in m.node_tree.nodes:
+                if n.type == 'EMISSION':
+                    n.inputs['Color'].default_value = (*col, 1)
+                    n.inputs['Strength'].default_value = strength
+
+
+terran_tint()
 fly(twA, a_pos, bank_up(0.5, 70))
 fly(twB, tw_pos(B_OFF, 1.1), bank_up(0.5))
 fly(twC, tw_pos(C_OFF, 2.3), bank_up(0.5))
