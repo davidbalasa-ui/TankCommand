@@ -1462,6 +1462,8 @@ class Promo:
                 o.keyframe_insert('rotation_euler', frame=f0 + tt * self.fps)
             show_between(o, f0, f0 + life * self.fps)
         # scorch decal (ground bursts only)
+        if hasattr(self, 'ground') and self.ground is None:     # space: no ground, no scorch
+            return self
         if getattr(self, 'ground', None) and pos.z - self.ground_z(pos.x, pos.y) > max(1.2, size * 0.45):
             return self
         sc_ = sphere('Scorch', 1.0, pbr_mat('ScorchM', (0.015, 0.012, 0.01), 1.0), seg=(16, 6))

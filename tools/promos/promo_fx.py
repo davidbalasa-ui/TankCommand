@@ -44,6 +44,7 @@ LIB_DIRS = [d for d in os.environ.get('PROMO_FLIPBOOKS', '').split(os.pathsep) i
 ALIASES = {
     'explo_ground': ['explo_ground_a', 'explo_ground_b', 'explo_ground*', 'explosion_ground*', 'explo_*'],
     'explo_air': ['explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
+    'explo_space': ['explo_space*', 'explosion_space*', 'explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
     'explo_small': ['explo_small*', 'explosion_small*', 'explo_ground*'],
     'fire_loop': ['fire_loop*', 'fire_*'],
     'smoke_plume': ['smoke_plume*', 'smoke_column*'],
@@ -282,8 +283,15 @@ def card(P, name, pos, t, size=1.0, mode='camera', speed=1.0, tint=None, rot_jit
         pl.keyframe_insert('color', index=3, frame=f0)
         pl.color[3] = 1.0
         pl.keyframe_insert('color', index=3, frame=f0 + fi)
-    if not loop and fade_out is None:
-        fo = 0.5 * (f1 - f0)       # one-shots dissolve over their second half (no dark leftovers)
+    if not loop and fade_out is None and man['frames'] > 12:
+        # one-shots dissolve from 35% to 85% of their run: the fireball reads, the baked dark smoke
+        # tail never lingers as a blob (smoke plumes take over)
+        d = f1 - f0
+        pl.color[3] = 1.0
+        pl.keyframe_insert('color', index=3, frame=f0 + max(fi, 0.35 * d))
+        pl.color[3] = 0.0
+        pl.keyframe_insert('color', index=3, frame=f0 + 0.85 * d)
+        fo = 0
     if fo > 0 and (t1 is not None or not loop):
         pl.color[3] = 1.0
         pl.keyframe_insert('color', index=3, frame=max(f0 + fi, f1 - fo))
@@ -628,7 +636,7 @@ def simulate(P, bodies, terr, t0, t_end, gravity=9.81, substeps=8, rest=0.28, mu
                     continue
                 b.v += g * h
                 b.v *= (1 - drag * h)
-                b.w *= (1 - 0.05 * h)
+                b.w *= (1 - 0.6 * drag * h)
                 b.x += b.v * h
                 wl = b.w.length
                 if wl > 1e-7:
@@ -911,13 +919,14 @@ def sparks(P, pos, t, n=24, speed=9.0, color=None, life=(0.35, 1.0), size=1.0, u
     rnd = P.rnd
     pos = K.V(pos)
     terr = terr or Terrain(P)
+    space = _space(P)
     for i in range(n):
         o = K.link(bpy.data.objects.new('FxSpark', me))
         if not me.materials:
             me.materials.append(mat)
         for attr in ('visible_shadow', 'visible_diffuse', 'visible_glossy'):
             setattr(o, attr, False)
-        d = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), abs(rnd.gauss(0, 1)) + up)).normalized()
+        d = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), (rnd.gauss(0, 1) if space else abs(rnd.gauss(0, 1)) + up))).normalized()
         v = d * speed * rnd.uniform(0.35, 1.0)
         if extra_v is not None:
             v = v + extra_v
@@ -935,8 +944,9 @@ def sparks(P, pos, t, n=24, speed=9.0, color=None, life=(0.35, 1.0), size=1.0, u
             if k:
                 for _ in range(4):
                     h = 1 / (P.fps * 4)
-                    v.z -= 9.81 * h
-                    v *= (1 - 1.2 * h)
+                    if not space:
+                        v.z -= 9.81 * h
+                    v *= (1 - (0.6 if space else 1.2) * h)
                     x += v * h
                     gz = terr.ground(x.x, x.y) if terr.has_ground else -1e9
                     if x.z < gz:
@@ -976,7 +986,8 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
     air, gz = _is_air(P, pos, size)
     if _space(P):
         air = True
-    want = 'explo_air' if air else 'explo_ground'
+    space = _space(P)
+    want = ('explo_space' if space else 'explo_air') if air else 'explo_ground'
     man = find_flipbook(want)
     if man is None:
         return False
@@ -984,10 +995,10 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
     # card size: fireball ~ 1.6 * size across
     k = size * 1.15 / (man['extent_m'] * 0.55)
     if air:
-        card(P, want, pos, t, size=k, mode='camera', push=size * 0.2)
+        card(P, want, pos, t, size=k, mode='camera', push=min(0.6, size * 0.1))
     else:
         base = Vector((pos.x, pos.y, gz))
-        card(P, want, base, t, size=k, mode='z_locked', push=size * 0.25)
+        card(P, want, base, t, size=k, mode='z_locked', push=min(0.8, size * 0.15))
         if find_flipbook('dust_ring') and size > 1.2:
             card(P, 'dust_ring', base, t + 0.02, size=k * 0.9, mode='z_locked', push=size * 0.1,
                  opacity=0.8)
@@ -998,10 +1009,11 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
     if light:
         P.light(pos + Vector((0, 0, size * 0.6)), t, (1.0, 0.5, 0.18), energy=500 * size * size, dur=0.4,
                 radius=size * 0.5)
-    sparks(P, pos + Vector((0, 0, size * 0.1)), t, n=int(10 + 6 * size), speed=5 + 3 * size, size=size * 0.6)
+    sparks(P, pos + Vector((0, 0, size * 0.1)), t, n=int(10 + 6 * size), speed=5 + 3 * size, size=size * 0.6,
+           up=0.0 if space else 0.6)
     if debris:
         _dirt_chunks(P, pos if air else Vector((pos.x, pos.y, gz + 0.1)), t, size, debris, air)
-    if smoke and find_flipbook('smoke_puff'):
+    if smoke and not space and find_flipbook('smoke_puff'):
         card(P, 'smoke_puff', pos + Vector((0, 0, size * 0.4)), t + 0.35, size=size * 0.5,
              opacity=0.7, t1=t + 2.6)
     if not air:
@@ -1039,7 +1051,9 @@ def _dirt_chunks(P, pos, t, size, n, air):
         b = Body(pts, [], max(0.01, s ** 3 * 8), pos + d * 0.1 * size, v, w)
         bodies.append(b)
         objs.append(o)
-    simulate(P, bodies, terr, t, min(P.seconds, t + 3.0))
+    space = _space(P)
+    simulate(P, bodies, terr, t, P.seconds + 1 / P.fps if space else min(P.seconds, t + 3.0),
+             gravity=0.0 if space else 9.81, drag=0.25 if space else 0.05)
     for o, b in zip(objs, bodies):
         key_body(o, b, P)
         K.show_between(o, P.T(t), P.T(P.seconds) + 1)
@@ -1242,14 +1256,15 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
     rest = [pc['body'] for pc in order[nbig:]]
     if pieces[0].get('role') == 'core' and kind == 'structure':
         pass
-    simulate(P, big, terr, t, t_end, gravity=gravity)
+    drag = 0.18 if space else 0.05      # space: debris drifts, tumbles and slows slightly
+    simulate(P, big, terr, t, t_end, gravity=gravity, drag=drag)
     if not space:
         for pc in order[:nbig]:
             b = pc['body']
             ts = b.settle_t if b.settle_t is not None else t + 1.2
             R_ = b.q.to_matrix()
             terr.add_collider([b.x + R_ @ p for p in pc['hull_v']], pc['hull_f'], ts)
-    simulate(P, rest, terr, t, t_end, gravity=gravity)
+    simulate(P, rest, terr, t, t_end, gravity=gravity, drag=drag)
     # ---------------------------------------------------------------- objects
     f_show = f_t + 1
     tag = actor.name
