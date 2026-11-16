@@ -34,7 +34,7 @@ def build_scene(cfg):
     sc.cycles.device = 'CPU'
     sc.cycles.samples = cfg.get('samples', 64)
     sc.cycles.use_denoising = True
-    sc.cycles.volume_bounces = cfg.get('volume_bounces', 0)
+    sc.cycles.volume_bounces = cfg.get('volume_bounces', 2)
     sc.cycles.transparent_max_bounces = 64
     sc.cycles.volume_step_rate = cfg.get('step_rate', 0.35)
     sc.cycles.volume_max_steps = 512

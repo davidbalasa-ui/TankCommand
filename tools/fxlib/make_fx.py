@@ -136,8 +136,8 @@ def big_blast(work, frames=72, seed=11, res=1.0):
     for tt in (0.35, 0.7):
         def pop(sim, tt=tt):
             a = rng.uniform(0, 2 * math.pi)
-            p = (cx + math.cos(a) * 1.0, cy + math.sin(a) * 1.0, 0.6)
-            sim.add_blast(p, 0.7, fuel=1.2, heat=0.7, speed=8, noise=1.0, soot=0.6)
+            p = (cx + math.cos(a) * 1.2, cy + math.sin(a) * 1.2, 1.6)
+            sim.add_blast(p, 0.5, fuel=1.0, heat=0.55, speed=7, noise=1.0, soot=0.8)
         evs.append((tt, pop))
     run(s, work, frames, 2, events=evs)
 
