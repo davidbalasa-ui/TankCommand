@@ -29,8 +29,8 @@ ORANGE = COL['terran_orange']
 SAND = (0.5, 0.36, 0.26)
 DUST = (0.55, 0.42, 0.32)
 
-P.env('dusk', sun=(80, 0, -60), sun_energy=2.2, props=26,
-      clear=[(0, 0, 8), (5.5, -8, 6), (5, -14, 4), (5, 8, 6)])
+P.env('dusk', sun=(80, 0, -60), sun_energy=2.2, props=18,
+      clear=[(0, 0, 14), (0, 18, 16), (-14, 10, 12), (12, 16, 10), (5.5, -8, 6), (5, -14, 4), (5, 8, 6), (-8, -10, 8)])
 P.flatten(1.5, -2, 12)
 P.flatten(5, 8, 7)
 # darker, night-ish sky
@@ -115,7 +115,6 @@ for t, pitch, z in [(1.66, 0.0, 0.0), (1.8, 2.4, -0.02), (1.95, -0.9, -0.03), (2
     hm.keyframe_insert('rotation_euler', index=1, frame=P.T(t))
     hm.keyframe_insert('location', index=2, frame=P.T(t))
 P.dust(hl, 0.0, T_STOP, every=0.09, size=0.8, color=SAND)
-P.dust(hl, 4.95, 6.0, every=0.14, size=0.45, color=SAND)
 for i in range(8):
     a = 2 * math.pi * i / 8
     P.puff(PARK + Vector((math.cos(a) * 2.4, math.sin(a) * 2.4, 0.2)), T_STOP + R.uniform(0, 0.06),
@@ -125,7 +124,7 @@ for i in range(8):
 # parked hauler frame: local (lx, ly, lz) -> world; ingots stay parented to the hauler root.
 PARK_M = Matrix.Translation(PARK) @ Matrix.Rotation(math.radians(90), 4, 'Z')
 PARK_INV = PARK_M.inverted()
-M_INGOT = K.pbr_mat('MetalIngot', (0.62, 0.66, 0.72), rough=0.28, metal=0.85, emit=NEON, emit_strength=0.45)
+M_INGOT = K.pbr_mat('MetalIngot', (0.36, 0.4, 0.47), rough=0.38, metal=0.9, emit=NEON, emit_strength=0.22)
 BED_Z = 0.9
 IH = 0.26
 slots = []
@@ -338,16 +337,16 @@ P.cam_shake(T_BEAM, 0.03, 0.35)
 # --------------------------------------------------------------------------- camera
 P.camera([
     # shot 1: head-on as the loaded Hauler rolls in, the lab waking up on the right
-    (0.0, (10.4, 5.4, 1.0), (3.2, -3.4, 1.2), 28),
-    (1.0, (10.0, 5.0, 1.15), (3.0, -2.2, 1.2), 28),
-    (1.708, (9.6, 4.6, 1.3), (2.8, -1.4, 1.25), 28),
+    (0.0, (10.6, 5.6, 1.0), (2.4, -2.9, 1.3), 26),
+    (1.0, (10.2, 5.2, 1.15), (2.3, -2.1, 1.3), 26),
+    (1.708, (9.8, 4.8, 1.3), (2.2, -1.4, 1.3), 26),
     # cut: south view of the transfer, the arc spanning the frame
     (1.75, (7.4, -7.4, 3.2), (3.3, 0.0, 1.3), 30),
     (3.0, (6.0, -8.0, 3.1), (2.9, 0.0, 1.5), 30),
     (3.75, (4.2, -7.8, 2.3), (1.8, 0.0, 1.8), 28),
     (4.3, (2.9, -7.4, 0.8), (0.6, 0.0, 2.8), 24),
-    (5.1, (0.6, -7.0, 0.55), (0.3, 0.0, 2.95), 23),
-    (6.0, (-1.9, -6.3, 0.5), (0.2, 0.0, 3.0), 22),
+    (5.1, (0.7, -7.9, 0.65), (0.3, 0.0, 2.6), 23),
+    (6.0, (-2.5, -7.2, 0.6), (0.15, 0.0, 2.45), 24),
 ], shake=0.012, cuts=(1.75,))
 P.cam_shake(T_STOP, 0.04, 0.3)
 

@@ -1344,7 +1344,7 @@ class Promo:
     def puff(self, pos, t, size=0.6, n=3, rise=1.0, life=1.2, color=None, opacity=0.65):
         """A few soft smoke/dust puffs that grow, rise, drift and fade out."""
         mat = self.soft_mat()
-        col = color or (0.13, 0.12, 0.11)
+        col = color or (0.3, 0.28, 0.26)
         for i in range(n):
             o = sphere('Puff', 1.0, mat, seg=(16, 10))
             p = V(pos) + Vector((self.rnd.uniform(-.3, .3), self.rnd.uniform(-.3, .3), self.rnd.uniform(0, .2))) * size
