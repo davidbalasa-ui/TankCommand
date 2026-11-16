@@ -534,7 +534,7 @@ def ground_material(b, name='GroundMat'):
         g2 = B.maprange(B.math('SUBTRACT', fs[1], fs[0]), 0.035, 0.0)
         pm = B.maprange(B.noise(wv, 0.05, detail=3), 0.45, 0.6)
         g2 = B.math('MULTIPLY', g2, pm)
-        height = B.math('SUBTRACT', height, B.math('ADD', B.math('MULTIPLY', groove, 0.03), B.math('MULTIPLY', g2, 0.01)))
+        height = B.math('SUBTRACT', height, B.math('ADD', B.math('MULTIPLY', groove, 0.01), B.math('MULTIPLY', g2, 0.012)))
         col = B.mix(B.math('MULTIPLY', groove, 0.25), col, (0.14, 0.1, 0.06))
         col = B.mix(B.math('MULTIPLY', g2, 0.55), col, (0.17, 0.12, 0.07))
         # bronze sheen on the polished plates (very subtle) + glints
