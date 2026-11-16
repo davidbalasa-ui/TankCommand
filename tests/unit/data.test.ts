@@ -26,10 +26,11 @@ function weaponsOf(row: Record<string, unknown>): Array<Record<string, unknown>>
 describe('unit data containers', () => {
   it('[DATA-01] placeholder table loads against the real asset manifest', () => {
     const table = loadUnitTable(units, registry);
-    expect(table.size).toBe(34);
+    expect(table.size).toBe(35);
     expect([...table.keys()].sort()).toEqual([
       'unit.alien.air_base_packed',
       'unit.alien.artillery',
+      'unit.alien.dragonfly',
       'unit.alien.fighter',
       'unit.alien.glider',
       'unit.alien.heavy_tank',
