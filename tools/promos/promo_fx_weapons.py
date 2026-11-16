@@ -23,7 +23,7 @@ import math
 
 import bpy  # noqa: I001
 import bmesh
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 import promo_kit as K
 
@@ -198,6 +198,17 @@ def glow_mat(P):
     return b.m
 
 
+def slug_mat(P):
+    """Tracer material: FxGlow under the kit's old 'Slug' name (scenes that look materials
+    up by that name and tweak their emit_node keep working; strength is driven per object)."""
+    c = _c(P)
+    if 'slug' not in c:
+        m = glow_mat(P).copy()
+        m.name = 'Slug'
+        c['slug'] = m
+    return c['slug']
+
+
 def smoke_mat(P):
     """Light volumetric puff: density = eroded 4D noise inside a soft ball, never black."""
     c = _c(P)
@@ -275,24 +286,26 @@ def _mesh(P, kind):
         return c[key]
     me = bpy.data.meshes.new('Fx' + kind)
     bm = bmesh.new()
-    if kind == 'sphere':
+    if kind in ('sphere', 'slug'):
         bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=12, radius=1.0)
     elif kind == 'ball':      # volume puffs: shape comes from the shader
         bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0)
     elif kind == 'rod':       # along X, -1..1, radius 1, open ends
         bmesh.ops.create_cone(bm, cap_ends=False, segments=20, radius1=1.0, radius2=1.0, depth=2.0)
-        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=__import__('mathutils').Matrix.Rotation(math.pi / 2, 3, 'Y'))
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, 'Y'))
     elif kind == 'disk':
         bmesh.ops.create_circle(bm, cap_ends=True, segments=24, radius=1.0)
     bm.to_mesh(me)
     bm.free()
-    if kind in ('sphere', 'rod'):
+    if kind in ('sphere', 'rod', 'slug'):
         for p in me.polygons:
             p.use_smooth = True
     if kind == 'ball':
         me.materials.append(smoke_mat(P))
     elif kind == 'disk':
         me.materials.append(scorch_mat(P))
+    elif kind == 'slug':
+        me.materials.append(slug_mat(P))
     else:
         me.materials.append(glow_mat(P))
     c[key] = me
@@ -612,35 +625,40 @@ def muzzle_flash(P, muzzle_obj, t, color, size=1.0):
     forward petal, 4-5 side petals in a star, a light and (for guns) a short smoke puff."""
     sc = bpy.context.scene
     f0 = P.T(t)
-    sc.frame_set(int(round(f0)))
+    cur = sc.frame_current
+    sc.frame_set(int(round(f0)) - 1)          # pose just before the barrel starts recoiling
     mw = muzzle_obj.matrix_world.copy()
-    ws = mw.to_scale()
-    s_par = (ws.x + ws.y + ws.z) / 3 or 1.0
+    # anchor: a muzzle riding a split barrel would drag the flash back into the turret as the
+    # barrel collapses, so hang the flash on the barrel's parent at the pre-recoil muzzle pose
+    par = muzzle_obj.parent
+    anchor = par.parent if (par is not None and 'barrel_len' in par.keys() and par.parent) else muzzle_obj
     rig = K.empty('MuzzleFx')
-    rig.parent = muzzle_obj
-    rig.scale = (1 / s_par,) * 3
+    rig.parent = anchor
+    loc, rot, _ = mw.decompose()
+    rig.matrix_world = Matrix.LocRotScale(loc, rot, Vector((1, 1, 1)))
+    sc.frame_set(cur)
     gun = _is_ballistic_col(color)
-    pcol = (1.0, 0.5, 0.12) if gun else color
+    pcol = (1.0, 0.42, 0.08) if gun else color
     s = size
     parts = []
-    core = glow(P, 'MuzzleCore', pcol, fx_e=3.2, fx_p=1.4, fx_hot=1.0)
+    core = glow(P, 'MuzzleCore', pcol, fx_e=2.8, fx_p=1.6, fx_hot=0.65)
     core.parent = rig
     core.location = (0.12 * s, 0, 0)
-    parts.append((core, (0.32 * s, 0.32 * s, 0.32 * s)))
+    parts.append((core, (0.24 * s, 0.2 * s, 0.2 * s)))
     # forward petal: local +X of the spindle points back at the muzzle (bright), tail at the tip
-    Lf = 0.7 * s
-    fw = glow(P, 'MuzzlePetal', pcol, fx_e=3.0, fx_p=1.3, fx_tail=0.9, fx_hot=0.7)
+    Lf = 0.55 * s
+    fw = glow(P, 'MuzzlePetal', pcol, fx_e=2.6, fx_p=1.2, fx_tail=0.9, fx_hot=0.35)
     fw.parent = rig
     fw.rotation_euler = (0, 0, math.pi)
     fw.location = (0.1 * s + Lf, 0, 0)
-    parts.append((fw, (Lf, 0.24 * s, 0.24 * s)))
+    parts.append((fw, (Lf, 0.17 * s, 0.17 * s)))
     roll = P.rnd.uniform(0, TAU)
     npet = 5 if gun else 4
     for i in range(npet):
         a = roll + TAU * i / npet + P.rnd.uniform(-0.25, 0.25)
         el = math.radians(P.rnd.uniform(55, 80))   # angle from the barrel axis
         d = Vector((math.cos(el), math.sin(el) * math.cos(a), math.sin(el) * math.sin(a)))
-        Ls = 0.42 * s * P.rnd.uniform(0.75, 1.15)
+        Ls = 0.3 * s * P.rnd.uniform(0.75, 1.15)
         o = glow(P, 'MuzzlePetal', pcol, fx_e=2.8, fx_p=1.3, fx_tail=0.95, fx_hot=0.4)
         o.parent = rig
         o.rotation_mode = 'QUATERNION'
@@ -665,9 +683,9 @@ def muzzle_flash(P, muzzle_obj, t, color, size=1.0):
     if gun:
         fwd = (mw.to_3x3().normalized() @ Vector((1, 0, 0))).normalized()
         base = mw.translation
-        for i in range(5):
-            smoke_puff(P, base + fwd * (0.3 + 0.28 * i) * s + _rand_perp(P, fwd) * 0.08 * s, t + 0.02 + 0.015 * i,
-                       r0=0.14 * s, r1=(0.5 + 0.1 * i) * s, life=P.rnd.uniform(1.1, 1.5),
+        for i in range(6):
+            smoke_puff(P, base + fwd * (0.25 + 0.17 * i) * s + _rand_perp(P, fwd) * 0.06 * s, t + 0.02 + 0.012 * i,
+                       r0=0.2 * s, r1=(0.6 + 0.08 * i) * s, life=P.rnd.uniform(1.2, 1.6),
                        vel=fwd * (3.0 - 0.45 * i) * s + _rand_perp(P, fwd) * 0.4 + Vector((0, 0, 0.3)),
                        dens=0.45, hot=1.2 if i < 2 else 0.0)
     return rig
@@ -708,18 +726,19 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
         body.scale = (size * 2.2, size, size)
         objs.append(body)
     else:
-        head = glow(P, 'SlugHead', col, fx_e=3.2, fx_p=1.0, fx_hot=1.0)
+        sat = (col[0], col[1] * 0.7, col[2] * 0.45)     # glow/streak stay saturated, core goes white
+        head = glow(P, 'SlugHead', col, kind='slug', fx_e=3.2, fx_p=0.8, fx_hot=1.0)
         head.parent = rig
-        head.scale = (size * 1.6, size * 0.75, size * 0.75)
-        glo = glow(P, 'SlugGlow', col, fx_e=1.2, fx_p=2.6, fx_hot=0.0)
+        head.scale = (size * 1.5, size * 0.42, size * 0.42)
+        glo = glow(P, 'SlugGlow', sat, kind='slug', alpha=0.8, fx_e=1.4, fx_p=2.4, fx_hot=0.0)
         glo.parent = rig
         glo.scale = (size * 3.2, size * 1.7, size * 1.7)
         # motion streak: about one frame of travel (plus motion blur in finals)
         Ls = min(max(size * 4, v_frame * (0.6 if streak else 0.4)), 4.0) * 0.5
-        st = glow(P, 'SlugStreak', col, fx_e=2.6, fx_p=1.4, fx_tail=1.0, fx_hot=0.35)
+        st = glow(P, 'SlugStreak', sat, kind='slug', fx_e=2.4, fx_p=1.3, fx_tail=1.0, fx_hot=0.25)
         st.parent = rig
         st.location = (-Ls + size, 0, 0)
-        st.scale = (Ls, size * 0.6, size * 0.6)
+        st.scale = (Ls, size * 0.45, size * 0.45)
         objs += [head, glo, st]
     for i in range(n + 1):
         u = i / n
@@ -960,7 +979,7 @@ def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, s
         first = False
         f += nfr
     # contact + source glows (flickering)
-    for pos, r, nm in ((p1, 0.35 + width * 3, 'BoltContact'), (p0, 0.18 + width * 2, 'BoltSource')):
+    for pos, r, nm in ((p1, 0.2 + width * 3, 'BoltContact'), (p0, 0.12 + width * 2, 'BoltSource')):
         o = _glow(P, nm, color, loc=pos, scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
         for fr in range(f0, f1 + 2):
             kprop(o, 'fx_e', fr, 3.0 * P.rnd.uniform(0.55, 1.0) if fr < f1 else 1.2, const=True)

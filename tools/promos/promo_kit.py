@@ -471,7 +471,9 @@ class Actor:
             front = [c for c in vs if c.x > mx - 0.08]
             loc = Vector((mx, sum(c.y for c in front) / len(front), sum(c.z for c in front) / len(front)))
         m = empty(self.name + '_Muzzle')
-        m.parent = host
+        # ride on the barrel when it is split (raises / recoils with it; the barrel shares the
+        # host's local frame), else on the turret/hull mesh
+        m.parent = self.barrels[0] if self.barrels else host
         m.location = loc
         self._muzzles = [m]
         return m
@@ -522,7 +524,7 @@ class Actor:
         kind: cannon | heavy | autocannon | laser | missile | shell | lightning | beam | bomb"""
         P = self.P
         mz = muzzle or self.muzzle()
-        p0 = self.world_at(mz, t)
+        p0 = self.world_at(mz, t - 1.0 / P.fps)   # the muzzle just before recoil starts
         if isinstance(target, Actor):
             p1 = target.pos_at(t + 0.15) + Vector((0, 0, target.size * 0.18))
         else:
