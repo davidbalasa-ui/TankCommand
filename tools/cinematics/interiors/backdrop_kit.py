@@ -252,6 +252,7 @@ class Kit:
             ob, extra = V.terran_ship(kind)
         elif kind == 'twinx':
             ob, extra = T.twin_x_fighter('TwinXSrc', seed=4)
+            _no_violet(ob)
         elif kind == 'kesh':
             ob = HD.kesh_mothership()
             ob = ob[0] if isinstance(ob, tuple) else ob
@@ -962,3 +963,22 @@ def arcadian_mouth(kit, dist=7.0):
     L.visible_transmission = False
     bpy.context.view_layer.update()
     return [root.matrix_world @ (p + Vector((0, 0, -D / 2))) for p in oval(1.0)]
+
+
+def _no_violet(root, to=(0.03, 0.42, 1.0)):
+    """No-purple rule: re-tint any violet/lavender glow in a ship's tree to Terran neon blue."""
+    seen = set()
+    obs = [root] + list(root.children_recursive)
+    for o in obs:
+        for slot in getattr(o, 'material_slots', []):
+            m = slot.material
+            if not m or m.name in seen or not m.use_nodes:
+                continue
+            seen.add(m.name)
+            for nd in m.node_tree.nodes:
+                for inp in nd.inputs:
+                    if inp.type != 'RGBA' or inp.is_linked:
+                        continue
+                    r, g, b = inp.default_value[:3]
+                    if b > 0.3 and r > 0.15 and r > 1.5 * g:          # violet / lavender / magenta-blue
+                        inp.default_value = (*to, inp.default_value[3])
