@@ -18,6 +18,7 @@ import sys
 
 import bpy
 import numpy as np
+from scipy import ndimage as ndi
 from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,9 +31,10 @@ MODE = A.get('mode', 'frames')
 RES = tuple(int(v) for v in A.get('res', '960x540').split('x'))
 FPS = 24.0
 T_TOUCH = 0.6
-DUR = 4.0
+DUR = float(A.get('dur', 4.6))
 GOLD = (1.0, 0.36, 0.02)
 INFL = 0.13          # the skin rides this far proud of the hull
+SLEEVE_W = float(A.get('sleeve_w', 0.75))   # how far the sleeve wall reaches out from the hull before it meets the plane
 
 
 def sstep(x):
@@ -181,11 +183,14 @@ class Attacker:
             z += 0.12 * math.exp(-(tau - 0.75) * 9) * math.sin((tau - 0.75) * 26)
         pitch = math.radians(4.0) * math.sin(min(max(tau, 0) / 0.8, 1.0) * math.pi)
         strain = sstep((p + 0.2) / 1.5) * (1 - sstep(tau / 0.2))
-        jit = 0.035 * strain * math.sin(t * 173.0)
+        jit = strain * (0.05 * math.sin(t * 173.0) + 0.03 * math.sin(t * 61.0))
+        pitch += math.radians(1.6) * strain * math.sin(t * 23.0) - math.radians(1.2) * strain   # bucking against the field
+        roll = math.radians(1.3) * strain * math.sin(t * 17.0 + 1.0)
         ny = self.yf - p
         cy = ny + self.nose
         self.root.location = (self.x + jit, cy, z)
-        self.root.rotation_euler = (0, pitch, math.radians(-90))
+        self.root.rotation_euler = (roll, pitch, math.radians(-90))
+        self.strain = strain
         self.glow.location = (self.x, cy - 2.0, z + 5.2)
         self.under.location = (self.x, cy, max(z, 0.2) + 0.45)
         return ny, cy, z
@@ -262,7 +267,7 @@ class Field:
         print('FIELD', name, 'triangles', self.N, flush=True)
         self._hull_maps()
         self._mesh(name, strength, edge, alpha)
-        self.ml = {'ring': line_obj(name + '_ring', (0.3, 0.85, 1.0), float(A.get('ring_e', 14))),
+        self.ml = {'ring': line_obj(name + '_ring', (0.12, 0.75, 1.0), float(A.get('ring_e', 10))),
                    'gold': line_obj(name + '_gold', GOLD, float(A.get('gold_e', 7))),
                    'spark': line_obj(name + '_spark', (0.2, 0.7, 1.0), float(A.get('spark_e', 10)))}
         self.extra = []                                # extra cyan segments (tracers), set by the scene
@@ -302,6 +307,30 @@ class Field:
     def blur(S):
         return (S * 4 + np.roll(S, 1, 0) + np.roll(S, -1, 0) + np.roll(S, 1, 1) + np.roll(S, -1, 1)) / 8.0
 
+    def glove(self, G):
+        """Skin depth everywhere: the gripped hull columns, plus a short steep wall that hugs the hull outline and
+        fillets into the rest plane within SLEEVE_W (a glove, not a funnel)."""
+        grip = G > 1e-3
+        if not grip.any():
+            return np.zeros_like(G)
+        d, (ii, jj) = ndi.distance_transform_edt(~grip, sampling=self.CELL, return_indices=True)
+        Gn = G[ii, jj]
+        w = SLEEVE_W + 0.08 * Gn
+        prof = np.clip(1 - d / w, 0, 1)
+        prof = prof * prof * (1.6 - 0.6 * prof)          # steep at the hull, soft fillet at the plane
+        S = np.where(grip, G, Gn * prof)
+        S = S + INFL * np.clip(S / 0.3, 0, 1)
+        S = 0.5 * S + 0.5 * self.blur(S)
+        S[:, -3:] = 0
+        S[0, :] = S[-1, :] = 0
+        return S
+
+    def snap_ref(self):
+        if not hasattr(self, '_snap'):
+            S, _, _, dep = self.sheet(self.att.t_clear - 0.04)
+            self._snap = (S, max(float(S.max()), 0.5))
+        return self._snap
+
     def sheet(self, t):
         """Inward displacement of the skin on the grid, the gripped region and the contour segments."""
         att = self.att
@@ -312,19 +341,7 @@ class Field:
             return Z, Z, [], 0.0
         prot = np.where(self.sil, pen - (att.nose - self.F), 0.0)
         G = np.where(self.B > xc, 0.0, np.clip(prot, 0, c))
-        S = G.copy()
-        ds, dd = self.slope * self.CELL, self.slope * self.CELL * 1.4142
-        for _ in range(int(c / ds) + 3):                # tent stretched over the hull (cone dilation)
-            n4 = np.maximum(np.maximum(np.roll(S, 1, 0), np.roll(S, -1, 0)), np.maximum(np.roll(S, 1, 1), np.roll(S, -1, 1)))
-            n8 = np.maximum(np.maximum(np.roll(np.roll(S, 1, 0), 1, 1), np.roll(np.roll(S, 1, 0), -1, 1)),
-                            np.maximum(np.roll(np.roll(S, -1, 0), 1, 1), np.roll(np.roll(S, -1, 0), -1, 1)))
-            S = np.maximum(S, np.maximum(n4 - ds, n8 - dd))
-            S[:, -3:] = 0
-        S[0, :] = S[-1, :] = 0
-        S = S + INFL * np.clip(S / 0.3, 0, 1)
-        Sb = self.blur(self.blur(self.blur(self.blur(S))))
-        S = np.maximum(S, Sb)
-        S[:, -3:] = 0
+        S = self.glove(G)
         # contour: the hull slice passing through the skin (marching squares on phi = 0)
         segs = []
         if xc < att.nose:
@@ -350,23 +367,25 @@ class Field:
         N = self.N
         me = bpy.data.meshes.new(name + '_faces')
         me.from_pydata([(0, 0, 0)] * (3 * N), [], [(3 * i, 3 * i + 1, 3 * i + 2) for i in range(N)])
-        for an in ('r', 'hot'):
+        for an in ('r', 'hot', 'pulse'):
             me.attributes.new(an, 'FLOAT', 'FACE')
         m = bpy.data.materials.new(name + '_face')
         t = K.NT(m)
         ar = t.n('ShaderNodeAttribute', attribute_name='r').outputs['Fac']
         ah = t.n('ShaderNodeAttribute', attribute_name='hot').outputs['Fac']
+        ap = t.n('ShaderNodeAttribute', attribute_name='pulse').outputs['Fac']
         colm = t.n('ShaderNodeMixRGB')
         colm.inputs[1].default_value = (*K.NEON, 1)
-        colm.inputs[2].default_value = (0.02, 0.42, 1.0, 1)           # hot stays BLUE (towards cyan, never white)
+        colm.inputs[2].default_value = (0.0, 0.33, 1.0, 1)           # hot stays BLUE (towards cyan, never white)
         t.link(t.m('MINIMUM', t.m('MULTIPLY', ah, 0.6), 1.0), colm.inputs[0])
         em = t.n('ShaderNodeEmission')
         t.link(colm.outputs[0], em.inputs[0])
         base = t.m('MULTIPLY', t.m('ADD', 0.35, ar), strength)
-        t.link(t.m('MULTIPLY', base, t.m('ADD', 1.0, t.m('MULTIPLY', ah, float(A.get('hotgain', 0.4))))), em.inputs[1])
+        gain = t.m('ADD', t.m('ADD', 1.0, t.m('MULTIPLY', ah, float(A.get('hotgain', 0.25)))), t.m('MULTIPLY', ap, 3.0))
+        t.link(t.m('MULTIPLY', base, gain), em.inputs[1])
         mix = t.n('ShaderNodeMixShader')
         a0 = t.m('ADD', alpha[0], t.m('MULTIPLY', ar, alpha[1] - alpha[0]))
-        t.link(t.m('MINIMUM', t.m('ADD', a0, t.m('MULTIPLY', ah, 0.4)), 0.85), mix.inputs[0])
+        t.link(t.m('MINIMUM', t.m('ADD', t.m('ADD', a0, t.m('MULTIPLY', ah, 0.22)), t.m('MULTIPLY', ap, 0.35)), 0.7), mix.inputs[0])
         t.link(t.n('ShaderNodeBsdfTransparent').outputs[0], mix.inputs[1])
         t.link(em.outputs[0], mix.inputs[2])
         t.link(mix.outputs[0], t.n('ShaderNodeOutputMaterial').inputs[0])
@@ -374,19 +393,20 @@ class Field:
         self.mf = me
         me = bpy.data.meshes.new(name + '_edges')
         me.from_pydata([(0, 0, 0)] * (12 * N), [], [(4 * q, 4 * q + 1, 4 * q + 2, 4 * q + 3) for q in range(3 * N)])
-        for an in ('hot', 'life'):
+        for an in ('hot', 'life', 'pulse'):
             me.attributes.new(an, 'FLOAT', 'FACE')
         m = bpy.data.materials.new(name + '_edge')
         t = K.NT(m)
         ah = t.n('ShaderNodeAttribute', attribute_name='hot').outputs['Fac']
         al = t.n('ShaderNodeAttribute', attribute_name='life').outputs['Fac']
+        ap = t.n('ShaderNodeAttribute', attribute_name='pulse').outputs['Fac']
         colm = t.n('ShaderNodeMixRGB')
-        colm.inputs[1].default_value = (*[0.6 * c + 0.4 * k for c, k in zip(K.NEON, K.CYAN)], 1)
-        colm.inputs[2].default_value = (0.03, 0.5, 1.0, 1)
+        colm.inputs[1].default_value = (*[0.8 * c + 0.2 * k for c, k in zip(K.NEON, K.CYAN)], 1)
+        colm.inputs[2].default_value = (0.02, 0.55, 1.0, 1)
         t.link(t.m('MINIMUM', t.m('MULTIPLY', ah, 0.6), 1.0), colm.inputs[0])
         em = t.n('ShaderNodeEmission')
         t.link(colm.outputs[0], em.inputs[0])
-        t.link(t.m('MULTIPLY', edge, t.m('ADD', 1.0, t.m('MULTIPLY', ah, 0.35))), em.inputs[1])
+        t.link(t.m('MULTIPLY', edge, t.m('ADD', t.m('ADD', 1.0, t.m('MULTIPLY', ah, 0.25)), t.m('MULTIPLY', ap, 4.0))), em.inputs[1])
         mix = t.n('ShaderNodeMixShader')
         t.link(al, mix.inputs[0])
         t.link(t.n('ShaderNodeBsdfTransparent').outputs[0], mix.inputs[1])
@@ -409,9 +429,15 @@ class Field:
         disp = self.samp(S, self.P2) * self.win
         tau = t - att.t_clear
         strain = sstep(att.pen(t) / 1.0) * (1 - sstep(tau / 0.15))
-        if tau > 0:                                    # spring back flat: a damped ripple runs outward
-            rip = 0.75 * math.exp(-tau * 3.0) * min(tau / 0.06, 1.0)
-            disp += rip * np.sin(2 * math.pi * (self.rv / 3.2 - 2.4 * tau)) * np.exp(-self.rv / 5.0) * self.win
+        if tau > 0:                                    # SNAP: the released sleeve whips back, overshoots outward, rings
+            Sr, dmax = self.snap_ref()
+            sig = (0.4 + float(A.get('snap_spread', 5.0)) * tau) / self.CELL
+            Sw = ndi.gaussian_filter(Sr, sig, mode='constant')
+            Sw = Sw / max(float(Sw.max()), 1e-6)
+            amp = min(dmax, float(A.get('snap_amp', 2.4))) * math.exp(-tau * 3.4) * math.cos(2 * math.pi * 2.4 * tau)
+            disp += amp * self.samp(Sw, self.P2) * self.win
+            rip = 0.8 * math.exp(-tau * 2.4) * min(tau / 0.08, 1.0)
+            disp += rip * np.sin(2 * math.pi * (self.rv / 3.4 - 3.0 * tau)) * np.exp(-self.rv / 9.0) * self.win
         out = self.base.copy()
         out[..., 1] -= disp
         cen = out.mean(axis=1)
@@ -423,8 +449,8 @@ class Field:
         Sc = self.samp(S, c2)
         act = np.clip(np.abs(disp).max(axis=1) / 0.18, 0, 1)
         hot = (0.8 * np.clip(Gc / 0.15, 0, 1) + 0.6 * np.clip(Sc / max(depth, 0.5), 0, 1)) * (0.85 + 0.3 * frnd.rand(self.N))
-        hot += 2.2 * np.clip(tilt, 0, 0.6)
-        hot = np.minimum(hot, 1.7)
+        hot += float(A.get('tiltgain', 0.9)) * np.clip(tilt, 0, 0.6)
+        hot = np.minimum(hot, 1.5)
         # brightness waves rippling outward, big triangle by big triangle
         k = 0
         while True:
@@ -434,16 +460,21 @@ class Field:
                 break
             front = 2.0 + (t - tk) * 13.0
             hot += 0.9 * np.clip(1 - np.abs(self.rp - front) / 1.5, 0, 1) * math.exp(-(t - tk) * 1.5)
-        if tau > 0:
-            front = 1.0 + tau * 16.0
-            hot += 1.6 * np.clip(1 - np.abs(self.rp - front) / 2.0, 0, 1) * math.exp(-tau * 1.6)
+        pulse = np.zeros(self.N)
+        if tau > 0:                                    # snap: a bright shock ring races out across the whole door
+            for k, (spd, amp) in enumerate(((17.0, 1.6), (11.0, 0.8))):
+                front = 0.5 + tau * spd
+                pulse += amp * np.clip(1 - np.abs(self.rp - front) / 1.8, 0, 1) ** 1.5 * math.exp(-tau * 1.3)
+            pulse += 1.2 * math.exp(-tau * 8.0) * np.exp(-self.rp / 3.5)          # flash at the exit point
+            pulse += 0.25 * math.exp(-tau * 5.0)                                 # whole field flickers bright
         # ---- faces
         self.mf.vertices.foreach_set('co', out.reshape(-1))
         self.mf.attributes['r'].data.foreach_set('value', self.r)
         self.mf.attributes['hot'].data.foreach_set('value', hot)
+        self.mf.attributes['pulse'].data.foreach_set('value', pulse)
         self.mf.update()
         # ---- seam lines: parent seams always, the finer hinges only where the skin is working
-        wgt = np.where(self.pe > 0.5, 1.0, 0.4 * act[:, None])              # (N, 3)
+        wgt = np.where(self.pe > 0.5, 1.0, 0.3 * act[:, None])              # (N, 3)
         g = self.line * wgt                                                  # line half-width per edge (m)
         O = out.copy()
         O[..., 1] -= 0.02
@@ -463,13 +494,14 @@ class Field:
             quads[:, e, 3] = a + pp * ge
         self.me.vertices.foreach_set('co', quads.reshape(-1))
         self.me.attributes['hot'].data.foreach_set('value', np.repeat(hot, 3))
-        self.me.attributes['life'].data.foreach_set('value', np.where(self.pe > 0.5, 1.0, 0.6 * act[:, None]).reshape(-1))
+        self.me.attributes['pulse'].data.foreach_set('value', np.repeat(pulse, 3))
+        self.me.attributes['life'].data.foreach_set('value', np.where(self.pe > 0.5, 1.0, 0.35 * act[:, None]).reshape(-1))
         self.me.update()
         # ---- contour line where the hull passes through
         c = self.CELL
         y = self.o[1] - depth - 0.05
         W = lambda p: (self.o[0] + self.gx0 + p[0] * c, y, self.o[2] + p[1] * c)
-        rr = float(A.get('ring_r', 0.065))
+        rr = float(A.get('ring_r', 0.045))
         tubes(self.ml['ring'], [(W(a), W(b), rr) for a, b in segs] + self.extra)
         # ---- gold lightning + sparks skittering over the skin around the contact
         gold, spark = [], []
@@ -567,9 +599,12 @@ def build_hangar(full):
             K.spot('Bay', (s * 26.0, yc, 8.2), (s * 17.5, yc, 0), 5200, (0.78, 0.9, 1.0), angle=100, blend=0.6, r=0.5)
             K.area('Wash', (s * 29.5, yc, 10.2), (1.0, 9.0), 900, (0.25, 0.5, 1.0), rot=(0, s * 150, 0), spread=140)
     yf = L + 0.5
+    defenders = []
     for kind, x, dy, rz in (('bulwark', 9.5, -7.0, 128), ('lancer', -13.2, -7.0, 70), ('bulwark', -14.0, -20.5, 72),
                             ('lancer', 10.5, -24.0, 131)):
-        K.tank(kind, (x, yf + dy, 0), rz=rz)
+        new = K.tank(kind, (x, yf + dy, 0), rz=rz)
+        piv = next((o for o in new if o.name.startswith('TurretPivot')), None)
+        defenders.append(dict(x=x, y=yf + dy, rz=rz, piv=piv, yaw=None, late=(x < -13 and dy > -10)))
         K.spot('Head', (x * 0.93, yf + dy + 3.0, 2.3), (0, yf, 3.0), 700, (0.8, 0.9, 1.0), angle=42, blend=0.7, r=0.15)
     K.tank('darter', (-9.5, yf + 19, 2.2), rz=-84, faction='alien')
     K.tank('stinger', (10.5, yf + 26, 3.0), rz=-97, faction='alien')
@@ -577,8 +612,8 @@ def build_hangar(full):
     def inside(a, b):
         return abs(a - W2) + b < W2 + H.DOOR_H - H.DOOR_CH
     att = Attacker('carapace', 0.0, yf)
-    fld = Field('BayField', (-W2, yf, 0), 2 * W2, H.DOOR_H, 2.3, inside, att, strength=float(A.get('field', 0.75)),
-                edge=1.5, alpha=(0.06, 0.3))
+    fld = Field('BayField', (-W2, yf, 0), 2 * W2, H.DOOR_H, 2.3, inside, att, strength=float(A.get('field', 0.5)),
+                edge=float(A.get('edge', 1.2)), alpha=(0.06, 0.3))
     print('T_PIERCE', att.t_pierce, 'T_CLEAR', att.t_clear, flush=True)
     glow = K.point('SkinGlow', (0, yf - 4.5, 3.0), 0, (0.08, 0.45, 1.0), r=1.0)
     muzzle = K.point('Muzzle', (0, 0, 0), 0, (0.3, 0.75, 1.0), r=0.3)
@@ -590,15 +625,35 @@ def build_hangar(full):
     ceil = [(o, o.data.energy) for o in bpy.data.objects if o.type == 'LIGHT' and o.name.startswith(('Ceil', 'Bay'))]
     fglow = bpy.data.objects.get('FieldGlow')
     aem = next(n for n in K.mat('alarm').node_tree.nodes if n.type == 'EMISSION')
-    gun = np.array([10.5 - 3.3, yf - 24.0 + 3.8, 2.25])      # muzzle of the foreground lancer (heading 131 deg)
-    shots = (3.3, 3.62)
+    MUZ = 5.0                                                # muzzle distance from the tank centre
+    shots = ((3, 3.30), (0, 3.45), (3, 3.62), (1, 3.78), (2, 3.95), (0, 4.15))   # (defender, time)
+
+    def aim(t, cy, z):
+        """Turrets slew (with lag) onto the contact point, then onto the boarder once it is inside."""
+        for d in defenders:
+            tgt = (att.x, min(cy, yf - 0.5), z + 2.0) if t > T_TOUCH else (0.0, yf, 3.0)
+            want = math.atan2(tgt[1] - d['y'], tgt[0] - d['x'])
+            yaw = math.radians(d['rz']) + 0.0
+            t0 = CUT if d.get('late') else T_TOUCH          # the one beside camera A waits for the cut
+            if t > t0:
+                lag = sstep((t - t0) / 0.9)
+                want = yaw + lag * math.atan2(math.sin(want - yaw), math.cos(want - yaw))
+            else:
+                want = yaw
+            d['yaw'] = want
+            if d['piv'] is not None:
+                d['piv'].rotation_mode = 'XYZ'
+                d['piv'].rotation_euler = (0, 0, want - yaw)
+            d['gun'] = np.array([d['x'] + MUZ * math.cos(want), d['y'] + MUZ * math.sin(want), 2.25])
 
     def update(t):
         ny, cy, z = att.update(t)
         fld.extra = []
         muzzle.data.energy = hit.data.energy = 0
-        for ts in shots:                                    # a defender opens fire once it is inside
+        aim(t, cy, z)
+        for di, ts in shots:                                # defenders open fire once it is inside
             a = t - ts
+            gun = defenders[di]['gun']
             if -0.001 <= a < 0.13:
                 tgt = np.array([att.x + 2.2, cy - 1.0, z + 2.0])
                 d = tgt - gun
@@ -637,11 +692,15 @@ def build_hangar(full):
 
 
 CUT = 2.7        # shot A -> shot B
+T_CLEAR_CAM = 99.0
 
 
 def camera(cam, name, t, yf):
     r = random.Random(int(round(t * FPS)) + 5)
     shake = 0.015 * sstep((t - T_TOUCH) / 0.4) * (1 - sstep((t - 3.3) / 0.3))
+    tc = t - T_CLEAR_CAM
+    if tc > 0:
+        shake += 0.06 * math.exp(-tc * 9.0)                  # the snap kicks the camera
     sx, sz = r.uniform(-shake, shake), r.uniform(-shake, shake)
     if name == 'A':        # low and close on the contact, pushing in, then following the hull through
         s = t / CUT
@@ -651,8 +710,8 @@ def camera(cam, name, t, yf):
         lens = 23
     elif name == 'B':      # among the defenders: tail clears, the skin snaps flat, the boarder settles
         s = (t - CUT) / (DUR - CUT)
-        loc = Vector((10.4 - 0.6 * s, yf - 30.0 - 1.2 * s, 3.9))
-        tgt = Vector((-0.5, yf - 6.0, 3.9))
+        loc = Vector((10.4 - 0.6 * s, yf - 30.0 - 1.2 * s, float(A.get('bz', 6.6))))
+        tgt = Vector((-0.5, yf - 6.0, float(A.get('btz', 3.6))))
         lens = 29
     else:                  # hero
         loc = Vector((-11.4, yf - 10.3, 1.85))
@@ -675,7 +734,9 @@ def main():
     full = A.get('full', '0') == '1'
     if MODE == 'game':
         return game()
+    global T_CLEAR_CAM
     sc, cam, update, info = build_hangar(full)
+    T_CLEAR_CAM = info['att'].t_clear
     sc.render.use_persistent_data = True
     if MODE == 'frames':
         for ts in A.get('times', '1.0').split(','):
