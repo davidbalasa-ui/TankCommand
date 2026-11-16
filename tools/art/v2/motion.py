@@ -15,6 +15,8 @@ model's _lod file). The game reads it from node.userData.anim:
                     `idle` replaces duty while `when` is not met.
            'scroll' on the mesh node 'Tread': slide its material's texture along U
                     (map.offset.x) by `speed` tiles per second while moving
+           'slide'  move along `axis`: offset = amp * sin(2 pi * speed * t + phase) metres, plus
+                    optional `snap` (+ attack, recover) metres added as snap * hit(tf) when the unit fires
     Firing (all timed from tf = seconds since the unit's weapon last fired):
            'recoil' slide the node back along -`axis` by dist * hit(tf - delay), where
                     hit(x) = x / attack while x < attack, then (1 - (x - attack) / recover)^2 until 0.
@@ -29,6 +31,9 @@ model's _lod file). The game reads it from node.userData.anim:
     whole unit visual nose-up by kick radians and shove it back by slide metres, both times
     exp(-4u) * cos(6u) with u = (tf - attack) / recover after a linear rise over `attack`; apply it
     opposite to the direction the weapon is pointing.
+    Whole-model idle life: the scene's extras.idle = {bob, bobSpeed, sway, swaySpeed, shake}: lift the unit
+    visual by bob * sin(2 pi bobSpeed t) metres, roll it by sway * sin(2 pi swaySpeed t) radians, and add
+    `shake` metres of fast engine shudder. Hover units bob and sway; tracked units only shudder.
     axis   in the node's own glTF space (Y up, model front +X)
     when   'always' | 'mining' | 'working' (repairing or building) | 'moving'
     busySpeed  optional: speed to use instead while the unit is working
@@ -59,6 +64,10 @@ def flicker(slot, slots, rate=18.0, duty=0.75, idle=0.12, when='moving'):
 
 def recoil(axis, dist, attack=0.04, recover=0.45, delay=0.0, **kw):
     return dict(type='recoil', axis=axis, dist=dist, attack=attack, recover=recover, delay=delay, **kw)
+
+
+def slide(axis, amp, speed, when='always', **kw):
+    return dict(type='slide', axis=axis, amp=amp, speed=speed, when=when, **kw)
 
 
 def flash(axis=None, dur=0.08, delay=0.0, **kw):
@@ -137,7 +146,7 @@ _a = lambda n: SPEC.setdefault('alien/' + n, {})
 for _sd, _d in (('L', 0.0), ('R', 1.8)):
     _h('lancer')[f'Flash{_sd}Pivot'] = flash(FWD, 0.09, _d)
     for _k in (1, 2, 3, 4):
-        _h('lancer')[f'Barrel{_sd}{_k}Pivot'] = recoil(FWD, 1.0 * _k, attack=0.05, recover=0.5, delay=_d)
+        _h('lancer')[f'Barrel{_sd}{_k}Pivot'] = recoil(FWD, 0.99 * _k, attack=0.05, recover=0.5, delay=_d)
 _h('lancer')['BladeLPivot'] = swing(FWD, 0.16, 0.3)
 _h('lancer')['BladeRPivot'] = swing(FWD, 0.16, 0.3, phase=2.1)
 _h('lancer')['@fire'] = dict(kick=0.03, slide=0.1, attack=0.05, recover=0.4, period=3.6, repeat=2, every=1.8)
@@ -153,6 +162,26 @@ def blades(spec, amp=0.16, speed=0.3):
     spec['BladeRPivot'] = swing(FWD, amp, speed, phase=2.1)
 
 
+# ---- Terran sci-fi units: each has its own idle life as well as its own firing rhythm ----
+DOWN = [0, -1, 0]
+# Outrider: restless. The sensor mast pumps up and down, the turret darts side to side, the body jitters on its suspension.
+_h('outrider').update({'MastPivot': slide(UP, 0.2, 0.22), 'TurretPivot': swing(UP, 0.35, 0.45, 'idle'), '@idle': dict(shake=0.012)})
+# Lancer: alert hunter. The turret sweeps steadily, blades scan out of step.
+_h('lancer').update({'TurretPivot': swing(UP, 0.25, 0.16, 'idle'), '@idle': dict(shake=0.006)})
+# Skimmer: floats. It bobs and rolls on its fans, turret drifting.
+_h('skimmer').update({'TurretPivot': swing(UP, 0.2, 0.12, 'idle'), '@idle': dict(bob=0.09, bobSpeed=0.55, sway=0.035, swaySpeed=0.31)})
+# Bulwark: heavy and slow. Barely turns its turret; the shoulder capacitor blades flare open on each blast and close as they cool.
+_h('bulwark').update({'TurretPivot': swing(UP, 0.12, 0.06, 'idle'), '@idle': dict(shake=0.004),
+                      'CapLPivot': swing(FWD, 0.015, 0.7, snap=-0.5, attack=0.1, recover=2.6),
+                      'CapRPivot': swing(FWD, 0.015, 0.7, phase=1.0, snap=0.5, attack=0.1, recover=2.6)})
+# Longbow: braces itself. Anchor claws slam into the ground for the salvo, the cannon breathes up and down between salvos.
+_h('longbow').update({'ClawPivot': slide(DOWN, 0.0, 0.1, snap=0.22, attack=0.06, recover=2.2),
+                      'GunPivot': swing(LEFT, 0.035, 0.11), '@idle': dict(shake=0.004)})
+# Javelin: the pod cradle rocks as it tracks, nods on each launch; fire-control panel spins.
+_h('javelin').update({'PodsPivot': swing(LEFT, 0.05, 0.17, snap=-0.07, attack=0.05, recover=0.6), '@idle': dict(shake=0.005)})
+# Support units: engine shudder; work tools carry their own motion.
+for _n, _sh in (('prospector', 0.012), ('hauler', 0.008), ('mender', 0.006), ('watchman', 0.004)):
+    _h(_n)['@idle'] = dict(shake=_sh)
 # Outrider (scout): 3 fast shots 0.15 s apart, reload 1.3 s (1.6 s cycle); blades twitch quickly, scanner spins.
 tele(_h('outrider'), 0.6, attack=0.03, recover=0.11, fdur=0.05, repeat=3, every=0.15)
 blades(_h('outrider'), 0.22, 0.9)
@@ -170,7 +199,7 @@ _h('bulwark')['@fire'] = dict(kick=0.06, slide=0.3, attack=0.06, recover=1.1, pe
 # Longbow (artillery): 3 shots 0.4 s apart, then a 3 s reload (3.8 s cycle, build thread's gameplay timing).
 _h('longbow')['FlashPivot'] = flash(up(26), 0.1, 0.0, repeat=3, every=0.4)
 for _k in (1, 2, 3, 4):   # telescoping cannon: every sleeve slams into the one behind (80% of the barrel length)
-    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.76 * _k, attack=0.05, recover=0.33, repeat=3, every=0.4)
+    _h('longbow')[f'Barrel{_k}Pivot'] = recoil(up(26), 1.72 * _k, attack=0.05, recover=0.33, repeat=3, every=0.4)
 _h('longbow')['@fire'] = dict(kick=0.09, slide=0.35, attack=0.05, recover=0.5, period=3.8, repeat=3, every=0.4)
 # Javelin (missile tank): 4-rocket ripple 0.2 s apart hopping between the pods, reload 5.0 s (5.6 s cycle).
 for _k, (_s, _i, _j) in enumerate([('L', 0, 1), ('R', 2, 1), ('L', 2, 1), ('R', 0, 1)]):
@@ -194,6 +223,9 @@ def patch(path, anims):
     j = json.loads(d[20:20 + jl])
     rest = d[20 + jl:]
     found = set()
+    if '@idle' in anims:
+        j['scenes'][j.get('scene', 0)].setdefault('extras', {})['idle'] = anims['@idle']
+        found.add('@idle')
     if '@fire' in anims:
         j['scenes'][j.get('scene', 0)].setdefault('extras', {})['fire'] = anims['@fire']
         found.add('@fire')

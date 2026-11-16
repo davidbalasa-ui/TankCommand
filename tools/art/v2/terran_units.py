@@ -132,19 +132,21 @@ def outrider():
         box((0.5, 0, gz), (0.3, 0.2, 0.17), 'plate', bevel=0.04)
         V.tele_cannon(0.6, 3.6, gz, 0.11, 4, piston=False)
         # Scout sensor mast with a rotating scanner bar.
-        for kk, (rr, hh) in enumerate(((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))):
-            zb = tz + 0.42 + sum(h for _, h in ((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))[:kk])
-            cyl((-0.95, -0.3, zb), (-0.95, -0.3, zb + hh), rr, 6, 'steel' if kk % 2 else 'dark')
-            cyl((-0.95, -0.3, zb + hh - 0.03), (-0.95, -0.3, zb + hh), rr * 1.3, 6, 'black')
-        box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
-        cyl((-0.82, -0.3, tz + 1.38), (-0.8, -0.3, tz + 1.38), 0.07, 8, 'hot')
+        cyl((-0.95, -0.3, tz + 0.42), (-0.95, -0.3, tz + 0.8), 0.075, 6, 'dark')
+        cyl((-0.95, -0.3, tz + 0.77), (-0.95, -0.3, tz + 0.8), 0.1, 6, 'black')
+        with F.group('Mast'):   # the upper mast pumps up and down out of the base tube
+            cyl((-0.95, -0.3, tz + 0.5), (-0.95, -0.3, tz + 1.16), 0.055, 6, 'steel')
+            cyl((-0.95, -0.3, tz + 1.13), (-0.95, -0.3, tz + 1.16), 0.072, 6, 'black')
+            cyl((-0.95, -0.3, tz + 1.16), (-0.95, -0.3, tz + 1.46), 0.038, 6, 'dark')
+            box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
+            cyl((-0.82, -0.3, tz + 1.38), (-0.8, -0.3, tz + 1.38), 0.07, 8, 'hot')
         with F.group('Radar'):
             cyl((-0.95, -0.3, tz + 1.48), (-0.95, -0.3, tz + 1.64), 0.045, 6, 'steel')
             prism([(-1.0, tz + 1.64), (-0.9, tz + 1.64), (-0.88, tz + 1.78), (-1.02, tz + 1.78)], -0.95, 0.35, 'plate', bevel=0.015)
             box((-0.875, -0.3, tz + 1.71), (0.008, 0.55, 0.02), 'hot')
     wheels = [(f"Wheel{i}{'L' if sd > 0 else 'R'}", (x, sd * 1.42, 0.6), f"Wheel{i}{'L' if sd > 0 else 'R'}Pivot")
               for sd in (1, -1) for i, x in enumerate((-1.9, 0.0, 1.9))]
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Turret')]
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Mast', (-0.95, -0.3, tz + 0.8), 'MastPivot', 'Turret'), ('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Mast')]
                 + V.cannon_pivots((0.6, 0, gz)) + V.blade_pivots(-1.3, 0.68, tz, 0.5))
 
 
@@ -228,11 +230,15 @@ def bulwark():
             box((-1.3, s * 1.78, tz + 0.52), (0.95, 0.3, 0.3), 'armor', bevel=0.07)
             box((-1.3, s * 1.42, tz + 0.45), (0.5, 0.12, 0.14), 'dark')
             box((-1.3, s * 2.09, tz + 0.52), (0.7, 0.012, 0.1), 'coilhot')
+            mc = F.mark()
             for k in range(5):
                 fx = -2.0 + k * 0.35
                 prism([(fx, tz + 0.8), (fx + 0.3, tz + 0.8), (fx + 0.05, tz + 1.12), (fx - 0.3, tz + 1.2)], min(s * 1.56, s * 2.0), max(s * 1.56, s * 2.0), 'plate', bevel=0.012)
+            box((-1.3, s * 1.78, tz + 0.83), (0.8, 0.16, 0.02), 'coilhot')
+            F.regroup(mc, 'Cap' + sd)   # the blades flare open when the cannons fire
             box((-0.3, s * 1.78, tz + 0.52), (0.03, 0.2, 0.18), 'amber')
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + V.cannon_pivots((1.8, 0, gz), ('L', 'R')) + V.blade_pivots(-2.6, 1.4, tz, th))
+    caps = [('Cap' + sd, (-1.3, sy * 1.6, tz + 0.8), f'Cap{sd}Pivot', 'Turret') for sd, sy in (('L', 1), ('R', -1))]
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + V.cannon_pivots((1.8, 0, gz), ('L', 'R')) + V.blade_pivots(-2.6, 1.4, tz, th) + caps)
 
 
 @asset('human/javelin.glb', 'Terran Javelin (missile tank)')
@@ -266,6 +272,9 @@ def javelin():
                 prism([(1.1, pz - 0.48), (1.55, pz - 0.36), (1.15, pz - 0.3)], s * 1.46 + dy - 0.04, s * 1.46 + dy + 0.04, 'steel', bevel=0.01)
             box((-2.57, s * 1.46, pz), (0.02, 0.3, 0.2), 'amber')
             F.rot_all(m, 'Y', -16, about=(-0.5, 0, pz))
+            for o in F.since(m):   # pod bodies ride one cradle part; the missiles keep their own parts under it
+                if o.get('group') == 'Turret':
+                    o['group'] = 'Pods'
         # Targeting sensor and a rotating fire-control panel.
         box((0.25, 0, tz + 1.02), (0.26, 0.2, 0.12), 'dark', bevel=0.04)
         box((0.52, 0, tz + 1.02), (0.012, 0.14, 0.05), 'hot')
@@ -277,7 +286,8 @@ def javelin():
                 box((0.055, 0, k * 0.2), (0.008, 0.5, 0.02), 'hot')
             F.rot_all(m, 'Y', -14)
             F.move_all(m, (-1.1, 0, tz + 1.82))
-    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret')] + [(g, p, g + 'Pivot', 'Turret') for g, p in msl])
+    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret'), ('Pods', (-0.5, 0, pz), 'PodsPivot', 'Turret')]
+                + [(g, p, g + 'Pivot', 'Pods') for g, p in msl])
 
 
 @asset('human/longbow.glb', 'Terran Longbow (artillery)', size=1024)
@@ -309,6 +319,7 @@ def longbow():
             for q in range(4):
                 box((-2.3 + q * 0.45, s * 0.64, gz), (0.04, 0.02, 0.3), 'black')
         box((0.22, 0, gz), (0.06, 0.66, 0.56), 'plate', bevel=0.02)
+        F.regroup(m, 'Gun')   # the cradle elevates as one part and carries the sleeves
         step = V.tele_cannon(0.2, 9.0, gz, 0.44, 4)
         F.rot_all(m, 'Y', -26, about=(-0.8, 0, gz))
         with F.group('Radar'):   # fire-control dish
@@ -321,7 +332,8 @@ def longbow():
             F.move_all(m, (c[0], c[1], c[2] + 0.12))
     p = (-0.8, 0, gz)
     return dict(pivot=[('Turret', (-0.9, 0, tz)), ('Radar', (-2.0, 0.0, tz + 0.75), 'RadarPivot', 'Turret')]
-                + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Turret') for k in (1, 2, 3, 4)] + [('Flash', p, 'FlashPivot', 'Barrel4')])
+                + [('Gun', p, 'GunPivot', 'Turret'), ('Claw', (0, 0, 1.0), 'ClawPivot')]
+                + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Gun') for k in (1, 2, 3, 4)] + [('Flash', p, 'FlashPivot', 'Barrel4')])
 
 
 def cab(x, y, z, sx=0.7, sy=0.6, sz=0.55):
@@ -667,3 +679,13 @@ def condor():
     import aircraft2
     aircraft2.hammer()
     return dict(name='TerranHammerhead', single=True)
+
+
+# ---- Style switch ----
+# David (2026-11-16) preferred the earlier armoured tank designs to the sci-fi set above, with the newer
+# animation (telescoping barrels, per-unit rhythms). TERRAN_STYLE=scifi builds the sci-fi set instead.
+import os as _os
+if _os.environ.get('TERRAN_STYLE', 'classic') == 'classic':
+    import terran_p6 as _p6
+    for _k in ('lancer', 'longbow'):
+        ASSETS[_k] = _p6.ASSETS[_k]

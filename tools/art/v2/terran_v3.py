@@ -69,10 +69,11 @@ def blade_pod(x0, x1, y, side, w=0.42, nwheels=5, top=1.3, prow=1.2, fin=0.6, cl
           a, b, 'armor', bevel=0.022)
     prism([(x0 - 0.1, 0.86), (x0 + 0.5, 0.86), (x0 + 0.5, top), (x0, top)], full[0], full[1], 'dark')
     box((x0 - 0.35, (a + b) / 2 + s * 0.06, top + fin * 0.45), (0.2, 0.01, 0.025), 'amber')
-    for cx in claws:   # ground anchor claws, folded against the pod
-        prism([(cx - 0.34, top - 0.1), (cx + 0.3, top - 0.1), (cx + 0.2, 0.62), (cx + 0.02, 0.2), (cx - 0.16, 0.62)], b if s > 0 else a - 0.09, (b + 0.09) if s > 0 else a,
-              'steel', bevel=0.02)
-        box((cx, (b + 0.1) if s > 0 else (a - 0.1), top - 0.3), (0.16, 0.012, 0.03), 'hazard')
+    for cx in claws:   # ground anchor claws, folded against the pod; group Claw so they can slam down when firing
+        with F.group('Claw'):
+            prism([(cx - 0.34, top - 0.1), (cx + 0.3, top - 0.1), (cx + 0.2, 0.62), (cx + 0.02, 0.2), (cx - 0.16, 0.62)], b if s > 0 else a - 0.09, (b + 0.09) if s > 0 else a,
+                  'steel', bevel=0.02)
+            box((cx, (b + 0.1) if s > 0 else (a - 0.1), top - 0.3), (0.16, 0.012, 0.03), 'hazard')
 
 
 def dart_hull(L=6.4, hw=1.22, top=1.42, nose=0.9, zone='hull'):
@@ -212,7 +213,7 @@ def arrow_turret(x0, x1, w, tz, h, zone='armor', bs=1.0):
         box((x0 + 0.25, s * w * 0.3, tz + h * 0.93), (0.16, w * 0.14, 0.02), 'vent')
 
 
-def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, prefix='Barrel'):
+def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, prefix='Barrel', classic=False):
     """Telescoping rail cannon along +X from x0 to x1: n nested round sleeves (groups Barrel1..n, widest first)
     that slam into each other when it fires, a clawed round emitter at the muzzle and a recoil piston out the back.
     Returns the travel of one sleeve relative to the next."""
@@ -222,28 +223,43 @@ def tele_cannon(x0, x1, z, r=0.5, n=4, flash_group='Flash', y=0.0, piston=True, 
         m = F.mark()
         rr = r * (1 - 0.17 * k)
         a, b = x0 + seg * k - (0.35 if k else 0.0), x0 + seg * (k + 1)
-        # Round sleeve: a glowing accelerator core wrapped in armoured rings, with the core showing in the gaps.
-        cyl((a, y, z), (b, y, z), rr * 0.86, 14, 'coilhot')
-        ring = max(0.22, min(0.5, rr * 1.3))
-        gap = ring * 0.3
-        cnt = max(2, int((b - a - 0.3) / (ring + gap)))
-        pitch = (b - a - 0.3) / cnt
-        for q in range(cnt):
-            qa = a + 0.06 + q * pitch
-            tube((qa, y, z), (qa + pitch - gap, y, z), [(0, rr * 0.9), (0.12, rr), (0.88, rr), (1, rr * 0.9)], 14, 'armor' if q % 2 else 'plate', sharp=30)
-        for ang in (45, 135, 225, 315):   # four tie rails along the sleeve
-            t = box(((a + b) / 2, y, z + rr * 1.0), ((b - a) / 2 - 0.1, rr * 0.13, rr * 0.07), 'black')
-            F.rot(t, 'X', ang, about=(0, y, z))
-        # Front collar with a fierce energy ring.
-        tube((b - 0.2, y, z), (b, y, z), [(0, rr * 1.05), (0.2, rr * 1.2), (0.8, rr * 1.2), (1, rr * 1.05)], 14, 'plate', sharp=30)
-        cyl((b - 0.27, y, z), (b - 0.2, y, z), rr * 1.13, 14, 'neon')
-        cyl((b - 0.245, y, z), (b - 0.225, y, z), rr * 1.16, 14, 'hot')
+        if classic:   # gun-metal sleeve with clamp rings, as on the earlier tanks
+            tube((a, y, z), (b, y, z), [(0, rr * 0.92), (0.03, rr), (0.97, rr), (1, rr * 0.92)], 12, 'barrel' if k % 2 else 'plate', sharp=30)
+            cnt = max(2, int((b - a) / max(0.5, rr * 3)))
+            for q in range(cnt):
+                qx = a + 0.25 + (b - a - 0.55) * q / max(1, cnt - 1)
+                cyl((qx - 0.04, y, z), (qx + 0.04, y, z), rr * 1.1, 12, 'steel')
+            tube((b - 0.2, y, z), (b, y, z), [(0, rr * 1.05), (0.2, rr * 1.22), (0.8, rr * 1.22), (1, rr * 1.05)], 12, 'armor', sharp=30)
+            cyl((b - 0.25, y, z), (b - 0.2, y, z), rr * 1.12, 12, 'glow')
+        else:
+            # Round sleeve: a glowing accelerator core wrapped in armoured rings, with the core showing in the gaps.
+            cyl((a, y, z), (b, y, z), rr * 0.86, 14, 'coilhot')
+            ring = max(0.22, min(0.5, rr * 1.3))
+            gap = ring * 0.3
+            cnt = max(2, int((b - a - 0.3) / (ring + gap)))
+            pitch = (b - a - 0.3) / cnt
+            for q in range(cnt):
+                qa = a + 0.06 + q * pitch
+                tube((qa, y, z), (qa + pitch - gap, y, z), [(0, rr * 0.9), (0.12, rr), (0.88, rr), (1, rr * 0.9)], 14, 'armor' if q % 2 else 'plate', sharp=30)
+            for ang in (45, 135, 225, 315):   # four tie rails along the sleeve
+                t = box(((a + b) / 2, y, z + rr * 1.0), ((b - a) / 2 - 0.1, rr * 0.13, rr * 0.07), 'black')
+                F.rot(t, 'X', ang, about=(0, y, z))
+            # Front collar with a fierce energy ring.
+            tube((b - 0.2, y, z), (b, y, z), [(0, rr * 1.05), (0.2, rr * 1.2), (0.8, rr * 1.2), (1, rr * 1.05)], 14, 'plate', sharp=30)
+            cyl((b - 0.27, y, z), (b - 0.2, y, z), rr * 1.13, 14, 'neon')
+            cyl((b - 0.245, y, z), (b - 0.225, y, z), rr * 1.16, 14, 'hot')
         if k == 0 and piston:   # recoil piston, hidden in the housing until the gun fires
             cyl((x0 - 1.75, y, z), (x0 + 0.1, y, z), r * 0.5, 10, 'steel')
             cyl((x0 - 1.8, y, z), (x0 - 1.75, y, z), r * 0.56, 10, 'heat')
             for q in range(3):
                 cyl((x0 - 1.5 + q * 0.4, y, z), (x0 - 1.44 + q * 0.4, y, z), r * 0.53, 10, 'hot')
-        if k == n - 1:   # round emitter crown: flared muzzle ring, bright bore, three raked claws
+        if k == n - 1 and classic:   # slotted muzzle brake with a thin glow ring
+            tube((b, y, z), (b + rr * 3.2, y, z), [(0, rr * 1.0), (0.12, rr * 1.6), (0.85, rr * 1.6), (1, rr * 1.3)], 16, 'armor', sharp=30)
+            for q in range(3):
+                box((b + rr * (0.9 + q * 0.8), y, z), (rr * 0.22, rr * 1.66, rr * 0.45), 'dark')
+            cyl((b + rr * 3.18, y, z), (b + rr * 3.22, y, z), rr * 0.8, 16, 'dark')
+            tube((b + rr * 3.15, y, z), (b + rr * 3.22, y, z), [(0, rr * 0.95), (1, rr * 0.95), (1, rr * 0.8), (0, rr * 0.8)], 16, 'glow')
+        elif k == n - 1:   # round emitter crown: flared muzzle ring, bright bore, three raked claws
             tube((b, y, z), (b + rr * 2.2, y, z), [(0, rr * 1.0), (0.15, rr * 1.45), (0.75, rr * 1.45), (1, rr * 1.15)], 14, 'armor', sharp=30)
             cyl((b + rr * 2.2, y, z), (b + rr * 2.24, y, z), rr * 0.95, 14, 'black')
             cyl((b + rr * 2.2, y, z), (b + rr * 2.27, y, z), rr * 0.62, 12, 'hot')

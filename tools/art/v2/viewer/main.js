@@ -91,12 +91,23 @@ window.__setTime = (t) => {
     root.rotation.z = firePeriod ? fire.kick * k : 0;
     root.position.x = firePeriod ? -fire.slide * k : 0;
   }
+  // Whole-unit idle life (scene extras idle): hover bob, roll sway, engine shudder.
+  for (const { root, idle, y0 } of roots) {
+    if (!idle) continue;
+    root.position.y = y0 + (idle.bob || 0) * Math.sin(Math.PI * 2 * (idle.bobSpeed || 0.5) * t) + (idle.shake || 0) * Math.sin(t * 61) * Math.sin(t * 37);
+    root.rotation.x = (idle.sway || 0) * Math.sin(Math.PI * 2 * (idle.swaySpeed || 0.3) * t + 1.3);
+  }
   for (const { node, spec, rest, pos, fire } of parts) {
     const tf = clock(fire);
     if (spec.type === 'scroll') { if (moving && node.material && node.material.map) node.material.map.offset.x = spec.speed * t; continue; }
     if (spec.type === 'recoil') {
       const a = new THREE.Vector3(...spec.axis).normalize();
       node.position.copy(pos).addScaledVector(a, -spec.dist * rep(spec, tf, (x) => hit(x, spec.attack, spec.recover)));
+      continue;
+    }
+    if (spec.type === 'slide') {
+      const a = new THREE.Vector3(...spec.axis).normalize();
+      node.position.copy(pos).addScaledVector(a, spec.amp * Math.sin(Math.PI * 2 * spec.speed * t + (spec.phase || 0)) + (spec.snap ? spec.snap * hit(tf, spec.attack, spec.recover) : 0));
       continue;
     }
     if (spec.type === 'flash') {
@@ -154,7 +165,7 @@ files.forEach((file, i) => {
     holder.position.set((col - (Math.min(cols, files.length) - 1) / 2) * gap - centre.x, -box.min.y + Number(q.get('lift') || 0), row * gap - centre.z);
     const unitFire = gltf.scene.userData && gltf.scene.userData.fire;
     root.traverse((o) => { if (o.userData && o.userData.anim) parts.push({ node: o, spec: o.userData.anim, rest: o.quaternion.clone(), pos: o.position.clone(), fire: unitFire }); });
-    roots.push({ root, fire: gltf.scene.userData && gltf.scene.userData.fire });
+    roots.push({ root, fire: gltf.scene.userData && gltf.scene.userData.fire, idle: gltf.scene.userData && gltf.scene.userData.idle, y0: root.position.y });
     root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(holder);
     loaded += 1;
