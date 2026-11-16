@@ -10,7 +10,7 @@ import bpy, json, math, os, sys
 from mathutils import Vector
 
 STYLE = dict(
-    smoke_color=(0.7, 0.67, 0.63),   # albedo of soot (grey, slightly warm)
+    smoke_color=(0.8, 0.77, 0.73),   # albedo of soot (grey, slightly warm)
     smoke_density=3.0,                # multiplier on the density grid
     detail=0.35,                      # noise modulation of density (upres look)
     detail_scale=6.0,
@@ -20,7 +20,7 @@ STYLE = dict(
     # fire ramp: dark red -> orange -> yellow -> near white (no purple ever)
     ramp=[(0.0, (0.0, 0.0, 0.0)), (0.1, (0.4, 0.04, 0.0)), (0.35, (1.0, 0.2, 0.01)),
           (0.7, (1.0, 0.45, 0.05)), (1.0, (1.0, 0.68, 0.22))],
-    sun=3.0, sun_rot=(50, 0, 35), world=0.55, world_color=(0.55, 0.62, 0.75),
+    sun=3.5, sun_rot=(50, 0, 35), world=0.8, world_color=(0.55, 0.62, 0.75),
     inner_light=0.0,                  # point light inside fireball (W per unit flame)
     dust=False,
 )

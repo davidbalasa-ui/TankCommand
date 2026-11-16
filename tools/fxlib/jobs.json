@@ -181,7 +181,7 @@
  "explo_big": {
   "recipe": "big_blast",
   "sim": {
-   "frames": 72,
+   "frames": 60,
    "res": 1.2
   },
   "test_frames": [
@@ -189,8 +189,8 @@
    12,
    20,
    32,
-   50,
-   72
+   46,
+   60
   ],
   "render": {
    "res": 768,
