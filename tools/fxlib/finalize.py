@@ -48,12 +48,13 @@ def main():
     ap.add_argument('--extent', type=float, required=True, help='metres covered by the full square frame width')
     ap.add_argument('--origin_v', type=float, default=0.0, help='ground/emitter height in the image, 0=bottom')
     ap.add_argument('--loop', type=int, default=0)
+    ap.add_argument('--drop_first', type=int, default=0)
     ap.add_argument('--atlas', type=int, default=128)
     ap.add_argument('--lib', default=LIB)
     ap.add_argument('--tint', default='', help='neutral|fire|gold : hint for users')
     ap.add_argument('--note', default='')
     a = ap.parse_args()
-    fr = load(a.png_dir)
+    fr = load(a.png_dir)[a.drop_first:]
     if a.loop:
         fr = crossfade_loop(fr, a.loop)
     od = os.path.join(a.lib, 'flipbooks', a.name)
