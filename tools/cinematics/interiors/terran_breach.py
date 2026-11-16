@@ -31,7 +31,7 @@ MODE = A.get('mode', 'frames')
 RES = tuple(int(v) for v in A.get('res', '960x540').split('x'))
 FPS = 24.0
 T_TOUCH = 0.6
-DUR = float(A.get('dur', 4.6))
+DUR = float(A.get('dur', 5.0))
 GOLD = (1.0, 0.36, 0.02)
 INFL = 0.13          # the skin rides this far proud of the hull
 SLEEVE_W = float(A.get('sleeve_w', 0.75))   # how far the sleeve wall reaches out from the hull before it meets the plane
@@ -188,11 +188,15 @@ class Attacker:
         roll = math.radians(1.3) * strain * math.sin(t * 17.0 + 1.0)
         ny = self.yf - p
         cy = ny + self.nose
-        self.root.location = (self.x + jit, cy, z)
-        self.root.rotation_euler = (roll, pitch, math.radians(-90))
+        vs = sstep(tau / 0.85)                    # once clear it peels off to the side, out of the doorway
+        vx = -float(A.get('veer', 4.5)) * vs
+        yaw = math.radians(float(A.get('veer_yaw', 24))) * math.sin(min(max(tau, 0) / 0.85, 1.0) * math.pi * 0.75)
+        self.cx_now = self.x + vx
+        self.root.location = (self.x + vx + jit, cy, z)
+        self.root.rotation_euler = (roll, pitch, math.radians(-90) - yaw)
         self.strain = strain
-        self.glow.location = (self.x, cy - 2.0, z + 5.2)
-        self.under.location = (self.x, cy, max(z, 0.2) + 0.45)
+        self.glow.location = (self.cx_now, cy - 2.0, z + 5.2)
+        self.under.location = (self.cx_now, cy, max(z, 0.2) + 0.45)
         return ny, cy, z
 
 
@@ -434,8 +438,10 @@ class Field:
             sig = (0.4 + float(A.get('snap_spread', 5.0)) * tau) / self.CELL
             Sw = ndi.gaussian_filter(Sr, sig, mode='constant')
             Sw = Sw / max(float(Sw.max()), 1e-6)
-            amp = min(dmax, float(A.get('snap_amp', 2.4))) * math.exp(-tau * 3.4) * math.cos(2 * math.pi * 2.4 * tau)
-            disp += amp * self.samp(Sw, self.P2) * self.win
+            amp = min(dmax, float(A.get('snap_amp', 2.4))) * math.exp(-tau * float(A.get('snap_decay', 2.3))) * math.cos(2 * math.pi * float(A.get('snap_hz', 1.9)) * tau)
+            snapd = amp * self.samp(Sw, self.P2) * self.win
+            disp += snapd
+            self._snapglow = np.clip(np.abs(snapd).max(axis=1) / 0.9, 0, 1.2)
             rip = 0.8 * math.exp(-tau * 2.4) * min(tau / 0.08, 1.0)
             disp += rip * np.sin(2 * math.pi * (self.rv / 3.4 - 3.0 * tau)) * np.exp(-self.rv / 9.0) * self.win
         out = self.base.copy()
@@ -461,6 +467,8 @@ class Field:
             front = 2.0 + (t - tk) * 13.0
             hot += 0.9 * np.clip(1 - np.abs(self.rp - front) / 1.5, 0, 1) * math.exp(-(t - tk) * 1.5)
         pulse = np.zeros(self.N)
+        if tau > 0 and hasattr(self, '_snapglow'):
+            pulse += float(A.get('bulge_glow', 0.9)) * self._snapglow      # the bulging skin lights up as it rings
         if tau > 0:                                    # snap: a bright shock ring races out across the whole door
             for k, (spd, amp) in enumerate(((17.0, 1.6), (11.0, 0.8))):
                 front = 0.5 + tau * spd
@@ -631,7 +639,7 @@ def build_hangar(full):
     def aim(t, cy, z):
         """Turrets slew (with lag) onto the contact point, then onto the boarder once it is inside."""
         for d in defenders:
-            tgt = (att.x, min(cy, yf - 0.5), z + 2.0) if t > T_TOUCH else (0.0, yf, 3.0)
+            tgt = (att.cx_now, min(cy, yf - 0.5), z + 2.0) if t > T_TOUCH else (0.0, yf, 3.0)
             want = math.atan2(tgt[1] - d['y'], tgt[0] - d['x'])
             yaw = math.radians(d['rz']) + 0.0
             t0 = CUT if d.get('late') else T_TOUCH          # the one beside camera A waits for the cut
@@ -655,7 +663,7 @@ def build_hangar(full):
             a = t - ts
             gun = defenders[di]['gun']
             if -0.001 <= a < 0.13:
-                tgt = np.array([att.x + 2.2, cy - 1.0, z + 2.0])
+                tgt = np.array([att.cx_now + 2.2, cy - 1.0, z + 2.0])
                 d = tgt - gun
                 Ld = np.linalg.norm(d)
                 d /= Ld
