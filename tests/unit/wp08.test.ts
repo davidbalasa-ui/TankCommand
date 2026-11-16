@@ -315,7 +315,65 @@ describe('[AIR-04] fighters and bombers', () => {
   });
 });
 
-describe('[AIR-05] aircraft ammo is spent per shot', () => {
+describe('[AIR-06] interceptors hit aircraft only', () => {
+  const interceptor = () =>
+    fighter({
+      id: 'unit.test.interceptor',
+      weapon: { damage: 26, range: 9, reloadSec: 1.2, projectileSpeed: 60, accuracy: 1, splashRadius: 0, targets: ['air'] },
+    });
+  it('[AIR-06] an air-only fighter never fires at ground units or structures', () => {
+    const w = build({
+      extra: [interceptor()],
+      structures: [
+        { owner: 1, typeId: 'structure.test.air_base', x: -40, z: -40 },
+        { owner: 2, typeId: 'structure.test.pad', x: -30, z: -36 },
+      ],
+      units: [
+        { owner: 1, typeId: 'unit.test.interceptor', x: -40, z: -40 },
+        { owner: 2, typeId: 'unit.test.tank', x: -32, z: -40 },
+      ],
+    });
+    const jet = unitOf(w, 'unit.test.interceptor');
+    const tank = unitOf(w, 'unit.test.tank');
+    let state = run(w, [{ kind: 'air', issuer: 1, unitIds: [jet.id], action: 'launch' }], 1);
+    state = run(state, [{ kind: 'attack', issuer: 1, unitIds: [jet.id], targetId: tank.id }], 1);
+    let fired = false;
+    for (let i = 0; i < 8 * SEC; i += 1) {
+      state = step(state, []);
+      fired ||= state.projectiles.some((p) => p.owner === 1);
+    }
+    expect(fired).toBe(false);
+    expect(unitOf(state, 'unit.test.tank').hp).toBe(tank.hp);
+    expect(unitOf(state, 'unit.test.interceptor').air?.ammo).toBe(3);
+  });
+  it('[AIR-06] an air-only fighter shoots down an enemy aircraft', () => {
+    const w = build({
+      extra: [interceptor()],
+      structures: [
+        { owner: 1, typeId: 'structure.test.air_base', x: -40, z: -40 },
+        { owner: 2, typeId: 'structure.test.air_base', x: -30, z: -40 },
+      ],
+      units: [
+        { owner: 1, typeId: 'unit.test.interceptor', x: -40, z: -40 },
+        { owner: 2, typeId: 'unit.test.bomber', x: -30, z: -40 },
+      ],
+    });
+    const jet = unitOf(w, 'unit.test.interceptor');
+    const foe = unitOf(w, 'unit.test.bomber');
+    let state = run(
+      w,
+      [
+        { kind: 'air', issuer: 1, unitIds: [jet.id], action: 'launch' },
+        { kind: 'air', issuer: 2, unitIds: [foe.id], action: 'launch' },
+      ],
+      1,
+    );
+    state = run(state, [{ kind: 'attackMove', issuer: 1, unitIds: [jet.id], x: -30, z: -40 }], 6 * SEC);
+    expect(state.units.find((u) => u.id === foe.id)?.hp ?? 0).toBeLessThan(foe.hp);
+  });
+});
+
+describe('[AIR-05] aircraft ammo is spent per attack run', () => {
   it('[AIR-05] every shot costs one ammo and an empty aircraft stops firing', () => {
     const w = airWorld([{ owner: 2, typeId: 'unit.test.tank', x: -36, z: -40 }]);
     const jet = unitOf(w, 'unit.test.fighter');

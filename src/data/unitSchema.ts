@@ -4,7 +4,12 @@ const weaponSchema = z.object({
   id: z.string(),
   damage: z.number().nonnegative(),
   range: z.number().positive(),
+  /** Pause after the burst's last shot before the next burst. */
   reloadSec: z.number().positive(),
+  /** Shots per burst (default 1). */
+  burst: z.number().int().positive().optional(),
+  /** Seconds between shots inside a burst. */
+  burstIntervalSec: z.number().nonnegative().optional(),
   projectileSpeed: z.number().positive(),
   accuracy: z.number().min(0).max(1),
   splashRadius: z.number().nonnegative(),

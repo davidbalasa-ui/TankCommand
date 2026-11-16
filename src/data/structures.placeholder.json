@@ -118,16 +118,18 @@
     "sightRange": 14,
     "modelId": "structure.human.turret",
     "weapon": {
-      "damage": 25,
+      "damage": 15,
       "range": 14,
-      "reloadSec": 2,
+      "reloadSec": 2.0,
       "projectileSpeed": 45,
       "accuracy": 0.85,
       "splashRadius": 0,
       "targets": [
         "ground",
         "structure"
-      ]
+      ],
+      "burst": 2,
+      "burstIntervalSec": 0.3
     },
     "turretTurnDegPerSec": 150,
     "packSec": 4,
@@ -211,16 +213,18 @@
     "sightRange": 14,
     "modelId": "structure.alien.turret",
     "weapon": {
-      "damage": 25,
+      "damage": 15,
       "range": 14,
-      "reloadSec": 2,
+      "reloadSec": 2.0,
       "projectileSpeed": 45,
       "accuracy": 0.85,
       "splashRadius": 0,
       "targets": [
         "ground",
         "structure"
-      ]
+      ],
+      "burst": 2,
+      "burstIntervalSec": 0.3
     },
     "turretTurnDegPerSec": 150,
     "packSec": 4,
@@ -354,9 +358,9 @@
     "sightRange": 14,
     "modelId": "structure.human.missile_battery",
     "weapon": {
-      "damage": 25,
+      "damage": 11,
       "range": 20,
-      "reloadSec": 3,
+      "reloadSec": 2.7,
       "projectileSpeed": 35,
       "accuracy": 0.9,
       "splashRadius": 0.5,
@@ -364,7 +368,9 @@
         "ground",
         "air",
         "structure"
-      ]
+      ],
+      "burst": 3,
+      "burstIntervalSec": 0.25
     },
     "turretTurnDegPerSec": 150,
     "packSec": 4,
@@ -398,9 +404,9 @@
     "sightRange": 14,
     "modelId": "structure.alien.missile_battery",
     "weapon": {
-      "damage": 25,
+      "damage": 11,
       "range": 20,
-      "reloadSec": 3,
+      "reloadSec": 2.7,
       "projectileSpeed": 35,
       "accuracy": 0.9,
       "splashRadius": 0.5,
@@ -408,7 +414,9 @@
         "ground",
         "air",
         "structure"
-      ]
+      ],
+      "burst": 3,
+      "burstIntervalSec": 0.25
     },
     "turretTurnDegPerSec": 150,
     "packSec": 4,

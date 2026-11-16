@@ -41,6 +41,8 @@ export function buildUnitTypes(table: ReadonlyMap<string, UnitRow>): ReadonlyMap
             damage: weapon.damage,
             range: weapon.range,
             reloadSec: weapon.reloadSec,
+            ...(weapon.burst !== undefined ? { burst: weapon.burst } : {}),
+            ...(weapon.burstIntervalSec !== undefined ? { burstIntervalSec: weapon.burstIntervalSec } : {}),
             projectileSpeed: weapon.projectileSpeed,
             accuracy: weapon.accuracy,
             splashRadius: weapon.splashRadius,

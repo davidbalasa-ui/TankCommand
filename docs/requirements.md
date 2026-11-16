@@ -59,11 +59,13 @@
 | MOVE-06 | Commands for units the issuer does not own change nothing. |
 | CMB-01 | Turrets turn at their turn rate independently of the hull. |
 | CMB-02 | A tank fires only when aligned and reloaded, with the configured reload interval. |
-| CMB-03 | Damage uses armor with a minimum of one, HP clamps and wrecks expire after ten seconds. |
+| CMB-03 | Damage uses armor with a minimum of one (and armor never stops more than 75% of a hit), HP clamps and wrecks expire after ten seconds. |
 | CMB-04 | Terrain blocks direct fire while open ground does not. |
 | CMB-05 | Inaccuracy produces misses while perfect accuracy does not. |
 | CMB-06 | Splash damage hits every unit in range including friendly units. |
 | CMB-07 | A skirmish ends with a result, a wipe yields a winner and simultaneous last kills draw. |
+| CMB-08 | Each weapon fires in its own rhythm: a burst of shots at a set spacing, then a reload; aircraft spend one ammo per burst; the fire-rate upgrade shortens only the reload. |
+| CMB-09 | Every armed unit and turret in the game data has a distinct firing pattern fitted to its role (scouts rapid and light, heavy tanks one big shot, artillery three-shell salvos). |
 | DET-01 | Scripted battles are bit-identical across runs and save/load. |
 | CAM-01 | Camera target, distance and pitch clamp and interpolate. |
 | CAM-02 | The camera never goes below terrain plus three units. |
@@ -152,7 +154,8 @@
 | AIR-02 | Aircraft launch, burn fuel, return when fuel is short or ammo is empty, rearm at base, and crash if they run dry away from any base. |
 | AIR-03 | Weapons honour their target list: ground-only weapons cannot hit airborne units, parked aircraft count as ground. |
 | AIR-04 | Fighters can shoot air; bombers never target air. |
-| AIR-05 | Aircraft ammo is spent one per shot and an empty aircraft stops firing. |
+| AIR-05 | Aircraft ammo is spent one per attack run (one per shot for single-shot weapons, one per burst otherwise) and an empty aircraft stops firing. |
+| AIR-06 | Interceptors (air-only weapons, e.g. the Arcadian Dragonfly) never fire at ground units or structures; the computer buys them only against enemy aircraft and never sends them on ground strikes. |
 | MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
 | MSN-02 | Every condition and action type has a unit test that fires it. |
 | MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). |
