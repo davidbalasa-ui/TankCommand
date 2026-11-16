@@ -690,7 +690,7 @@ for i, a in enumerate(dfs):
     th, tl = T_HATCH[i], T_LIFT[i]
     p = perch_top(i, th)
     pc = P_ORDER[i]
-    cocoon(p + Vector((0, 0, 0.45)), th, DF_SIZE * 0.55, DF_SIZE * 0.45, 0.85, yaw_deg=pc['az'])
+    cocoon(p + Vector((0, 0, 0.45)), th, DF_SIZE * 0.5, DF_SIZE * 0.42, 1.0, yaw_deg=pc['az'], alpha=0.6)
     hatch_scale(a, th)
     wings(a, th, tl, hz=10.0 + i * 0.7, phase=i * 1.3)
     df_lifters(a, tl - 0.12)
