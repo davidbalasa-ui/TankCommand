@@ -25,25 +25,25 @@ if CASE in ('cannon', 'autocannon'):
     else:
         for i in range(8):
             a.fire(0.3 + 0.12 * i, (17, 0.5 * (i % 3) - 0.5, 0.1), kind='autocannon', recoil=False, spread=0.6)
-    P.camera([(0, (1, -15, 3.2), (7.5, 0, 0.8), 35)])
+    P.camera([(0, (5, -16, 3.0), (6, 0, 0.8), 30)])
 elif CASE == 'missile':
     a = P.load('javelin', at=(0, 0), heading=0)
     P.muzzle_flash(a.muzzle(), 0.3, COL['fire'], 0.8)
-    th = P.missile(a.world_at(a.muzzle(), 0.3), (34, 3, 0.2), 0.3)
-    P.impact((34, 3, 0.2), th, size=1.2)
-    P.camera([(0, (10, -17, 4.0), (16, 2, 2.0), 28)])
+    th = P.missile(a.world_at(a.muzzle(), 0.3), (22, 3, 0.2), 0.3)
+    P.impact((22, 3, 0.2), th, size=1.2)
+    P.camera([(0, (10, -17, 3.5), (11, 2, 2.5), 24)])
 elif CASE == 'laser':
     a = P.load('lancer', at=(0, 0), heading=0)
     a.split_barrels()
     a.fire(0.3, (16, 1, 0.1), kind='laser', color=COL['laser_blue'])
     P.beam(a.world_at(a.muzzle(), 1.0), (15, -2, 0.1), 1.0, 1.8, COL['terran_neon'], width=0.12)
     P.impact((15, -2, 0.1), 1.05, size=0.8, color=COL['terran_neon'])
-    P.camera([(0, (5, -10, 2.4), (8, 0, 0.8), 30)])
+    P.camera([(0, (8, -16, 3.0), (8.5, 0, 0.8), 28)])
 elif CASE == 'lightning':
     a = P.load('lumen', at=(0, 0), heading=0)
     a.fire(0.3, (14, 1, 0.1), kind='lightning')
     a.fire(1.2, (13, -2, 0.1), kind='lightning', size=1.4)
-    P.camera([(0, (5, -9, 2.2), (7, 0, 0.8), 30)])
+    P.camera([(0, (6, -14, 2.5), (7, 0, 0.8), 28)])
 elif CASE in ('shield', 'shield_gold'):
     gold = CASE == 'shield_gold'
     hits = [(0.5, (-4.2, -3.0, 2.5)), (1.1, (-5.4, 0.5, 1.2)), (1.35, (-3.0, -3.5, 3.4))]
@@ -59,7 +59,7 @@ elif CASE in ('shield', 'shield_gold'):
 elif CASE == 'shell':
     a = P.load('longbow', at=(0, 0), heading=0)
     a.fire(0.3, (40, 4, 0.1), kind='shell')
-    P.camera([(0, (18, -30, 7), (22, 3, 4), 30)])
+    P.camera([(0, (20, -40, 8), (20, 3, 4), 26)])
 elif CASE == 'bomb':
     a = P.load('condor', at=(0, 0, 14), heading=0)
     for i in range(3):

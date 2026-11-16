@@ -323,6 +323,9 @@ def glow(P, name, color, kind='sphere', loc=(0, 0, 0), scale=(1, 1, 1), alpha=1.
     return _fxobj(o)
 
 
+_glow = glow
+
+
 def kprop(o, name, frame, value, const=False):
     o[name] = float(value)
     o.keyframe_insert(f'["{name}"]', frame=frame)
@@ -531,7 +534,7 @@ def dirt_kick(P, pos, t, size=1.0, color=None):
     base = Vector((pos.x, pos.y, gz))
     pal = getattr(P, 'palette', None)
     g = (pal['g1'] if pal and 'g1' in pal else (0.36, 0.29, 0.21))
-    dust = tuple(min(1.0, 0.06 + c * 1.5) for c in g)
+    dust = tuple(min(1.0, 0.5 * (0.06 + c * 1.5) + 0.5 * w) for c, w in zip(g, (0.66, 0.53, 0.38)))
     clod_m = _c(P).get('clod') or K.pbr_mat('FxClod', tuple(c * 0.45 for c in g), rough=1.0)
     _c(P)['clod'] = clod_m
     f0 = P.T(t)
@@ -625,12 +628,12 @@ def muzzle_flash(P, muzzle_obj, t, color, size=1.0):
     core.location = (0.12 * s, 0, 0)
     parts.append((core, (0.32 * s, 0.32 * s, 0.32 * s)))
     # forward petal: local +X of the spindle points back at the muzzle (bright), tail at the tip
-    Lf = 0.95 * s
+    Lf = 0.7 * s
     fw = glow(P, 'MuzzlePetal', pcol, fx_e=3.0, fx_p=1.3, fx_tail=0.9, fx_hot=0.7)
     fw.parent = rig
     fw.rotation_euler = (0, 0, math.pi)
     fw.location = (0.1 * s + Lf, 0, 0)
-    parts.append((fw, (Lf, 0.2 * s, 0.2 * s)))
+    parts.append((fw, (Lf, 0.24 * s, 0.24 * s)))
     roll = P.rnd.uniform(0, TAU)
     npet = 5 if gun else 4
     for i in range(npet):
@@ -688,6 +691,10 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
     dur = max(0.04, d.length / speed)
     if style is None:
         style = 'shell' if (arc and streak) else ('bomb' if not streak and not arc and _is_ballistic_col(color) and speed < 25 else 'tracer')
+    if style == 'bomb' and d.z < -1.0:
+        # released level: carries forward and accelerates down (gravity-shaped drop)
+        def at(u):
+            return p0 + Vector((d.x * u, d.y * u, d.z * u * u))
     col = color
     n = max(2, int(math.ceil(dur * P.fps)))
     rig = K.empty('Slug')
@@ -786,11 +793,11 @@ def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True
         fn.rotation_euler = (a, 0, 0)
         fn.scale = (0.12, 0.08, 0.008)
         fins.append(fn)
-    motor = glow(P, 'MissileMotor', col, loc=(-0.42, 0, 0), scale=(0.16, 0.13, 0.13), fx_e=3.4, fx_p=1.2, fx_hot=1.0)
+    motor = glow(P, 'MissileMotor', col, loc=(-0.42, 0, 0), scale=(0.11, 0.09, 0.09), fx_e=3.4, fx_p=1.0, fx_hot=1.0)
     motor.parent = rig
     flame = glow(P, 'MissileFlame', col, fx_e=2.8, fx_p=1.4, fx_tail=1.0, fx_hot=0.6)
     flame.parent = rig
-    halo = glow(P, 'MissileHalo', col, loc=(-0.5, 0, 0), scale=(0.7, 0.5, 0.5), fx_e=1.2, fx_p=3.0)
+    halo = glow(P, 'MissileHalo', col, loc=(-0.5, 0, 0), scale=(0.45, 0.32, 0.32), fx_e=1.0, fx_p=3.0)
     halo.parent = rig
     n = max(4, int(math.ceil(dur * P.fps)))
     pts = []
@@ -815,22 +822,25 @@ def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True
         K.show_between(o, f0, f1)
     L = flicker_light(P, (-0.6, 0, 0), t0, t0 + dur, col, 260, radius=0.15, lo=0.75, hi=1.1, parent=rig)
     if trail:
-        sub = 2 if dur * P.fps < 40 else 1
-        m = n * sub
-        prev = pts[0][1]
-        for i in range(1, m):
-            tau = i / m
+        # emit by distance (not time) so the fast end of the flight has no gaps
+        spacing = 0.32
+        acc = 0.0
+        ns = 600
+        prev = at(U(0.0))
+        for i in range(1, ns):
+            tau = i / ns
             p = at(U(tau))
-            q = at(U(min(1.0, tau + 0.01))) - at(U(max(0.0, tau - 0.01)))
-            q = q.normalized() if q.length > 1e-6 else fwd
-            gap = (p - prev).length
+            acc += (p - prev).length
             prev = p
+            if acc < spacing:
+                continue
+            acc = 0.0
+            q = at(U(min(1.0, tau + 0.005))) - at(U(max(0.0, tau - 0.005)))
+            q = q.normalized() if q.length > 1e-6 else fwd
             tp = t0 + dur * tau
-            age = P.seconds - tp
-            smoke_puff(P, p - q * 0.55, tp, r0=0.09, r1=P.rnd.uniform(0.75, 1.05),
-                       life=min(P.rnd.uniform(2.6, 3.4), max(0.5, age + 0.2)) if age < 3.4 else P.rnd.uniform(2.6, 3.4),
-                       vel=-q * 1.2 + _rand_perp(P, q) * 0.3, dens=0.75, hot=1.6,
-                       stretch=(q, gap * 0.75), wind=(0.45, 0.2, 0.28), fade_in=0.0)
+            smoke_puff(P, p - q * 0.5, tp, r0=0.1, r1=P.rnd.uniform(0.9, 1.35),
+                       life=P.rnd.uniform(2.8, 3.6), vel=-q * 1.0 + _rand_perp(P, q) * 0.35, dens=1.1,
+                       hot=1.6, stretch=(q, spacing * 1.3), wind=(0.45, 0.2, 0.3), fade_in=0.0)
     return t0 + dur
 
 
@@ -846,7 +856,7 @@ def _jag(P, a, b, jag, depth, perp_bias=None):
             m = (p + q) / 2 + _rand_perp(P, q - p) * amp * P.rnd.uniform(-1, 1)
             new += [m, q]
         pts = new
-        amp *= 0.55
+        amp *= 0.52
     return pts
 
 
@@ -875,19 +885,19 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
     p0, p1 = Vector(p0), Vector(p1)
     L = (p1 - p0).length
     depth = max(3, min(6, int(math.log2(max(2.0, L / 0.25)))))
-    trunk = _jag(P, p0, p1, jag * 0.55, depth)
-    hot = tuple(0.55 * c + 0.45 * w for c, w in zip(color, HOT_WHITE))
+    trunk = _jag(P, p0, p1, jag * 0.75, depth)
+    hot = tuple(0.3 * c + 0.7 * w for c, w in zip(color, HOT_WHITE))
     objs = []
     nn = len(trunk)
     taper = [0.75 + 0.25 * math.sin(math.pi * i / (nn - 1)) for i in range(nn)]
     core = _curve(P, 'BoltCore', trunk, width * 0.45, taper, res=1)
     core.color = (*hot, 1)
-    core['fx_e'], core['fx_p'], core['fx_hot'] = 3.4, 0.6, 0.6
+    core['fx_e'], core['fx_p'], core['fx_hot'] = 3.4, 0.5, 1.0
     objs.append(core)
     if glow_:
         g = _curve(P, 'BoltGlow', trunk, width * 2.4, taper)
         g.color = (*color, 1)
-        g['fx_e'], g['fx_p'] = 2.4, 1.8
+        g['fx_e'], g['fx_p'] = 2.0, 2.0
         h = _curve(P, 'BoltGlow', trunk, width * 7.0, taper)
         h.color = (*color, 0.55)
         h['fx_e'], h['fx_p'] = 1.0, 3.0
@@ -951,7 +961,7 @@ def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, s
         f += nfr
     # contact + source glows (flickering)
     for pos, r, nm in ((p1, 0.35 + width * 3, 'BoltContact'), (p0, 0.18 + width * 2, 'BoltSource')):
-        o = glow(P, nm, color, loc=pos, scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
+        o = _glow(P, nm, color, loc=pos, scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
         for fr in range(f0, f1 + 2):
             kprop(o, 'fx_e', fr, 3.0 * P.rnd.uniform(0.55, 1.0) if fr < f1 else 1.2, const=True)
         K.show_between(o, f0, f1 + 2)
@@ -1008,8 +1018,8 @@ def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
                 kp.interpolation = 'LINEAR'
         K.show_between(o, int(f0), int(f1) + 3)
     # end glows
-    src = glow(P, 'BeamSource', color, loc=p0, scale=(width * 2.6,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.9)
-    hit = glow(P, 'BeamContact', color, loc=p1, scale=(width * 4.5,) * 3, fx_e=3.0, fx_p=1.4, fx_hot=0.9)
+    src = glow(P, 'BeamSource', color, loc=p0, scale=(width * 1.8,) * 3, fx_e=2.8, fx_p=1.5, fx_hot=0.6)
+    hit = glow(P, 'BeamContact', color, loc=p1 + Vector((0, 0, width)), scale=(width * 3.0,) * 3, fx_e=2.6, fx_p=1.5, fx_hot=0.6)
     for o in (src, hit):
         for fr in range(int(f0), int(f1) + 2):
             kcol(o, fr, a=P.rnd.uniform(0.75, 1.0) if fr <= f1 else 0.3)
@@ -1021,9 +1031,9 @@ def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
         tt += 2.0 / P.fps
     tt = t0 + 0.05
     while tt < t1:
-        smoke_puff(P, p1 + Vector((0, 0, 0.1)), tt, r0=0.08, r1=0.45, life=1.2, vel=(0, 0, 0.8), dens=0.45)
+        smoke_puff(P, p1 + Vector((0, 0, 0.1)), tt, r0=0.08, r1=0.4, life=1.2, vel=(0, 0, 0.8), dens=0.35)
         tt += 0.12
-    flicker_light(P, p1 + Vector((0, 0, 0.3)), t0, t1, color, energy=1500 * k, radius=0.3, lo=0.75, hi=1.0)
+    flicker_light(P, p1 + Vector((0, 0, 0.3)), t0, t1, color, energy=600 * k, radius=0.3, lo=0.75, hi=1.0)
     flicker_light(P, (p0 + p1) / 2, t0, t1, color, energy=400 + 40 * d.length, radius=d.length * 0.2, lo=0.8, hi=1.0)
     return t1
 
@@ -1062,8 +1072,8 @@ def shield_shell_mat(P):
     nz.inputs['Detail'].default_value = 2.0
     b.put(nz.inputs['Vector'], b.vmath('ADD', tc.outputs['Object'], b.comb(0.0, 0.0, b.attr('fx_t'))))
     shim = b.math('MULTIPLY_ADD', nz.outputs['Fac'], 1.2, 0.4)
-    base = b.math('MULTIPLY_ADD', face, b.attr('fx_facek'), 0.06)
-    fac = b.math('MULTIPLY', b.math('ADD', base, b.math('MULTIPLY', rim, 0.55)), shim)
+    base = b.math('MULTIPLY_ADD', face, b.attr('fx_facek'), 0.04)
+    fac = b.math('MULTIPLY', b.math('ADD', base, b.math('MULTIPLY', rim, 0.45)), shim)
     fac = b.math('MULTIPLY', b.math('MULTIPLY', fac, mask), oi.outputs['Alpha'], clamp=True)
     em = b.node('ShaderNodeEmission')
     b.put(em.inputs['Color'], oi.outputs['Color'])
@@ -1190,8 +1200,8 @@ def shield_dome(P, center, radius, t0, t1, color=None, hits=()):
     shell = _fxobj(K.link(bpy.data.objects.new('Shield', me)))
     shell.location = center
     shell.color = (*color, 1.0)
-    shell['fx_e'] = 1.4 if not arc else 1.6
-    shell['fx_dark'] = 0.0 if not arc else 0.55
+    shell['fx_e'] = 1.4 if not arc else 0.8
+    shell['fx_dark'] = 0.0 if not arc else 0.75
     shell['fx_facek'] = 0.22 if not arc else 0.04
     lat_me.materials.append(shield_lattice_mat(P))
     lat = _fxobj(K.link(bpy.data.objects.new('ShieldLattice', lat_me)))
@@ -1200,8 +1210,8 @@ def shield_dome(P, center, radius, t0, t1, color=None, hits=()):
     wf = lat.modifiers.new('Wire', 'WIREFRAME')
     wf.thickness = R * (0.006 if arc else 0.008)
     wf.use_even_offset = False
-    lat.color = (*color, 0.55 if not arc else 0.9)
-    lat['fx_e'] = 1.1 if not arc else 2.4
+    lat.color = (*color, 0.35 if not arc else 0.9)
+    lat['fx_e'] = 0.9 if not arc else 2.4
     f0, f1 = P.T(t0), P.T(t1)
     for o in (shell, lat):
         o['fx_up'] = 0.0
@@ -1244,7 +1254,7 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         o['fx_v'] = R * 2.4
         o['fx_w'] = R * 0.07
         o['fx_life'] = life
-        o['fx_sr'] = R * 0.09
+        o['fx_sr'] = R * 0.05
         o['fx_e'] = e
         o['fx_spot'] = spot
         o['fx_local'] = local
@@ -1255,7 +1265,7 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         K.set_interp(o, 'LINEAR')
         K.show_between(o, int(f0), int(f1) + 1)
     # surface flash + sparks glancing off along the surface
-    flash(P, surf, t, 0.5 + R * 0.05, color, frames=(1, 2, 5), e=3.0, hot=0.9, name='ShieldFlash')
+    flash(P, surf, t, 0.3 + R * 0.035, color, frames=(1, 2, 4), e=2.8, hot=0.5, name='ShieldFlash')
     sparks(P, surf, t, n=10, speed=8.0, color=color, axis=n, spread=75, life=(0.15, 0.45), width=0.02,
            gravity=4.0)
     P.light(surf + n * 0.6, t, color, energy=1600, dur=0.2, radius=0.4)
