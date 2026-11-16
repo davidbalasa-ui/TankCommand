@@ -5,8 +5,9 @@ const PHONE_ONLY = 'phone-only touch flow';
 
 test('[HUD-05] build menu, live resources, queue and cancel work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  // The open Build drawer over the detailed models renders slowly in software.
-  test.setTimeout(60_000);
+  // The open Build drawer over the detailed models renders slowly in software (about 40 s on CI,
+  // up to 60 s on its slower runners).
+  test.setTimeout(90_000);
   await enterGame(page);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? -1))
@@ -51,8 +52,9 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
 
 test('[HUD-05] miner deposit tap, mine command and salvage button work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  // Full models from the first frame make software rendering slow; this ran at ~29 of 30 s.
-  test.setTimeout(60_000);
+  // Full models from the first frame make software rendering slow: about 40 s on CI, up to 60 s on
+  // its slower runners.
+  test.setTimeout(90_000);
   await enterGame(page);
   const miner = await page.evaluate(() => {
     const hook = window.__TC_TEST__;

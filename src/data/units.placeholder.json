@@ -21,9 +21,9 @@
     "weapons": [
       {
         "id": "cannon",
-        "damage": 30,
+        "damage": 22,
         "range": 12,
-        "reloadSec": 2.5,
+        "reloadSec": 1.8,
         "projectileSpeed": 40,
         "accuracy": 0.85,
         "splashRadius": 0.5,
@@ -71,16 +71,18 @@
     "weapons": [
       {
         "id": "autocannon",
-        "damage": 10,
+        "damage": 6,
         "range": 8,
-        "reloadSec": 1.2,
+        "reloadSec": 1.3,
         "projectileSpeed": 55,
         "accuracy": 0.85,
         "splashRadius": 0,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 3,
+        "burstIntervalSec": 0.15
       }
     ],
     "fireOnMove": true,
@@ -198,9 +200,9 @@
     "weapons": [
       {
         "id": "cannon",
-        "damage": 30,
+        "damage": 22,
         "range": 12,
-        "reloadSec": 2.5,
+        "reloadSec": 1.8,
         "projectileSpeed": 40,
         "accuracy": 0.85,
         "splashRadius": 0.5,
@@ -248,16 +250,18 @@
     "weapons": [
       {
         "id": "autocannon",
-        "damage": 10,
+        "damage": 6,
         "range": 8,
-        "reloadSec": 1.2,
+        "reloadSec": 1.3,
         "projectileSpeed": 55,
         "accuracy": 0.85,
         "splashRadius": 0,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 3,
+        "burstIntervalSec": 0.15
       }
     ],
     "fireOnMove": true,
@@ -615,16 +619,18 @@
     "weapons": [
       {
         "id": "cannon",
-        "damage": 24,
+        "damage": 15,
         "range": 11,
-        "reloadSec": 2.2,
+        "reloadSec": 2.15,
         "projectileSpeed": 42,
         "accuracy": 0.85,
         "splashRadius": 0.4,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 2,
+        "burstIntervalSec": 0.25
       }
     ],
     "fireOnMove": true,
@@ -666,16 +672,18 @@
     "weapons": [
       {
         "id": "laser",
-        "damage": 18,
+        "damage": 12,
         "range": 14,
-        "reloadSec": 1.5,
+        "reloadSec": 1.7,
         "projectileSpeed": 45,
         "accuracy": 0.9,
         "splashRadius": 0,
         "targets": [
           "air",
           "ground"
-        ]
+        ],
+        "burst": 2,
+        "burstIntervalSec": 0.15
       }
     ],
     "fireOnMove": true,
@@ -723,16 +731,18 @@
     "weapons": [
       {
         "id": "bombs",
-        "damage": 120,
+        "damage": 40,
         "range": 3,
-        "reloadSec": 4,
+        "reloadSec": 4.0,
         "projectileSpeed": 20,
         "accuracy": 0.8,
         "splashRadius": 3,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 3,
+        "burstIntervalSec": 0.25
       }
     ],
     "fireOnMove": false,
@@ -780,16 +790,18 @@
     "weapons": [
       {
         "id": "cannon",
-        "damage": 24,
+        "damage": 15,
         "range": 11,
-        "reloadSec": 2.2,
+        "reloadSec": 2.15,
         "projectileSpeed": 42,
         "accuracy": 0.85,
         "splashRadius": 0.4,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 2,
+        "burstIntervalSec": 0.25
       }
     ],
     "fireOnMove": true,
@@ -831,16 +843,18 @@
     "weapons": [
       {
         "id": "ground_beam",
-        "damage": 140,
+        "damage": 35,
         "range": 4,
-        "reloadSec": 4,
+        "reloadSec": 3.5,
         "projectileSpeed": 60,
         "accuracy": 0.95,
         "splashRadius": 3.5,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 4,
+        "burstIntervalSec": 0.12
       }
     ],
     "fireOnMove": true,
@@ -888,16 +902,18 @@
     "weapons": [
       {
         "id": "lightning",
-        "damage": 18,
+        "damage": 12,
         "range": 14,
-        "reloadSec": 1.5,
+        "reloadSec": 1.7,
         "projectileSpeed": 45,
         "accuracy": 0.9,
         "splashRadius": 0,
         "targets": [
           "air",
           "ground"
-        ]
+        ],
+        "burst": 2,
+        "burstIntervalSec": 0.15
       }
     ],
     "fireOnMove": false,
@@ -945,9 +961,9 @@
     "weapons": [
       {
         "id": "heavy_cannon",
-        "damage": 60,
+        "damage": 70,
         "range": 13,
-        "reloadSec": 3,
+        "reloadSec": 3.5,
         "projectileSpeed": 38,
         "accuracy": 0.85,
         "splashRadius": 1,
@@ -995,9 +1011,9 @@
     "weapons": [
       {
         "id": "missile",
-        "damage": 28,
+        "damage": 14,
         "range": 18,
-        "reloadSec": 3.5,
+        "reloadSec": 5.0,
         "projectileSpeed": 30,
         "accuracy": 0.9,
         "splashRadius": 0.8,
@@ -1005,7 +1021,9 @@
           "ground",
           "air",
           "structure"
-        ]
+        ],
+        "burst": 4,
+        "burstIntervalSec": 0.2
       }
     ],
     "fireOnMove": false,
@@ -1046,16 +1064,18 @@
     "weapons": [
       {
         "id": "shell",
-        "damage": 90,
+        "damage": 22,
         "range": 34,
-        "reloadSec": 6,
+        "reloadSec": 3.0,
         "projectileSpeed": 25,
         "accuracy": 0.6,
         "splashRadius": 3,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 3,
+        "burstIntervalSec": 0.4
       }
     ],
     "fireOnMove": false,
@@ -1136,9 +1156,9 @@
     "weapons": [
       {
         "id": "heavy_cannon",
-        "damage": 60,
+        "damage": 70,
         "range": 13,
-        "reloadSec": 3,
+        "reloadSec": 3.5,
         "projectileSpeed": 38,
         "accuracy": 0.85,
         "splashRadius": 1,
@@ -1187,9 +1207,9 @@
     "weapons": [
       {
         "id": "missile",
-        "damage": 28,
+        "damage": 14,
         "range": 18,
-        "reloadSec": 3.5,
+        "reloadSec": 5.0,
         "projectileSpeed": 30,
         "accuracy": 0.9,
         "splashRadius": 0.8,
@@ -1197,7 +1217,9 @@
           "ground",
           "air",
           "structure"
-        ]
+        ],
+        "burst": 4,
+        "burstIntervalSec": 0.2
       }
     ],
     "fireOnMove": false,
@@ -1239,16 +1261,18 @@
     "weapons": [
       {
         "id": "shell",
-        "damage": 90,
+        "damage": 22,
         "range": 34,
-        "reloadSec": 6,
+        "reloadSec": 3.0,
         "projectileSpeed": 25,
         "accuracy": 0.6,
         "splashRadius": 3,
         "targets": [
           "ground",
           "structure"
-        ]
+        ],
+        "burst": 3,
+        "burstIntervalSec": 0.4
       }
     ],
     "fireOnMove": false,

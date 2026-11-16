@@ -315,7 +315,7 @@ describe('[AIR-04] fighters and bombers', () => {
   });
 });
 
-describe('[AIR-05] aircraft ammo is spent per shot', () => {
+describe('[AIR-05] aircraft ammo is spent per attack run', () => {
   it('[AIR-05] every shot costs one ammo and an empty aircraft stops firing', () => {
     const w = airWorld([{ owner: 2, typeId: 'unit.test.tank', x: -36, z: -40 }]);
     const jet = unitOf(w, 'unit.test.fighter');

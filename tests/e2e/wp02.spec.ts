@@ -232,7 +232,8 @@ const SAMPLE_CAMERAS = [
 test('[INP-01] ground picks land at the picked point at every zoom and near the map corners', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(180_000);
+  // Hundreds of picks across zoom levels: about 2.2 min on CI, over 3 min on its slower runners.
+  test.setTimeout(300_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const pickRadius = touch ? 36 : 24;
