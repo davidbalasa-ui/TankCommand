@@ -18,7 +18,7 @@ P.flatten(-4, 2, 16)
 
 GOLD = COL['arc_gold']
 WHITE = COL['arc_white']
-DEEP_GOLD = (1.0, 0.5, 0.06)   # reads as rich gold under AgX (arc_gold drifts to cream when bright)
+DEEP_GOLD = (1.0, 0.5, 0.06)   # rich gold; keep emission strength ~1.5 so channels don't clip to yellow
 
 # ------------------------------------------------------------------ the mining site
 deposit = P.load('deposit_ore', at=(0.5, -0.5), heading=35, size=6.5)
@@ -83,9 +83,9 @@ for i, d in enumerate(discs):
 
 
 # ---- gold lightning lifters: short crackling arcs under the hull, re-drawn every 2 frames
-bolt_mat = emit_mat('LifterBolt', DEEP_GOLD, 2.5)
+bolt_mat = emit_mat('LifterBolt', DEEP_GOLD, 1.5)
 core_mat = emit_mat('LifterCore', WHITE, 10)
-glow_mat = emit_mat('LifterGlow', DEEP_GOLD, 1.0, alpha=0.3)
+glow_mat = emit_mat('LifterGlow', DEEP_GOLD, 0.8, alpha=0.3)
 
 
 def lifters(d, step=2, n=2):
@@ -128,7 +128,7 @@ for d in discs:
 
 
 # ---- the under-beam pulse
-ring_mat = emit_mat('PulseRing', DEEP_GOLD, 2.2, alpha=0.8)
+ring_mat = emit_mat('PulseRing', DEEP_GOLD, 1.4, alpha=0.8)
 
 
 def gold_beam(p0, p1, t0, t1, col, width, strength, alpha=None):
@@ -160,7 +160,7 @@ def pulse(d, t, target, size=1.0):
     wrapping it, a ground shock ring, a hull kick upward. Returns the hit time."""
     p_hit = target.pos_at(t) + Vector((0, 0, 0.6)) if hasattr(target, 'pos_at') else Vector(target)
     # charge: gathering gold sphere under the pod
-    cm = emit_mat('Charge', DEEP_GOLD, 2.5)
+    cm = emit_mat('Charge', DEEP_GOLD, 1.6)
     c = sphere('Charge', 1.0, cm, seg=(12, 8))
     c.parent = d.model_root
     c.location = (0, 0, -0.35)
@@ -181,8 +181,8 @@ def pulse(d, t, target, size=1.0):
                     tt, tt + 0.08, width=0.03, branches=0, segs=6, glow=False)
     p0 = pod(d, t)
     # the beam: white core + gold sheath + crackle
-    gold_beam(p0, p_hit, t, t + 0.3, WHITE, 0.12 * size, 6)
-    gold_beam(p0, p_hit, t, t + 0.36, DEEP_GOLD, 0.4 * size, 1.8)
+    gold_beam(p0, p_hit, t, t + 0.3, WHITE, 0.12 * size, 3)
+    gold_beam(p0, p_hit, t, t + 0.36, (1.0, 0.42, 0.03), 0.42 * size, 1.25)
     P.light(p_hit + Vector((0, 0, 1.5)), t, GOLD, energy=6000 * size, dur=0.35, radius=1.0)
     P.lightning(p0, p_hit, t, t + 0.3, color=DEEP_GOLD, width=0.05, jag=0.25, branches=3)
     # ground ring blast
@@ -243,9 +243,9 @@ pros.destroy(th, size=2.6)
 th = pulse(discs[1], 3.2, haul, size=0.95)                         # the Hauler
 haul.destroy(th, size=2.4)
 th = pulse(discs[2], 3.6, (0.8, -0.2, 0.8), size=1.25)           # crack the seam itself
-P.explosion((0.8, -0.2, 1.0), th + 0.05, size=4.2, debris=18)
+P.explosion((0.8, -0.2, 1.0), th + 0.05, size=4.2, debris=18, smoke=False)
 P.smoke_column((0.8, -0.2, 0.5), th + 0.4, 6.0, size=0.9, every=0.45)
-P.fire_patch((0.8, -0.2, 0.8), th + 0.1, 6.0, size=0.9)
+P.fire_patch((0.8, -0.2, 0.8), th + 0.1, 6.0, size=0.55)
 P.cam_shake(th + 0.05, 0.25, 0.6)
 
 # Wreck flames: keep them saturated orange (bright emission goes cream under AgX).

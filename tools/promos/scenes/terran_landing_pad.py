@@ -300,7 +300,7 @@ acc_box('Acc_west_bar', (0.05, 5.6, 0.1), (-7.25, 0, 0.2), ACC_NEON, root)
 
 
 # ------------------------------------------------------------------------------ dust
-SAND = (0.46, 0.42, 0.34)
+SAND = (0.55, 0.47, 0.36)
 
 
 def dust_wave(center, t, r0, r1, rings=3, n=28, size=1.2, life=1.4, color=SAND, opacity=0.35,
@@ -320,7 +320,7 @@ def dust_wave(center, t, r0, r1, rings=3, n=28, size=1.2, life=1.4, color=SAND, 
 
 # thruster wash as it nears the ground, then the touchdown ring
 dust_wave((0, 0, 0), 0.85, 3.0, 6.5, rings=2, n=16, size=1.4, life=1.0, opacity=0.45)
-dust_wave((0, 0, 0), T_LAND - 0.03, 7.0, 15.0, rings=4, n=32, size=1.8, life=1.7, opacity=0.6, dt=0.1)
+dust_wave((0, 0, 0), T_LAND - 0.03, 7.0, 15.0, rings=4, n=44, size=1.1, life=1.7, opacity=0.35, dt=0.1)
 P.cam_shake(T_LAND, 0.22, dur=0.45)
 
 # ------------------------------------------------------------------------------ delivery lifters

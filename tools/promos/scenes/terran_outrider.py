@@ -80,7 +80,7 @@ def gold_bolt(p0, p1, t0, t1, width=0.07, jag=0.2, branches=2, segs=10, glow=Tru
         for ob in obs:
             K.show_between(ob, fr, fr + 1)
     if light:
-        P.light((p0 + p1) / 2, t0, GOLD, energy=400 + 40 * L, dur=t1 - t0 + 0.05, radius=L * 0.2)
+        P.light((p0 + p1) / 2, t0, GOLD, energy=120 + 12 * L, dur=t1 - t0 + 0.05, radius=L * 0.2)
 
 
 def gold_sparks(pos, t, n=9, size=1.0):
@@ -517,7 +517,7 @@ def strike(src, t, at, aim_dur=0.25):
     src.recoil(t, kick=1.5, back=0.08)
     gold_bolt(mz, at, t, t + 0.2, width=0.075)
     gold_sparks(at + Vector((0, 0, 0.1)), t + 0.02)
-    P.light(at + Vector((0, 0, 0.6)), t, GOLD, energy=1500, dur=0.15)
+    P.light(at + Vector((0, 0, 0.6)), t, GOLD, energy=450, dur=0.12)
     for k in range(6):  # dirt kick: a ring of small sand puffs thrown up
         a = k * math.pi / 3 + P.rnd.uniform(0, 0.5)
         P.puff(at + Vector((0.5 * math.cos(a), 0.5 * math.sin(a), 0.15)), t + 0.02 + 0.015 * k,
@@ -527,7 +527,7 @@ def strike(src, t, at, aim_dur=0.25):
     sc.location = (at.x, at.y, at.z - 0.01)
     sc.scale = (0.75, 0.75, 0.02)
     K.show_between(sc, f0 + 1, P.T(P.seconds) + 2)
-    glow = K.sphere('ScorchGlow', 1.0, K.emit_mat('ScorchGlowM', COL['arc_ember'], 1.5), seg=(16, 6))
+    glow = K.sphere('ScorchGlow', 1.0, K.emit_mat('ScorchGlowM', COL['arc_ember'], 0.8), seg=(16, 6))
     glow.location = (at.x, at.y, at.z + 0.01)
     glow.scale = (0.35, 0.35, 0.02)
     K.show_between(glow, f0 + 1, f0 + 7)
