@@ -1,12 +1,15 @@
-"""Arcadian boarders forcing the Terran triangle force field of the hangar bay door (design study).
+"""Arcadian boarders pushing THROUGH the Terran triangle force field of the hangar bay door (design study, v2).
+
+Rule: the field never breaks. It is one continuous tessellated skin the whole time. The attacker presses in, the
+skin hinges at its shared edges and wraps the hull (the lattice subdivides near the contact), then the hull
+passes through the surface: a tight cyan contour line marks the cut and slides from nose to tail. When the tail
+clears, the skin springs back flat with a ripple.
 
 Everything is a stateless function of time t (seconds), so any frame can be rendered on its own.
 
   --mode=frames --times=0.4,1.0,1.3 [--cam=A|B|H|auto] [--full=1]   stills (drafts)
-  --mode=clip   [--f0=0 --f1=87]                                     frames for the draft clip
-  --mode=game   [--t=1.45]                                           the same breach from the game camera
-
-Timeline: approach -> touch (T_TOUCH) -> press / flex / strain -> break (T_BREAK) -> push through -> settle -> seal.
+  --mode=clip   [--f0=0 --f1=95]                                     frames for the draft clip
+  --mode=game   [--t=2.0]                                            the same from the game camera
 """
 import math
 import os
@@ -22,14 +25,14 @@ sys.path.insert(0, HERE)
 import terran_interior_kit as K  # noqa: E402
 
 A = K.args()
-OUT = A.get('out', '/home/user/work/terran-interiors/breach')
+OUT = A.get('out', '/home/user/work/terran-interiors/breach2')
 MODE = A.get('mode', 'frames')
 RES = tuple(int(v) for v in A.get('res', '960x540').split('x'))
 FPS = 24.0
-T_TOUCH, T_BREAK = 0.5, 1.25
-DUR = 3.625                       # 87 frames
+T_TOUCH = 0.6
+DUR = 4.0
 GOLD = (1.0, 0.36, 0.02)
-HOTC = (0.3, 0.68, 1.0)
+INFL = 0.13          # the skin rides this far proud of the hull
 
 
 def sstep(x):
@@ -37,196 +40,340 @@ def sstep(x):
     return x * x * (3 - 2 * x)
 
 
-def press(t):
-    """0..1 how hard the attacker leans on the field (only before the break)."""
-    if t <= T_TOUCH:
-        return 0.0
-    s = min((t - T_TOUCH) / (T_BREAK - T_TOUCH), 1.0)
-    return (0.25 * s + 0.75 * sstep(s)) * (1 + 0.05 * math.sin(t * 61.0) * s)
+def hermite(keys, t):
+    if t <= keys[0][0]:
+        return keys[0][1]
+    if t >= keys[-1][0]:
+        return keys[-1][1]
+    for (t0, p0, m0), (t1, p1, m1) in zip(keys[:-1], keys[1:]):
+        if t <= t1:
+            h = t1 - t0
+            s = (t - t0) / h
+            return ((2 * s ** 3 - 3 * s ** 2 + 1) * p0 + (s ** 3 - 2 * s ** 2 + s) * h * m0 +
+                    (-2 * s ** 3 + 3 * s ** 2) * p1 + (s ** 3 - s ** 2) * h * m1)
 
 
-def rodrigues(p, axis, ang):
-    """Rotate rows of p (n,3) around a unit axis."""
-    c, s = math.cos(ang), math.sin(ang)
-    return p * c + np.cross(axis, p) * s + np.outer(p @ axis, axis) * (1 - c)
+def tubes(me, segs):
+    """segs: list of (p0, p1, radius) -> three-sided tubes."""
+    me.clear_geometry()
+    vs, fs = [], []
+    for p0, p1, r in segs:
+        p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
+        d = p1 - p0
+        L = np.linalg.norm(d)
+        if L < 1e-5:
+            continue
+        d /= L
+        a = np.cross(d, (0.0, 0.3, 1.0))
+        if np.linalg.norm(a) < 1e-4:
+            a = np.cross(d, (1.0, 0, 0))
+        a /= np.linalg.norm(a)
+        b = np.cross(d, a)
+        n = len(vs)
+        for p in (p0, p1):
+            for k in range(3):
+                an = k * 2.0944
+                vs.append(tuple(p + (a * math.cos(an) + b * math.sin(an)) * r))
+        fs += [(n + k, n + (k + 1) % 3, n + 3 + (k + 1) % 3, n + 3 + k) for k in range(3)]
+    if vs:
+        me.from_pydata(vs, [], fs)
+    me.update()
 
 
-# ====================================================================== the field
+def line_obj(name, col, strength):
+    me = bpy.data.meshes.new(name)
+    me.materials.append(K._emit(name, col, strength))
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.visible_shadow = False
+    K.NOFOG.append(ob)
+    return me
+
+
+# ====================================================================== the attacker
+class Attacker:
+    def __init__(self, kind, x, y_field, hover=0.9, end_centre=13.5, c0=2.4, cdrag=0.8):
+        new = K.tank(kind, (0, 0, 0), rz=0, faction='alien')
+        bpy.context.view_layer.update()
+        rs = np.random.RandomState(4)
+        pts = []
+        mats = set()
+        for o in new:
+            if o.type != 'MESH':
+                continue
+            me = o.data
+            mats.update(m for m in me.materials if m)
+            me.calc_loop_triangles()
+            v = np.zeros(len(me.vertices) * 3)
+            me.vertices.foreach_get('co', v)
+            v = v.reshape(-1, 3)
+            M = np.array(o.matrix_world)
+            v = v @ M[:3, :3].T + M[:3, 3]
+            ti = np.zeros(len(me.loop_triangles) * 3, dtype=np.int32)
+            me.loop_triangles.foreach_get('vertices', ti)
+            tr = v[ti.reshape(-1, 3)]
+            ar = 0.5 * np.linalg.norm(np.cross(tr[:, 1] - tr[:, 0], tr[:, 2] - tr[:, 0]), axis=1)
+            n = np.maximum((ar / 0.0012).astype(int), 1)          # ~ one sample per 12 cm^2
+            idx = np.repeat(np.arange(len(tr)), n)
+            u, w = rs.rand(len(idx)), rs.rand(len(idx))
+            f = u + w > 1
+            u[f], w[f] = 1 - u[f], 1 - w[f]
+            pts.append(tr[idx, 0] + (tr[idx, 1] - tr[idx, 0]) * u[:, None] + (tr[idx, 2] - tr[idx, 0]) * w[:, None])
+            pts.append(v)
+        self.pts = np.concatenate(pts)
+        lo, hi = self.pts.min(axis=0), self.pts.max(axis=0)
+        self.lo, self.hi = lo, hi
+        print('ATTACKER', kind, lo, hi, len(self.pts), flush=True)
+        self.nose, self.tail = hi[0], -lo[0]
+        self.len = self.nose + self.tail
+        # keep the Arcadian hull reading gold under the blue light
+        for m in mats:
+            if not m.use_nodes:
+                continue
+            for nd in m.node_tree.nodes:
+                if nd.type == 'BSDF_PRINCIPLED':
+                    bc = nd.inputs['Base Color']
+                    mix = m.node_tree.nodes.new('ShaderNodeMixRGB')
+                    mix.blend_type = 'MULTIPLY'
+                    mix.inputs[0].default_value = float(A.get('goldtint', 0.85))
+                    mix.inputs[2].default_value = (1.0, 0.62, 0.22, 1)
+                    if bc.is_linked:
+                        m.node_tree.links.new(bc.links[0].from_socket, mix.inputs[1])
+                    else:
+                        mix.inputs[1].default_value = bc.default_value[:]
+                    m.node_tree.links.new(mix.outputs[0], bc)
+        self.root = bpy.data.objects.new('Attacker', None)
+        bpy.context.scene.collection.objects.link(self.root)
+        for o in new:
+            if o.parent is None:
+                o.parent = self.root
+        self.root.rotation_mode = 'XYZ'
+        self.x, self.yf, self.hover = x, y_field, hover
+        self.c0, self.cdrag = c0, cdrag
+        clear_pen = self.len + c0 + cdrag + INFL + 0.3
+        end_pen = max(end_centre + self.nose, clear_pen + 1.5)
+        self.keys = [(0.0, -9.0, 22.0), (T_TOUCH, 0.0, 6.0), (1.3, 2.5, 3.0), (1.9, 5.6, 6.5),
+                     (3.0, clear_pen, 8.0), (3.8, end_pen, 0.0)]
+        self.t_pierce = next(k / 200.0 for k in range(100, 800) if self.pen(k / 200.0) > c0 + 0.05)
+        self.t_clear = next(k / 200.0 for k in range(200, 800) if self.xc(k / 200.0) < -self.tail)
+        self.glow = K.point('AttGlow', (0, 0, 0), 0, (1.0, 0.5, 0.12), r=1.2)
+        self.under = K.point('AttUnder', (0, 0, 0), 0, (1.0, 0.5, 0.12), r=1.5)
+
+    def pen(self, t):
+        """How far the nose tip is past the rest plane of the field (negative = still outside)."""
+        return hermite(self.keys, t)
+
+    def c(self, t):
+        """Depth the skin is dragged inward where it grips the hull."""
+        p = self.pen(t)
+        return min(max(p, 0.0), self.c0 + self.cdrag * sstep((p - 5.0) / 9.0))
+
+    def xc(self, t):
+        """Model-space x (forward) of the hull slice that is passing through the skin right now."""
+        return self.nose - (self.pen(t) - self.c(t) - INFL)
+
+    def update(self, t):
+        p = self.pen(t)
+        tau = t - self.t_clear
+        land = sstep(tau / 0.75)
+        z = self.hover * (1 - land)
+        if tau > 0.75:
+            z += 0.12 * math.exp(-(tau - 0.75) * 9) * math.sin((tau - 0.75) * 26)
+        pitch = math.radians(4.0) * math.sin(min(max(tau, 0) / 0.8, 1.0) * math.pi)
+        strain = sstep((p + 0.2) / 1.5) * (1 - sstep(tau / 0.2))
+        jit = 0.035 * strain * math.sin(t * 173.0)
+        ny = self.yf - p
+        cy = ny + self.nose
+        self.root.location = (self.x + jit, cy, z)
+        self.root.rotation_euler = (0, pitch, math.radians(-90))
+        self.glow.location = (self.x, cy - 2.0, z + 5.2)
+        self.under.location = (self.x, cy, max(z, 0.2) + 0.45)
+        return ny, cy, z
+
+
+# ====================================================================== the field (one continuous skin)
 class Field:
     """Triangle field in the plane y = origin.y (u = +x, v = +z). Inside of the ship is -y."""
-    DIRS = [(0, 2), (1, 1), (1, -1), (0, -2), (-1, -1), (-1, 1)]     # lattice steps (row, col), 60 deg apart
+    CELL = 0.1
 
-    def __init__(self, name, origin, w, h, tri, inside, contact, R, depth, sigma, strength, edge, alpha, gap,
-                 seed, t_clear, t_seal=(0.15, 1.3), shard_speed=1.0, hot_gain=1.5):
-        self.hot_gain = hot_gain
+    def __init__(self, name, origin, w, h, tri, inside, att, strength, edge, alpha, seed=1, rsub=8.0, nsub=6,
+                 slope=1.6, line=0.038):
         self.o = np.array(origin, float)
-        self.w, self.h, self.tri, self.hh = w, h, tri, tri * math.sqrt(3) / 2
-        self.inside = inside or (lambda a, b: True)
-        self.c = np.array(contact, float)             # plane coords of the contact point
-        self.R, self.depth, self.sigma, self.gap = R, depth, sigma, gap
-        self.t_clear = t_clear
+        self.w, self.h, self.tri = w, h, tri
+        self.att = att
+        self.slope = slope
+        self.cx = att.x - origin[0]
+        self.cz = att.hover + (att.lo[2] + att.hi[2]) / 2 - origin[2]
+        self.rwin = (rsub - 1.6, rsub - 0.3)
+        hh = tri * math.sqrt(3) / 2
         rnd = random.Random(seed)
-        tris, rr = [], []
-        rows = int(math.ceil(h / self.hh))
+        T, R, PE, PC, IN = [], [], [], [], []          # triangles, r, parent-edge flags, parent centroid, inset
+        rows = int(math.ceil(h / hh))
         cols = int(math.ceil(w / (tri / 2))) + 1
         for r in range(rows):
             for c in range(-1, cols):
                 up = (r + c) % 2 == 0
                 x0 = c * tri / 2
                 if up:
-                    t3 = [(x0, r * self.hh), (x0 + tri, r * self.hh), (x0 + tri / 2, (r + 1) * self.hh)]
+                    t3 = [(x0, r * hh), (x0 + tri, r * hh), (x0 + tri / 2, (r + 1) * hh)]
                 else:
-                    t3 = [(x0, (r + 1) * self.hh), (x0 + tri / 2, r * self.hh), (x0 + tri, (r + 1) * self.hh)]
+                    t3 = [(x0, (r + 1) * hh), (x0 + tri / 2, r * hh), (x0 + tri, (r + 1) * hh)]
                 cx = sum(p[0] for p in t3) / 3
                 cy = sum(p[1] for p in t3) / 3
-                if not (0 <= cx <= w and 0 <= cy <= h) or not self.inside(cx, cy):
+                if not (0 <= cx <= w and 0 <= cy <= h) or (inside and not inside(cx, cy)):
                     continue
-                tris.append([(min(max(a, 0), w), min(max(b, 0), h)) for a, b in t3])
-                rr.append(rnd.random() ** 1.6)
-        W = np.array(tris, float)                      # (Nw, 3, 2)
-        cen = W.mean(axis=1)
-        d = np.linalg.norm(cen - self.c, axis=1)
-        ang = np.arctan2(cen[:, 1] - self.c[1], cen[:, 0] - self.c[0])
-        Rr = R * (1 + 0.13 * np.sin(ang * 3 + 1.0) + 0.09 * np.sin(ang * 7 + 2.0))
-        brk = d < Rr
-        self.nw = len(W)
-        self.wd = d
-        self.brk = brk
-        rn = np.array([rnd.random() for _ in range(self.nw)])
-        self.tc = np.where(brk, T_BREAK + 0.032 * d + 0.05 * rn, 1e9)
-        # sealing order: rim first, spiralling inwards, one by one
-        idx = [i for i in range(self.nw) if brk[i]]
-        idx.sort(key=lambda i: -(d[i] + 0.25 * math.sin(ang[i] * 2) + 0.4 * rn[i]))
-        self.ts = np.full(self.nw, 1e9)
-        t0, t1 = t_clear + t_seal[0], t_clear + t_seal[1]
-        for k, i in enumerate(idx):
-            self.ts[i] = t0 + (t1 - t0) * k / max(len(idx) - 1, 1)
-        self.t_sealed = t1 + 0.2
-        # shards: every breaking triangle cracks into four irregular pieces
-        S, sp, sr = [], [], []
-        for i in idx:
-            a, b, c = W[i]
-            f = [rnd.uniform(0.32, 0.68) for _ in range(3)]
-            ab, bc, ca = a + (b - a) * f[0], b + (c - b) * f[1], c + (a - c) * f[2]
-            for t3 in ((a, ab, ca), (ab, b, bc), (ca, bc, c), (ab, bc, ca)):
-                S.append(t3)
-                sp.append(i)
-                sr.append(rr[i])
-        S = np.array(S, float).reshape(-1, 3, 2)
-        self.ns = len(S)
-        self.sp = np.array(sp, int)
-        sc = S.mean(axis=1)
-        sd = np.linalg.norm(sc - self.c, axis=1)
-        rad = (sc - self.c) / np.maximum(sd, 0.2)[:, None]
-        n = self.ns
-        R_ = lambda lo, hi: np.array([rnd.uniform(lo, hi) for _ in range(n)])
-        near = np.clip(1 - sd / (R * 1.2), 0, 1)
-        self.sv = np.stack([rad[:, 0] * R_(2, 8) + R_(-1.5, 1.5),
-                            -(R_(7, 13) + near * R_(4, 12)) * shard_speed,
-                            rad[:, 1] * R_(2, 7) + R_(0, 3.5)], axis=1)
-        ax = np.stack([R_(-1, 1), R_(-1, 1), R_(-1, 1)], axis=1)
-        self.sax = ax / np.linalg.norm(ax, axis=1)[:, None]
-        self.sw = R_(4, 15) * np.where(R_(0, 1) < 0.5, -1, 1)
-        self.slife = R_(0.65, 1.45)
-        self.base = np.concatenate([self.to3(W), self.to3(S)])        # (P, 3, 3) world
-        self.r = np.array(rr + sr, float)
-        self.np_ = len(self.base)
-        self.rn = np.array([rnd.random() for _ in range(self.np_)])
+                t3 = np.array([(min(max(a, 0), w), min(max(b, 0), h)) for a, b in t3])
+                rv = rnd.random() ** 1.6
+                n = nsub if math.hypot(cx - self.cx, cy - self.cz) < rsub else 1
+                P = lambda i, j: t3[0] + (t3[1] - t3[0]) * (i / n) + (t3[2] - t3[0]) * (j / n)
+                for i in range(n):
+                    for j in range(n - i):
+                        subs = [((i, j), (i + 1, j), (i, j + 1))]
+                        if i + j < n - 1:
+                            subs.append(((i + 1, j), (i + 1, j + 1), (i, j + 1)))
+                        for s3 in subs:
+                            T.append([P(*q) for q in s3])
+                            R.append(rv)
+                            PC.append((cx, cy))
+                            IN.append(1.0 / (tri / n / (2 * math.sqrt(3))))
+                            fl = []
+                            for k in range(3):
+                                (i0, j0), (i1, j1) = s3[k], s3[(k + 1) % 3]
+                                fl.append(1.0 if (j0 == 0 and j1 == 0) or (i0 == 0 and i1 == 0) or
+                                          (i0 + j0 == n and i1 + j1 == n) else 0.0)
+                            PE.append(fl)
+        self.P2 = np.array(T, float)                  # (N, 3, 2) plane coords
+        self.N = len(self.P2)
+        self.r = np.array(R)
+        self.pe = np.array(PE)
+        self.inv_inr = np.array(IN)
+        self.line = line
+        pc = np.array(PC)
+        self.rp = np.hypot(pc[:, 0] - self.cx, pc[:, 1] - self.cz)
+        self.rn = np.array([rnd.random() for _ in range(self.N)])
+        base = np.zeros((self.N, 3, 3))
+        base[..., 0] = self.o[0] + self.P2[..., 0]
+        base[..., 1] = self.o[1]
+        base[..., 2] = self.o[2] + self.P2[..., 1]
+        self.base = base
+        rv = np.hypot(self.P2[..., 0] - self.cx, self.P2[..., 1] - self.cz)
+        self.win = 1 - np.clip((rv - self.rwin[0]) / (self.rwin[1] - self.rwin[0]), 0, 1)
+        self.rv = rv
+        print('FIELD', name, 'triangles', self.N, flush=True)
+        self._hull_maps()
         self._mesh(name, strength, edge, alpha)
-        self.rnd = rnd
-        self._strain_paths()
-        self._sparks()
+        self.ml = {'ring': line_obj(name + '_ring', (0.3, 0.85, 1.0), float(A.get('ring_e', 14))),
+                   'gold': line_obj(name + '_gold', GOLD, float(A.get('gold_e', 7))),
+                   'spark': line_obj(name + '_spark', (0.2, 0.7, 1.0), float(A.get('spark_e', 10)))}
+        self.extra = []                                # extra cyan segments (tracers), set by the scene
 
-    # -------------------------------------------------------------- helpers
-    def to3(self, p2):
-        p2 = np.asarray(p2, float)
-        out = np.zeros(p2.shape[:-1] + (3,))
-        out[..., 0] = self.o[0] + p2[..., 0]
-        out[..., 1] = self.o[1]
-        out[..., 2] = self.o[2] + p2[..., 1]
-        return out
+    # -------------------------------------------------------------- hull height maps on the field grid
+    def _hull_maps(self):
+        att, c = self.att, self.CELL
+        self.gx0 = self.cx - 9.0
+        self.nx, self.nz = 180, int(min(self.h, 11.0) / c)
+        F = np.full((self.nx, self.nz), -1e9)
+        B = np.full((self.nx, self.nz), 1e9)
+        p = att.pts
+        i = np.round((p[:, 1] + 9.0) / c).astype(int)
+        j = np.round((p[:, 2] + att.hover - self.o[2]) / c).astype(int)
+        ok = (i >= 0) & (i < self.nx) & (j >= 0) & (j < self.nz)
+        np.maximum.at(F, (i[ok], j[ok]), p[ok, 0])
+        np.minimum.at(B, (i[ok], j[ok]), p[ok, 0])
+        F0, B0 = F.copy(), B.copy()
+        for di in range(-2, 3):                         # inflate a little so flat facets clear the hull
+            for dj in range(-2, 3):
+                if di * di + dj * dj <= 5:
+                    F = np.maximum(F, np.roll(np.roll(F0, di, 0), dj, 1))
+                    B = np.minimum(B, np.roll(np.roll(B0, di, 0), dj, 1))
+        self.F, self.B = F, B
+        self.sil = F > -1e8
 
-    def bulge_amp(self, t):
-        if t <= T_BREAK:
-            return self.depth * press(t)
-        tau = t - T_BREAK
-        return self.depth * math.exp(-tau * 6.5) * math.cos(tau * 27.0)
+    def samp(self, G, p2):
+        c = self.CELL
+        a = np.clip((p2[..., 0] - self.gx0) / c, 0, self.nx - 1.001)
+        b = np.clip(p2[..., 1] / c, 0, self.nz - 1.001)
+        i, j = a.astype(int), b.astype(int)
+        fa, fb = a - i, b - j
+        return (G[i, j] * (1 - fa) * (1 - fb) + G[i + 1, j] * fa * (1 - fb) +
+                G[i, j + 1] * (1 - fa) * fb + G[i + 1, j + 1] * fa * fb)
 
-    def bulge(self, p3, t):
-        """Inward (-y) displacement of world points p3 (...,3)."""
-        dx = p3[..., 0] - (self.o[0] + self.c[0])
-        dz = p3[..., 2] - (self.o[2] + self.c[1])
-        return self.bulge_amp(t) * np.exp(-(dx * dx + dz * dz) / (2 * self.sigma ** 2))
+    @staticmethod
+    def blur(S):
+        return (S * 4 + np.roll(S, 1, 0) + np.roll(S, -1, 0) + np.roll(S, 1, 1) + np.roll(S, -1, 1)) / 8.0
 
-    def lat(self, r, c):
-        return (c * self.tri / 2, r * self.hh)
-
-    def lat_ok(self, r, c):
-        a, b = self.lat(r, c)
-        return -0.01 <= a <= self.w + 0.01 and -0.01 <= b <= self.h + 0.01 and self.inside(a, max(b - 0.3, 0))
-
-    def lat_near(self, a, b):
-        r = int(round(b / self.hh))
-        c = int(round(a / (self.tri / 2)))
-        if (r + c) % 2:
-            c += 1
-        return r, c
-
-    def walk(self, rnd, start, steps, straight=0.75, away=None):
-        """Random walk over lattice vertices, biased away from the contact point. Returns plane coords."""
-        away = self.c if away is None else away
-        r, c = start
-        pts = [self.lat(r, c)]
-
-        def gain(k):
-            a, b = self.lat(r + self.DIRS[k][0], c + self.DIRS[k][1])
-            return math.hypot(a - away[0], b - away[1])
-        ks = sorted(range(6), key=gain, reverse=True)
-        k = ks[0] if rnd.random() < 0.5 else ks[1] if rnd.random() < 0.7 else ks[2]
-        for _ in range(steps):
-            if rnd.random() > straight:
-                k = max(((k + 1) % 6, (k - 1) % 6), key=lambda q: gain(q) + rnd.uniform(0, self.tri))
-            r2, c2 = r + self.DIRS[k][0], c + self.DIRS[k][1]
-            if not self.lat_ok(r2, c2):
-                break
-            r, c = r2, c2
-            pts.append(self.lat(r, c))
-        return pts
+    def sheet(self, t):
+        """Inward displacement of the skin on the grid, the gripped region and the contour segments."""
+        att = self.att
+        pen, c = att.pen(t), att.c(t)
+        xc = att.xc(t)
+        if pen <= 0:
+            Z = np.zeros((self.nx, self.nz))
+            return Z, Z, [], 0.0
+        prot = np.where(self.sil, pen - (att.nose - self.F), 0.0)
+        G = np.where(self.B > xc, 0.0, np.clip(prot, 0, c))
+        S = G.copy()
+        ds, dd = self.slope * self.CELL, self.slope * self.CELL * 1.4142
+        for _ in range(int(c / ds) + 3):                # tent stretched over the hull (cone dilation)
+            n4 = np.maximum(np.maximum(np.roll(S, 1, 0), np.roll(S, -1, 0)), np.maximum(np.roll(S, 1, 1), np.roll(S, -1, 1)))
+            n8 = np.maximum(np.maximum(np.roll(np.roll(S, 1, 0), 1, 1), np.roll(np.roll(S, 1, 0), -1, 1)),
+                            np.maximum(np.roll(np.roll(S, -1, 0), 1, 1), np.roll(np.roll(S, -1, 0), -1, 1)))
+            S = np.maximum(S, np.maximum(n4 - ds, n8 - dd))
+            S[:, -3:] = 0
+        S[0, :] = S[-1, :] = 0
+        S = S + INFL * np.clip(S / 0.3, 0, 1)
+        Sb = self.blur(self.blur(self.blur(self.blur(S))))
+        S = np.maximum(S, Sb)
+        S[:, -3:] = 0
+        # contour: the hull slice passing through the skin (marching squares on phi = 0)
+        segs = []
+        if xc < att.nose:
+            phi = np.where(self.sil, np.minimum(self.F - xc, xc - self.B), -0.6)
+            phi = self.blur(np.clip(phi, -0.6, 0.6))
+            s = phi > 0
+            mix = (s[:-1, :-1] | s[1:, :-1] | s[1:, 1:] | s[:-1, 1:]) & ~(s[:-1, :-1] & s[1:, :-1] & s[1:, 1:] & s[:-1, 1:])
+            for i, j in zip(*np.nonzero(mix)):
+                cr = [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)]
+                pts = []
+                for k in range(4):
+                    (i0, j0), (i1, j1) = cr[k], cr[(k + 1) % 4]
+                    v0, v1 = phi[i0, j0], phi[i1, j1]
+                    if (v0 > 0) != (v1 > 0):
+                        f = v0 / (v0 - v1)
+                        pts.append((i0 + (i1 - i0) * f, j0 + (j1 - j0) * f))
+                for k in range(0, len(pts) - 1, 2):
+                    segs.append((pts[k], pts[k + 1]))
+        return S, G, segs, c + INFL
 
     # -------------------------------------------------------------- meshes
     def _mesh(self, name, strength, edge, alpha):
-        P = self.np_
+        N = self.N
         me = bpy.data.meshes.new(name + '_faces')
-        me.from_pydata([(0, 0, 0)] * (3 * P), [], [(3 * i, 3 * i + 1, 3 * i + 2) for i in range(P)])
-        for an in ('r', 'hot', 'life'):
+        me.from_pydata([(0, 0, 0)] * (3 * N), [], [(3 * i, 3 * i + 1, 3 * i + 2) for i in range(N)])
+        for an in ('r', 'hot'):
             me.attributes.new(an, 'FLOAT', 'FACE')
         m = bpy.data.materials.new(name + '_face')
         t = K.NT(m)
         ar = t.n('ShaderNodeAttribute', attribute_name='r').outputs['Fac']
         ah = t.n('ShaderNodeAttribute', attribute_name='hot').outputs['Fac']
-        al = t.n('ShaderNodeAttribute', attribute_name='life').outputs['Fac']
         colm = t.n('ShaderNodeMixRGB')
         colm.inputs[1].default_value = (*K.NEON, 1)
-        colm.inputs[2].default_value = (*HOTC, 1)
-        t.link(t.m('MINIMUM', t.m('MULTIPLY', ah, 0.5), 0.75), colm.inputs[0])
+        colm.inputs[2].default_value = (0.02, 0.42, 1.0, 1)           # hot stays BLUE (towards cyan, never white)
+        t.link(t.m('MINIMUM', t.m('MULTIPLY', ah, 0.6), 1.0), colm.inputs[0])
         em = t.n('ShaderNodeEmission')
         t.link(colm.outputs[0], em.inputs[0])
         base = t.m('MULTIPLY', t.m('ADD', 0.35, ar), strength)
-        t.link(t.m('MULTIPLY', t.m('MULTIPLY', base, t.m('ADD', 1.0, t.m('MULTIPLY', ah, self.hot_gain))), al), em.inputs[1])
+        t.link(t.m('MULTIPLY', base, t.m('ADD', 1.0, t.m('MULTIPLY', ah, float(A.get('hotgain', 0.4))))), em.inputs[1])
         mix = t.n('ShaderNodeMixShader')
         a0 = t.m('ADD', alpha[0], t.m('MULTIPLY', ar, alpha[1] - alpha[0]))
-        t.link(t.m('MULTIPLY', t.m('ADD', a0, t.m('MULTIPLY', ah, 0.22), clamp=True), al), mix.inputs[0])
+        t.link(t.m('MINIMUM', t.m('ADD', a0, t.m('MULTIPLY', ah, 0.4)), 0.85), mix.inputs[0])
         t.link(t.n('ShaderNodeBsdfTransparent').outputs[0], mix.inputs[1])
         t.link(em.outputs[0], mix.inputs[2])
         t.link(mix.outputs[0], t.n('ShaderNodeOutputMaterial').inputs[0])
         me.materials.append(m)
         self.mf = me
         me = bpy.data.meshes.new(name + '_edges')
-        ef = []
-        for i in range(P):
-            n = 6 * i
-            ef += [(n + j, n + (j + 1) % 3, n + 3 + (j + 1) % 3, n + 3 + j) for j in range(3)]
-        me.from_pydata([(0, 0, 0)] * (6 * P), [], ef)
+        me.from_pydata([(0, 0, 0)] * (12 * N), [], [(4 * q, 4 * q + 1, 4 * q + 2, 4 * q + 3) for q in range(3 * N)])
         for an in ('hot', 'life'):
             me.attributes.new(an, 'FLOAT', 'FACE')
         m = bpy.data.materials.new(name + '_edge')
@@ -235,11 +382,11 @@ class Field:
         al = t.n('ShaderNodeAttribute', attribute_name='life').outputs['Fac']
         colm = t.n('ShaderNodeMixRGB')
         colm.inputs[1].default_value = (*[0.6 * c + 0.4 * k for c, k in zip(K.NEON, K.CYAN)], 1)
-        colm.inputs[2].default_value = (0.5, 0.82, 1.0, 1)
-        t.link(t.m('MULTIPLY', ah, 0.8, clamp=True), colm.inputs[0])
+        colm.inputs[2].default_value = (0.03, 0.5, 1.0, 1)
+        t.link(t.m('MINIMUM', t.m('MULTIPLY', ah, 0.6), 1.0), colm.inputs[0])
         em = t.n('ShaderNodeEmission')
         t.link(colm.outputs[0], em.inputs[0])
-        t.link(t.m('MULTIPLY', edge, t.m('ADD', 1.0, t.m('MULTIPLY', ah, self.hot_gain * 1.07))), em.inputs[1])
+        t.link(t.m('MULTIPLY', edge, t.m('ADD', 1.0, t.m('MULTIPLY', ah, 0.35))), em.inputs[1])
         mix = t.n('ShaderNodeMixShader')
         t.link(al, mix.inputs[0])
         t.link(t.n('ShaderNodeBsdfTransparent').outputs[0], mix.inputs[1])
@@ -247,296 +394,121 @@ class Field:
         t.link(mix.outputs[0], t.n('ShaderNodeOutputMaterial').inputs[0])
         me.materials.append(m)
         self.me = me
-        self.objs = []
         for me in (self.mf, self.me):
             ob = bpy.data.objects.new(me.name, me)
             bpy.context.scene.collection.objects.link(ob)
             ob.visible_shadow = False
             K.NOFOG.append(ob)
-            self.objs.append(ob)
-        # line meshes: strain (white-blue), lightning + sparks (gold)
-        self.lines = {}
-        for key, col, st in (('strain', (0.55, 0.85, 1.0), float(A.get('strain_e', 20))),
-                             ('gold', GOLD, float(A.get('gold_e', 6)))):
-            me = bpy.data.meshes.new(f'{name}_{key}')
-            me.materials.append(K._emit(f'{name}_{key}', col, st))
-            ob = bpy.data.objects.new(me.name, me)
-            bpy.context.scene.collection.objects.link(ob)
-            ob.visible_shadow = False
-            K.NOFOG.append(ob)
-            self.lines[key] = me
-
-    @staticmethod
-    def _tubes(me, segs):
-        """segs: list of (p0, p1, radius) -> three-sided tubes."""
-        me.clear_geometry()
-        if not segs:
-            me.update()
-            return
-        vs, fs = [], []
-        for p0, p1, r in segs:
-            p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
-            d = p1 - p0
-            L = np.linalg.norm(d)
-            if L < 1e-5:
-                continue
-            d /= L
-            a = np.cross(d, (0.0, 0.3, 1.0))
-            a /= max(np.linalg.norm(a), 1e-6)
-            b = np.cross(d, a)
-            n = len(vs)
-            for p in (p0, p1):
-                for k in range(3):
-                    an = k * 2.0944
-                    vs.append(tuple(p + (a * math.cos(an) + b * math.sin(an)) * r))
-            fs += [(n + k, n + (k + 1) % 3, n + 3 + (k + 1) % 3, n + 3 + k) for k in range(3)]
-        me.from_pydata(vs, [], fs)
-        me.update()
-
-    # -------------------------------------------------------------- strain lines + sparks (precomputed)
-    def _strain_paths(self):
-        rnd = self.rnd
-        self.strain = []
-        for k in range(22):
-            s = T_TOUCH + 0.04 + (T_BREAK - T_TOUCH - 0.04) * (k / 21.0) ** 0.7
-            st = self.lat_near(self.c[0] + rnd.uniform(-1.3, 1.3), self.c[1] + rnd.uniform(-1.3, 1.3))
-            self.strain.append((s, self.walk(rnd, st, rnd.randint(7, 15), 0.82)))
-        for k in range(14):                              # the break itself throws cracks out from the rim
-            an = rnd.uniform(0, 6.283)
-            st = self.lat_near(self.c[0] + math.cos(an) * self.R, max(self.c[1] + math.sin(an) * self.R, 0))
-            self.strain.append((T_BREAK + rnd.uniform(0, 0.12), self.walk(rnd, st, rnd.randint(6, 12), 0.85)))
-
-    def _sparks(self):
-        rnd = self.rnd
-        self.sparks = []
-        for k in range(260):
-            burst = k < 170
-            t0 = T_BREAK + (rnd.uniform(0, 0.16) if burst else rnd.uniform(0.1, max(self.t_clear - T_BREAK, 0.3)))
-            an = rnd.uniform(0, 6.283)
-            rr = self.R * (rnd.uniform(0.1, 1.0) if burst else rnd.uniform(0.75, 1.0))
-            p = self.to3((self.c[0] + math.cos(an) * rr, max(self.c[1] + math.sin(an) * rr * 0.8, 0.2)))
-            sp = rnd.uniform(6, 24) if burst else rnd.uniform(3, 12)
-            v = np.array([math.cos(an) * rnd.uniform(1, 9), -sp, math.sin(an) * rnd.uniform(1, 8) + rnd.uniform(0, 4)])
-            self.sparks.append((t0, p, v, rnd.uniform(0.25, 0.8), 'gold' if rnd.random() < 0.6 else 'strain'))
 
     # -------------------------------------------------------------- per-frame update
-    def update(self, t, hull=None):
-        """hull: (centre a, centre b, half-width, half-height) of the attacker cross-section in the field
-        plane while it spans the plane, else None."""
+    def update(self, t):
+        att = self.att
         frame = int(round(t * FPS))
         frnd = np.random.RandomState(1000 + frame)
-        P, nw = self.np_, self.nw
+        S, G, segs, depth = self.sheet(t)
+        disp = self.samp(S, self.P2) * self.win
+        tau = t - att.t_clear
+        strain = sstep(att.pen(t) / 1.0) * (1 - sstep(tau / 0.15))
+        if tau > 0:                                    # spring back flat: a damped ripple runs outward
+            rip = 0.75 * math.exp(-tau * 3.0) * min(tau / 0.06, 1.0)
+            disp += rip * np.sin(2 * math.pi * (self.rv / 3.2 - 2.4 * tau)) * np.exp(-self.rv / 5.0) * self.win
         out = self.base.copy()
-        hot = np.zeros(P)
-        life = np.ones(P)
-        pr = press(t)
-        d = self.wd
-        # ---- whole triangles: flex with the bulge
-        out[:nw, :, 1] -= self.bulge(out[:nw], t)
-        flick = 0.82 + 0.36 * frnd.rand(nw)
-        after = math.exp(-max(t - T_BREAK, 0) * 3.5) if t > T_BREAK else pr
-        hot[:nw] = 1.7 * after * np.exp(-d * d / (2 * (self.sigma * 1.15) ** 2)) * flick
-        for tk, amp in ((T_TOUCH, 1.0), (0.74, 0.7), (0.93, 0.8), (1.07, 0.9), (1.17, 1.0), (T_BREAK, 2.4)):
-            if t > tk:
-                front = (t - tk) * 27.0
-                hot[:nw] += amp * np.clip(1 - np.abs(d - front) / 1.7, 0, 1) * math.exp(-(t - tk) * 2.0)
-        # the lip of the open hole stays hot and flickers
-        opened = sstep((t - T_BREAK) / 0.1) * (1 - sstep((t - self.t_clear) / 0.5))
-        hot[:nw] += opened * np.clip(1 - (d - self.R) / 3.0, 0, 1) * (0.9 + 0.8 * frnd.rand(nw)) * (~self.brk)
-        # breaking triangles: shake and glow before they go
-        pre = np.clip((t - (self.tc[:nw] - 0.3)) / 0.3, 0, 1) * self.brk
-        hot[:nw] += 1.6 * pre
-        shake = (0.05 * pr + 0.16 * pre)[:, None] * (frnd.rand(nw, 3) - 0.5) * 2 * self.brk[:, None]
-        out[:nw, :, 1] += shake
-        gone = self.brk & (t >= self.tc[:nw]) & (t < self.ts[:nw])
-        life[:nw][gone] = 0
-        # sealing: replacement triangles flip in around one edge
-        for i in np.nonzero(self.brk & (t >= self.ts[:nw]))[0]:
-            tau = t - self.ts[i]
-            s = min(tau / 0.17, 1.0)
-            e = 1 - (1 - s) ** 3
-            ang = math.radians(118) * (1 - e) - math.radians(9) * math.sin(s * math.pi) * (1 - s)
-            p = out[i]
-            k = int(self.rn[i] * 3)
-            a, b = p[k], p[(k + 1) % 3]
-            axis = (b - a) / np.linalg.norm(b - a)
-            q = rodrigues(p - a, axis, ang)
-            if q[(k + 2) % 3][1] > 0:               # always swing in from the hangar side
-                q = rodrigues(p - a, axis, -ang)
-            out[i] = q + a
-            life[i] = min(1.0, 0.25 + tau / 0.06)
-            hot[i] += 2.6 * math.exp(-tau * 6.0)
-        # ---- shards
-        if self.ns:
-            sb = self.base[nw:]
-            tc = self.tc[self.sp]
-            tau = t - tc
-            live = (tau >= 0) & (tau < self.slife)
-            tt = np.clip(tau, 0, None)
-            cen = sb.mean(axis=1)
-            cen0 = cen.copy()
-            cen0[:, 1] -= self.depth * np.exp(-((cen[:, 0] - self.o[0] - self.c[0]) ** 2 +
-                                                (cen[:, 2] - self.o[2] - self.c[1]) ** 2) / (2 * self.sigma ** 2))
-            kd = 1.1
-            trav = (1 - np.exp(-kd * tt)) / kd
-            pos = cen0 + self.sv * trav[:, None]
-            pos[:, 2] -= 0.5 * 7.0 * tt * tt
-            pos[:, 2] = np.maximum(pos[:, 2], self.o[2] + 0.12)
-            fr = np.clip(tt / self.slife, 0, 1)
-            sc = 1 - 0.35 * fr
-            for j in np.nonzero(live)[0]:
-                q = rodrigues(sb[j] - cen[j], self.sax[j], self.sw[j] * tt[j]) * sc[j]
-                out[nw + j] = q + pos[j]
-            life[nw:] = np.where(live, (1 - fr ** 1.6), 0)
-            hot[nw:] = 2.6 * np.exp(-tt * 4.5) + 0.35
-        # ---- write
-        dead = life <= 0
-        out[dead] = self.o + np.array([0, 0, -60.0])
-        cen = out.mean(axis=1, keepdims=True)
-        inner = cen + (out - cen) * (1 - self.gap)
-        self.mf.vertices.foreach_set('co', inner.reshape(-1))
+        out[..., 1] -= disp
+        cen = out.mean(axis=1)
+        nrm = np.cross(out[:, 1] - out[:, 0], out[:, 2] - out[:, 0])
+        nrm /= np.maximum(np.linalg.norm(nrm, axis=1), 1e-9)[:, None]
+        tilt = 1 - np.abs(nrm[:, 1])
+        c2 = self.P2.mean(axis=1)
+        Gc = self.samp(G, c2)
+        Sc = self.samp(S, c2)
+        act = np.clip(np.abs(disp).max(axis=1) / 0.18, 0, 1)
+        hot = (0.8 * np.clip(Gc / 0.15, 0, 1) + 0.6 * np.clip(Sc / max(depth, 0.5), 0, 1)) * (0.85 + 0.3 * frnd.rand(self.N))
+        hot += 2.2 * np.clip(tilt, 0, 0.6)
+        hot = np.minimum(hot, 1.7)
+        # brightness waves rippling outward, big triangle by big triangle
+        k = 0
+        while True:
+            tk = T_TOUCH + 0.24 * k
+            k += 1
+            if tk > min(t, att.t_clear):
+                break
+            front = 2.0 + (t - tk) * 13.0
+            hot += 0.9 * np.clip(1 - np.abs(self.rp - front) / 1.5, 0, 1) * math.exp(-(t - tk) * 1.5)
+        if tau > 0:
+            front = 1.0 + tau * 16.0
+            hot += 1.6 * np.clip(1 - np.abs(self.rp - front) / 2.0, 0, 1) * math.exp(-tau * 1.6)
+        # ---- faces
+        self.mf.vertices.foreach_set('co', out.reshape(-1))
         self.mf.attributes['r'].data.foreach_set('value', self.r)
         self.mf.attributes['hot'].data.foreach_set('value', hot)
-        self.mf.attributes['life'].data.foreach_set('value', life)
         self.mf.update()
-        self.me.vertices.foreach_set('co', np.concatenate([out, inner], axis=1).reshape(-1))
+        # ---- seam lines: parent seams always, the finer hinges only where the skin is working
+        wgt = np.where(self.pe > 0.5, 1.0, 0.4 * act[:, None])              # (N, 3)
+        g = self.line * wgt                                                  # line half-width per edge (m)
+        O = out.copy()
+        O[..., 1] -= 0.02
+        cn = O.mean(axis=1, keepdims=True)
+        quads = np.zeros((self.N, 3, 4, 3))
+        for e in range(3):
+            a, b = O[:, e], O[:, (e + 1) % 3]
+            ge = g[:, e][:, None]
+            quads[:, e, 0] = a
+            quads[:, e, 1] = b
+            ed = b - a
+            ed /= np.maximum(np.linalg.norm(ed, axis=1), 1e-9)[:, None]
+            pp = cn[:, 0] - a
+            pp -= ed * (pp * ed).sum(axis=1)[:, None]
+            pp /= np.maximum(np.linalg.norm(pp, axis=1), 1e-9)[:, None]
+            quads[:, e, 2] = b + pp * ge
+            quads[:, e, 3] = a + pp * ge
+        self.me.vertices.foreach_set('co', quads.reshape(-1))
         self.me.attributes['hot'].data.foreach_set('value', np.repeat(hot, 3))
-        self.me.attributes['life'].data.foreach_set('value', np.repeat(life, 3))
+        self.me.attributes['life'].data.foreach_set('value', np.where(self.pe > 0.5, 1.0, 0.6 * act[:, None]).reshape(-1))
         self.me.update()
-        self._lines(t, frame, hull)
+        # ---- contour line where the hull passes through
+        c = self.CELL
+        y = self.o[1] - depth - 0.05
+        W = lambda p: (self.o[0] + self.gx0 + p[0] * c, y, self.o[2] + p[1] * c)
+        rr = float(A.get('ring_r', 0.065))
+        tubes(self.ml['ring'], [(W(a), W(b), rr) for a, b in segs] + self.extra)
+        # ---- gold lightning + sparks skittering over the skin around the contact
+        gold, spark = [], []
+        cand = np.argwhere((S > 0.2) & (S < max(depth * 0.75, 0.3)))
+        if len(cand) and strain > 0:
+            rnd = random.Random(77 + frame // 2)
 
-    def _surf(self, pts2, t, off=0.05):
-        p = self.to3(pts2)
-        p[..., 1] -= self.bulge(p, t) + off
-        return p
-
-    def _lines(self, t, frame, hull):
-        strain, gold = [], []
-        # strain lines racing along the seams
-        for s, pts in self.strain:
-            head = (t - s) * 30.0
-            if head <= 0 or head > len(pts) + 6:
-                continue
-            p3 = self._surf(pts, t)
-            for k in range(len(pts) - 1):
-                age = head - k
-                if 0 < age <= 6:
-                    a, b = p3[k], p3[k + 1]
-                    if age < 1:
-                        b = a + (b - a) * age
-                    strain.append((a, b, 0.085 * (1 - age / 7.0)))
-        # gold lightning crawling out from the attacker (re-struck every two frames)
-        rnd = random.Random(77 + frame // 2)
-        pr = press(t)
-        bolts = []
-        if T_TOUCH < t <= T_BREAK + 0.06:
-            for k in range(3 + int(pr * 6)):
-                st = self.lat_near(self.c[0] + rnd.uniform(-1.6, 1.6), self.c[1] + rnd.uniform(-1.4, 1.4))
-                bolts.append((None, self.walk(rnd, st, 1 + int(rnd.uniform(0.4, 1.0) * (1 + pr * 7)), 0.45)))
-        elif hull is not None:
-            ha, hb, hw, hh_ = hull
-            for k in range(6):
-                an = rnd.uniform(-0.5, 3.64)
-                hp = (ha + math.cos(an) * hw, max(hb + math.sin(an) * hh_, 0.3))
-                st = self.lat_near(self.c[0] + math.cos(an) * (self.R + 1.2), max(self.c[1] + math.sin(an) * (self.R + 1.2), 0))
-                bolts.append((hp, self.walk(rnd, st, rnd.randint(1, 3), 0.45)))
-        elif self.t_clear <= t < self.t_clear + 0.35:
-            for k in range(3):
-                an = rnd.uniform(0, 3.14)
-                st = self.lat_near(self.c[0] + math.cos(an) * (self.R + 1), self.c[1] + math.sin(an) * (self.R + 1))
-                bolts.append((None, self.walk(rnd, st, rnd.randint(1, 3), 0.45)))
-        for hp, pts in bolts:
-            if hp is not None:
-                pts = [hp] + pts
-            fine = []
-            for a, b in zip(pts[:-1], pts[1:]):
-                n = 3
-                for k in range(n):
-                    f = k / n
-                    j = 0.0 if k == 0 else 0.2
-                    fine.append((a[0] + (b[0] - a[0]) * f + rnd.uniform(-j, j), a[1] + (b[1] - a[1]) * f + rnd.uniform(-j, j)))
-            fine.append(pts[-1])
-            p3 = self._surf(fine, t, off=0.09)
-            if hp is not None:
-                p3[0, 1] = self.o[1] - 0.3
-            n = len(p3)
-            for k in range(n - 1):
-                gold.append((p3[k], p3[k + 1], 0.075 * (1 - 0.75 * k / n)))
-        # sparks
-        for t0, p, v, lf, key in self.sparks:
-            tau = t - t0
-            if 0 < tau < lf:
-                trav = (1 - math.exp(-1.6 * tau)) / 1.6
-                q = p + v * trav + np.array([0, 0, -4.0 * tau * tau])
-                if q[2] < self.o[2] + 0.05:
+            def P3(a, b):
+                s = float(self.samp(S, np.array([a, b])))
+                return (self.o[0] + a, self.o[1] - s - 0.08, self.o[2] + b)
+            for _ in range(int(3 + 6 * strain)):
+                i, j = cand[rnd.randrange(len(cand))]
+                a, b = self.gx0 + i * c, j * c
+                an = math.atan2(b - self.cz, a - self.cx) + rnd.uniform(-0.9, 0.9)
+                n = rnd.randint(3, 9)
+                p = P3(a, b)
+                for q in range(n):
+                    an += rnd.uniform(-0.7, 0.7)
+                    a, b = a + math.cos(an) * 0.4, max(b + math.sin(an) * 0.4, 0.05)
+                    p2 = P3(a, b)
+                    gold.append((p, p2, 0.05 * (1 - 0.7 * q / n)))
+                    p = p2
+            for q in range(140):
+                pr = random.Random(q * 7919)
+                t0 = T_TOUCH + pr.uniform(0, 0.33) + 0.33 * int((t - T_TOUCH) / 0.33)
+                if t0 > t:
+                    t0 -= 0.33
+                age, life = t - t0, pr.uniform(0.12, 0.33)
+                if not (0 < age < life) or t0 > att.t_clear + 0.1:
                     continue
-                tail = q - v * 0.03 * math.exp(-1.6 * tau)
-                (gold if key == 'gold' else strain).append((tail, q, 0.03 * (1 - tau / lf) + 0.008))
-        self._tubes(self.lines['strain'], strain)
-        self._tubes(self.lines['gold'], gold)
-
-
-# ====================================================================== the attacker
-class Attacker:
-    def __init__(self, kind, x, y_field, depth, hover=0.9, end_centre=13.5, t_move=1.55):
-        new = K.tank(kind, (0, 0, 0), rz=0, faction='alien')
-        lo, hi = Vector((1e9,) * 3), Vector((-1e9,) * 3)
-        bpy.context.view_layer.update()
-        for o in new:
-            if o.type == 'MESH':
-                for c in o.bound_box:
-                    w = o.matrix_world @ Vector(c)
-                    lo = Vector(map(min, lo, w))
-                    hi = Vector(map(max, hi, w))
-        self.lo, self.hi = lo, hi
-        print('ATTACKER BBOX', kind, tuple(lo), tuple(hi), flush=True)
-        self.nose, self.tail = hi.x, -lo.x
-        self.root = bpy.data.objects.new('Attacker', None)
-        bpy.context.scene.collection.objects.link(self.root)
-        for o in new:
-            if o.parent is None:
-                o.parent = self.root
-        self.root.rotation_mode = 'XYZ'
-        self.x, self.yf, self.depth, self.hover = x, y_field, depth, hover
-        self.travel = end_centre + self.nose - depth
-        self.t_move = t_move
-        self.t_clear = next(k / 200.0 for k in range(200, 2000) if self.nose_y(k / 200.0) + self.nose + self.tail < y_field - 0.3)
-        self.glow = K.point('AttGlow', (0, 0, 0), 0, GOLD, r=1.2)
-        self.under = K.point('AttUnder', (0, 0, 0), 0, GOLD, r=1.5)
-
-    def nose_y(self, t):
-        if t <= T_TOUCH:
-            return self.yf + 12.0 * (1 - t / T_TOUCH) ** 1.5 + 0.1
-        if t <= T_BREAK:
-            return self.yf - self.depth * press(t) + 0.1
-        s = min((t - T_BREAK) / self.t_move, 1.0)
-        e = 1 - (1 - s ** 1.25) ** 2
-        return self.yf - self.depth - self.travel * e
-
-    def update(self, t):
-        ny = self.nose_y(t)
-        s = min(max((t - T_BREAK) / self.t_move, 0), 1.0)
-        land = sstep((s - 0.55) / 0.4)
-        z = self.hover * (1 - land) + 0.12 * math.sin(t * 7.0) * (1 - land)
-        z += 0.18 * math.exp(-max(s - 0.95, 0) * 30) * math.sin(max(s - 0.95, 0) * 60) if s > 0.95 else 0
-        pitch = math.radians(5.0) * math.sin(min(s / 0.8, 1.0) * math.pi) * (1 if s > 0 else 0)
-        pr = press(t)
-        jit = 0.05 * pr * math.sin(t * 173.0) if t < T_BREAK else 0.0
-        cy = ny + self.nose
-        self.root.location = (self.x + jit, cy, z)
-        self.root.rotation_euler = (0, pitch, math.radians(-90))
-        self.glow.location = (self.x, ny - 0.4, z + 2.2)
-        self.under.location = (self.x, cy, max(z, 0.2) + 0.5)
-        return ny, cy, z
-
-    def hull(self, t, origin):
-        """Cross-section at the field plane (plane coords) while the hull spans it."""
-        ny = self.nose_y(t)
-        if t > T_BREAK and ny < self.yf - 0.5 and ny + self.nose + self.tail > self.yf:
-            z = self.root.location[2]
-            return (self.x - origin[0], z + (self.hi.z + self.lo.z) / 2 - origin[2],
-                    (self.hi.y - self.lo.y) / 2 * 0.92, (self.hi.z - self.lo.z) / 2 * 0.9)
-        return None
+                i, j = cand[int(pr.random() * len(cand)) % len(cand)]
+                a, b = self.gx0 + i * c, j * c
+                an = math.atan2(b - self.cz, a - self.cx) + pr.uniform(-0.6, 0.6)
+                v = np.array([math.cos(an) * pr.uniform(1, 6), -pr.uniform(2, 9), math.sin(an) * pr.uniform(1, 6) + 1.5])
+                p = np.array(P3(a, b)) + v * age + np.array([0, 0, -4.0 * age * age])
+                (gold if q % 3 == 0 else spark).append((p - v * 0.035, p, 0.022 * (1 - age / life) + 0.008))
+        tubes(self.ml['gold'], gold)
+        tubes(self.ml['spark'], spark)
+        return depth, strain
 
 
 # ====================================================================== hangar scene
@@ -570,9 +542,8 @@ def build_hangar(full):
         H.detail()
     L, W2 = H.LEN, H.DOOR_W2
     bpy.data.objects['Sun'].data.energy = float(A.get('sun', 2.2))
-    # alarm beacons on the door frame and the last ribs
     y0 = L - 3.56
-    for s in (-1, 1):
+    for s in (-1, 1):                                   # alarm beacons on the door frame
         for z in (6.0, 10.0, 14.0):
             K.box('dark', (s * (W2 + 1.5), y0 - 0.1, z), (1.3, 0.3, 0.9))
             K.box('alarm', (s * (W2 + 1.5), y0 - 0.28, z), (1.0, 0.08, 0.55))
@@ -586,7 +557,6 @@ def build_hangar(full):
             if ob in K.NOFOG:
                 K.NOFOG.remove(ob)
             bpy.data.objects.remove(ob)
-    # parked tanks in the bays nearest the door + their lights
     kinds = ['lancer', 'bulwark', 'javelin', 'longbow', 'outrider', 'bulwark']
     i = 0
     for yb in (H.RIBS[-2], H.RIBS[-3]) + ((H.RIBS[-4],) if full else ()):
@@ -597,92 +567,98 @@ def build_hangar(full):
             K.spot('Bay', (s * 26.0, yc, 8.2), (s * 17.5, yc, 0), 5200, (0.78, 0.9, 1.0), angle=100, blend=0.6, r=0.5)
             K.area('Wash', (s * 29.5, yc, 10.2), (1.0, 9.0), 900, (0.25, 0.5, 1.0), rot=(0, s * 150, 0), spread=140)
     yf = L + 0.5
-    # defenders facing the door
     for kind, x, dy, rz in (('bulwark', 9.5, -7.0, 128), ('lancer', -13.2, -7.0, 70), ('bulwark', -14.0, -20.5, 72),
-                            ('lancer', 10.5, -24.0, 104)):
+                            ('lancer', 10.5, -24.0, 131)):
         K.tank(kind, (x, yf + dy, 0), rz=rz)
         K.spot('Head', (x * 0.93, yf + dy + 3.0, 2.3), (0, yf, 3.0), 700, (0.8, 0.9, 1.0), angle=42, blend=0.7, r=0.15)
-    # more boarders queueing outside
     K.tank('darter', (-9.5, yf + 19, 2.2), rz=-84, faction='alien')
     K.tank('stinger', (10.5, yf + 26, 3.0), rz=-97, faction='alien')
 
     def inside(a, b):
         return abs(a - W2) + b < W2 + H.DOOR_H - H.DOOR_CH
-    contact = (W2 + 0.0, 2.9)
-    depth = 2.3
-    att = Attacker('carapace', 0.0, yf, depth)
-    fld = Field('BayField', (-W2, yf, 0), 2 * W2, H.DOOR_H, 2.3, inside, contact, R=float(A.get('R', 4.2)),
-                depth=depth, sigma=2.8, strength=float(A.get('field', 0.7)), edge=1.5, alpha=(0.05, 0.3), gap=0.055,
-                seed=1, t_clear=att.t_clear)
-    print('T_CLEAR', att.t_clear, 'SEALED', fld.t_sealed, 'pieces', fld.np_, 'shards', fld.ns, flush=True)
-    flare = K.point('Flare', (0, yf - 1.2, 2.9), 0, (0.6, 0.85, 1.0), r=0.8)
+    att = Attacker('carapace', 0.0, yf)
+    fld = Field('BayField', (-W2, yf, 0), 2 * W2, H.DOOR_H, 2.3, inside, att, strength=float(A.get('field', 0.75)),
+                edge=1.5, alpha=(0.06, 0.3))
+    print('T_PIERCE', att.t_pierce, 'T_CLEAR', att.t_clear, flush=True)
+    glow = K.point('SkinGlow', (0, yf - 4.5, 3.0), 0, (0.08, 0.45, 1.0), r=1.0)
+    muzzle = K.point('Muzzle', (0, 0, 0), 0, (0.3, 0.75, 1.0), r=0.3)
+    hit = K.point('Hit', (0, 0, 0), 0, (1.0, 0.6, 0.2), r=0.4)
     alarms = [K.spot('Alarm', (s * 15, L - 6, 17.5), (s * 6, L - 14, 0), 0, (1.0, 0.3, 0.04), angle=95, blend=0.8, r=0.6)
               for s in (-1, 1)]
     alarms += [K.area('AlarmW', (s * (W2 + 1.5), L - 4.2, 10), (1.0, 9.0), 0, (1.0, 0.3, 0.04), rot=(90, 0, 0), spread=160)
                for s in (-1, 1)]
     ceil = [(o, o.data.energy) for o in bpy.data.objects if o.type == 'LIGHT' and o.name.startswith(('Ceil', 'Bay'))]
     fglow = bpy.data.objects.get('FieldGlow')
-    am = K.mat('alarm').node_tree.nodes
-    aem = next(n for n in am if n.type == 'EMISSION')
+    aem = next(n for n in K.mat('alarm').node_tree.nodes if n.type == 'EMISSION')
+    gun = np.array([10.5 - 3.3, yf - 24.0 + 3.8, 2.25])      # muzzle of the foreground lancer (heading 131 deg)
+    shots = (3.3, 3.62)
 
     def update(t):
         ny, cy, z = att.update(t)
-        fld.update(t, att.hull(t, fld.o))
-        pr = press(t)
-        tb = t - T_BREAK
-        flash = math.exp(-tb * 7.0) if tb >= 0 else 0.0
+        fld.extra = []
+        muzzle.data.energy = hit.data.energy = 0
+        for ts in shots:                                    # a defender opens fire once it is inside
+            a = t - ts
+            if -0.001 <= a < 0.13:
+                tgt = np.array([att.x + 2.2, cy - 1.0, z + 2.0])
+                d = tgt - gun
+                Ld = np.linalg.norm(d)
+                d /= Ld
+                h0, h1 = min(a * 150.0, Ld), min(a * 150.0 + 6.0, Ld)
+                if h1 - h0 > 0.3:
+                    fld.extra.append((gun + d * h0, gun + d * h1, 0.07))
+                muzzle.location = gun
+                muzzle.data.energy = 9000 * max(0.0, 1 - a / 0.07)
+                if a * 150.0 + 6.0 >= Ld:
+                    hit.location = tgt - d * 0.5
+                    hit.data.energy = 12000
+        depth, strain = fld.update(t)
         fr = random.Random(int(round(t * FPS)))
-        flare.data.energy = 2200 * pr * fr.uniform(0.8, 1.2) + 22000 * flash
-        inside_amt = sstep((yf + 2 - ny) / 6.0)
-        att.glow.data.energy = (8000 * pr + 6000 * (1 if tb >= 0 else 0)) * fr.uniform(0.8, 1.2)
-        att.under.data.energy = 3500 * inside_amt
-        # alarm: off until contact, then a hard two-per-second pulse
+        tau = t - att.t_clear
+        glow.location = (0, yf - depth - 2.2, 3.2)
+        glow.data.energy = 2600 * strain * fr.uniform(0.85, 1.15) + 2200 * max(0, math.exp(-max(tau, 0) * 4)) * (tau > 0)
+        ins = sstep((yf + 1 - ny) / 6.0)
+        att.glow.data.energy = 4000 + 4000 * ins
+        att.under.data.energy = 3000 * ins
         al = 0.0
         if t > T_TOUCH + 0.12:
             ph = ((t - T_TOUCH - 0.12) * 2.4) % 1.0
             al = 0.12 + 0.88 * max(0.0, 1 - ph * 1.8) ** 1.5
         aem.inputs[1].default_value = 0.4 + 14.0 * al
         for k, o in enumerate(alarms):
-            o.data.energy = (16000 if k < 2 else 4000) * al
-        # main lights sag while the field fights, drop to emergency level when it breaks
-        dim = 1.0 - 0.3 * pr * fr.uniform(0.6, 1.0)
-        if tb >= 0:
-            dim = 0.34 + 0.12 * math.exp(-tb * 3) * fr.uniform(0, 1)
+            o.data.energy = (14000 if k < 2 else 4000) * al
+        dim = 1.0 - 0.45 * sstep((t - T_TOUCH) / 0.5) - 0.18 * sstep((t - att.t_pierce) / 0.3)
+        dim *= 1 - 0.12 * strain * fr.uniform(0, 1)
         for o, e in ceil:
             o.data.energy = e * dim
         if fglow:
-            hole = 1.0
-            fglow.data.energy = 14000 * hole * (1 + 0.5 * pr + 0.8 * flash)
+            fglow.data.energy = 14000 * (1 + 0.5 * strain)
     return sc, cam, update, dict(yf=yf, att=att, fld=fld)
 
 
+CUT = 2.7        # shot A -> shot B
+
+
 def camera(cam, name, t, yf):
-    tb = t - T_BREAK
-    shake = 0.0
-    if tb >= 0:
-        shake = 0.16 * math.exp(-tb * 5.0)
-    elif t > T_TOUCH:
-        shake = 0.02 * press(t)
     r = random.Random(int(round(t * FPS)) + 5)
+    shake = 0.015 * sstep((t - T_TOUCH) / 0.4) * (1 - sstep((t - 3.3) / 0.3))
     sx, sz = r.uniform(-shake, shake), r.uniform(-shake, shake)
-    if name == 'A':        # low and close on the contact point, pushing in
-        s = t / 1.7
-        loc = Vector((-11.2 + 1.0 * s, yf - 9.6 + 1.2 * s, 2.0))
-        tgt = Vector((1.2, yf - 0.8, 3.5))
-        lens = 24
-    elif name == 'B':      # among the defenders as it comes through
-        s = (t - 1.6) / 2.0
-        loc = Vector((10.2 - 0.6 * s, yf - 30.5 - 1.2 * s, 3.9))
-        tgt = Vector((-0.5, yf - 6.0, 3.7))
-        lens = 30
+    if name == 'A':        # low and close on the contact, pushing in, then following the hull through
+        s = t / CUT
+        f = sstep((t - 1.5) / 1.0)
+        loc = Vector((-11.6 + 0.9 * s, yf - 10.6 + 1.0 * s, 2.0))
+        tgt = Vector((1.0 - 0.6 * f, yf - 1.2 - 3.0 * f, 3.5))
+        lens = 23
+    elif name == 'B':      # among the defenders: tail clears, the skin snaps flat, the boarder settles
+        s = (t - CUT) / (DUR - CUT)
+        loc = Vector((10.4 - 0.6 * s, yf - 30.0 - 1.2 * s, 3.9))
+        tgt = Vector((-0.5, yf - 6.0, 3.9))
+        lens = 29
     else:                  # hero
-        loc = Vector((-11.3, yf - 9.9, 1.85))
-        tgt = Vector((1.5, yf - 1.1, 3.9))
-        lens = 22
+        loc = Vector((-11.4, yf - 10.3, 1.85))
+        tgt = Vector((0.6, yf - 3.2, 3.6))
+        lens = 21
     K.look(cam, loc + Vector((sx, 0, sz)), tgt + Vector((sx * 0.5, 0, sz * 0.5)), lens=lens)
-
-
-CUT = 1.625        # shot A -> shot B
 
 
 def still(sc, cam, update, info, t, name, tag, depth=False):
@@ -692,7 +668,7 @@ def still(sc, cam, update, info, t, name, tag, depth=False):
     K.render(sc, raw, RES, depth_far=130.0 if depth else None)
     return K.post(raw, os.path.join(OUT, tag + '.jpg'), haze=float(A.get('haze', 0.4)) if depth else 0,
                   scatter=float(A.get('scatter', 0.2)) if depth else 0, haze_col=(0.08, 0.25, 0.6),
-                  bloom=float(A.get('bloom', 0.85)), thresh=float(A.get('thresh', 0.7)))
+                  bloom=float(A.get('bloom', 0.8)), thresh=float(A.get('thresh', 0.72)))
 
 
 def main():
@@ -707,7 +683,7 @@ def main():
             still(sc, cam, update, info, t, A.get('cam', 'auto'), '%s_t%04d' % (A.get('name', 'br'), round(t * 1000)),
                   depth=A.get('depth', '0') == '1')
     elif MODE == 'clip':
-        for f in range(int(A.get('f0', 0)), int(A.get('f1', round(DUR * FPS))) + 1):
+        for f in range(int(A.get('f0', 0)), int(A.get('f1', round(DUR * FPS) - 1)) + 1):
             tag = 'clip/f%03d' % f
             if os.path.exists(os.path.join(OUT, tag + '.jpg')):
                 continue
@@ -722,7 +698,7 @@ def game():
     Dk.RES = RES
     Dk.NAME = A.get('name', 'breach_game')
     Dk.OUT = OUT
-    t = float(A.get('t', 1.5))
+    t = float(A.get('t', 2.0))
 
     def hook(sc):
         for o in list(bpy.data.objects):
@@ -736,26 +712,22 @@ def game():
         T('lancer', 86.5, 68, 180)
         T('lancer', 53.5, 68, 0)
         T('javelin', 86.5, 58, 180)
-        T('bulwark', 70, 64, 90)       # defenders facing the bay door
+        T('bulwark', 70, 62, 90)       # defenders facing the bay door
         T('lancer', 62.5, 70, 78)
         T('lancer', 77.5, 69, 104)
-        T('bulwark', 61, 80, 62)
+        T('bulwark', 60.5, 80, 62)
         T('outrider', 79.5, 79, 118)
         Al('darter', 63.5, 97, -80)    # next boarders on the lip
         Al('stinger', 76.5, 99, -95)
         yf, x0 = 90.0, 56.7
-        depth = 1.4
-        att = Attacker('carapace', 70.0, yf, depth, hover=0.6, end_centre=11.0)
-        fld = Field('Field_bay', (x0, yf, 0.1), 26.6, Dk.H + 0.6, 2.0, None, (70.0 - x0, 2.5), R=3.9, depth=depth,
-                    sigma=2.4, strength=1.7, edge=5.0, alpha=(0.1, 0.45), gap=0.07, seed=3, t_clear=att.t_clear,
-                    shard_speed=0.8, hot_gain=0.45)
+        att = Attacker('carapace', 70.0, yf, hover=0.6, end_centre=11.0, c0=2.0, cdrag=0.6)
+        fld = Field('Field_bay', (x0, yf, 0.1), 26.6, Dk.H + 0.6, 2.0, None, att, strength=float(A.get('field', 1.5)),
+                    edge=4.5, alpha=(0.1, 0.45), seed=3, rsub=7.5, nsub=5, line=0.045)
         ny, cy, z = att.update(t)
-        fld.update(t, att.hull(t, fld.o))
-        tb = t - T_BREAK
-        flash = math.exp(-max(tb, 0) * 7.0) if tb >= 0 else 0
-        K.point('Flare', (70, yf - 1.5, 3.0), 1200 * press(t) + 8000 * flash + 800, (0.6, 0.85, 1.0), r=0.8)
-        att.glow.data.energy = 5000
-        att.under.data.energy = 3000
+        depth, strain = fld.update(t)
+        K.point('SkinGlow', (70, yf - depth - 2.0, 4.0), 1500 * strain, (0.08, 0.45, 1.0), r=0.8)
+        att.glow.data.energy = 4000
+        att.under.data.energy = 2000
         for x in (57.5, 82.5):
             K.point('Alarm', (x, 87.5, 4.5), 9000, (1.0, 0.3, 0.04), r=0.5)
     Dk.main(hook=hook, units_on=False)
