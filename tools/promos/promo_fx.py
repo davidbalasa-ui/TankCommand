@@ -284,13 +284,13 @@ def card(P, name, pos, t, size=1.0, mode='camera', speed=1.0, tint=None, rot_jit
         pl.color[3] = 1.0
         pl.keyframe_insert('color', index=3, frame=f0 + fi)
     if not loop and fade_out is None and man['frames'] > 12:
-        # one-shots dissolve from 35% to 85% of their run: the fireball reads, the baked dark smoke
+        # one-shots dissolve from 28% to 68% of their run: the fireball reads, the baked dark smoke
         # tail never lingers as a blob (smoke plumes take over)
         d = f1 - f0
         pl.color[3] = 1.0
-        pl.keyframe_insert('color', index=3, frame=f0 + max(fi, 0.35 * d))
+        pl.keyframe_insert('color', index=3, frame=f0 + max(fi, 0.28 * d))
         pl.color[3] = 0.0
-        pl.keyframe_insert('color', index=3, frame=f0 + 0.85 * d)
+        pl.keyframe_insert('color', index=3, frame=f0 + 0.68 * d)
         fo = 0
     if fo > 0 and (t1 is not None or not loop):
         pl.color[3] = 1.0
