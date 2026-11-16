@@ -104,11 +104,11 @@ def small_blast(work, frames=32, seed=7, res=1.0):
     def boom(sim):
         sim.add_blast((cx, cy, 0.15), 0.3, fuel=1.2, heat=1.0, speed=6.0, noise=0.9, soot=0.4)
         # dirt thrown up in a cone of jets
-        for k in range(8):
-            a = rng.uniform(0, 2 * math.pi); el = rng.uniform(0.6, 1.35); d = rng.uniform(0.25, 0.6)
-            p = (cx + math.cos(a) * math.cos(el) * d, cy + math.sin(a) * math.cos(el) * d, 0.1 + math.sin(el) * d)
-            m, _ = sim.sphere(p, rng.uniform(0.1, 0.18))
-            sim.dens += m * 1.5
+        for k in range(14):
+            a = rng.uniform(0, 2 * math.pi); el = rng.uniform(0.35, 1.0); d = rng.uniform(0.15, 0.4)
+            p = (cx + math.cos(a) * math.cos(el) * d, cy + math.sin(a) * math.cos(el) * d, 0.05 + math.sin(el) * d)
+            m, _ = sim.sphere(p, rng.uniform(0.07, 0.13))
+            sim.dens += m * 2.0
             sim.u[0] += m * math.cos(a) * math.cos(el) * 5; sim.u[1] += m * math.sin(a) * math.cos(el) * 5
             sim.u[2] += m * math.sin(el) * 7
     run(s, work, frames, 2, events=[(0.0, boom)])
@@ -146,7 +146,7 @@ def fire_loop(work, frames=96, seed=13, res=1.0):
     """Burning wreck: continuous flames + smoke from a patch. Made loopable afterwards by crossfade."""
     h = 0.03 / res; n = (int(70 * res), int(70 * res), int(110 * res))
     s = _base(n, h, seed)
-    s.buoy = 7.0; s.cool = 3.0; s.burn_rate = 6.0; s.soot_gain = 0.9; s.expand_gain = 2.0; s.vort = 18.0
+    s.buoy = 7.0; s.cool = 3.0; s.burn_rate = 6.0; s.soot_gain = 0.3; s.expand_gain = 2.0; s.vort = 18.0
     cx, cy = n[0] * h / 2, n[1] * h / 2
     base_m = None
 
@@ -165,7 +165,7 @@ def smoke_plume(work, frames=120, seed=17, res=1.0):
     """Lingering dark-grey smoke column from a wreck, drifting with wind. Loop by crossfade."""
     h = 0.06 / res; n = (int(70 * res), int(70 * res), int(130 * res))
     s = _base(n, h, seed)
-    s.buoy = 5.0; s.cool = 0.5; s.vort = 20.0; s.weight = -0.25; s.drag = 0.3; s.dens_decay = 0.3
+    s.buoy = 5.0; s.cool = 0.5; s.vort = 20.0; s.weight = -0.25; s.drag = 0.3; s.dens_decay = 0.15
     s.wind[:] = (1.3, 0, 0)
     cx, cy = n[0] * h * 0.4, n[1] * h / 2
     base_m = None
@@ -176,7 +176,7 @@ def smoke_plume(work, frames=120, seed=17, res=1.0):
             m, _ = sim.sphere((cx, cy, 0.2), 0.3)
             base_m = m
         puls = np.clip(1 + 0.8 * sim.noise(2.0), 0, 2)
-        sim.dens += base_m * puls * 9.0 * dt
+        sim.dens += base_m * puls * 12.0 * dt
         sim.temp = np.maximum(sim.temp, base_m * 0.5)
         sim.u[2] += base_m * 3.0 * dt * 10
     run(s, work, frames, 2, per_step=emit)

@@ -16,11 +16,11 @@ STYLE = dict(
     detail_scale=6.0,
     fire_strength=5.0,               # emission strength at heat=1
     flame_boost=2.5,                 # extra emission from active burning
-    heat_lo=0.5, heat_hi=2.0,        # heat -> ramp position
+    heat_lo=0.6, heat_hi=2.0,        # heat -> ramp position
     # fire ramp: dark red -> orange -> yellow -> near white (no purple ever)
     ramp=[(0.0, (0.0, 0.0, 0.0)), (0.1, (0.4, 0.04, 0.0)), (0.35, (1.0, 0.2, 0.01)),
-          (0.7, (1.0, 0.42, 0.04)), (1.0, (1.0, 0.62, 0.16))],
-    sun=3.5, sun_rot=(50, 0, 35), world=0.8, world_color=(0.55, 0.62, 0.75),
+          (0.7, (1.0, 0.4, 0.03)), (1.0, (1.0, 0.56, 0.1))],
+    sun=3.5, sun_rot=(50, 0, 35), world=0.8, world_color=(0.7, 0.68, 0.64),
     inner_light=0.0,                  # point light inside fireball (W per unit flame)
     dust=False,
 )
@@ -141,6 +141,16 @@ def build_scene(cfg):
     Lk.new(em.outputs[0], sc3.inputs[0]); Lk.new(sc2.outputs[0], sc3.inputs[1])
     Lk.new(sc3.outputs[0], pv.inputs['Emission Strength'])
     nz2.name = 'FireNoise'
+    # soot near the fire is dark (it is lit from inside by the flames, not by the sun); only cooled smoke is pale grey.
+    # Without this, orange emission + sunlit grey soot reads as pastel salmon / cream.
+    hf = N.new('ShaderNodeMath'); hf.operation = 'MULTIPLY'; hf.use_clamp = True
+    hf.inputs[1].default_value = st.get('hot_soot_gain', 2.0)
+    Lk.new(hm.outputs['Result'], hf.inputs[0])
+    mix = N.new('ShaderNodeMix'); mix.data_type = 'RGBA'
+    mix.inputs[6].default_value = (*st['smoke_color'], 1)
+    mix.inputs[7].default_value = (*st.get('hot_soot', (0.06, 0.045, 0.035)), 1)
+    Lk.new(hf.outputs[0], mix.inputs['Factor'])
+    Lk.new(mix.outputs[2], pv.inputs['Color'])
     # soot inside the burning core is thin: fire shows saturated instead of a grey wash
     inv = N.new('ShaderNodeMath'); inv.operation = 'MULTIPLY_ADD'
     inv.inputs[1].default_value = -st.get('core_clear', 0.8); inv.inputs[2].default_value = 1.0

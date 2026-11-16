@@ -310,7 +310,7 @@
    "style": {
     "fire_strength": 0.0,
     "flame_boost": 0.0,
-    "smoke_density": 3.0,
+    "smoke_density": 4.0,
     "detail": 0.45,
     "detail_scale": 5.0,
     "smoke_color": [

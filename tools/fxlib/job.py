@@ -20,6 +20,7 @@ def main():
     ap.add_argument('effect'); ap.add_argument('--test', action='store_true')
     ap.add_argument('--work', default='/home/user/fxwork'); ap.add_argument('--threads', type=int, default=4)
     ap.add_argument('--resim', action='store_true')
+    ap.add_argument('--rerender', action='store_true', help='clear rendered frames but reuse the sim')
     a = ap.parse_args()
     J = json.load(open(os.path.join(HERE, 'jobs.json')))[a.effect]
     sim_name = J.get('sim_as', a.effect)
@@ -33,7 +34,7 @@ def main():
     r.update(vdb_dir=vdb, out_dir=out, domain=simj['domain'], frames=[1, simj['frames']], threads=a.threads, skip_existing=True)
     if a.test:
         r.update(only=J['test_frames'], res=384, samples=32)
-    if a.resim and os.path.isdir(out):
+    if (a.resim or a.rerender) and os.path.isdir(out):
         import shutil; shutil.rmtree(out)
     cfgp = os.path.join(a.work, tag + '.json')
     json.dump(r, open(cfgp, 'w'))
