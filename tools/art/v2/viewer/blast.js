@@ -62,8 +62,8 @@ const textures = () => {
   TEX.puff = canvasTex(128, 64, (x, y) => { const r = Math.hypot((x - 0.5) * 2, (y - 0.5) * 2); return Math.pow(Math.max(0, 1 - r), 1.6) * (0.8 + 0.2 * noise2(x * 8, y * 6)); });
   TEX.ring = canvasTex(128, 128, (x, y) => {
     const r = Math.hypot(x - 0.5, y - 0.5) * 2;
-    const d = Math.abs(r - 0.7) / 0.3;
-    return r > 1 ? 0 : (Math.pow(Math.max(0, 1 - d), 2) * 0.8 + 0.2 * Math.pow(Math.max(0, 1 - r), 1.5)) * smooth(1, 0.85, r) * (0.35 + 0.65 * noise2((x - 0.5) / Math.max(r, 1e-3) * 2.5 + 5, (y - 0.5) / Math.max(r, 1e-3) * 2.5 + 5));
+    const d = Math.abs(r - 0.66) / 0.42;
+    return r > 1 ? 0 : (Math.pow(Math.max(0, 1 - d), 2) * 0.8 + 0.2 * Math.pow(Math.max(0, 1 - r), 1.5)) * smooth(1, 0.85, r) * Math.pow(noise2((x - 0.5) / Math.max(r, 1e-3) * 3 + 5, (y - 0.5) / Math.max(r, 1e-3) * 3 + 5) * (0.7 + 0.3 * noise2(x * 18, y * 18)), 1.6);
   });
   // Smoke puff: lumpy edge, lit from the top (RGB brighter at the top, darker underneath).
   // Smoke puff: a cauliflower of soft lobes with fine billow detail, lit from the top
@@ -215,6 +215,8 @@ export class Blast {
     const lift = new THREE.Vector3().crossVectors(side, dir).normalize();
     const flatDir = new THREE.Vector3(dir.x, 0, dir.z).normalize();
     const toCam = cam.position.clone().sub(p).normalize();
+    // Light guns get a relatively punchier flash (it has to read at game zoom), heavy ones get mass instead.
+    const P = 1 + 0.25 * (1 - H);
 
     // Ground dust (heavy guns): drawn first, under everything.
     if (H > 0) {
@@ -245,7 +247,7 @@ export class Blast {
       const life = (1.2 + 0.8 * H) * (0.75 + 0.5 * r(i));
       if (x > life) continue;
       const k = x / life;
-      const v0 = (0.6 + 13 * ((i + 0.5) / nSmoke) ** 1.5 * (0.75 + 0.5 * r(i + 10))) * S * (1 + 0.3 * H);
+      const v0 = (0.6 + 13 * ((i + 0.5) / nSmoke) ** 1.5 * (0.75 + 0.5 * r(i + 10))) * S * (1 - 0.45 * H);
       const drag = 3.5;
       const travel = (v0 * (1 - Math.exp(-x * drag))) / drag;
       const spread = (r(i + 20) - 0.5) * 1.8;
@@ -259,6 +261,23 @@ export class Blast {
       this.bill(cam, T.smoke, pos, size, tint, a, roll, false);
     }
 
+    // Lingering smoke: the hot bore keeps venting slow puffs at the muzzle for a while, so the plume
+    // stays joined to the gun and drifts off instead of leaving a gap (heavy guns vent longer).
+    const nLinger = Math.round(2 + 8 * H);
+    for (let i = 0; i < nLinger; i += 1) {
+      const born = 0.06 + i * (0.07 + 0.05 * H);
+      const x = u - born;
+      const life = (1.0 + 1.0 * H) * (0.8 + 0.4 * r(i + 300));
+      if (x < 0 || x > life) continue;
+      const k = x / life;
+      const pos = at(0.5 * S + (0.8 + 1.2 * r(i + 310)) * S * x).addScaledVector(side, (r(i + 320) - 0.5) * S * (0.4 + x));
+      pos.y += S * (0.3 + 0.5 * r(i + 330)) * x * 2;
+      const size = S * (0.9 + (1.6 + 0.6 * H) * ease(Math.min(1, x * 1.3))) * (0.75 + 0.5 * r(i + 340));
+      pos.y = Math.max(pos.y, groundY + size * 0.32);
+      const a = (0.45 + 0.05 * H) * (1 - 0.5 * i / nLinger) * Math.min(1, x / 0.08) * (1 - k) ** 1.4; // later vents thinner
+      this.bill(cam, T.smoke, pos, size, C.smoke, a, (r(i + 350) - 0.5) * 0.9 + x * 0.4, false);
+    }
+
     // Muzzle stays hot and cools (rides the recoiling barrel tip).
     const cool = env(u, 0, 0.9, 2);
     if (cool > 0) {
@@ -270,22 +289,31 @@ export class Blast {
     const rk = u / (0.15 + 0.04 * H);
     if (rk < 1) {
       const nrm = dir.clone().add(toCam.clone().multiplyScalar(1.2)).normalize();
-      this.flat(T.ring, at(0.9 * S + rk * 1.2 * S), nrm, S * (1.3 + (3.2 + H) * ease(rk)), C.hot, 0.3 * (1 - rk) ** 2);
+      this.flat(T.ring, at(0.9 * S + rk * 1.2 * S), nrm, S * (1.6 + (3.4 + H) * ease(rk)), C.hot, 0.2 * (1 - rk) ** 1.5 * Math.min(1, u / 0.02), true, r(7) * 6.28);
     }
 
     // Plasma tongue from the muzzle (as it recoils) out along the barrel line.
     const j = env(u, 0, 0.1, 1.4);
     if (j > 0) {
-      const reach = S * (3 + 0.8 * r(1) + 0.8 * H) * (0.75 + 0.25 * Math.min(1, u / 0.035));
+      const reach = S * (3 + 0.8 * r(1) + 0.8 * H) * P * (0.75 + 0.25 * Math.min(1, u / 0.035));
       const base = at(-0.2 * S);
       // Outer tongue alpha-blended (reads cyan on any ground), white-hot inner tongue additive.
-      this.along(cam, T.jet, base, dir, reach, S * (2.2 + 0.6 * H), C.halo, 0.75 * j, false);
+      this.along(cam, T.jet, base, dir, reach, S * (2.2 + 0.6 * H) * P, C.halo, Math.min(1, 0.75 * P) * j, false);
       this.overGun();
-      this.along(cam, T.jet, base, dir, reach * 0.7, S * 1.1, C.white, j);
-      // A thin hot wisp still pouring out of the barrel tip as it snaps back (bridges the gap for a frame or two).
+      this.along(cam, T.jet, base, dir, reach * 0.7, S * 1.1 * P, C.white, j);
+      // The barrel snaps back faster than the flash dies: plasma keeps pouring out of the live tip and
+      // joins the bloom, so the blast is never seen floating ahead of a retracted barrel.
       const gap = pm.distanceTo(base);
-      const w = env(u, 0, 0.06, 2);
-      if (gap > 0.3 * S && w > 0) this.along(cam, T.streak, pm, base.clone().sub(pm).normalize(), gap + S, S * 0.5, C.cyan, 0.6 * w);
+      const w = env(u, 0, 0.1, 1.6);
+      if (gap > 0.2 * S && w > 0) {
+        const bd = p.clone().addScaledVector(dir, 0.6 * S).sub(pm);
+        const bl = bd.length();
+        bd.normalize();
+        this.along(cam, T.puff, pm.clone().addScaledVector(bd, -0.4 * S), bd, bl + 0.6 * S, S * 1.3, C.halo, 0.8 * w, false);
+        this.overGun();
+        this.along(cam, T.puff, pm.clone().addScaledVector(bd, -0.2 * S), bd, bl + 0.3 * S, S * 0.55, C.white, w);
+        this.bill(cam, T.glow, pm, S * 1.8, C.cyan, 0.8 * w);
+      }
       for (let s = -1; s <= 1; s += 2) {
         const dd = dir.clone().addScaledVector(side, s * (0.25 + 0.1 * r(2 + s))).addScaledVector(lift, 0.15 * (r(4 + s) - 0.5)).normalize();
         this.along(cam, T.puff, at(0.1 * S), dd, reach * 0.5, S * 1.1, C.hot, 0.5 * j);
@@ -303,10 +331,10 @@ export class Blast {
     const c = env(u, 0, 0.1, 2);
     if (c > 0) {
       // The halo is alpha-blended so it reads cyan over any ground (additive cyan on grass turns lime).
-      this.bill(cam, T.glow, at(0.5 * S), S * (4.5 + 0.5 * H) * (1.15 - 0.15 * c), C.halo, 0.5 * c, 0, false);
+      this.bill(cam, T.glow, at(0.5 * S), S * (4.5 + 1.2 * H) * P * (1.15 - 0.15 * c), C.halo, Math.min(0.75, 0.5 * P) * c, 0, false);
       this.overGun();
-      this.bill(cam, T.glow, at(0.5 * S), S * (3.5 + 0.5 * H), C.cyan, 0.7 * c);
-      this.bill(cam, T.glow, at(0.4 * S), S * (1.7 + 0.3 * H), C.white, Math.min(1, 1.5 * c));
+      this.bill(cam, T.glow, at(0.5 * S), S * (3.5 + 1.0 * H) * P, C.cyan, 0.7 * c);
+      this.bill(cam, T.glow, at(0.4 * S), S * (1.7 + 0.6 * H) * P, C.white, Math.min(1, 1.5 * c));
     }
     // Sparks.
     const nSparks = Math.round(9 + 8 * H);
