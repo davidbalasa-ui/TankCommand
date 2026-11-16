@@ -31,10 +31,10 @@ R = P.rnd
 
 SCALE = 0.3
 FR_SIZE = 120 * SCALE
-SR_SIZE = 10 * SCALE
+SR_SIZE = 10 * SCALE * 1.35   # fighters nudged up 35% so they read at phone size
 DN_SIZE = 400 * SCALE
 
-P.space(planet=(-300, -700, -520, 520, (0.12, 0.17, 0.27)), nebula=(0.07, 0.03, 0.11),
+P.space(planet=(700, -150, -520, 480, (0.12, 0.17, 0.27)), nebula=(0.07, 0.03, 0.11),
         sun=(58, 0, 60), sun_energy=4.5)
 
 T_CUT1 = 36 / FPS     # frame 37
@@ -284,7 +284,7 @@ T_DIE = [1.9, 2.5, 3.55, 4.35]
 
 
 # compress the far end of the approach so the wave reads in the opening shot
-SR_KEYS = [[(t, VV(60 + (p.x - 60) * 0.72, p.y, p.z) if p.x > 60 else p) for t, p in ks] for ks in SR_KEYS]
+SR_KEYS = [[(t, VV(60 + (p.x - 60) * 0.55, p.y, p.z) if p.x > 60 else p) for t, p in ks] for ks in SR_KEYS]
 
 
 def S(i, t):
@@ -420,7 +420,7 @@ for k, tu in enumerate(turrets):
         d = (tgt - base).normalized()
         # swing-in from rest at the start, and quick slews between targets
         if t < 1.25:
-            u = ss((t - 0.75) / 0.5)
+            u = ss((t - 0.3) / 0.9)
             return rest.lerp(d, u).normalized()
         for a_, b_, j in ENGAGE[1:]:
             if a_ - 0.35 <= t < a_ and j == i:
@@ -465,7 +465,7 @@ for i, a in enumerate(rays):
     t = T_DIE[i]
     p = S(i, t)
     before = set(bpy.data.objects)
-    P.explosion(p, t, size=(2.6, 2.6, 2.4, 3.2)[i], debris=14, smoke=True)
+    P.explosion(p, t, size=(2.6, 2.6, 2.4, 2.6)[i], debris=14, smoke=True)
     for o in bpy.data.objects:
         if o not in before and o.name.startswith('Scorch'):
             bpy.data.objects.remove(o, do_unlink=True)
@@ -490,9 +490,9 @@ for i, a in enumerate(rays):
 keys = []
 # Shot A: low on the frigate's starboard flank, dolly forward, looking up-range
 for t, cp, lk, lens in [
-    (0.0, VV(-58, -44, 18), VV(30, 0, 6), 34),
-    (0.75, VV(-48, -40, 15), VV(34, 0, 6), 34),
-    (T_CUT1 - 1 / FPS, VV(-40, -36, 13), VV(38, 0, 6), 34),
+    (0.0, VV(-52, -17, 3.0), VV(60, -4, 2.0), 44),
+    (0.75, VV(-46, -16, 3.3), VV(62, -4, 2.5), 45),
+    (T_CUT1 - 1 / FPS, VV(-40, -15, 3.6), VV(64, -4, 3.0), 46),
 ]:
     keys.append((t, tuple(cp), tuple(lk), lens))
 # Shot B: chase behind the Stingray leader, frigate and Dreadnought ahead
