@@ -295,6 +295,14 @@ def _spring(target, dt, hz, zeta, impulses=None, x0=None):
     return out
 
 
+def _turret_yaw(a, frame):
+    tu = a.turret
+    if tu is None or tu.rotation_mode != 'XYZ':
+        return 0.0
+    cv = _curves(tu).get(('rotation_euler', 2))
+    return cv.evaluate(frame) if cv else tu.rotation_euler.z
+
+
 def _smooth(x):
     x = max(0.0, min(1.0, x))
     return x * x * (3 - 2 * x)
@@ -337,6 +345,77 @@ def _footprint(a):
             lo = Vector(map(min, lo, w))
             hi = Vector(map(max, hi, w))
     return max(0.3, (hi.x - lo.x) / 2), max(0.3, (hi.y - lo.y) / 2), max(0.3, hi.z - lo.z)
+
+
+MAX_TREAD = 0.35   # texture tiles per frame: faster strobes backwards at 24 fps
+
+
+def _tread_scroll(a, grid, pos, yaw):
+    """Tracked units: the tread belt texture circulates with the distance driven (Tread*
+    meshes with a UV-mapped tiling texture: offset U through a Mapping node). Returns count."""
+    treads = [o for o in a.meshes if o.name.split('.')[0].startswith('Tread') and o.data.uv_layers]
+    if not treads:
+        return 0
+    inv = a.root.matrix_world.inverted()
+    done = 0
+    for o in treads:
+        me = o.data
+        uv = me.uv_layers.active.data
+        mw = inv @ o.matrix_world
+        zs = [(mw @ v.co).z for v in me.vertices]
+        ztop = max(zs)
+        # dU/dx along the top run of the belt (root space, metres)
+        num = den = 0.0
+        for poly in me.polygons:
+            if (mw @ poly.center).z < ztop - 0.04 * (ztop - min(zs)) - 1e-4:
+                continue
+            L = list(poly.loop_indices)
+            for l0, l1 in zip(L, L[1:] + L[:1]):
+                x0 = (mw @ me.vertices[me.loops[l0].vertex_index].co).x
+                x1 = (mw @ me.vertices[me.loops[l1].vertex_index].co).x
+                du = uv[l1].uv.x - uv[l0].uv.x
+                if abs(x1 - x0) > 1e-4:
+                    num += du * (x1 - x0)
+                    den += (x1 - x0) ** 2
+        if den <= 0:
+            continue
+        dudx = num / den
+        if abs(dudx) < 1e-3:
+            continue
+        # per-object material copies (P.copy instances share mesh + materials)
+        for slot in o.material_slots:
+            m0 = slot.material
+            if m0 is None or not m0.node_tree:
+                continue
+            imgs = [nd for nd in m0.node_tree.nodes if nd.type == 'TEX_IMAGE']
+            if not imgs:
+                continue
+            mat = m0.copy()
+            mat.name = m0.name + '_' + a.name
+            slot.link = 'OBJECT'
+            slot.material = mat
+            nt = mat.node_tree
+            tc = nt.nodes.new('ShaderNodeTexCoord')
+            mp = nt.nodes.new('ShaderNodeMapping')
+            nt.links.new(tc.outputs['UV'], mp.inputs['Vector'])
+            for im in [nd for nd in nt.nodes if nd.type == 'TEX_IMAGE']:
+                nt.links.new(mp.outputs['Vector'], im.inputs['Vector'])
+            loc = mp.inputs['Location']
+            off = 0.0
+            prev = None
+            for i in range(0, len(grid), SUB):
+                if prev is not None:
+                    d = pos[i] - pos[prev]
+                    step = (d.x * math.cos(yaw[i]) + d.y * math.sin(yaw[i])) * dudx
+                    off -= _clamp(step, MAX_TREAD)
+                prev = i
+                loc.default_value[0] = off
+                loc.keyframe_insert('default_value', index=0, frame=grid[i])
+            for f in _fc(nt.animation_data.action):
+                for kp in f.keyframe_points:
+                    kp.interpolation = 'LINEAR'
+            done += 1
+    return done
 
 
 # ------------------------------------------------------------------------- classification
@@ -466,6 +545,7 @@ def _bake_actor(P, a, grid, sm, dt):
     pitch, roll, heave, surge, sway = zeros[:], zeros[:], zeros[:], zeros[:], zeros[:]
     pivot = Vector((0, 0, 0))
     D = math.radians
+    ter_p, ter_r, ter_h = zeros, zeros, zeros   # terrain part (wheels follow it, no suspension)
 
     # --- per class drive
     if dyn and cls == 'ground':
@@ -517,6 +597,7 @@ def _bake_actor(P, a, grid, sm, dt):
             tp = _spring(tp, dt, 3.0, 0.6)
             tr = _spring(tr, dt, 3.0, 0.6)
             th = _spring(th, dt, 3.5, 0.65)
+            ter_p, ter_r, ter_h = tp, tr, th
             for i in range(n):
                 pitch[i] += tp[i]
                 roll[i] += tr[i]
@@ -536,7 +617,7 @@ def _bake_actor(P, a, grid, sm, dt):
         if m['pitch']:
             pitch = _spring([_soft(D(1.2) * g_ * x, D(8) * g_) for x in along], dt, hz, 0.4)
         if m['roll'] and not own_roll:
-            roll = _spring([_soft(-D(1.4) * g_ * x, D(12) * g_) for x in alat], dt, hz, 0.4)
+            roll = _spring([_soft(-D(1.3) * g_ * x, D(12) * g_) for x in alat], dt, hz, 0.5)
         if m['sway']:
             surge = _spring([_soft(-0.03 * x, 0.35) for x in along], dt, hz * 0.85, 0.32)
             sway = _spring([_soft(-0.03 * x, 0.35) for x in alat], dt, hz * 0.85, 0.32)
@@ -567,8 +648,9 @@ def _bake_actor(P, a, grid, sm, dt):
 
     # --- impulses: recoil rock, unfold thunk
     struct = a.entry.get('kind') == 'structure'   # a dug-in gun tower barely rocks
-    imp_p, imp_s, imp_h, imp_r = {}, {}, {}, {}
+    imp_p, imp_s, imp_h, imp_r, imp_y = {}, {}, {}, {}, {}
     rng = random.Random(seed)
+    lim_p = 1e-6
     for ev, t, k1, k2 in events:
         i = int(round((P.T(t) + 1 - grid[0]) * SUB))   # one frame after the shot: the kick
         if not (0 <= i < n):
@@ -578,33 +660,60 @@ def _bake_actor(P, a, grid, sm, dt):
             if struct:
                 g, back = 0.4, k2 * 0.15
             elif cls == 'hover':
-                g, back = 0.7, k2 * 0.6
+                g, back = 0.55, k2 * 0.5
             elif cls == 'air':
                 g, back = 0.35, k2 * 0.3
             else:
-                g, back = 0.75 / mass ** 0.3, k2 * 0.7
+                g, back = 0.6 / mass ** 0.3, k2 * 0.7
+            # rapid fire: later rounds of a burst add less (no resonant pumping)
+            g *= 0.45 if any(e[0] == 'recoil' and 0 < t - e[1] < 0.35 for e in events) else 1.0
+            lim_p = max(lim_p, kick * g * 1.15)
             # a spring with peak response ~ v0/w*0.64 (zeta .3): solve v0 for the wanted peak
-            imp_p[i] = imp_p.get(i, 0) - kick * g * (2 * math.pi * 2.4) / 0.64
-            imp_s[i] = imp_s.get(i, 0) - back * (2 * math.pi * 2.0) / 0.64
+            # the shove follows the gun: firing over the nose pitches the hull up, firing
+            # broadside rolls it away from the shot
+            gy = _turret_yaw(a, P.T(t))
+            cy, sy = math.cos(gy), math.sin(gy)
+            jit = 1.0 + rng.uniform(-0.12, 0.12)
+            imp_p[i] = imp_p.get(i, 0) - cy * kick * g * jit * (2 * math.pi * 2.4) / 0.64
+            imp_r[i] = imp_r.get(i, 0) + (sy * 0.8 + rng.uniform(-0.15, 0.15)) * kick * g * (2 * math.pi * 2.6) / 0.64
+            imp_s[i] = imp_s.get(i, 0) - cy * back * (2 * math.pi * 2.0) / 0.64
+            imp_y[i] = imp_y.get(i, 0) - sy * back * (2 * math.pi * 2.0) / 0.64
             imp_h[i] = imp_h.get(i, 0) - 0.02 * k1 / 7.0 * (2 * math.pi * 3.0) / 0.64 * (0.5 if struct else 1)
-            imp_r[i] = imp_r.get(i, 0) + rng.choice((-1, 1)) * kick * g * 0.18 * (2 * math.pi * 2.4) / 0.64
         elif ev == 'unfold' and m['settle']:
             imp_h[i] = imp_h.get(i, 0) - 0.025 * (2 * math.pi * 3.0) / 0.64 * min(2.0, a.size / 5.0)
             imp_p[i] = imp_p.get(i, 0) + D(0.5) * rng.choice((-1, 1)) * (2 * math.pi * 2.4) / 0.64
     if imp_p or imp_h:
         stiff = 1.5 if struct else 1.0
         rp = _spring(zeros, dt, 2.4 * stiff, 0.3, imp_p, 0.0)
+        if lim_p > 1e-5:
+            rp = [_soft(x, lim_p) for x in rp]
         rr = _spring(zeros, dt, 2.6 * stiff, 0.3, imp_r, 0.0)
         rs = _spring(zeros, dt, 2.0 * stiff, 0.45, imp_s, 0.0)
         rh = _spring(zeros, dt, 3.0 * stiff, 0.35, imp_h, 0.0)
+        ry = _spring(zeros, dt, 2.0 * stiff, 0.45, imp_y, 0.0)
         for i in range(n):
             pitch[i] += rp[i]
             roll[i] += rr[i]
             surge[i] += rs[i]
             heave[i] += rh[i]
+            sway[i] += ry[i]
 
     if not any(abs(x) > 1e-5 for x in pitch + roll + heave + surge + sway):
         return f'{cls}-none'
+
+    # --- wheel pivots in root space (rest), for the suspension below
+    wheels = []
+    if dyn and cls == 'ground' and m['wheels']:
+        bpy.context.view_layer.update()
+        inv = a.root.matrix_world.inverted()
+        for name, pv in a.parts.items():
+            if name.startswith('Wheel') and name.endswith('Pivot') and pv.parent is not None:
+                zs = [(c.matrix_world @ Vector(b)).z for c in pv.children_recursive if c.type == 'MESH'
+                      for b in c.bound_box]
+                rad = (max(zs) - min(zs)) / 2 if zs else 0.35
+                p_rel = inv @ pv.matrix_world.translation
+                ks = pv.parent.matrix_world.to_scale().z / max(1e-6, a.root.matrix_world.to_scale().z)
+                wheels.append((pv, p_rel - Vector((0, 0, rad)), ks))
 
     # --- key the motion layer on whole frames
     mo = _insert_layer(a)
@@ -622,14 +731,38 @@ def _bake_actor(P, a, grid, sm, dt):
         for kp in f.keyframe_points:
             kp.interpolation = 'LINEAR'
 
+    # --- suspension: wheels stay planted while the body pitches/rolls/heaves over them
+    for pv, c, ks in wheels:
+        comp = []
+        for i in range(0, n, SUB):
+            Rd = Matrix.Rotation((pitch[i] - ter_p[i]) * sc_amp, 3, 'Y') @ Matrix.Rotation((roll[i] - ter_r[i]) * sc_amp, 3, 'X')
+            ld = pivot - Rd @ pivot + Vector((surge[i], sway[i], heave[i] - ter_h[i])) * sc_amp
+            dz = (Rd @ c + ld).z - c.z
+            comp.append(_clamp(-dz, 0.15) / ks)
+        cv = _curves(pv).get(('location', 2))
+        base = pv.location.z
+        vals = [(cv.evaluate(grid[i]) if cv else base) + comp[i // SUB] for i in range(0, n, SUB)]
+        if cv:
+            while len(cv.keyframe_points):
+                cv.keyframe_points.remove(cv.keyframe_points[0], fast=True)
+        for i, v in zip(range(0, n, SUB), vals):
+            pv.location.z = v
+            pv.keyframe_insert('location', index=2, frame=grid[i])
+        for f in _fc(pv.animation_data.action):
+            if f.data_path == 'location':
+                for kp in f.keyframe_points:
+                    kp.interpolation = 'LINEAR'
+                f.update()
+        pv.location.z = base
+
     # --- wheels from rolling distance
     nw = 0
     if m['wheels'] and dyn and cls == 'ground':
         for name, pv in a.parts.items():
             if not (name.startswith('Wheel') and name.endswith('Pivot')):
                 continue
-            if pv.animation_data and pv.animation_data.action:
-                continue  # the scene drives it
+            if ('rotation_euler', 1) in _curves(pv):
+                continue  # the scene spins it
             kids = [c for c in pv.children_recursive if c.type == 'MESH']
             rad = 0.0
             for c in kids:
@@ -659,6 +792,7 @@ def _bake_actor(P, a, grid, sm, dt):
             for i in range(0, n, SUB):
                 fh.write(f'{grid[i]:.0f},{spd[i]:.3f},{along[i]:.3f},{alat[i]:.3f},{math.degrees(pitch[i]):.3f},'
                          f'{math.degrees(roll[i]):.3f},{heave[i]:.4f},{surge[i]:.4f},{sway[i]:.4f}\n')
+    ntr = _tread_scroll(a, grid, pos, yaw) if (m['wheels'] and dyn and cls == 'ground') else 0
     mx_p = max(abs(x) for x in pitch)
     mx_r = max(abs(x) for x in roll)
-    return f'{cls}{"" if dyn else "(fixed)"} pitch<={math.degrees(mx_p):.1f} roll<={math.degrees(mx_r):.1f} wheels={nw} ev={len(events)}'
+    return f'{cls}{"" if dyn else "(fixed)"} pitch<={math.degrees(mx_p):.1f} roll<={math.degrees(mx_r):.1f} wheels={nw} treads={ntr} ev={len(events)}'
