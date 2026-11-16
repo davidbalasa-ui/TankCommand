@@ -7,6 +7,12 @@ camera. See `CHECKLIST.md` for the list and `briefs/<id>.md` for each clip's bri
 - `models.json`: model NAME -> file. Scripts only ever use names, so remodels only need a re-render.
   Lookup order: `$PROMO_MODELS`, `/mnt/project-files/promos/models`, `public/assets/models`.
 - `promo_kit.py`: shared toolkit (environment, model loading, camera, weapons, effects, unfold, render).
+- `promo_env.py`: the environment behind `P.env()`: displaced terrain (per-biome relief + heightmap),
+  procedural ground shaders, instanced gravel/stones/grass near the camera, far horizon relief
+  (mesas, mountains, volcanoes), sky with clouds and matching aerial haze, and the clustered prop
+  scatter. Props are placed at render time (after every `flatten()` and actor path), so they never
+  float in flattened areas or sit in a unit's path. `env/env_proof.py --kind desert` renders a
+  ground/rock close-up for review.
 - `scenes/<id>.py`: one script per clip. `scenes/terran_bastion.py` is the reference example.
 
 ## Running

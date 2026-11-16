@@ -811,150 +811,13 @@ class Promo:
             clear=None, deposits=None, seed=None):
         """Ground, sky and sun. kind: desert | highland | alien | dusk | ash.
         clear: [(x, y, r)] circles kept free of scattered props (the action area).
-        deposits: [('ore'|'metal', (x, y), scale)] resource sites to place."""
-        pal = {
-            'desert': dict(g1=(0.33, 0.22, 0.13), g2=(0.18, 0.12, 0.075), sky=(0.42, 0.6, 0.85), hor=(0.85, 0.75, 0.62), sunc=(1.0, 0.93, 0.82)),
-            'highland': dict(g1=(0.2, 0.2, 0.14), g2=(0.1, 0.11, 0.08), sky=(0.38, 0.55, 0.8), hor=(0.7, 0.74, 0.75), sunc=(1.0, 0.95, 0.88)),
-            'alien': dict(g1=(0.3, 0.2, 0.22), g2=(0.13, 0.09, 0.12), sky=(0.3, 0.45, 0.62), hor=(0.85, 0.65, 0.6), sunc=(1.0, 0.88, 0.78)),
-            'dusk': dict(g1=(0.28, 0.17, 0.1), g2=(0.12, 0.07, 0.05), sky=(0.18, 0.22, 0.42), hor=(1.0, 0.5, 0.25), sunc=(1.0, 0.62, 0.35)),
-            'ash': dict(g1=(0.17, 0.16, 0.15), g2=(0.07, 0.065, 0.06), sky=(0.3, 0.32, 0.36), hor=(0.62, 0.55, 0.5), sunc=(1.0, 0.85, 0.7)),
-        }[kind]
-        self.palette = pal
-        rnd = random.Random(seed if seed is not None else self.rnd.random())
-        sc = bpy.context.scene
-        # world: horizon -> zenith gradient
-        w = bpy.data.worlds.new('World')
-        sc.world = w
-        w.use_nodes = True
-        nt = w.node_tree
-        nt.nodes.clear()
-        out = nt.nodes.new('ShaderNodeOutputWorld')
-        bg = nt.nodes.new('ShaderNodeBackground')
-        tc = nt.nodes.new('ShaderNodeTexCoord')
-        sep = nt.nodes.new('ShaderNodeSeparateXYZ')
-        ramp = nt.nodes.new('ShaderNodeValToRGB')
-        ramp.color_ramp.elements[0].position = 0.0
-        ramp.color_ramp.elements[0].color = (*pal['hor'], 1)
-        ramp.color_ramp.elements[1].position = 0.35
-        ramp.color_ramp.elements[1].color = (*pal['sky'], 1)
-        nt.links.new(tc.outputs['Generated'], sep.inputs[0])
-        nt.links.new(sep.outputs['Z'], ramp.inputs['Fac'])
-        nt.links.new(ramp.outputs['Color'], bg.inputs['Color'])
-        bg.inputs['Strength'].default_value = 0.9
-        nt.links.new(bg.outputs[0], out.inputs[0])
-        # Generated coords for world are the view direction normalised to 0..1? use Z of
-        # direction remapped: (z+1)/2 -> bias so horizon (0.5) sits at ramp 0.
-        mp = nt.nodes.new('ShaderNodeMapRange')
-        mp.inputs['From Min'].default_value = 0.0
-        mp.inputs['From Max'].default_value = 0.55
-        nt.links.new(sep.outputs['Z'], mp.inputs['Value'])
-        nt.links.new(mp.outputs['Result'], ramp.inputs['Fac'])
-        # sun
-        s = link(bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN')))
-        s.data.energy = sun_energy
-        s.data.color = pal['sunc']
-        s.data.angle = math.radians(2.0)
-        s.rotation_euler = [math.radians(a) for a in sun]
-        self.sun = s
-        # ground: big subdivided plane, gentle displacement, procedural dirt + haze by distance
-        me = bpy.data.meshes.new('Ground')
-        bm = bmesh.new()
-        bmesh.ops.create_grid(bm, x_segments=160, y_segments=160, size=radius)
-        bm.to_mesh(me)
-        bm.free()
-        g = link(bpy.data.objects.new('Ground', me))
-        tex = bpy.data.textures.new('GroundNoise', 'CLOUDS')
-        tex.noise_scale = 18.0
-        d = g.modifiers.new('Displace', 'DISPLACE')
-        d.texture = tex
-        d.strength = 1.2
-        d.mid_level = 0.5
-        self._ground_tex = tex
-        for p in me.polygons:
-            p.use_smooth = True
-        m = bpy.data.materials.new('GroundMat')
-        m.use_nodes = True
-        n = m.node_tree.nodes
-        L = m.node_tree.links
-        b = n.get('Principled BSDF')
-        b.inputs['Roughness'].default_value = 0.95
-        coord = n.new('ShaderNodeTexCoord')
-        nz = n.new('ShaderNodeTexNoise')
-        nz.inputs['Scale'].default_value = 0.08
-        nz.inputs['Detail'].default_value = 8
-        L.new(coord.outputs['Object'], nz.inputs['Vector'])
-        cr = n.new('ShaderNodeValToRGB')
-        cr.color_ramp.elements[0].color = (*pal['g2'], 1)
-        cr.color_ramp.elements[1].color = (*pal['g1'], 1)
-        cr.color_ramp.elements[0].position = 0.35
-        cr.color_ramp.elements[1].position = 0.65
-        L.new(nz.outputs['Fac'], cr.inputs['Fac'])
-        vo = n.new('ShaderNodeTexVoronoi')
-        vo.inputs['Scale'].default_value = 1.6
-        L.new(coord.outputs['Object'], vo.inputs['Vector'])
-        mixc = n.new('ShaderNodeMix')
-        mixc.data_type = 'RGBA'
-        mixc.blend_type = 'MULTIPLY'
-        mixc.inputs['Factor'].default_value = 0.25
-        L.new(cr.outputs['Color'], mixc.inputs['A'])
-        L.new(vo.outputs['Distance'], mixc.inputs['B'])
-        # haze toward horizon colour with camera distance
-        cam_d = n.new('ShaderNodeCameraData')
-        hz = n.new('ShaderNodeMapRange')
-        hz.inputs['From Min'].default_value = 45
-        hz.inputs['From Max'].default_value = radius * 1.4
-        L.new(cam_d.outputs['View Distance'], hz.inputs['Value'])
-        hm = n.new('ShaderNodeMix')
-        hm.data_type = 'RGBA'
-        L.new(hz.outputs['Result'], hm.inputs['Factor'])
-        L.new(mixc.outputs['Result'], hm.inputs['A'])
-        hm.inputs['B'].default_value = (*[c * 0.8 for c in pal['hor']], 1)
-        L.new(hm.outputs['Result'], b.inputs['Base Color'])
-        bump = n.new('ShaderNodeBump')
-        bump.inputs['Strength'].default_value = 0.35
-        nz2 = n.new('ShaderNodeTexNoise')
-        nz2.inputs['Scale'].default_value = 2.5
-        L.new(coord.outputs['Object'], nz2.inputs['Vector'])
-        L.new(nz2.outputs['Fac'], bump.inputs['Height'])
-        L.new(bump.outputs['Normal'], b.inputs['Normal'])
-        me.materials.append(m)
-        self.ground = g
-        self._clear = list(clear or [])
-        # resource deposits
-        for kind_, at, k in (deposits or []):
-            nm = 'deposit_ore' if kind_ == 'ore' else 'deposit_metal'
-            a = self.load(nm, at=at, heading=rnd.uniform(0, 360), size=resolve(nm)['size'] * k)
-            a.root.location.z = self.ground_z(at[0], at[1]) - 0.2
-        # scatter props as linked duplicates of one import each
-        if props:
-            kinds = ['boulder', 'rock_cluster', 'shrub', 'dead_tree'] if kind != 'alien' else ['boulder', 'rock_cluster', 'tendril', 'slab']
-            protos = {}
-            for kd in kinds:
-                protos[kd] = self.load(kd, at=(0, 0), label='proto_' + kd)
-                for o in [protos[kd].root] + list(protos[kd].root.children_recursive):
-                    o.hide_render = True
-                    o.hide_viewport = True
-            placed = 0
-            tries = 0
-            while placed < props and tries < props * 20:
-                tries += 1
-                r = rnd.uniform(8, radius * 0.55)
-                th = rnd.uniform(0, 2 * math.pi)
-                x, y = r * math.cos(th), r * math.sin(th)
-                if any((x - cx) ** 2 + (y - cy) ** 2 < cr_ ** 2 for cx, cy, cr_ in self._clear):
-                    continue
-                kd = rnd.choice(kinds)
-                pr = protos[kd]
-                h = empty(f'prop_{kd}_{placed}')
-                for o in pr.root.children_recursive:
-                    pass
-                inst = self._instance(pr.root, h)
-                h.location = (x, y, self.ground_z(x, y) - 0.1)
-                h.rotation_euler.z = rnd.uniform(0, 6.28)
-                s_ = rnd.uniform(0.6, 1.5)
-                h.scale = (s_, s_, s_)
-                placed += 1
-        return self
+        deposits: [('ore'|'metal', (x, y), scale)] resource sites to place.
+        Terrain, sky, haze and the prop scatter live in promo_env.py; props are placed at
+        render time, after every flatten() and actor path."""
+        import promo_env
+        self.env_kind = kind
+        return promo_env.build(self, kind, sun=sun, sun_energy=sun_energy, radius=radius, props=props,
+                               clear=clear, deposits=deposits, seed=seed)
 
     def _instance(self, src_root, parent):
         """Linked-data copy of a hierarchy (cheap)."""
@@ -983,89 +846,22 @@ class Promo:
         return a
 
     def ground_z(self, x, y):
-        """Approximate ground height at (x, y) (matches the Displace modifier)."""
-        if not getattr(self, 'ground', None):
-            return 0.0
-        g = self.ground
-        dg = bpy.context.evaluated_depsgraph_get()
-        ev = g.evaluated_get(dg)
-        origin = Vector((x, y, 50))
-        ok, loc, nrm, idx = ev.ray_cast(origin, Vector((0, 0, -1)))
-        return loc.z if ok else 0.0
+        """Ground height at (x, y) (the displaced terrain, after flatten())."""
+        import promo_env
+        return promo_env.ground_z(self, x, y)
 
     def flatten(self, x, y, r):
         """Keep the ground flat (z~0) inside a circle: the action area. Call before load()."""
-        self._clear.append((x, y, r))
-        g = self.ground
-        mod = g.modifiers['Displace']
-        vg = g.vertex_groups.get('Flat') or g.vertex_groups.new(name='Flat')
-        mod.vertex_group = 'Flat'
-        mod.invert_vertex_group = False
-        # weight 1 = displaced, 0 = flat
-        for v in g.data.vertices:
-            d = math.hypot(v.co.x - x, v.co.y - y)
-            wcur = 1.0
-            try:
-                wcur = vg.weight(v.index)
-            except RuntimeError:
-                wcur = 1.0
-            w = min(wcur, smoothstep((d - r) / (r * 0.8 + 4)))
-            vg.add([v.index], w, 'REPLACE')
-        return self
+        import promo_env
+        return promo_env.flatten(self, x, y, r)
 
     def space(self, stars=True, planet=None, nebula=(0.08, 0.03, 0.12), sun=(30, 0, 40), sun_energy=3.5):
-        """Space backdrop: black with stars and a soft nebula; optional planet
-        planet=(x, y, z, radius, (r, g, b))."""
-        sc = bpy.context.scene
-        w = bpy.data.worlds.new('Space')
-        sc.world = w
-        w.use_nodes = True
-        nt = w.node_tree
-        nt.nodes.clear()
-        out = nt.nodes.new('ShaderNodeOutputWorld')
-        bg = nt.nodes.new('ShaderNodeBackground')
-        tc = nt.nodes.new('ShaderNodeTexCoord')
-        vo = nt.nodes.new('ShaderNodeTexVoronoi')
-        vo.inputs['Scale'].default_value = 420
-        nt.links.new(tc.outputs['Generated'], vo.inputs['Vector'])
-        st = nt.nodes.new('ShaderNodeMapRange')
-        st.inputs['From Min'].default_value = 0.025
-        st.inputs['From Max'].default_value = 0.0
-        st.inputs['To Max'].default_value = 6.0
-        nt.links.new(vo.outputs['Distance'], st.inputs['Value'])
-        nz = nt.nodes.new('ShaderNodeTexNoise')
-        nz.inputs['Scale'].default_value = 2.2
-        nz.inputs['Detail'].default_value = 6
-        nt.links.new(tc.outputs['Generated'], nz.inputs['Vector'])
-        neb = nt.nodes.new('ShaderNodeMix')
-        neb.data_type = 'RGBA'
-        neb.inputs['A'].default_value = (0.002, 0.002, 0.004, 1)
-        neb.inputs['B'].default_value = (*nebula, 1)
-        pw = nt.nodes.new('ShaderNodeMath')
-        pw.operation = 'POWER'
-        pw.inputs[1].default_value = 3.0
-        nt.links.new(nz.outputs['Fac'], pw.inputs[0])
-        nt.links.new(pw.outputs[0], neb.inputs['Factor'])
-        add = nt.nodes.new('ShaderNodeMix')
-        add.data_type = 'RGBA'
-        add.blend_type = 'ADD'
-        add.inputs['Factor'].default_value = 1.0
-        nt.links.new(neb.outputs['Result'], add.inputs['A'])
-        nt.links.new(st.outputs['Result'], add.inputs['B'])
-        nt.links.new(add.outputs['Result'], bg.inputs['Color'])
-        nt.links.new(bg.outputs[0], out.inputs[0])
-        s = link(bpy.data.objects.new('Sun', bpy.data.lights.new('Sun', 'SUN')))
-        s.data.energy = sun_energy
-        s.rotation_euler = [math.radians(a) for a in sun]
-        self.sun = s
-        self.ground = None
-        if planet:
-            x, y, z, r, c = planet
-            pm = pbr_mat('Planet', c, rough=0.8)
-            sphere('Planet', r, pm, seg=(64, 32), loc=(x, y, z))
-            am = emit_mat('Atmo', (0.35, 0.55, 1.0), 0.6, alpha=0.25)
-            sphere('Atmosphere', r * 1.02, am, seg=(64, 32), loc=(x, y, z))
-        return self
+        """Space backdrop: star field (with a faint galactic band), layered nebula with dust lanes
+        and the sun's glow; optional planet=(x, y, z, radius, (r, g, b)) with oceans/land/clouds,
+        a lit atmosphere rim and a terminator. Implementation in promo_env.py."""
+        import promo_env
+        return promo_env.build_space(self, stars=stars, planet=planet, nebula=nebula, sun=sun,
+                                     sun_energy=sun_energy)
 
     # -- camera ----------------------------------------------------------------------------
     def camera(self, keys, lens=35, shake=0.0, interp='BEZIER', cuts=(), fstop=None, focus=None):
@@ -1587,6 +1383,8 @@ class Promo:
     def render(self, grade=None, dof=None, bloom=None, vignette=None):
         """Finishing look (promo_look.py): grade/dof/bloom/vignette=False switch parts off."""
         _motion.bake(self)  # secondary motion layer (promo_motion.py); PROMO_MOTION=0 = off
+        import promo_env
+        promo_env.finalize(self)  # deferred prop scatter + ground cover (promo_env.py)
         a = self.args
         q = a.quality
         res, spp, step, blur = QUALITY[q]
