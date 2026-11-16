@@ -28,7 +28,8 @@
         "unit.alien.repair",
         "unit.alien.glider",
         "structure.alien.air_base",
-        "unit.alien.fighter"
+        "unit.alien.fighter",
+        "unit.alien.dragonfly"
       ],
       "researchDone": [
         "research.alien.fortifications",

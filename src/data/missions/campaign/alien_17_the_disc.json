@@ -29,6 +29,7 @@
         "unit.alien.glider",
         "structure.alien.air_base",
         "unit.alien.fighter",
+        "unit.alien.dragonfly",
         "unit.alien.saucer"
       ],
       "researchDone": [

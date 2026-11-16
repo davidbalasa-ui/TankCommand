@@ -925,7 +925,7 @@
       "armor"
     ],
     "movement": "air",
-    "modelAssetId": "unit.alien.dragonfly",
+    "modelAssetId": "unit.alien.halo",
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -938,6 +938,62 @@
     },
     "visualScale": 1.2,
     "roleLabel": "Fighter"
+  },
+  {
+    "id": "unit.alien.dragonfly",
+    "name": "Dragonfly",
+    "faction": "alien",
+    "role": "air",
+    "techLevel": 2,
+    "cost": {
+      "ore": 250,
+      "metal": 0
+    },
+    "deliverySec": 15,
+    "hp": 110,
+    "armor": 3,
+    "speed": {
+      "top": 20,
+      "accel": 12,
+      "turnDegPerSec": 240
+    },
+    "turretTurnDegPerSec": 0,
+    "weapons": [
+      {
+        "id": "lightning",
+        "damage": 26,
+        "range": 9,
+        "reloadSec": 1.2,
+        "projectileSpeed": 60,
+        "accuracy": 0.95,
+        "splashRadius": 0,
+        "targets": [
+          "air"
+        ]
+      }
+    ],
+    "fireOnMove": false,
+    "sightRange": 12,
+    "sensorRange": 12,
+    "abilities": [],
+    "upgrades": [
+      "fireRate",
+      "armor"
+    ],
+    "movement": "air",
+    "modelAssetId": "unit.alien.dragonfly",
+    "source": {
+      "kind": "tuned",
+      "ref": "docs/research/datasheet-proposal.md"
+    },
+    "air": {
+      "ammo": 6,
+      "fuelSec": 60,
+      "rearmSec": 10,
+      "cruiseHeight": 6
+    },
+    "visualScale": 1.2,
+    "roleLabel": "Interceptor"
   },
   {
     "id": "unit.human.heavy_tank",
