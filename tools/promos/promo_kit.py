@@ -1068,9 +1068,12 @@ class Promo:
         return self
 
     # -- camera ----------------------------------------------------------------------------
-    def camera(self, keys, lens=35, shake=0.0, interp='BEZIER', cuts=()):
-        """keys: [(sec, (x,y,z) position, (x,y,z) look-at[, lens])]. Look-at may also be an Actor
-        (tracks it with a z offset of 1 m). shake: handheld wobble in metres."""
+    def camera(self, keys, lens=35, shake=0.0, interp='BEZIER', cuts=(), fstop=None, focus=None):
+        """keys: [(sec, (x,y,z) position, (x,y,z) look-at[, lens][, {'fstop': f, 'focus': actor|point}])].
+        Look-at may also be an Actor (tracks it with a z offset of 1 m). shake: handheld wobble in
+        metres. Depth of field focuses automatically on the subject (promo_look.py); fstop= fixes
+        the f-stop, focus= an Actor/point to focus on; a per-key dict overrides until the next key."""
+        self.look_cam = dict(keys=keys, cuts=cuts, fstop=fstop, focus=focus)
         sc = bpy.context.scene
         cam = link(bpy.data.objects.new('Cam', bpy.data.cameras.new('Cam')))
         sc.camera = cam
@@ -1090,7 +1093,7 @@ class Promo:
                 look = look.pos_at(t) + Vector((0, 0, 1.0))
             tgt.location = look
             tgt.keyframe_insert('location', frame=self.T(t))
-            if len(k) > 3:
+            if len(k) > 3 and not isinstance(k[3], dict):
                 cam.data.lens = k[3]
                 cam.data.keyframe_insert('lens', frame=self.T(t))
         set_interp(cam, interp)
@@ -1122,7 +1125,7 @@ class Promo:
         return cam
 
     def orbit(self, center, radius, height, deg0, deg1, t0=0.0, t1=None, lens=35, look_z=1.2,
-              radius1=None, height1=None, steps=12, shake=0.0):
+              radius1=None, height1=None, steps=12, shake=0.0, fstop=None, focus=None):
         """Camera circling `center` from deg0 to deg1 (counter-clockwise if deg1 > deg0) while
         optionally pushing in (radius1) or rising (height1)."""
         t1 = self.seconds if t1 is None else t1
@@ -1137,7 +1140,7 @@ class Promo:
             h = height + (height1 - height) * smoothstep(u)
             keys.append((t0 + (t1 - t0) * u, (c.x + r * math.cos(a), c.y + r * math.sin(a), h),
                          (c.x, c.y, c.z + look_z)))
-        return self.camera(keys, lens=lens, shake=shake, interp='BEZIER')
+        return self.camera(keys, lens=lens, shake=shake, interp='BEZIER', fstop=fstop, focus=focus)
 
     def cam_shake(self, t, amount=0.15, dur=0.4):
         """A jolt (e.g. on a big explosion or heavy shot)."""
@@ -1581,7 +1584,8 @@ class Promo:
         return None
 
     # -- render ----------------------------------------------------------------------------
-    def render(self):
+    def render(self, grade=None, dof=None, bloom=None, vignette=None):
+        """Finishing look (promo_look.py): grade/dof/bloom/vignette=False switch parts off."""
         _motion.bake(self)  # secondary motion layer (promo_motion.py); PROMO_MOTION=0 = off
         a = self.args
         q = a.quality
@@ -1610,6 +1614,8 @@ class Promo:
         r.image_settings.file_format = 'PNG'
         sc.view_settings.view_transform = os.environ.get('PROMO_VIEW', 'Standard')
         sc.view_settings.look = 'None'
+        import promo_look
+        promo_look.apply(self, q, grade=grade, dof=dof, bloom=bloom, vignette=vignette)
         sc.frame_step = step
         out = a.out or os.path.join(OUT_ROOT, 'clips' if q == 'final' else 'previews', self.id)
         os.makedirs(out, exist_ok=True)
