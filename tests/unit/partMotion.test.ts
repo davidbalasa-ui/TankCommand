@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { collectPartMotions, pivotIsSpinner, readPartMotion, treadTilesPerMetre, updatePartMotions } from '../../src/render/partMotion';
+import { collectPartMotions, pivotIsSpinner, readPartMotion, stripFlashParts, treadTilesPerMetre, updatePartMotions } from '../../src/render/partMotion';
 import { UnitInstances, markInstanced } from '../../src/render/unitInstances';
 
 const idle = { mining: false, working: false, moving: false };
@@ -145,5 +145,48 @@ describe('moving model parts', () => {
     expect(tread.userData.uvScroll as number).toBeCloseTo(-0.2, 6);
     updatePartMotions(parts, { ...idle, moving: false, travel: 0 }, 0.1);
     expect(tread.userData.uvScroll as number).toBeCloseTo(-0.2, 6);
+  });
+
+  it('[PART-01] flickering bolts: at most one slot shows per tick, and moving-only bolts go dark at rest', () => {
+    const root = new THREE.Object3D();
+    for (const slot of [0, 1]) {
+      const node = new THREE.Object3D();
+      node.name = `Thrust${slot}`;
+      node.userData.anim = { type: 'flicker', slot, slots: 2, rate: 24, duty: 1, idle: 0, when: 'moving' };
+      root.add(node);
+    }
+    const parts = collectPartMotions(root.clone());
+    expect(parts).toHaveLength(2);
+    expect(parts.every((part) => part.spec.type === 'flicker')).toBe(true);
+    const shown = (): number => parts.filter((part) => part.node.scale.x > 0).length;
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i += 1) {
+      updatePartMotions(parts, { ...idle, moving: true }, 1 / 30);
+      expect(shown()).toBe(1);
+      seen.add(parts.find((part) => part.node.scale.x > 0)?.node.name ?? '');
+    }
+    expect(seen.size).toBe(2);
+    for (let i = 0; i < 30; i += 1) {
+      updatePartMotions(parts, idle, 1 / 30);
+      expect(shown()).toBe(0);
+    }
+    expect(readPartMotion({ type: 'flicker', slot: 2, slots: 2, rate: 20 })).toBeNull();
+  });
+
+  it('[PART-01] model muzzle flashes are stripped, so they never glow while the unit idles', () => {
+    const root = new THREE.Object3D();
+    const barrel = new THREE.Object3D();
+    barrel.name = 'BarrelPivot';
+    barrel.userData.anim = { type: 'recoil', axis: [1, 0, 0], dist: 0.2 };
+    const flash = new THREE.Object3D();
+    flash.name = 'FlashPivot';
+    flash.userData.anim = { type: 'flash', axis: [1, 0, 0], dur: 0.08 };
+    flash.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)));
+    root.add(barrel, flash);
+    stripFlashParts(root);
+    expect(root.getObjectByName('FlashPivot')).toBeUndefined();
+    expect(root.getObjectByName('BarrelPivot')).toBeDefined();
+    // Recoil is not played by the game yet; the barrel just stays put.
+    expect(collectPartMotions(root)).toHaveLength(0);
   });
 });

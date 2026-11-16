@@ -19,7 +19,7 @@ import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
-import { collectPartMotions, pivotIsSpinner, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
+import { collectPartMotions, pivotIsSpinner, stripFlashParts, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
 import {
   QUALITY_LADDER,
   QualityController,
@@ -1866,6 +1866,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       const result = lodResults[index];
       if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
         // Geometry only: the low-detail file's placeholder material is replaced by the full model's.
+        stripFlashParts(result.value);
         const geometries: THREE.BufferGeometry[] = [];
         result.value.traverse((object) => {
           if (object instanceof THREE.Mesh) {
@@ -1994,6 +1995,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   }
 
   private prepareTemplate(model: THREE.Object3D): THREE.Group {
+    stripFlashParts(model);
     const plane = model.getObjectByName('Plane');
     if (plane) {
       plane.visible = false;
@@ -2063,6 +2065,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   // Structure models are normalised to a 1 x 1 footprint, centred, standing on y = 0.
   // Fold-out towers normalise on their deployed pose without the Carrier (the folded hull).
   private prepareStructureTemplate(model: THREE.Object3D): THREE.Group {
+    stripFlashParts(model);
     model.updateMatrixWorld(true);
     const unfold = readUnfold(model);
     const bounds = unfold ? unfold.bounds : new THREE.Box3().setFromObject(model);

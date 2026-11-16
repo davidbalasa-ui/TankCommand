@@ -221,6 +221,7 @@
       "armor"
     ],
     "modelAssetId": "unit.alien.stinger",
+    "modelScale": 1.08,
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -278,7 +279,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 0.9,
-    "modelScale": 0.8,
+    "modelScale": 0.9,
     "roleLabel": "Scout"
   },
   {
@@ -318,7 +319,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.1,
-    "modelScale": 1.15,
+    "modelScale": 1.2,
     "roleLabel": "Ore miner"
   },
   {
@@ -357,7 +358,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.05,
-    "modelScale": 1.0,
+    "modelScale": 1.1,
     "roleLabel": "Hauler"
   },
   {
@@ -475,6 +476,7 @@
       "ratePerSec": 12
     },
     "modelAssetId": "unit.alien.weaver",
+    "modelScale": 1.12,
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -594,7 +596,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.0,
-    "modelScale": 0.9,
+    "modelScale": 1.0,
     "roleLabel": "Radar truck"
   },
   {
@@ -814,6 +816,7 @@
     ],
     "movement": "hover",
     "modelAssetId": "unit.alien.glider",
+    "modelScale": 1.25,
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -867,6 +870,7 @@
     ],
     "movement": "air",
     "modelAssetId": "unit.alien.disc",
+    "modelScale": 1.3,
     "source": {
       "kind": "tuned",
       "ref": "docs/research/datasheet-proposal.md"
@@ -1238,7 +1242,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.3,
-    "modelScale": 1.45,
+    "modelScale": 1.5,
     "roleLabel": "Heavy tank"
   },
   {
@@ -1292,7 +1296,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.05,
-    "modelScale": 1.1,
+    "modelScale": 1.18,
     "roleLabel": "Missile tank"
   },
   {
@@ -1345,7 +1349,7 @@
       "ref": "docs/research/datasheet-proposal.md"
     },
     "visualScale": 1.35,
-    "modelScale": 1.4,
+    "modelScale": 1.45,
     "roleLabel": "Artillery"
   },
   {

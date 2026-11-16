@@ -5,6 +5,12 @@
 //   { type: 'spin',  axis: [x, y, z], speed: rad/s, when, busySpeed? }
 //   { type: 'swing', axis: [x, y, z], amp: rad, speed: Hz, when, busySpeed? }
 //   { type: 'scroll', speed: tiles/s, when }   (tank treads: slides the texture along U)
+//   { type: 'flicker', slot, slots, rate: ticks/s, duty, idle, when }   (lightning bolts)
+//   { type: 'flash', ... }   (muzzle flashes: removed by stripFlashParts, the game draws its own)
+//
+// Flicker: a node is one of `slots` alternative bolts. Every tick one slot is picked at random and
+// shown with chance `duty` while `when` holds (`idle` otherwise); the rest are hidden. Hiding sets
+// the node's scale to zero, so instanced drawing hides it too.
 //
 // Treads are matched to the ground instead of using `speed`: the game measures how many texture
 // tiles one metre of the top run holds (and which way U runs) from the mesh, then moves the top
@@ -25,12 +31,14 @@ import * as THREE from 'three';
 export type PartMotionWhen = 'always' | 'mining' | 'working' | 'moving';
 
 export interface PartMotionSpec {
-  type: 'spin' | 'swing' | 'scroll';
+  type: 'spin' | 'swing' | 'scroll' | 'flicker';
   axis: THREE.Vector3;
   speed: number;
   amp: number;
   when: PartMotionWhen;
   busySpeed: number | null;
+  /** Flicker only. */
+  flicker?: { slot: number; slots: number; duty: number; idle: number };
 }
 
 export interface PartMotion {
@@ -43,6 +51,8 @@ export interface PartMotion {
   blend: number;
   /** Scroll only: texture tiles per metre along +X on the top run (signed), or null if unknown. */
   tilesPerMetre: number | null;
+  /** Flicker only: the node's rest scale. */
+  restScale?: THREE.Vector3;
 }
 
 /** What the owning unit or structure is doing this frame. */
@@ -77,6 +87,25 @@ export function readPartMotion(raw: unknown): PartMotionSpec | null {
     }
     return { type: 'scroll', axis: new THREE.Vector3(1, 0, 0), speed: item.speed, amp: 0, when, busySpeed: busy };
   }
+  if (item.type === 'flicker') {
+    const num = (value: unknown, fallback: number): number =>
+      typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const slots = Math.max(1, Math.round(num(item.slots, 1)));
+    const slot = Math.round(num(item.slot, 0));
+    const rate = num(item.rate, 18);
+    if (slot < 0 || slot >= slots || rate <= 0) {
+      return null;
+    }
+    return {
+      type: 'flicker',
+      axis: new THREE.Vector3(1, 0, 0),
+      speed: rate,
+      amp: 0,
+      when,
+      busySpeed: null,
+      flicker: { slot, slots, duty: num(item.duty, 0.75), idle: num(item.idle, 0.12) },
+    };
+  }
   const axis = item.axis;
   if (
     (item.type !== 'spin' && item.type !== 'swing') ||
@@ -99,9 +128,29 @@ export function readPartMotion(raw: unknown): PartMotionSpec | null {
   return { type: item.type, axis: vector.normalize(), speed: item.speed, amp, when, busySpeed: busy };
 }
 
+/**
+ * Removes muzzle-flash parts (anim type 'flash') from a loaded model: the game draws its own
+ * muzzle flashes, and a model flash left in place would glow all the time. Call on the template
+ * and on its low-detail file alike, so both keep the same meshes.
+ */
+export function stripFlashParts(root: THREE.Object3D): void {
+  const doomed: THREE.Object3D[] = [];
+  root.traverse((node) => {
+    const anim: unknown = node.userData.anim;
+    if (anim && typeof anim === 'object' && (anim as Record<string, unknown>).type === 'flash') {
+      doomed.push(node);
+    }
+  });
+  for (const node of doomed) {
+    node.removeFromParent();
+  }
+}
+
 /** Every moving part under a model, with its rest rotation. Call on the cloned model. */
 export function collectPartMotions(root: THREE.Object3D): PartMotion[] {
   const out: PartMotion[] = [];
+  // Flickers on one model share a clock (so its bolts swap together) that starts at a random tick.
+  const clock = Math.random() * 1000;
   root.traverse((node) => {
     const spec = readPartMotion(node.userData.anim);
     if (spec) {
@@ -109,9 +158,10 @@ export function collectPartMotions(root: THREE.Object3D): PartMotion[] {
         node,
         spec,
         rest: node.quaternion.clone(),
-        phase: 0,
+        phase: spec.type === 'flicker' ? clock : 0,
         blend: spec.when === 'always' ? 1 : 0,
         tilesPerMetre: spec.type === 'scroll' ? treadTilesPerMetre(node) : null,
+        restScale: spec.type === 'flicker' ? node.scale.clone() : undefined,
       });
       if (spec.type === 'scroll') {
         node.traverse((child) => {
@@ -196,7 +246,7 @@ const worldScale = new THREE.Vector3();
 
 /** True when this model's TurretPivot is a spinner (so it must not be aimed). */
 export function pivotIsSpinner(parts: readonly PartMotion[]): boolean {
-  return parts.some((part) => part.node.name === 'TurretPivot' && part.spec.type !== 'scroll');
+  return parts.some((part) => part.node.name === 'TurretPivot' && (part.spec.type === 'spin' || part.spec.type === 'swing'));
 }
 
 function active(when: PartMotionWhen, state: PartMotionState): boolean {
@@ -213,6 +263,13 @@ function active(when: PartMotionWhen, state: PartMotionState): boolean {
 }
 
 const turn = new THREE.Quaternion();
+const ONE = new THREE.Vector3(1, 1, 1);
+
+/** A repeatable 0..1 value per tick (the same hash the art viewer uses). */
+function flickerHash(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
 
 /** Advances and poses every part. `dt` is real seconds since the last frame. */
 export function updatePartMotions(parts: readonly PartMotion[], state: PartMotionState, dt: number): void {
@@ -241,6 +298,20 @@ export function updatePartMotions(parts: readonly PartMotion[], state: PartMotio
           child.userData[UV_SCROLL] = offset;
         }
       });
+      continue;
+    }
+    if (spec.type === 'flicker' && spec.flicker) {
+      // Ticks at `rate`; each tick picks one slot (the same pick for every bolt on this model).
+      part.phase += spec.speed * step;
+      const tick = Math.floor(part.phase);
+      const { slot, slots, duty, idle } = spec.flicker;
+      const level = on ? duty : idle;
+      const shown = flickerHash(tick) < level && Math.floor(flickerHash(tick + 0.5) * slots) === slot;
+      if (shown) {
+        part.node.scale.copy(part.restScale ?? ONE);
+      } else {
+        part.node.scale.setScalar(0);
+      }
       continue;
     }
     if (spec.type === 'spin') {
