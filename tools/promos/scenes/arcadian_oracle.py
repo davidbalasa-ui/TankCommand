@@ -556,7 +556,18 @@ def curtain_mat():
     mul.operation = 'MULTIPLY'
     mul.use_clamp = True
     t_.links.new(sq.outputs[0], mul.inputs[0])
-    t_.links.new(oi.outputs['Alpha'], mul.inputs[1])
+    lw = t_.nodes.new('ShaderNodeLayerWeight')
+    lw.inputs['Blend'].default_value = 0.5
+    fade = t_.nodes.new('ShaderNodeMath')
+    fade.operation = 'SUBTRACT'
+    fade.use_clamp = True
+    fade.inputs[0].default_value = 1.0
+    t_.links.new(lw.outputs['Facing'], fade.inputs[1])
+    fa = t_.nodes.new('ShaderNodeMath')
+    fa.operation = 'MULTIPLY'
+    t_.links.new(oi.outputs['Alpha'], fa.inputs[0])
+    t_.links.new(fade.outputs[0], fa.inputs[1])
+    t_.links.new(fa.outputs[0], mul.inputs[1])
     em = t_.nodes.new('ShaderNodeEmission')
     em.inputs['Color'].default_value = (*PALE, 1)
     em.inputs['Strength'].default_value = 1.1

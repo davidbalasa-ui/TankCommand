@@ -1,15 +1,16 @@
 """Aerie (Arcadian air base / hive roost): a packed Aerie saucer skims in over the alien flats on
 legs of gold lightning, spinning as it brakes, and settles. It comes apart into the air: the base
-blooms open, twelve ribs lift out one by one and hang over the rim on nothing, three perches rise
-between them to staggered heights and the crown floats high above the orb. Gold cocoons crackle on
-the perches and hatch three Dragonflies; a fourth cocoon in the crown hatches a Halo. The
-Dragonflies kick off their perches one after another (each perch dips and sparks), climb out over
-the ribs and circle; the crown spins up and flings the Halo straight up. End low under the hovering
-roost, its suspended parts bobbing, as the squadron climbs away into the sky.
+blooms open, twelve ribs lift out one by one and hang over the rim on nothing (faint gold arcs
+crackle in the gaps), three perches rise between the struts to staggered heights and the crown
+floats high above the orb. Gold cocoons crackle on the perches and hatch three Dragonflies; a
+fourth in the crown hatches a Halo. The Dragonflies kick off their perches one after another (each
+perch dips, arcs leap to the belly), climb out over the ribs and swing wide; the crown spins up and
+flings the Halo straight up. End low under the roost, its suspended parts bobbing, as the squadron
+forms up and makes a flypast over it, the Halo leading.
 
 Timeline (s): 0-1.15 glide in (tracking) | 1.15 touchdown, dust | 1.25-2.8 float-apart unfold |
-2.45-3.1 cocoons hatch (3 Dragonflies, then the Halo) | 3.05/3.3/3.55 Dragonfly launches |
-3.95 cut low | 4.05 Halo launch | 4.6-6 squadron climbs away over the roost."""
+2.55-3.0 cocoons hatch (3 Dragonflies, then the Halo) | 3.05/3.3/3.55 Dragonfly launches |
+3.95 cut low under the crown | 4.05 Halo launch | 5.0-6.0 flypast over the roost."""
 import math
 import os
 import sys
@@ -273,7 +274,7 @@ for k, pc in enumerate(ORDER):
 PERCH_T = {}
 T_HATCH = {}
 T_LIFT = {}
-P_ORDER = sorted(PERCH, key=lambda pc: (pc['az'] - 300) % 360)     # camera-side first
+P_ORDER = sorted(PERCH, key=lambda pc: (pc['az'] - 100) % 360)     # far side first, camera side last
 for i, pc in enumerate(P_ORDER):
     PERCH_T[i] = T_UF0 + 0.45 + 0.1 * i
     T_HATCH[i] = 2.55 + 0.12 * i
@@ -404,7 +405,7 @@ for f in range(1, int(P.T(T_LAND)) + 2):
     t = (f - 1) / FPS
     c = root_pos(t)
     fade = 1 - ss((t - T_LAND + 0.15) / 0.2)
-    for k in range(3):
+    for k in range(4):
         if R.random() < 0.2:
             continue
         a = R.uniform(0, 2 * math.pi)
@@ -412,12 +413,12 @@ for f in range(1, int(P.T(T_LAND)) + 2):
         gz = P.ground_z(p0.x, p0.y)
         p1 = Vector((p0.x + R.uniform(-0.8, 0.8) + 1.2, p0.y + R.uniform(-0.8, 0.8) - 0.4, gz))
         if fade > 0.05:
-            bolt_frame(jag_pts(p0, p1, 6, 0.5), f, 0.035 * fade + 0.01, forks=1, core=False)
+            bolt_frame(jag_pts(p0, p1, 6, 0.5), f, 0.025 * fade + 0.008, forks=1, core=False)
     if f % 3 == 0 and t < T_LAND - 0.1:
         P.puff(Vector((c.x, c.y, P.ground_z(c.x, c.y) + 0.2)), t, size=1.1, n=1, rise=0.5, life=1.0,
                color=DUST, opacity=0.25)
-dust_ring((0, 0, 0), T_LAND, 2.0, 4.5, n=16, size=1.2, opacity=0.3)
-dust_ring((0, 0, 0), T_UF0 + 0.3, 5.5, 7.5, n=22, size=1.3, opacity=0.25)
+dust_ring((0, 0, 0), T_LAND, 2.0, 4.5, n=16, size=1.3, opacity=0.2)
+dust_ring((0, 0, 0), T_UF0 + 0.3, 5.5, 7.5, n=22, size=1.4, opacity=0.18)
 P.cam_shake(T_LAND, 0.12, dur=0.3)
 
 # suspension: faint gold arcs flicker in the gaps between the floating ribs and the base rim
@@ -531,8 +532,18 @@ ZM = (HZ0 + HZ1) / 2
 WROOT = inv @ dfs[0].parts['WingLPivot'].matrix_world.translation
 print('DF hull', HX0, HZ0, HZ1, 'wingroot', WROOT, 'height', dfs[0].entry['height'])
 
-# departure: the squadron climbs away toward +x+y (away from the final camera)
-DEPART = Vector((0.62, 0.72, 0.32)).normalized()
+# flypast: the squadron crosses over the roost right to left as seen from the final camera
+FF = Vector((-1.0, 1.0, 0.0)).normalized()
+FS = Vector((1.0, 1.0, 0.0)).normalized()        # away from the final camera
+FV = FF * 15.0 + Vector((0, 0, 0.6))
+DEPART = FF.copy()
+
+
+def form(t):
+    return Vector((-4.5, 3.0, 10.8)) + FV * (t - 6.0)
+
+
+SLOTS = [-FF * 3.0 - FS * 3.0, -FF * 3.0 + FS * 3.0, -FF * 6.0 + Vector((0, 0, -1.0))]
 
 
 def df_path(i):
@@ -541,23 +552,19 @@ def df_path(i):
     out = Vector((math.cos(a), math.sin(a), 0))
     tl = T_LIFT[i]
     p0 = perch_top(i, tl)
-    # climb out, swing counter-clockwise round the roost, then fall into formation and leave
-    a1 = a + math.radians(55)
-    a2 = a + math.radians(115)
-    r1, r2 = 9.0, 12.5
-    z1, z2 = p0.z + 6.0, p0.z + 9.5 + i * 0.6
+    # climb out over the ribs, swing wide, then form up for a flypast over the roost
+    a1 = a - math.radians(25)
+    p2 = Vector((9.0 * math.cos(a1), 9.0 * math.sin(a1), p0.z + 4.0))
+    slot = SLOTS[i]
+    e = form(5.0) + slot
+    v2 = (e - p2).normalized() * 13.0 + Vector((0, 0, 2.5))
     keys = [
         (tl, p0, (0, 0, 0)),
         (tl + 0.35, p0 + Vector((0, 0, 1.6)) + out * 0.3, tuple(Vector((0, 0, 6.0)) + out * 2.5)),
-        (tl + 0.85, (r1 * math.cos(a1), r1 * math.sin(a1), z1),
-         tuple(Vector((-math.sin(a1), math.cos(a1), 0)) * 14.0 + Vector((0, 0, 5.0)))),
-        (tl + 1.4, (r2 * math.cos(a2), r2 * math.sin(a2), z2),
-         tuple(Vector((-math.sin(a2), math.cos(a2), 0)) * 16.0 + Vector((0, 0, 2.5)))),
+        (tl + 0.8, tuple(p2), tuple(v2)),
+        (5.0, tuple(e), tuple(FV)),
+        (6.0, tuple(form(6.0) + slot), tuple(FV)),
     ]
-    slot = [Vector((-3.0, 4.5, -1.0)), Vector((-3.5, -4.0, -0.5)), Vector((-7.0, 0.5, -1.8))][i]
-    lead = Vector((24.0, 30.0, 23.0))
-    keys.append((6.0, tuple(lead + slot), tuple(DEPART * 22.0)))
-    keys.sort(key=lambda k: k[0])
     hp = hermite(keys)
 
     def pos(t):
@@ -639,17 +646,17 @@ def df_lifters(actor, t0, t1=6.0):
                        forks=1 if R.random() < 0.5 else 0)
 
 
-def cocoon(pos, t_h, rx, ry, rz, yaw_deg=0.0, dur=0.42):
+def cocoon(pos, t_h, rx, ry, rz, yaw_deg=0.0, dur=0.42, alpha=1.0):
     """A gold cocoon swells and crackles, then bursts: the unit hatches out of it."""
     o = K.sphere('Cocoon', 1.0, P.soft_fire_mat(), seg=(16, 10))
     o.visible_shadow = False
     o.location = pos
     o.rotation_euler = (0, 0, math.radians(yaw_deg))
     t0 = t_h - dur
-    for t, s, al in ((t0, 0.15, 0.0), (t0 + dur * 0.6, 0.8, 0.35), (t_h - 0.02, 1.0, 0.55),
-                     (t_h + 1 / FPS, 1.25, 0.4), (t_h + 4 / FPS, 1.5, 0.0)):
+    for t, s, al in ((t0, 0.15, 0.0), (t0 + dur * 0.6, 0.8, 0.2), (t_h - 0.02, 1.0, 0.32),
+                     (t_h + 1 / FPS, 1.25, 0.25), (t_h + 4 / FPS, 1.5, 0.0)):
         o.scale = (rx * s, ry * s, rz * s)
-        o.color = (1.0, 0.42, 0.05, al)
+        o.color = (1.0, 0.42, 0.05, al * alpha)
         o.keyframe_insert('scale', frame=P.T(t))
         o.keyframe_insert('color', frame=P.T(t))
     K.show_between(o, P.T(t0), P.T(t_h) + 5)
@@ -683,7 +690,7 @@ for i, a in enumerate(dfs):
     th, tl = T_HATCH[i], T_LIFT[i]
     p = perch_top(i, th)
     pc = P_ORDER[i]
-    cocoon(p + Vector((0, 0, 0.45)), th, DF_SIZE * 0.55, DF_SIZE * 0.45, 0.6, yaw_deg=pc['az'])
+    cocoon(p + Vector((0, 0, 0.45)), th, DF_SIZE * 0.55, DF_SIZE * 0.45, 0.85, yaw_deg=pc['az'])
     hatch_scale(a, th)
     wings(a, th, tl, hz=10.0 + i * 0.7, phase=i * 1.3)
     df_lifters(a, tl - 0.12)
@@ -716,13 +723,12 @@ def halo_pos_base(t):
     return hp_halo(t)
 
 
-lead = Vector((24.0, 30.0, 23.0))
 _hrest = Vector((0, 0, 5.9 + CROWN_GAP + HALO_REST))
 hp_halo = hermite([
     (T_HLAUNCH, tuple(_hrest), (0, 0, 0)),
     (T_HLAUNCH + 0.45, tuple(_hrest + Vector((0.4, 0.3, 5.5))), (2.0, 2.0, 16.0)),
-    (T_HLAUNCH + 1.0, tuple(_hrest + Vector((5.0, 5.5, 11.0))), (13.0, 14.0, 6.0)),
-    (6.0, tuple(lead + Vector((2.5, 0.5, 1.5))), tuple(DEPART * 22.0)),
+    (5.2, (-1.0, 2.0, 14.5), tuple(FF * 9.0 + Vector((0, 0, 0.3)))),
+    (6.0, (-6.0, 7.0, 14.3), tuple(FF * 13.0 + Vector((0, 0, 0.5)))),
 ])
 fly(halo, halo_pos_base, lambda t: DEPART.copy().to_2d().to_3d().normalized(), bank=0.2, clamp=30, pitch_max=14)
 
@@ -738,7 +744,7 @@ for f in range(0, NF + 2):
     mr.keyframe_insert('rotation_euler', index=2, frame=f)
 K.set_interp(mr, 'LINEAR')
 
-cocoon(_hrest + Vector((0, 0, -0.1)), T_HHATCH, HALO_SIZE * 0.55, HALO_SIZE * 0.55, 0.7, dur=0.45)
+cocoon(_hrest + Vector((0, 0, -0.1)), T_HHATCH, HALO_SIZE * 0.5, HALO_SIZE * 0.5, 1.1, dur=0.45, alpha=0.45)
 hatch_scale(halo, T_HHATCH)
 RING_R = HALO_SIZE * 0.47
 
@@ -788,18 +794,18 @@ def car(t):
 keys = []
 for t in (0.0, 0.3, 0.6, 0.85):
     c = car(t)
-    keys.append((t, tuple(c + Vector((2.5, -7.5, 0.7))), c + Vector((-0.5, 0, 0.5)), 30))
+    keys.append((t, tuple(c + Vector((3.5, -10.0, 1.3))), c + Vector((-0.8, 0, 1.0)), 30))
 keys += [
-    (1.25, (-1.5, -12.5, 1.6), (-0.6, 0.0, 1.4), 28),
+    (1.25, (-1.0, -10.5, 1.5), (-0.4, 0.0, 1.6), 28),
     (1.9, (2.0, -15.5, 2.3), (0.0, 0.0, 3.0), 26),
     (2.7, (8.5, -14.5, 3.0), (0.0, 0.0, 4.3), 26),
     (3.35, (13.0, -10.0, 3.6), (0.0, 0.5, 5.6), 26),
     (T_CUT - 1 / FPS, (15.0, -5.5, 4.3), (0.5, 1.0, 6.8), 26),
     # shot B: low under the roost looking up at the crown; the Halo leaves, pull back for the end
     (T_CUT, (-6.5, -8.5, 1.1), (0.3, 0.3, 7.6), 20),
-    (4.6, (-7.0, -9.5, 1.2), (1.5, 2.0, 10.5), 20),
-    (5.3, (-9.0, -12.0, 1.5), (4.0, 5.0, 11.0), 21),
-    (6.0, (-10.5, -14.0, 1.7), (6.0, 7.5, 10.5), 22),
+    (4.6, (-8.0, -10.0, 1.4), (0.5, 0.5, 10.0), 20),
+    (5.3, (-10.5, -11.5, 1.8), (0.5, 1.0, 7.0), 20),
+    (6.0, (-12.0, -13.0, 2.0), (-1.2, 2.0, 6.4), 19),
 ]
 P.camera(keys, shake=0.03, cuts=(T_CUT,))
 for t in T_LIFT.values():
