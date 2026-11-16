@@ -449,14 +449,14 @@ def _ease(x):
     return x * x * (3 - 2 * x)
 
 
-def _fabrik(base_p, tgt, pts, lens, pole, iters=14, avoid=None):
+def _fabrik(base_p, tgt, pts, lens, pole, iters=14, avoid=None, max_reach=0.97):
     """N-bone FABRIK in body space, warm-started from last frame's joints, bent toward pole, kept off the body.
     avoid(p, pole) -> p pushes a joint out of the body (default: the hull of the original Orb)."""
     n = len(lens)
     total = sum(lens)
     d = tgt - base_p
-    if d.length > total * 0.97:
-        tgt = base_p + d.normalized() * total * 0.97
+    if d.length > total * max_reach:
+        tgt = base_p + d.normalized() * total * max_reach
     if d.length < total * 0.23:
         tgt = base_p + (d.normalized() if d.length > 1e-4 else pole) * total * 0.23
 
@@ -517,7 +517,7 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
     def accel_local(f):
         a = (P[f + 1] - 2 * P[f] + P[f - 1]) / (dt * dt)
         al = M[f].to_3x3().normalized().inverted() @ a / scale
-        cap = 900 if arm is None else 420      # arms: jinks pull the arms, but never all-at-once flings
+        cap = 900 if arm is None else 320      # arms: jinks pull the arms, but never all-at-once flings
         if al.length > cap:
             al = al.normalized() * cap
         return al
@@ -574,7 +574,8 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                     if all((reach_p - o_['plan'][0]).length > 2.6 for o_ in st if o_ is not S and 'plan' in o_):
                         break
                 rt = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
-                trail_p = b + (-ax * 0.95 + rad * rnd.uniform(0.25, 0.6) - need * 0.35 + rt * 0.3).normalized() * L * rnd.uniform(0.78, 0.95)
+                trail_p = b + (-ax * 0.95 + rad * rnd.uniform(0.25, 0.6) - need * 0.35 + rt * 0.3).normalized() * L * \
+                    (rnd.uniform(0.78, 0.95) if arm is None else rnd.uniform(0.6, 0.76))   # long arms: never a straight rod
                 rc = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
                 curl_p = b + (rad + rc * 0.6 - ax * 0.2).normalized() * L * rnd.uniform(0.32, 0.5)
                 S['plan'], S['plan_i'] = (reach_p, curl_p, trail_p), ci
@@ -626,7 +627,9 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
             S['x'], S['v'] = x, vv
             pole = (rad * 1.0 + ax * 0.45 * math.sin(t * 1.3 * S['gk'] + S['ph']) + tan * 0.35 * math.sin(t * 0.9 + S['ph'] * 2.3)).normalized()
             prev_pts = [R_delta @ p for p in S['pts']]
-            pts = _fabrik(b, x, prev_pts, lens, pole, avoid=avoid)
+            # long arms keep a living curve: never pulled out to a straight rod (except the death fling)
+            mr = 0.97 if arm is None or (f_die is not None and f >= f_die) else 0.84
+            pts = _fabrik(b, x, prev_pts, lens, pole, avoid=avoid, max_reach=mr)
             if arm is None:
                 S['pts'] = pts
                 qs = [_frame_q(pts[j + 1] - pts[j], rad, ax) for j in range(3)]
@@ -666,6 +669,21 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                 # spread the curvature: a light smoothing pass so no single joint carries the whole bend
                 for _it in range(2):
                     jp = [jp[0]] + [jp[i_] * 0.5 + (jp[i_ - 1] + jp[i_ + 1]) * 0.25 for i_ in range(1, NJ)] + [jp[NJ]]
+                # arms never pass through each other: push this arm's joints clear of every other arm (legs
+                # already solved this frame use their new shape, the rest last frame's carried through the spin)
+                _, rads_ = arm_dims()
+                others_ = []
+                for o_ in st:
+                    if o_ is S:
+                        continue
+                    op = o_.get('pts_now') if o_.get('pts_f') == f else [R_delta @ q_ for q_ in o_['pts']]
+                    others_.append(op)
+                    for j_ in range(2, NJ + 1):
+                        for i_ in range(2, NJ + 1):
+                            dd = jp[j_] - op[i_]
+                            need_ = (rads_[j_] + rads_[i_]) * 1.35 + 0.08
+                            if dd.length < need_:
+                                jp[j_] = op[i_] + (dd.normalized() if dd.length > 1e-5 else pole) * need_
                 # re-chain from the shoulder with exact segment lengths. Each joint bends at most 24 degrees
                 # (curls, never knots), each segment turns at most 13-30 degrees a frame (stiff near the shoulder,
                 # quick at the harpoon: no snaps or pops), and nothing passes through the core.
@@ -685,18 +703,30 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                     dj = (jp[j_ + 1] - out_[-1])
                     dj = dj.normalized() if dj.length > 1e-5 else (dprev or (prev_pts[1] - b).normalized())
                     dold = prev_pts[j_ + 1] - prev_pts[j_]
-                    if dold.length > 1e-5:
-                        dj = _turn_to(dold.normalized(), dj, math.radians(13 + 17 * j_ / (NJ - 1)))
-                    if dprev is not None:
-                        dj = _turn_to(dprev, dj, math.radians(24))
                     nxt = out_[-1] + dj * lens[j_]
                     if j_ > 0 and avoid is not None and (nxt - cc).length < ORB_RC * 1.7:
                         push = (nxt - cc).normalized()
                         dj = (dj + push * 0.8).normalized()
-                        nxt = out_[-1] + dj * lens[j_]
+                    if j_ >= 1:                                # deflect around the other arms' joints
+                        for _rep in range(2):
+                            for op_ in others_:
+                                for i_ in range(2, NJ + 1):
+                                    dd = nxt - op_[i_]
+                                    need_ = (rads_[j_ + 1] + rads_[i_]) * 1.35 + 0.08
+                                    if dd.length < need_:
+                                        nxt = op_[i_] + (dd.normalized() if dd.length > 1e-5 else pole) * need_
+                            dj = (nxt - out_[-1]).normalized()
+                            nxt = out_[-1] + dj * lens[j_]
+                    # limits last, so nothing after them can snap a segment
+                    if dold.length > 1e-5:
+                        dj = _turn_to(dold.normalized(), dj, math.radians(11 + 14 * j_ / (NJ - 1)))
+                    if dprev is not None:
+                        dj = _turn_to(dprev, dj, math.radians(24))
+                    nxt = out_[-1] + dj * lens[j_]
                     out_.append(nxt)
                     dprev = dj
                 S['pts'] = out_
+                S['pts_now'], S['pts_f'] = out_, f
                 # bones: parallel-transport the crest side down the chain so the arm never twists
                 Rr = rest_m[k]
                 zref = rad.copy()

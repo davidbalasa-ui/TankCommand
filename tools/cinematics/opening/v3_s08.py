@@ -181,6 +181,11 @@ def build(draft=True):
                                legs=[0, 1, 3, 4, 6]),
                           dict(f_reach=fr(T_REACH2) - 4, f_grab=fr(T_GRAB2), f_tear=fr(T_TEAR2), hold=hold,
                                legs=[1, 2, 5, 6, 7])], arm=orb_arm, tethers=orb_teth)
+    # curved motion blur: each arm segment is sampled along its real arc through the shutter (8 sub-steps)
+    # instead of one straight smear, so fast segments stay joined to their neighbours
+    for o in orb.children_recursive:
+        if o.type == 'MESH' and hasattr(o, 'cycles'):
+            o.cycles.motion_steps = 4
     # ---------------------------------------------------------------- attack run: bolts on the shield
     hits = []
     import fleet_life as FL
@@ -286,7 +291,9 @@ def build(draft=True):
     sc_.frame_set(fr(T_DIE))
     pd = rig.matrix_world.translation.copy()
     sc_.frame_set(1)
-    SP.impact_flare(pd, -d, fr(T_HIT) + 3, fr(T_DIE), (0.6, 0.8, 1.0), 6.0, 'OrbHit')
+    # where the lance bites: a smaller flickering splash that rides on the Orb (not a white ball parked ahead of it)
+    ohit = SP.impact_flare(pd, -d, fr(T_HIT) + 3, fr(T_DIE), (0.45, 0.7, 1.0), 2.6, 'OrbHit')
+    follow_pos(lambda f_: rig.matrix_world.translation - d * OF.ORB_RC * ORB_K * 1.2, fr(T_HIT) + 3, fr(T_DIE), ohit)
     SP.gold_boom(pd, fr(T_DIE), 16.0, life=1.8, light=6e5)
     SP.blue_boom(pd, fr(T_DIE) - 1, 9.0, life=0.6, light=3e5)
     SP.shards(pd, fr(T_DIE), 90, (1.0, 0.7, 0.3), 0.9, 45, seed=77, life=2.2, kind='hex', strength=10.0)
@@ -335,14 +342,14 @@ def build(draft=True):
             shake=[(fr(T_GRAB2), 1.2, 12), (fr(T_TEAR2), 2.0, 16)])
     # D: over the frigate's shoulder as the Orb charges it, and dies
     sc.shot('D', fr(12.6), fr(T_HIT) - 1,
-            [(f_, at(rig, f_ / 24.0 - 1 / 24.0) - lane * 34 + s1_ * 20 + s2_ * 8,
+            [(f_, at(rig, f_ / 24.0 - 1 / 24.0) - lane * 42 + s1_ * 24 + s2_ * 10,
               at(rig, f_ / 24.0 - 1 / 24.0) + lane * 18, 28) for f_ in range(fr(12.6), fr(T_HIT), 3)] +
-            [(fr(T_HIT) - 1, at(rig, T_HIT - 1 / 24.0) - lane * 34 + s1_ * 20 + s2_ * 8, at(rig, T_HIT) + lane * 18, 28)],
+            [(fr(T_HIT) - 1, at(rig, T_HIT - 1 / 24.0) - lane * 42 + s1_ * 24 + s2_ * 10, at(rig, T_HIT) + lane * 18, 28)],
             shake=[(fr(T_HIT - 0.55), 0.8, 20)])
     # D2: over the frigate's shoulder as its lance connects, and the Orb dies
     sc.shot('D2', fr(T_HIT), fr(16.0) - 1,
-            [(fr(T_HIT), at(tf, T_HIT) + Vector((-50, 44, 26)), at(rig, T_HIT) * 0.7 + at(tf, T_HIT) * 0.3, 26),
-             (fr(16.0) - 1, at(tf, 16.0) + Vector((-55, 48, 28)), pd * 0.7 + at(tf, 16.0) * 0.3, 26)],
+            [(fr(T_HIT), at(tf, T_HIT) + Vector((-46, 40, 58)), at(rig, T_HIT) * 0.7 + at(tf, T_HIT) * 0.3, 34),
+             (fr(16.0) - 1, at(tf, 16.0) + Vector((-50, 44, 62)), pd * 0.7 + at(tf, 16.0) * 0.3, 32)],
             shake=[(fr(T_HIT), 1.5, 14), (fr(T_DIE), 4.0, 24)])
     sc.shot('E', fr(16.0), nf,
             [(fr(16.0), pd + Vector((-70, -60, 20)), pd, 26), (nf, pd + Vector((-80, -75, 24)), at(tf, 18.0) * 0.4 + pd * 0.6, 26)])
