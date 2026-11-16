@@ -16,10 +16,10 @@ STYLE = dict(
     detail_scale=6.0,
     fire_strength=5.0,               # emission strength at heat=1
     flame_boost=2.5,                 # extra emission from active burning
-    heat_lo=0.5, heat_hi=1.5,        # heat -> ramp position
+    heat_lo=0.5, heat_hi=2.0,        # heat -> ramp position
     # fire ramp: dark red -> orange -> yellow -> near white (no purple ever)
     ramp=[(0.0, (0.0, 0.0, 0.0)), (0.1, (0.4, 0.04, 0.0)), (0.35, (1.0, 0.2, 0.01)),
-          (0.7, (1.0, 0.45, 0.05)), (1.0, (1.0, 0.68, 0.22))],
+          (0.7, (1.0, 0.42, 0.04)), (1.0, (1.0, 0.62, 0.16))],
     sun=3.5, sun_rot=(50, 0, 35), world=0.8, world_color=(0.55, 0.62, 0.75),
     inner_light=0.0,                  # point light inside fireball (W per unit flame)
     dust=False,
@@ -133,7 +133,7 @@ def build_scene(cfg):
     em = N.new('ShaderNodeMath'); em.operation = 'MULTIPLY'
     Lk.new(es.outputs[0], em.inputs[0]); Lk.new(br.outputs['Result'], em.inputs[1])
     # soft clip: x / (1 + x / cap) keeps the hot core from blowing out to flat white
-    sc1 = N.new('ShaderNodeMath'); sc1.operation = 'DIVIDE'; sc1.inputs[1].default_value = st.get('emit_cap', 4.0)
+    sc1 = N.new('ShaderNodeMath'); sc1.operation = 'DIVIDE'; sc1.inputs[1].default_value = st.get('emit_cap', 2.5)
     Lk.new(em.outputs[0], sc1.inputs[0])
     sc2 = N.new('ShaderNodeMath'); sc2.operation = 'ADD'; sc2.inputs[1].default_value = 1.0
     Lk.new(sc1.outputs[0], sc2.inputs[0])
