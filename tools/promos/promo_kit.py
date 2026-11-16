@@ -29,6 +29,8 @@ import bmesh
 from mathutils import Matrix, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import promo_motion as _motion  # noqa: E402  (secondary motion layer, see promo_motion.py)
 REPO = os.path.abspath(os.path.join(HERE, '..', '..'))
 REGISTRY = json.load(open(os.path.join(HERE, 'models.json')))
 SEARCH = [p for p in [os.environ.get('PROMO_MODELS'), '/mnt/project-files/promos/models',
@@ -261,6 +263,7 @@ class Actor:
         self.barrels = []
         self._muzzles = []
         self.alive_until = None
+        _motion.init(self)  # self.motion: secondary-motion opt-out flags (promo_motion.py)
 
     # -- placement & motion --------------------------------------------------------------
     def place(self, at, heading=0.0, z=0.0, t=None):
@@ -311,12 +314,14 @@ class Actor:
             self.root.keyframe_insert('location', frame=P.T(t))
             self.root.keyframe_insert('rotation_euler', frame=P.T(t))
         set_interp(self.root, interp)
+        self._mo_path = dict(z=z, bank=bank, pitch=pitch, interp=interp)
         return self
 
     def hover_bob(self, amp=0.12, hz=0.7, t0=0.0, t1=None):
         """Gentle float for hover units: adds a sine on the model (not the root), so it stacks
         with path()."""
         P = self.P
+        self._mo_hover = True
         t1 = P.seconds if t1 is None else t1
         m = self.model_root
         base = m.location.z
@@ -374,6 +379,7 @@ class Actor:
         tu.keyframe_insert('rotation_euler', index=2, frame=P.T(max(0, t - dur)))
         tu.rotation_euler.z = yaw
         tu.keyframe_insert('rotation_euler', index=2, frame=P.T(t))
+        _motion.turret_overshoot(self, tu, start, yaw, t, dur)
         if t_hold is not None:
             tu.keyframe_insert('rotation_euler', index=2, frame=P.T(t_hold))
         return self
@@ -485,13 +491,16 @@ class Actor:
         burst = (t - last) < settle  # previous shot still settling: don't key a rest pose before
         self._last_recoil = t
         for b in self.barrels:
+            ax = _motion.barrel_axis(b)  # slide along the tube itself (elevated barrels too)
             L = b['barrel_len'] * collapse
-            b.location.x = -L * 0.3 if burst else 0
-            b.keyframe_insert('location', index=0, frame=f - 1)
-            b.location.x = -L
-            b.keyframe_insert('location', index=0, frame=f + 1)
-            b.location.x = 0
-            b.keyframe_insert('location', index=0, frame=f + P.fps * settle)
+            b.location = -ax * L * 0.3 if burst else Vector()
+            b.keyframe_insert('location', frame=f - 1)
+            b.location = -ax * L
+            b.keyframe_insert('location', frame=f + 1)
+            b.location = Vector()
+            b.keyframe_insert('location', frame=f + P.fps * settle)
+        if _motion.handles_recoil(self, t, kick, back):
+            return self  # hull rock is a damped spring on the motion layer
         m = self.model_root
         m.rotation_mode = 'XYZ'
         base_y = getattr(self, '_rest_pitch', None)
@@ -669,10 +678,12 @@ class Actor:
             for attr in ('location', 'rotation_quaternion', 'scale'):
                 o.keyframe_insert(attr, frame=0)
                 o.keyframe_insert(attr, frame=P.T(a))
+            pk_pose = (o.location.copy(), o.rotation_quaternion.copy(), o.scale.copy())
             o.location, o.rotation_quaternion, o.scale = dep_loc, dep_rot, dep_scale
             for attr in ('location', 'rotation_quaternion', 'scale'):
                 o.keyframe_insert(attr, frame=P.T(b))
             set_interp(o, 'BEZIER')
+            _motion.unfold_settle(self, o, P.T(a), P.T(b), pk_pose, (dep_loc, dep_rot, dep_scale))
             if o.get('hideWhenDeployed'):
                 for c in [o] + list(o.children_recursive):
                     key_hide(c, 0, False)
@@ -1571,6 +1582,7 @@ class Promo:
 
     # -- render ----------------------------------------------------------------------------
     def render(self):
+        _motion.bake(self)  # secondary motion layer (promo_motion.py); PROMO_MOTION=0 = off
         a = self.args
         q = a.quality
         res, spp, step, blur = QUALITY[q]
