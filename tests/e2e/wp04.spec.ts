@@ -35,10 +35,14 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0))
     .toBeGreaterThanOrEqual(1);
-  // A second order waits behind the first, so it is still cancellable however slowly the browser
-  // renders (the first can land before a slow tap arrives).
-  await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
-  await expect.poll(unearnedOre).toBe(600 - 2 * scoutOre);
+  // Deliveries land one at a time, and taps on the open drawer can take many seconds on a slow
+  // runner, so the order to cancel goes at the back of a queue of four. Half sim speed gives it
+  // well over a minute before it can start landing (an order that is landing can't be cancelled).
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(0.5));
+  for (let count = 2; count <= 4; count += 1) {
+    await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
+    await expect.poll(unearnedOre).toBe(600 - count * scoutOre);
+  }
   const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.at(-1)?.id ?? null);
   expect(orderId).not.toBeNull();
   if (orderId === null) {
@@ -54,7 +58,7 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
     }
     expect(await queued()).toBe(false);
   }).toPass({ timeout: 30_000 });
-  await expect.poll(unearnedOre).toBe(600 - scoutOre);
+  await expect.poll(unearnedOre).toBe(600 - 3 * scoutOre);
 });
 
 test('[HUD-05] miner deposit tap, mine command and salvage button work by touch', async ({ page }, testInfo) => {
