@@ -519,9 +519,12 @@ class Actor:
         return self
 
     def fire(self, t, target, kind='cannon', color=None, speed=None, size=1.0, recoil=True,
-             kick=None, impact=True, impact_size=None, arc=None, muzzle=None, spread=0.0):
+             kick=None, impact=True, impact_size=None, arc=None, muzzle=None, spread=0.0,
+             jag=None, branches=None, width=None):
         """Fire one shot at `target` (point or Actor) at time t. Returns the impact time.
-        kind: cannon | heavy | autocannon | laser | missile | shell | lightning | beam | bomb"""
+        kind: cannon | heavy | autocannon | laser | missile | shell | lightning | beam | bomb
+        jag / branches / width: lightning shape (defaults 0.18 / 2 / 0.05 x size); width also
+        sets beam and laser thickness."""
         P = self.P
         mz = muzzle or self.muzzle()
         p0 = self.world_at(mz, t - 1.0 / P.fps)   # the muzzle just before recoil starts
@@ -552,10 +555,11 @@ class Actor:
         if recoil and kk > 0:
             self.recoil(t, kick=kk, back=0.05 * kk)
         if kind in ('lightning',):
-            P.lightning(p0, p1, t, t + 0.18, color=col, width=0.05 * size)
+            P.lightning(p0, p1, t, t + 0.18, color=col, width=width if width is not None else 0.05 * size,
+                        jag=0.18 if jag is None else jag, branches=2 if branches is None else branches)
             t_hit = t + 0.02
         elif kind == 'beam':
-            P.beam(p0, p1, t, t + 0.45, color=col, width=0.18 * size)
+            P.beam(p0, p1, t, t + 0.45, color=col, width=width if width is not None else 0.18 * size)
             t_hit = t + 0.05
         elif kind == 'missile':
             t_hit = P.missile(p0, p1, t, speed=spd, color=col, arc=arc if arc is not None else 2.5)
@@ -563,7 +567,8 @@ class Actor:
             # Terran laser: a short beam zap that lands instantly (core + glow + scrolling energy)
             import promo_fx_weapons as W
             t_hit = t + 0.02
-            W.beam(P, p0, p1, t, t + 0.14 * max(1.0, size), color=col, width=0.07 * size, strength=9)
+            W.beam(P, p0, p1, t, t + 0.14 * max(1.0, size), color=col,
+                   width=width if width is not None else 0.07 * size, strength=9)
         elif kind in ('shell', 'bomb'):
             import promo_fx_weapons as W
             t_hit = W.projectile(P, p0, p1, t, spd, col, size=0.18 * size,
