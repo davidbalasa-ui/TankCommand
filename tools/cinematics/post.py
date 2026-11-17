@@ -20,6 +20,8 @@ crf = opts.get('crf', '24')
 fps = opts.get('fps', '24')
 tmp = os.path.join(os.path.dirname(os.path.abspath(out)), '_bloom')
 os.makedirs(tmp, exist_ok=True)
+for _f in glob.glob(os.path.join(tmp, 'b_*.png')):   # stale frames from a longer earlier clip
+    os.remove(_f)
 
 files = sorted(glob.glob(os.path.join(src, '*.png')))
 for i, f in enumerate(files):
