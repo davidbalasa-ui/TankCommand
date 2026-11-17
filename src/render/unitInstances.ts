@@ -129,13 +129,15 @@ float tcPartScroll() {
 function partMaterial<T extends THREE.Material>(material: T, uniform: { value: THREE.DataTexture }, key: string): T {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.tcParts = uniform;
+    // The part matrix is fetched once per vertex, at the top of main, and reused below.
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${PART_COMMON}`)
+      .replace('void main() {', 'void main() {\n\tmat4 tcM = tcPartMatrix();')
       .replace(
         '#include <beginnormal_vertex>',
-        `#include <beginnormal_vertex>\nobjectNormal = mat3(tcPartMatrix()) * objectNormal;\n#ifdef USE_TANGENT\nobjectTangent = mat3(tcPartMatrix()) * objectTangent;\n#endif`,
+        `#include <beginnormal_vertex>\nobjectNormal = mat3(tcM) * objectNormal;\n#ifdef USE_TANGENT\nobjectTangent = mat3(tcM) * objectTangent;\n#endif`,
       )
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = (tcPartMatrix() * vec4(transformed, 1.0)).xyz;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = (tcM * vec4(transformed, 1.0)).xyz;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv.x += tcPartScroll();\n#endif');
   };
   material.customProgramCacheKey = () => key;

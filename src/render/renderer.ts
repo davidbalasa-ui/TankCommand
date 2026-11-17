@@ -73,7 +73,6 @@ const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
-const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
 const COLORBLIND_ENEMY_TINT = new THREE.Color(0.35, 0.65, 1);
@@ -1362,7 +1361,8 @@ export class RenderView {
       return;
     }
     const frameMs = now - previous;
-    if (frameMs <= 0 || frameMs > MAX_FRAME_SAMPLE_MS) {
+    // Long gaps are judged by the controller: a lone one is ignored, a run of them counts.
+    if (frameMs <= 0) {
       return;
     }
     if (this.qualityController.sample(frameMs)) {
