@@ -13,7 +13,9 @@ import numpy as np
 from scipy import fft as sfft
 from scipy.ndimage import map_coordinates, gaussian_filter
 
-VDB_SITE = '/home/user/bvenv/lib/python3.13/site-packages/bpy/5.3/python/lib/python3.13/site-packages'
+VDB_SITE = os.path.join(sys.prefix, 'lib/python3.13/site-packages/bpy/5.3/python/lib/python3.13/site-packages')
+if not os.path.exists(VDB_SITE):
+    VDB_SITE = '/home/user/bvenv/lib/python3.13/site-packages/bpy/5.3/python/lib/python3.13/site-packages'
 
 
 class Sim:
