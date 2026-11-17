@@ -632,7 +632,7 @@
       "id": "prop.nature.shrub",
       "kind": "model",
       "path": "assets/models/props/shrub.glb",
-      "bytes": 95404,
+      "bytes": 95892,
       "faction": "neutral",
       "credit": {
         "license": "ORIGINAL",
@@ -645,7 +645,7 @@
       "id": "prop.nature.grass",
       "kind": "model",
       "path": "assets/models/props/grass.glb",
-      "bytes": 65636,
+      "bytes": 66156,
       "faction": "neutral",
       "credit": {
         "license": "ORIGINAL",

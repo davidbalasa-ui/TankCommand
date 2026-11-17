@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { heightAt, isWaterAt, slopeAt, type MapDef } from "../sim/map";
 import { MAX_SLOPE } from "../sim/tuning";
 import type { DepositState, WorldState } from "../sim/types";
+import { groundNoiseAt } from "./groundDetail";
 import { distanceOutside, groundHeightAt } from "./outerLand";
 
 export const PROP_IDS = [
@@ -48,6 +49,8 @@ interface Placement {
   x: number;
   z: number;
   matrix: THREE.Matrix4;
+  /** Per-instance colour multiplier, so repeated props are not identical copies. */
+  tint: THREE.Color;
   /** Past the map edge: drawn without shadows (they would fall outside the shadow map anyway). */
   outside?: boolean;
 }
@@ -73,6 +76,7 @@ export function addFogHook(
   material: THREE.Material,
   fog: FogUniforms,
   instanced: boolean,
+  foliage = false,
 ): void {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uFog = fog.uFog;
@@ -98,8 +102,64 @@ export function addFogHook(
         "#include <emissivemap_fragment>",
         "#include <emissivemap_fragment>\ntotalEmissiveRadiance *= fogLevel;",
       );
+    if (foliage) {
+      // Grass and leaves are lit mostly as if they faced the sky, the usual foliage trick: thin
+      // blades seen edge-on or from behind otherwise go almost black against the lit ground.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        "#include <normal_fragment_maps>\nnormal = normalize(mix(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), 0.65));",
+      );
+    }
   };
-  material.customProgramCacheKey = () => (instanced ? "tcFogInst" : "tcFog");
+  material.customProgramCacheKey = () =>
+    (instanced ? "tcFogInst" : "tcFog") + (foliage ? "Fol" : "");
+}
+
+const ROCKS: ReadonlySet<PropId> = new Set<PropId>([
+  "prop.nature.boulder",
+  "prop.nature.rock_cluster",
+  "prop.nature.slab",
+  "prop.nature.cliff",
+]);
+const PLANTS: ReadonlySet<PropId> = new Set<PropId>([
+  "prop.nature.grass",
+  "prop.nature.shrub",
+]);
+/** Plant colour multiplier on lush and on dry ground. */
+const PLANT_LUSH = new THREE.Color(1.1, 1.12, 0.95);
+const PLANT_DRY = new THREE.Color(1.38, 1.24, 0.86);
+
+/**
+ * A colour multiplier for one prop: rocks vary in lightness and lean warm or cool, plants take the
+ * dryness of the ground under them (from the same noise the terrain shader uses), everything varies
+ * a little in brightness.
+ */
+function propTint(prop: PropId, x: number, z: number, seed: number): THREE.Color {
+  const ix = Math.floor(x * 8);
+  const iz = Math.floor(z * 8);
+  const light = hash(ix, iz, seed, 21);
+  const hue = hash(ix, iz, seed, 22) * 2 - 1;
+  if (ROCKS.has(prop)) {
+    const b = 0.8 + light * 0.34;
+    return new THREE.Color(b * (1 + 0.06 * hue), b, b * (1 - 0.08 * hue));
+  }
+  if (PLANTS.has(prop)) {
+    const dry = groundNoiseAt(seed, x, z).dry;
+    // Shrubs are broad and catch more light than grass blades: a smaller lift.
+    const b = (0.86 + light * 0.28) * (prop === "prop.nature.shrub" ? 0.78 : 1);
+    return PLANT_LUSH.clone()
+      .lerp(PLANT_DRY, Math.min(1, Math.max(0, dry * 1.2 - 0.1 + hue * 0.15)))
+      .multiplyScalar(b);
+  }
+  const b = 0.88 + light * 0.24;
+  return new THREE.Color(b, b, b);
+}
+
+/** Rocks also vary in height, so two boulders of one size are not the same shape. */
+function propStretch(prop: PropId, x: number, z: number, seed: number): number {
+  return ROCKS.has(prop)
+    ? 0.84 + hash(Math.floor(x * 8), Math.floor(z * 8), seed, 23) * 0.32
+    : 1;
 }
 
 /** Rough radius of a solid prop at scale 1, in metres. */
@@ -141,9 +201,15 @@ export function scatterProps(map: MapDef): Placement[] {
     sink: number,
   ): void => {
     q.setFromAxisAngle(up, yaw);
-    s.set(scale, scale, scale);
+    s.set(scale, scale * propStretch(prop, x, z, map.seed), scale);
     p.set(x, heightAt(map, x, z) - sink * scale, z);
-    out.push({ prop, x, z, matrix: new THREE.Matrix4().compose(p, q, s) });
+    out.push({
+      prop,
+      x,
+      z,
+      matrix: new THREE.Matrix4().compose(p, q, s),
+      tint: propTint(prop, x, z, map.seed),
+    });
   };
   for (let cz = 0; cz < map.rows; cz += 1) {
     for (let cx = 0; cx < map.cols; cx += 1) {
@@ -292,13 +358,14 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
         scale = 1 + size * 0.9;
       }
       q.setFromAxisAngle(up, yaw);
-      s.set(scale, scale, scale);
+      s.set(scale, scale * propStretch(prop, x, z, map.seed), scale);
       p.set(x, groundHeightAt(map, x, z) - sink * scale, z);
       out.push({
         prop,
         x,
         z,
         matrix: new THREE.Matrix4().compose(p, q, s),
+        tint: propTint(prop, x, z, map.seed),
         outside: true,
       });
     }
@@ -346,7 +413,7 @@ export class Landscape {
       return;
     }
     const material = mesh.material.clone();
-    addFogHook(material, this.fog, true);
+    addFogHook(material, this.fog, true, PLANTS.has(id as PropId));
     this.templates.set(id as PropId, {
       geometry: mesh.geometry,
       material,
@@ -418,7 +485,7 @@ export class Landscape {
         r: Math.max(STRUCTURE_CLEAR, cells * this.map.cellSize * 0.75 + 1.5),
       });
     }
-    const byProp = new Map<string, THREE.Matrix4[]>();
+    const byProp = new Map<string, Placement[]>();
     for (const placement of this.placements) {
       if (!this.templates.has(placement.prop)) {
         continue;
@@ -435,7 +502,7 @@ export class Landscape {
         ? placement.prop + OUTSIDE_SUFFIX
         : placement.prop;
       const list = byProp.get(key) ?? [];
-      list.push(placement.matrix);
+      list.push(placement);
       byProp.set(key, list);
     }
     const matrix = new THREE.Matrix4();
@@ -466,12 +533,16 @@ export class Landscape {
         }
         const target = mesh;
         list.forEach((placed, index) => {
-          matrix.multiplyMatrices(placed, template.local);
+          matrix.multiplyMatrices(placed.matrix, template.local);
           target.setMatrixAt(index, matrix);
+          target.setColorAt(index, placed.tint);
         });
         target.count = list.length;
         target.visible = list.length > 0;
         target.instanceMatrix.needsUpdate = true;
+        if (target.instanceColor) {
+          target.instanceColor.needsUpdate = true;
+        }
       }
     }
   }

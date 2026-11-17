@@ -162,7 +162,7 @@ def _veg_mat(name, build):
 def _grass_shader(n):
     t = NA.attr(n, 'st')
     v = NA.attr(n, 'sv')
-    root, mid, tip = (0.04, 0.07, 0.02), (0.11, 0.21, 0.045), (0.3, 0.32, 0.1)
+    root, mid, tip = (0.07, 0.1, 0.03), (0.2, 0.3, 0.06), (0.42, 0.42, 0.14)
     col = n.mix(n.smooth(t, 0.0, 0.55), root, mid)
     col = n.mix(n.smooth(t, 0.5, 1.0), col, tip)
     # some blades greener, some dry straw, a few with a bronze alien tint
@@ -178,7 +178,7 @@ def _grass_shader(n):
 def _succulent_shader(n):
     t = NA.attr(n, 'st')
     v = NA.attr(n, 'sv')
-    base, body, bloom = (0.035, 0.06, 0.035), (0.08, 0.15, 0.11), (0.2, 0.27, 0.24)
+    base, body, bloom = (0.06, 0.08, 0.03), (0.17, 0.25, 0.08), (0.3, 0.36, 0.2)
     col = n.mix(n.smooth(t, 0.0, 0.35), base, body)
     col = n.mix(n.m('MULTIPLY', n.smooth(n.noise(6.0, 3.0), 0.4, 0.7), 0.6), col, bloom)      # waxy bloom
     col = n.mix(n.m('MULTIPLY', n.smooth(t, 0.7, 0.98), 0.7), col, (0.42, 0.08, 0.13))    # wine-red tips
