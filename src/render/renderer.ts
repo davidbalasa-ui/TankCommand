@@ -276,6 +276,10 @@ interface UnitVisual {
   floats: boolean;
   /** Aircraft lean into turns (radians of roll, smoothed). */
   bank: number;
+  /** The model's muzzle anchors (one per barrel), where its shots visibly leave the gun. */
+  muzzles: THREE.Object3D[];
+  /** Twin guns take turns: the barrel the next shot leaves from. */
+  nextMuzzle: number;
 }
 
 interface PositionSnapshot {
@@ -425,25 +429,35 @@ const GUN_PART = /^(Barrel|Flash|Msl)/;
 // The art pipeline's solid muzzle-flash meshes (under Flash* nodes) are made for a viewer that
 // shows them only for a frame after each shot; the game draws its own muzzle effects, so the meshes
 // are dropped from unit models (and their low-detail files, so both keep the same mesh order).
-// The empty Flash* nodes stay as muzzle anchors.
+// Each one leaves an empty Muzzle* node at its centre (FlashL leaves MuzzleL), where the barrel tip is.
 function dropFlashMeshes(root: THREE.Object3D): void {
-  const drop: THREE.Object3D[] = [];
+  const drop: Array<{ mesh: THREE.Object3D; geometry: THREE.BufferGeometry; flash: string }> = [];
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) {
       return;
     }
     for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
       if (node.name.startsWith('Flash')) {
-        drop.push(object);
+        drop.push({ mesh: object, geometry: object.geometry as THREE.BufferGeometry, flash: node.name });
         return;
       }
     }
   });
-  for (const mesh of drop) {
-    mesh.removeFromParent();
-    if (mesh instanceof THREE.Mesh) {
-      (mesh.geometry as THREE.BufferGeometry).dispose();
+  for (const { mesh, geometry, flash } of drop) {
+    const parent = mesh.parent;
+    if (parent && !parent.getObjectByName(flash.replace(/^Flash/, 'Muzzle'))) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (box && !box.isEmpty()) {
+        mesh.updateMatrix();
+        const anchor = new THREE.Object3D();
+        anchor.name = flash.replace(/^Flash/, 'Muzzle');
+        anchor.position.copy(box.getCenter(new THREE.Vector3()).applyMatrix4(mesh.matrix));
+        parent.add(anchor);
+      }
     }
+    mesh.removeFromParent();
+    geometry.dispose();
   }
 }
 
@@ -628,7 +642,10 @@ export class RenderView {
       object: THREE.Object3D;
       kind: string | undefined;
       splash: number;
-      offset: number;
+      /** Where the shot is drawn relative to the sim's shot at launch, closing to 0 at the target. */
+      offsetX: number;
+      offsetY: number;
+      offsetZ: number;
       startX: number;
       startZ: number;
       shooterId: number | undefined;
@@ -2274,6 +2291,8 @@ export class RenderView {
       firing: createUnitFiring(root, parts),
       floats: this.world.unitTypes.get(unit.typeId)?.movement === 'hover',
       bank: 0,
+      muzzles: collectMuzzles(root),
+      nextMuzzle: 0,
     };
   }
 
@@ -3319,7 +3338,13 @@ export class RenderView {
         // starts at the aircraft and closes onto the sim's path by the time it reaches the target.
         const shooter = projectile.shooterId === undefined ? undefined : this.unitRoots.get(projectile.shooterId);
         const airborne = shooter !== undefined && shooter.lift > 0.5;
-        const offset = airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
+        // A ground gun fires from its barrel tip (the model's muzzle-flash mesh); the sim launches
+        // every shot from the unit's centre, so the shot is drawn from the muzzle and closes onto
+        // the sim's path the same way.
+        const muzzle = shooter && !airborne ? this.muzzlePoint(shooter) : null;
+        const offsetX = muzzle ? muzzle.x - projectile.x : 0;
+        const offsetY = muzzle ? muzzle.y - projectile.y : airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
+        const offsetZ = muzzle ? muzzle.z - projectile.z : 0;
         const human = this.world.factions.find((item) => item.player === projectile.owner)?.faction !== 'alien';
         const object = this.effects.projectileMesh(projectile.kind, human);
         this.scene.add(object);
@@ -3327,7 +3352,9 @@ export class RenderView {
           object,
           kind: projectile.kind,
           splash: projectile.splashRadius,
-          offset,
+          offsetX,
+          offsetY,
+          offsetZ,
           startX: projectile.x,
           startZ: projectile.z,
           shooterId: projectile.shooterId,
@@ -3335,7 +3362,7 @@ export class RenderView {
           alien: !human,
         };
         this.projectileVisuals.set(projectile.id, visual);
-        this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz);
+        this.effects.muzzle(projectile.x, projectile.y + offsetY, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz, muzzle);
         if (shooter && !airborne) {
           shooter.recoil = 1;
           fireUnit(shooter.firing, shooter.parts, performance.now() / 1000);
@@ -3345,9 +3372,12 @@ export class RenderView {
       const progress = visual.aim > 0.01 ? Math.min(1, travelled / visual.aim) : 1;
       // Bombs fall (slow at first, then faster); energy shots fly straight from the gun.
       const left = visual.kind === 'bombs' ? 1 - progress * progress : 1 - progress;
-      const y = projectile.y + visual.offset * left;
       const previous = visual.object.position.clone();
-      visual.object.position.set(projectile.x, y, projectile.z);
+      visual.object.position.set(
+        projectile.x + visual.offsetX * left,
+        projectile.y + visual.offsetY * left,
+        projectile.z + visual.offsetZ * left,
+      );
       const direction = new THREE.Vector3().subVectors(visual.object.position, previous);
       if (direction.lengthSq() < 1e-6 || previous.lengthSq() === 0) {
         direction.set(projectile.vx, projectile.vy, projectile.vz);
@@ -3381,6 +3411,21 @@ export class RenderView {
         }
       }
     }
+  }
+
+  /** World position of the barrel tip the unit's next shot leaves from, or null without one. */
+  private muzzlePoint(visual: UnitVisual): THREE.Vector3 | null {
+    const count = visual.muzzles.length;
+    if (count === 0) {
+      return null;
+    }
+    const anchor = visual.muzzles[visual.nextMuzzle % count];
+    visual.nextMuzzle = (visual.nextMuzzle + 1) % count;
+    if (!anchor) {
+      return null;
+    }
+    visual.root.updateMatrixWorld(true);
+    return anchor.getWorldPosition(new THREE.Vector3());
   }
 
   /** World position of a Shard structure's heart (its Core node), for the lance to start from. */
@@ -3477,4 +3522,15 @@ export class RenderView {
   private placementGhostType(): SimStructureType | null {
     return this.placementType;
   }
+}
+
+/** A model's muzzle anchors (Muzzle, MuzzleL, MuzzleR... left by dropFlashMeshes), left before right. */
+function collectMuzzles(root: THREE.Object3D): THREE.Object3D[] {
+  const found: THREE.Object3D[] = [];
+  root.traverse((object) => {
+    if (/^Muzzle[A-Z]?$/.test(object.name)) {
+      found.push(object);
+    }
+  });
+  return found.sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -443,7 +443,16 @@ export class Effects {
 
   // ---- muzzle flashes ------------------------------------------------------------------
   /** The blast where a shot leaves the gun. `dirX/dirZ` aim the flame (optional). */
-  muzzle(x: number, y: number, z: number, kind: string | undefined, alien = false, dirX = 0, dirZ = 0): void {
+  muzzle(
+    x: number,
+    y: number,
+    z: number,
+    kind: string | undefined,
+    alien = false,
+    dirX = 0,
+    dirZ = 0,
+    at: { x: number; y: number; z: number } | null = null,
+  ): void {
     const s = WEAPON_SCALE[kind ?? ''] ?? 1;
     const len = Math.hypot(dirX, dirZ);
     const fx = len > 1e-6 ? dirX / len : 0;
@@ -470,6 +479,11 @@ export class Effects {
     // The sim fires from the shooter's centre at a fixed height and the renderer first sees the shot
     // a tick later: step back to the shooter and out to roughly where each gun's muzzle sits.
     const [reach, height] = MUZZLE_AT[kind ?? ''] ?? [1.2, 1.5];
+    if (at) {
+      // The renderer found the gun's own muzzle on the model.
+      this.terranBlast(at.x, at.y, at.z, kind, s, fx, fz, reach);
+      return;
+    }
     const back = len / SIM_TICK_HZ;
     this.terranBlast(x + fx * (reach - back), y - MUZZLE_HEIGHT + height, z + fz * (reach - back), kind, s, fx, fz, reach);
   }
