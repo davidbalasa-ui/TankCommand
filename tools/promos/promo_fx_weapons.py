@@ -593,8 +593,10 @@ def impact(P, pos, t, size=1.0, color=None):
     ground = bool(getattr(P, 'ground', None)) and (pos.z - gz) < 0.35 + 0.3 * size
     fcol = color if energy else (1.0, 0.5, 0.14)
     lift = Vector((0, 0, 0.4 * size)) if ground else Vector()
-    flash(P, pos + lift, t, 0.5 * size, fcol, frames=(1, 2, 4), e=3.2, hot=0.9)
-    star(P, pos + lift * 0.6, t, 1.3 * size, fcol, axis=UP if ground else None, n=6 if ground else 7)
+    flash(P, pos + lift * (0.5 if energy else 1.0), t, (0.3 if energy else 0.5) * size, fcol, frames=(1, 2, 4),
+          e=3.2, hot=0.9)
+    star(P, pos + lift * 0.6, t, (0.8 if energy else 1.3) * size, fcol, axis=UP if ground else None,
+         n=6 if ground else 7)
     if not energy:   # short-lived ragged fire blossom
         for i in range(3):
             d = _cone_dir(P, UP, 70) if ground else _cone_dir(P, UP, 180)
@@ -610,7 +612,10 @@ def impact(P, pos, t, size=1.0, color=None):
     sparks(P, pos + Vector((0, 0, 0.05)), t, n=int(min(22, 8 + 7 * size)), speed=9 * math.sqrt(size),
            color=fcol if energy else (1.0, 0.45, 0.1), axis=UP if ground else Vector((0, 0, 0.3)),
            spread=65 if ground else 140, life=(0.2, 0.55))
-    P.light(pos + Vector((0, 0, 0.6 * size)), t, fcol, energy=1400 * size, dur=0.18, radius=0.4 * size)
+    # energy hits: low, weak light so the ground shows a tight hotspot rather than a soft smear
+    P.light(Vector((pos.x, pos.y, _gz(P, pos.x, pos.y) + 0.1)) if (energy and ground and pos.z - _gz(P, pos.x, pos.y) < 1.2)
+            else pos + Vector((0, 0, (0.25 if energy else 0.6) * size)), t, fcol, energy=(220 if energy else 1400) * size,
+            dur=0.12 if energy else 0.15, radius=(0.15 if energy else 0.3) * size)
     if ground:
         dirt_kick(P, pos, t, size=size * (0.6 if energy else 1.0))
         scorch(P, pos, t, 0.75 * size, ember=fcol if energy else (1.0, 0.33, 0.06),
@@ -646,53 +651,61 @@ def muzzle_flash(P, muzzle_obj, t, color, size=1.0):
     pcol = (1.0, 0.42, 0.08) if gun else color
     s = size
     parts = []
-    core = glow(P, 'MuzzleCore', pcol, fx_e=2.8, fx_p=1.6, fx_hot=0.65)
+    # small hot core at the muzzle
+    core = glow(P, 'MuzzleCore', pcol, fx_e=2.8, fx_p=1.8, fx_hot=0.6)
     core.parent = rig
-    core.location = (0.12 * s, 0, 0)
-    parts.append((core, (0.24 * s, 0.2 * s, 0.2 * s)))
-    # forward petal: local +X of the spindle points back at the muzzle (bright), tail at the tip
-    Lf = 0.55 * s
-    fw = glow(P, 'MuzzlePetal', pcol, fx_e=2.6, fx_p=1.2, fx_tail=0.9, fx_hot=0.35)
-    fw.parent = rig
-    fw.rotation_euler = (0, 0, math.pi)
-    fw.location = (0.1 * s + Lf, 0, 0)
-    parts.append((fw, (Lf, 0.17 * s, 0.17 * s)))
-    roll = P.rnd.uniform(0, TAU)
-    npet = 5 if gun else 4
-    for i in range(npet):
-        a = roll + TAU * i / npet + P.rnd.uniform(-0.25, 0.25)
-        el = math.radians(P.rnd.uniform(55, 80))   # angle from the barrel axis
+    core.location = (0.06 * s, 0, 0)
+    parts.append((core, (0.13 * s, 0.1 * s, 0.1 * s)))
+    # tight forward cone of flame: 3 slightly divergent tapered tongues (bright at the muzzle,
+    # fading toward the tip; spindle +X points back at the muzzle), one with ragged noise
+    for k in range(3):
+        Lf = s * (0.42 if k == 0 else P.rnd.uniform(0.22, 0.34))
+        wdt = s * (0.075 if k == 0 else P.rnd.uniform(0.045, 0.065))
+        dv = Vector((1.0, P.rnd.uniform(-0.12, 0.12), P.rnd.uniform(-0.12, 0.12))).normalized() if k else Vector((1, 0, 0))
+        o = glow(P, 'MuzzleTongue', pcol, fx_e=2.6, fx_p=1.5, fx_tail=0.95, fx_hot=0.3 if k == 0 else 0.15,
+                 fx_noise=0.0 if k == 0 else 0.6, fx_w=P.rnd.uniform(0, 9))
+        o.parent = rig
+        o.rotation_mode = 'QUATERNION'
+        o.rotation_quaternion = (-dv).to_track_quat('X', 'Z')
+        o.location = Vector((0.05 * s, 0, 0)) + dv * Lf
+        parts.append((o, (Lf, wdt, wdt)))
+    # 2-3 short irregular side petals, leaning forward, at random (not evenly spaced) rolls
+    npet = P.rnd.choice((2, 3, 3)) if gun else 2
+    rolls = sorted(P.rnd.uniform(0, TAU) for _ in range(npet))
+    for a in rolls:
+        el = math.radians(P.rnd.uniform(30, 58))   # angle from the barrel axis
         d = Vector((math.cos(el), math.sin(el) * math.cos(a), math.sin(el) * math.sin(a)))
-        Ls = 0.3 * s * P.rnd.uniform(0.75, 1.15)
-        o = glow(P, 'MuzzlePetal', pcol, fx_e=2.8, fx_p=1.3, fx_tail=0.95, fx_hot=0.4)
+        Ls = s * P.rnd.uniform(0.09, 0.2)
+        o = glow(P, 'MuzzlePetal', pcol, fx_e=2.4, fx_p=1.3, fx_tail=0.95, fx_hot=0.2)
         o.parent = rig
         o.rotation_mode = 'QUATERNION'
         o.rotation_quaternion = (-d).to_track_quat('X', 'Z')
-        o.location = Vector((0.12 * s, 0, 0)) + d * Ls
-        parts.append((o, (Ls, 0.09 * s, 0.09 * s)))
-    for o, sc_ in parts:
-        o.scale = tuple(x * 0.4 for x in sc_)
+        o.location = Vector((0.06 * s, 0, 0)) + d * Ls
+        w_ = s * P.rnd.uniform(0.035, 0.055)
+        parts.append((o, (Ls, w_, w_)))
+    for o, sc_ in parts:   # 2-3 frames: full, stretched and dimmer, gone
+        o.scale = tuple(x * 0.5 for x in sc_)
         o.keyframe_insert('scale', frame=f0 - 1)
         o.scale = sc_
         o.keyframe_insert('scale', frame=f0)
-        o.scale = (sc_[0] * 1.2, sc_[1] * 0.8, sc_[2] * 0.8)
+        o.scale = (sc_[0] * 1.25, sc_[1] * 0.7, sc_[2] * 0.7)
         o.keyframe_insert('scale', frame=f0 + 1)
-        o.scale = (sc_[0] * 1.3, sc_[1] * 0.4, sc_[2] * 0.4)
+        o.scale = (sc_[0] * 1.35, sc_[1] * 0.35, sc_[2] * 0.35)
         o.keyframe_insert('scale', frame=f0 + 2)
         kcol(o, f0, a=1.0)
-        kcol(o, f0 + 1, a=0.7)
+        kcol(o, f0 + 1, a=0.55)
         kcol(o, f0 + 2, a=0.0)
-        K.show_between(o, int(f0), int(f0) + 3)
-    P.light(mw.translation + mw.to_3x3().normalized() @ Vector((0.4 * s, 0, 0)), t, pcol, energy=450 * s, dur=0.08,
-            radius=0.25 * s)
+        K.show_between(o, int(f0), int(f0) + 2 + (1 if s > 1.2 else 0))
+    P.light(mw.translation + mw.to_3x3().normalized() @ Vector((0.3 * s, 0, 0)), t, pcol, energy=110 * s, dur=0.07,
+            radius=0.2 * s)
     if gun:
         fwd = (mw.to_3x3().normalized() @ Vector((1, 0, 0))).normalized()
         base = mw.translation
-        for i in range(6):
-            smoke_puff(P, base + fwd * (0.25 + 0.17 * i) * s + _rand_perp(P, fwd) * 0.06 * s, t + 0.02 + 0.012 * i,
-                       r0=0.2 * s, r1=(0.6 + 0.08 * i) * s, life=P.rnd.uniform(1.2, 1.6),
-                       vel=fwd * (3.0 - 0.45 * i) * s + _rand_perp(P, fwd) * 0.4 + Vector((0, 0, 0.3)),
-                       dens=0.45, hot=1.2 if i < 2 else 0.0)
+        for i in range(4):   # quick puff that pushes out, slows and drifts off
+            smoke_puff(P, base + fwd * (0.2 + 0.15 * i) * s + _rand_perp(P, fwd) * 0.05 * s, t + 0.03 + 0.012 * i,
+                       r0=0.12 * s, r1=(0.45 + 0.07 * i) * s, life=P.rnd.uniform(0.9, 1.3),
+                       vel=fwd * (3.5 - 0.6 * i) * s + _rand_perp(P, fwd) * 0.3 + Vector((0, 0, 0.35)),
+                       dens=0.4, hot=0.8 if i == 0 else 0.0, wind=(0.6, 0.25, 0.35))
     return rig
 
 
@@ -735,9 +748,9 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
         head = glow(P, 'SlugHead', col, kind='slug', fx_e=3.2, fx_p=0.8, fx_hot=1.0)
         head.parent = rig
         head.scale = (size * 1.5, size * 0.42, size * 0.42)
-        glo = glow(P, 'SlugGlow', sat, kind='slug', alpha=0.8, fx_e=1.4, fx_p=2.4, fx_hot=0.0)
+        glo = glow(P, 'SlugGlow', sat, kind='slug', alpha=0.8, fx_e=1.2, fx_p=2.6, fx_hot=0.0)
         glo.parent = rig
-        glo.scale = (size * 3.2, size * 1.7, size * 1.7)
+        glo.scale = (size * 2.6, size * 1.2, size * 1.2)
         # motion streak: about one frame of travel (plus motion blur in finals)
         Ls = min(max(size * 4, v_frame * (0.6 if streak else 0.4)), 4.0) * 0.5
         st = glow(P, 'SlugStreak', sat, kind='slug', fx_e=2.4, fx_p=1.3, fx_tail=1.0, fx_hot=0.25)
@@ -989,7 +1002,8 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
         g = _curve(P, 'BoltGlow', trunk, width * 2.8, taper, res=3)
         g.color = (*color, 1)
         g['fx_e'], g['fx_p'] = 2.2, 3.0
-        h = _curve(P, 'BoltGlow', trunk, width * 8.0, taper, res=3)
+        tap_h = [0.12 + 0.88 * math.sin(math.pi * i / (nn - 1)) for i in range(nn)]   # haze pinches at the ends
+        h = _curve(P, 'BoltGlow', trunk, width * 8.0, tap_h, res=3)
         h.color = (*color, 0.5)
         h['fx_e'], h['fx_p'] = 0.8, 3.5
         objs += [g, h]
@@ -1080,8 +1094,8 @@ def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, s
         first = False
         f += nfr
     # contact + source glows (flickering, following the ends)
-    for fn, r, nm in ((fn1, 0.2 + width * 3, 'BoltContact'), (fn0, 0.12 + width * 2, 'BoltSource')):
-        o = _glow(P, nm, color, loc=fn(f0), scale=(r,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.8)
+    for fn, r, nm in ((fn1, 0.1 + width * 2, 'BoltContact'), (fn0, 0.08 + width * 1.5, 'BoltSource')):
+        o = _glow(P, nm, color, loc=fn(f0), scale=(r,) * 3, fx_e=3.0, fx_p=2.2, fx_hot=0.9)
         for fr in range(f0, f1 + 2):
             kprop(o, 'fx_e', fr, 3.0 * P.rnd.uniform(0.55, 1.0) if fr < f1 else 1.2, const=True)
             if moving:
@@ -1090,7 +1104,10 @@ def lightning(P, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, s
         K.show_between(o, f0, f1 + 2)
     if light:
         L = (fn1(f0) - fn0(f0)).length
-        _pool_light(P, f0, f1, color, 600 + 30 * L, 0.3, lambda fr: fn1(fr) + Vector((0, 0, 0.4)), lo=0.45, hi=1.0)
+        def _hug(v):   # sit the light just above the ground when the contact is near it: tight hotspot, no smear
+            gz = _gz(P, v.x, v.y)
+            return Vector((v.x, v.y, gz + 0.1)) if getattr(P, 'ground', None) and v.z - gz < 1.2 else v + Vector((0, 0, 0.12))
+        _pool_light(P, f0, f1, color, 70 + 3 * L, 0.06, lambda fr: _hug(fn1(fr)), lo=0.45, hi=1.0)   # low + weak: tight hotspot, no ground smear
     bpy.context.scene.frame_set(cur)
     return t1
 
@@ -1412,8 +1429,10 @@ def shield_ripple_mat(P):
     ring3 = b.math('MULTIPLY', gauss(b.math('SUBTRACT', dist, b.math('MULTIPLY', front, 0.3)), b.math('MULTIPLY', w, 0.6)), 0.35)
     life = b.math('SUBTRACT', 1.0, b.math('DIVIDE', age, b.attr('fx_life')), clamp=True)
     rings = b.math('MULTIPLY', b.math('ADD', b.math('ADD', ring1, ring2), ring3), b.math('MULTIPLY', life, life))
+    # rings only light up once they have left the impact point (no soft blob at the centre)
+    rings = b.math('MULTIPLY', rings, b.math('DIVIDE', dist, b.math('MULTIPLY', b.attr('fx_R'), 0.14), clamp=True))
     spot = b.math('MULTIPLY', gauss(dist, b.attr('fx_sr')), b.math('EXPONENT', b.math('MULTIPLY', age, -5.0)))
-    local = b.math('MULTIPLY', gauss(dist, b.math('MULTIPLY', b.attr('fx_R'), 0.45)),
+    local = b.math('MULTIPLY', gauss(dist, b.math('MULTIPLY', b.attr('fx_R'), 0.28)),
                    b.math('MULTIPLY', b.math('EXPONENT', b.math('MULTIPLY', age, -2.2)), b.attr('fx_local')))
     v = b.math('ADD', b.math('ADD', rings, b.math('MULTIPLY', spot, b.attr('fx_spot'))), local)
     fac = b.math('MULTIPLY', v, oi.outputs['Alpha'], clamp=True)
@@ -1514,9 +1533,9 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
     f1 = min(P.T(t + life), P.T(t_end))
     rip = shield_ripple_mat(P)
     if arc:   # Arcadian: crisper, thinner rings, the honeycomb carries the light
-        layers = ((shell, 1.004, 1.5, 0.8, 0.5, 0.1, 0.045), (lat, 1.006, 3.2, 1.0, 1.0, 0.7, 0.06))
+        layers = ((shell, 1.004, 1.5, 0.8, 0.6, 0.04, 0.045), (lat, 1.006, 3.2, 1.0, 0.8, 0.45, 0.06))
     else:
-        layers = ((shell, 1.004, 2.2, 0.85, 0.6, 0.25, 0.07), (lat, 1.006, 3.0, 1.0, 1.0, 0.9, 0.07))
+        layers = ((shell, 1.004, 2.2, 0.85, 0.7, 0.06, 0.06), (lat, 1.006, 3.0, 1.0, 0.8, 0.5, 0.06))
     for src, scale, e, a, spot, local, wk in layers:
         o = src.copy()
         K.link(o)
@@ -1535,7 +1554,7 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         o['fx_v'] = R * 2.4
         o['fx_w'] = R * wk
         o['fx_life'] = life
-        o['fx_sr'] = R * 0.05
+        o['fx_sr'] = R * 0.022
         o['fx_e'] = e
         o['fx_spot'] = spot
         o['fx_local'] = local
@@ -1546,10 +1565,10 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         K.set_interp(o, 'LINEAR')
         K.show_between(o, int(f0), int(f1) + 1)
     # surface flash + sparks glancing off along the surface
-    flash(P, surf, t, 0.3 + R * 0.035, color, frames=(1, 2, 4), e=2.8, hot=0.5, name='ShieldFlash')
+    flash(P, surf, t, 0.12 + R * 0.012, color, frames=(1, 1, 3), e=3.0, hot=0.7, name='ShieldFlash')
     sparks(P, surf, t, n=10, speed=8.0, color=color, axis=n, spread=75, life=(0.15, 0.45), width=0.02,
            gravity=4.0)
-    P.light(surf + n * 0.6, t, color, energy=1600, dur=0.2, radius=0.4)
+    P.light(surf + n * 0.6, t, color, energy=900, dur=0.15, radius=0.25)
 
 
 def shield_push(P, shell, actor, t0, t1, release=0.6, reach=None, stretch=None):
