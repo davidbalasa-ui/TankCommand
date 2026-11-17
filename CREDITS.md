@@ -108,3 +108,4 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | Font | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
 | Inter (public/fonts) | The Inter Project Authors | SIL OFL 1.1 (public/fonts/OFL.txt) | https://github.com/rsms/inter | Menu and HUD text |
+| Oxanium (public/fonts) | The Oxanium Project Authors | SIL OFL 1.1 (public/fonts/OFL-Oxanium.txt) | https://github.com/sevmeyer/oxanium | Logo and title menu |

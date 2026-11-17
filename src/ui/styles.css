@@ -1,4 +1,16 @@
 @font-face {
+  font-family: Oxanium;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/oxanium-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: Oxanium;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/oxanium-800.woff2') format('woff2');
+}
+@font-face {
   font-family: Inter;
   font-weight: 400;
   font-display: swap;
@@ -3328,165 +3340,542 @@ button.danger {
   }
 }
 
-/* ---------- Title screen (redesign v2) ----------
-   The battle behind the menu stays visible: the shade only darkens the menu column, a vignette
-   frames the picture, and the menu sits on glass panels that slide in one after another. */
-.screen-title .title-shade {
-  background:
-    linear-gradient(90deg, rgba(4, 8, 14, 0.9) 0%, rgba(4, 8, 14, 0.62) 30%, rgba(4, 8, 14, 0.08) 58%, transparent 100%),
-    radial-gradient(ellipse 120% 95% at 60% 50%, transparent 55%, rgba(2, 5, 10, 0.7) 100%);
+/* ---------- Title screen (v3: premium pass) ----------
+   A dusk battle fills the screen. The menu column sits on a soft shade at the left, the picture
+   is framed top and bottom like a film still, embers drift across it, and on launch the whole
+   thing opens from black: emblem, name, then the menu, one after another. Everything that moves
+   here is transform or opacity only, so it costs the phone nothing next to the 3D behind it. */
+.screen-title {
+  --display: Oxanium, Inter, system-ui, sans-serif;
+  --gold: #ffc66b;
+  --ease-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+  background: #04070d;
+  overflow: hidden;
 }
 
+/* Until the live scene is in (and on low graphics, always) a painted dusk stands in for it. */
+.screen-title .title-backdrop {
+  background:
+    radial-gradient(ellipse 60% 26% at 74% 33%, rgba(255, 158, 84, 0.5) 0%, rgba(214, 104, 60, 0.18) 55%, transparent 100%),
+    linear-gradient(180deg, #070d1f 0%, #1c2146 22%, #5a3a4e 31%, #2a2a26 36%, #171c16 60%, #0a0e0c 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+.screen-title .title-backdrop canvas {
+  transition: opacity 1.4s ease;
+}
+
+.screen-title .title-shade {
+  background:
+    /* film-still framing: a little weight at the top, more at the bottom */
+    linear-gradient(180deg, rgba(3, 6, 14, 0.55) 0%, transparent 24%, transparent 66%, rgba(3, 5, 10, 0.82) 100%),
+    /* the menu column */
+    linear-gradient(90deg, rgba(3, 6, 12, 0.92) 0%, rgba(3, 6, 12, 0.72) 26%, rgba(3, 6, 12, 0.18) 52%, transparent 70%),
+    /* vignette */
+    radial-gradient(ellipse 110% 100% at 62% 46%, transparent 52%, rgba(1, 3, 8, 0.72) 100%);
+}
+
+/* A hairline down the edge of the menu column, blue fading to gold: the two sides of the war. */
+.screen-title .title-shade::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 26px;
+  bottom: 22px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(95, 227, 255, 0.55) 18%, rgba(95, 227, 255, 0.18) 60%, rgba(255, 198, 107, 0.5) 88%, transparent);
+}
+
+/* ----- embers ----- */
+.title-embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.title-embers i {
+  position: absolute;
+  left: calc(28% + var(--x) * 0.7%);
+  bottom: -12px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe2b0 0%, #ff9a3c 45%, rgba(255, 120, 40, 0) 72%);
+  opacity: 0;
+  animation: title-ember var(--t) linear var(--d) infinite;
+  will-change: transform, opacity;
+}
+
+.title-embers i:nth-child(1) { --x: 6; --s: 6px; --t: 13s; --d: -2s; --dx: 70px; }
+.title-embers i:nth-child(2) { --x: 17; --s: 5px; --t: 17s; --d: -9s; --dx: 120px; }
+.title-embers i:nth-child(3) { --x: 29; --s: 7px; --t: 11s; --d: -5s; --dx: 40px; }
+.title-embers i:nth-child(4) { --x: 38; --s: 5px; --t: 19s; --d: -14s; --dx: 150px; }
+.title-embers i:nth-child(5) { --x: 47; --s: 6px; --t: 14s; --d: -1s; --dx: 90px; }
+.title-embers i:nth-child(6) { --x: 55; --s: 8px; --t: 12s; --d: -7s; --dx: 30px; }
+.title-embers i:nth-child(7) { --x: 63; --s: 5px; --t: 16s; --d: -11s; --dx: 110px; }
+.title-embers i:nth-child(8) { --x: 71; --s: 6px; --t: 18s; --d: -4s; --dx: 60px; }
+.title-embers i:nth-child(9) { --x: 79; --s: 7px; --t: 13s; --d: -10s; --dx: 100px; }
+.title-embers i:nth-child(10) { --x: 86; --s: 5px; --t: 15s; --d: -6s; --dx: 50px; }
+.title-embers i:nth-child(11) { --x: 93; --s: 6px; --t: 20s; --d: -16s; --dx: 80px; }
+.title-embers i:nth-child(12) { --x: 12; --s: 5px; --t: 21s; --d: -18s; --dx: 140px; }
+.title-embers i:nth-child(13) { --x: 51; --s: 5px; --t: 22s; --d: -12s; --dx: 20px; }
+.title-embers i:nth-child(14) { --x: 67; --s: 7px; --t: 10s; --d: -3s; --dx: 130px; }
+
+@keyframes title-ember {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  12% {
+    opacity: 0.85;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx), -86vh, 0) scale(0.35);
+  }
+}
+
+html.quality-low .title-embers {
+  display: none;
+}
+
+/* ----- logo ----- */
 .screen-title .title-logo {
-  top: 22px;
-  animation: title-logo-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  left: 40px;
+  top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.title-emblem {
+  width: 66px;
+  height: 66px;
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.6));
 }
 
 .screen-title h1.title-name {
-  font-size: 44px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  line-height: 0.95;
-  /* Brushed metal: light at the top edge, a darker band through the middle. */
-  background: linear-gradient(180deg, #ffffff 0%, #dfe8f2 38%, #8c9aab 52%, #c9d4e0 70%, #f4f8fc 100%);
+  margin: 0;
+  font-family: var(--display);
+  font-size: 50px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  line-height: 0.84;
+  /* Machined metal with a highlight that passes across it now and then. */
+  background:
+    linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.95) 50%, transparent 58%) no-repeat,
+    linear-gradient(180deg, #ffffff 0%, #e3ebf5 34%, #8794a6 54%, #c6d1de 68%, #f4f8fc 100%);
+  background-size: 250% 100%, 100% 100%;
+  background-position: 180% 0, 0 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(63, 216, 255, 0.18));
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
+  animation: title-sheen 9s ease-in-out 2.6s infinite;
 }
 
 .screen-title .title-name span {
   display: block;
-  margin-top: 2px;
-  font-size: 0.62em;
-  letter-spacing: 0.46em;
-  background: linear-gradient(180deg, #b6f2ff 0%, #3fd8ff 55%, #1a95c0 100%);
+  margin-top: 7px;
+  font-size: 0.4em;
+  font-weight: 700;
+  letter-spacing: 0.44em;
+  line-height: 1;
+  background: linear-gradient(180deg, #c9f6ff 0%, #3fd8ff 60%, #1f9fcb 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.title-rule {
+.screen-title .title-rule {
   position: relative;
-  width: 210px;
+  width: 100%;
   height: 2px;
-  margin-top: 10px;
+  margin-top: 9px;
   overflow: hidden;
-  background: linear-gradient(90deg, rgba(63, 216, 255, 0.55), rgba(63, 216, 255, 0.12) 70%, transparent);
+  background: linear-gradient(90deg, rgba(95, 227, 255, 0.85), rgba(95, 227, 255, 0.2) 55%, rgba(255, 198, 107, 0.7) 100%);
+  transform-origin: left center;
 }
 
-.title-rule::after {
+.screen-title .title-rule::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 60px;
-  left: -60px;
-  background: linear-gradient(90deg, transparent, #ffb15c, transparent);
-  animation: title-rule-sweep 6s ease-in-out 1.2s 3;
+  left: 0;
+  width: 70px;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  transform: translateX(-80px);
+  animation: title-rule-sweep 9s ease-in-out 2.6s infinite;
 }
 
+@keyframes title-sheen {
+  0%,
+  78% {
+    background-position: 180% 0, 0 0;
+  }
+  96%,
+  100% {
+    background-position: -80% 0, 0 0;
+  }
+}
+
+@keyframes title-rule-sweep {
+  0%,
+  80% {
+    transform: translateX(-80px);
+  }
+  98%,
+  100% {
+    transform: translateX(360px);
+  }
+}
+
+/* ----- menu ----- */
 .screen-title .title-menu {
-  top: 128px;
-  width: 320px;
-  gap: 9px;
+  left: 40px;
+  top: 132px;
+  width: 322px;
+  gap: 8px;
 }
 
 .screen-title .title-menu button.menu-button {
   position: relative;
   height: 54px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 210, 255, 0.2);
-  background: linear-gradient(90deg, rgba(16, 28, 44, 0.9), rgba(12, 20, 32, 0.74));
-
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  padding: 0 14px 0 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(150, 205, 245, 0.16);
+  background: linear-gradient(90deg, rgba(14, 24, 40, 0.86), rgba(10, 17, 29, 0.6));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  transition:
+    transform 0.16s var(--ease-out),
+    border-color 0.16s ease,
+    background 0.16s ease;
 }
 
 /* A lit edge on the left of each entry. */
 .screen-title .title-menu button.menu-button::before {
   content: '';
   position: absolute;
-  left: -1px;
-  top: 10px;
-  bottom: 10px;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: rgba(63, 216, 255, 0.55);
-  transition: background 0.15s ease, top 0.15s ease, bottom 0.15s ease;
+  background: linear-gradient(180deg, var(--cyan-hi), rgba(63, 216, 255, 0.25));
+  transition: width 0.16s var(--ease-out);
 }
 
 .screen-title .title-menu button.menu-button:hover,
 .screen-title .title-menu button.menu-button:focus-visible {
-  transform: translateX(4px);
-  border-color: rgba(95, 227, 255, 0.55);
+  transform: translateX(5px);
+  border-color: rgba(95, 227, 255, 0.6);
+  background: linear-gradient(90deg, rgba(20, 36, 58, 0.92), rgba(12, 22, 36, 0.7));
 }
 
 .screen-title .title-menu button.menu-button:hover::before,
 .screen-title .title-menu button.menu-button:focus-visible::before {
-  top: 6px;
-  bottom: 6px;
-  background: var(--cyan-hi);
+  width: 5px;
 }
 
 .screen-title .title-menu button.menu-button:active {
-  transform: translateX(2px) scale(0.985);
+  transform: translateX(2px) scale(0.98);
+  border-color: var(--cyan-hi);
+  background: linear-gradient(90deg, rgba(30, 62, 92, 0.95), rgba(14, 28, 44, 0.8));
 }
 
-.screen-title .title-menu button.menu-button.primary {
-  border-color: rgba(95, 227, 255, 0.75);
-  background: linear-gradient(90deg, rgba(21, 147, 184, 0.92), rgba(15, 108, 140, 0.72));
-  box-shadow: 0 0 22px rgba(63, 216, 255, 0.32), 0 6px 18px rgba(0, 0, 0, 0.35);
+.screen-title .menu-button-title {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.05;
 }
 
-.screen-title .title-menu button.menu-button.primary::before {
-  background: #ffb15c;
+.screen-title .menu-button-sub {
+  margin-top: 3px;
+  letter-spacing: 0.02em;
+  color: #93a8bf;
 }
 
 .screen-title .title-menu .menu-button .ico {
   color: var(--cyan-hi);
 }
 
-.screen-title .title-menu .menu-button.primary .ico {
+.screen-title .title-menu .menu-button .chev {
+  width: 18px;
+  opacity: 0.45;
+  transition: transform 0.16s var(--ease-out), opacity 0.16s ease;
+}
+
+.screen-title .title-menu button.menu-button:hover .chev,
+.screen-title .title-menu button.menu-button:active .chev {
+  transform: translateX(3px);
+  opacity: 1;
+}
+
+/* The entry the player most likely wants (Continue, or Campaign on a first launch) is the one
+   lit plate in the column, with a slow highlight passing over it. */
+.screen-title .title-menu button.menu-button.primary,
+.screen-title .title-menu button.menu-button.lead {
+  border-color: rgba(120, 232, 255, 0.8);
+  background: linear-gradient(90deg, rgba(24, 150, 190, 0.95) 0%, rgba(14, 96, 130, 0.82) 60%, rgba(12, 70, 100, 0.62) 100%);
+  box-shadow: 0 0 26px rgba(63, 216, 255, 0.3), 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.screen-title .title-menu button.menu-button.primary::before,
+.screen-title .title-menu button.menu-button.lead::before {
+  background: linear-gradient(180deg, #ffe0a6, #ff9a2e);
+}
+
+.screen-title .title-menu button.menu-button.primary::after,
+.screen-title .title-menu button.menu-button.lead::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 90px;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+  transform: translateX(-120px) skewX(-18deg);
+  animation: title-plate-sheen 5.5s ease-in-out 2.2s infinite;
+  pointer-events: none;
+}
+
+.screen-title .title-menu button.menu-button.primary .ico,
+.screen-title .title-menu button.menu-button.lead .ico,
+.screen-title .title-menu button.menu-button.primary .chev,
+.screen-title .title-menu button.menu-button.lead .chev {
   color: #fff;
+  opacity: 0.9;
 }
 
-.screen-title .title-menu button.menu-button:nth-child(1) {
-  animation-delay: 0.15s;
+.screen-title .title-menu button.menu-button.primary .menu-button-sub,
+.screen-title .title-menu button.menu-button.lead .menu-button-sub {
+  color: #d3f3fd;
 }
 
-.screen-title .title-menu button.menu-button:nth-child(2) {
-  animation-delay: 0.23s;
+@keyframes title-plate-sheen {
+  0%,
+  62% {
+    transform: translateX(-120px) skewX(-18deg);
+  }
+  90%,
+  100% {
+    transform: translateX(380px) skewX(-18deg);
+  }
 }
 
-.screen-title .title-menu button.menu-button:nth-child(3) {
-  animation-delay: 0.31s;
-}
-
+/* ----- small row and version ----- */
 .screen-title .title-small-row {
-  animation: title-item-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) 0.42s both;
+  left: 40px;
+  bottom: 18px;
+  gap: 8px;
 }
 
 .screen-title .title-small-row button.icon-button {
-  border: 1px solid rgba(140, 210, 255, 0.2);
-  background: rgba(12, 20, 32, 0.7);
+  width: 54px;
+  height: 50px;
+  border-radius: 4px;
+  border: 1px solid rgba(150, 205, 245, 0.14);
+  background: rgba(9, 15, 26, 0.6);
+  color: #cfe0f2;
+  transition: transform 0.16s var(--ease-out), border-color 0.16s ease, background 0.16s ease;
+}
 
+.screen-title .title-small-row button.icon-button:hover,
+.screen-title .title-small-row button.icon-button:focus-visible {
+  border-color: rgba(95, 227, 255, 0.55);
+}
+
+.screen-title .title-small-row button.icon-button:active {
+  transform: scale(0.94);
+  background: rgba(30, 62, 92, 0.9);
+}
+
+.screen-title .title-small-row .icon-caption {
+  letter-spacing: 0.04em;
 }
 
 .screen-title .title-version {
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.08em;
+  right: 18px;
+  bottom: 14px;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.34);
 }
 
-@keyframes title-logo-in {
+/* ----- opening ----- */
+.title-curtain {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* Coming back from another screen: a quick settle, no ceremony. */
+.screen-title.title-return .title-logo,
+.screen-title.title-return .title-menu,
+.screen-title.title-return .title-small-row {
+  animation: title-settle 0.35s var(--ease-out) both;
+}
+
+@keyframes title-settle {
   from {
     opacity: 0;
-    transform: translateY(-10px);
-    letter-spacing: 0.3em;
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
+    transform: none;
+  }
+}
+
+/* First launch: black, the emblem draws itself, the name rises, the picture opens, the menu
+   arrives. About two seconds, and every button works from the first frame. */
+.screen-title.title-intro .title-curtain {
+  animation: title-curtain 1.9s ease 0.5s both;
+}
+
+.screen-title.title-intro .title-shade::after {
+  transform-origin: top;
+  animation: title-line 1.1s var(--ease-out) 1s both;
+}
+
+.screen-title.title-intro .title-logo {
+  z-index: 2;
+}
+
+.screen-title.title-intro .emblem-edge {
+  stroke-dasharray: 1;
+  animation: title-draw 1s ease-in-out 0.1s both;
+}
+
+.screen-title.title-intro .emblem-plate,
+.screen-title.title-intro .emblem-split {
+  animation: title-fade 0.6s ease 0.7s both;
+}
+
+.screen-title.title-intro .emblem-terran {
+  animation: title-half-left 0.6s var(--ease-out) 0.75s both;
+}
+
+.screen-title.title-intro .emblem-arcadian {
+  animation: title-half-right 0.6s var(--ease-out) 0.9s both;
+}
+
+.screen-title.title-intro .title-wordmark {
+  animation: title-name-in 0.9s var(--ease-out) 0.55s both;
+}
+
+.screen-title.title-intro .title-rule {
+  animation: title-rule-in 0.8s var(--ease-out) 1.15s both;
+}
+
+.screen-title.title-intro .title-menu button.menu-button {
+  animation: title-item-in 0.6s var(--ease-out) both;
+}
+
+.screen-title.title-intro .title-menu button.menu-button:nth-child(1) {
+  animation-delay: 1.45s;
+}
+
+.screen-title.title-intro .title-menu button.menu-button:nth-child(2) {
+  animation-delay: 1.55s;
+}
+
+.screen-title.title-intro .title-menu button.menu-button:nth-child(3) {
+  animation-delay: 1.65s;
+}
+
+.screen-title.title-intro .title-small-row,
+.screen-title.title-intro .title-version {
+  animation: title-fade 0.7s ease 1.9s both;
+}
+
+@keyframes title-curtain {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes title-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes title-line {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes title-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes title-half-left {
+  from {
+    opacity: 0;
+    transform: translateX(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-half-right {
+  from {
+    opacity: 0;
+    transform: translateX(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-name-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes title-rule-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
     transform: none;
   }
 }
@@ -3494,7 +3883,7 @@ button.danger {
 @keyframes title-item-in {
   from {
     opacity: 0;
-    transform: translateX(-18px);
+    transform: translateX(-22px);
   }
   to {
     opacity: 1;
@@ -3502,51 +3891,139 @@ button.danger {
   }
 }
 
-@keyframes title-rule-sweep {
-  0% {
-    left: -60px;
-  }
-  45%,
-  100% {
-    left: 220px;
-  }
-}
-
+/* ----- upright phone ----- */
 @media (max-width: 560px) {
+  .screen-title .title-logo {
+    left: 24px;
+    right: 24px;
+    top: 34px;
+  }
+
+  .title-emblem {
+    width: 58px;
+    height: 58px;
+  }
+
   .screen-title h1.title-name {
-    font-size: 38px;
+    font-size: 42px;
   }
 
   .screen-title .title-menu {
-    top: 136px;
+    left: 24px;
+    right: 24px;
+    top: auto;
+    bottom: 104px;
     width: auto;
+  }
+
+  .screen-title .title-small-row {
+    left: 24px;
+    bottom: 28px;
   }
 
   .screen-title .title-shade {
     background:
-      linear-gradient(180deg, rgba(4, 8, 14, 0.88) 0%, rgba(4, 8, 14, 0.55) 45%, rgba(4, 8, 14, 0.2) 72%, rgba(4, 8, 14, 0.6) 100%);
+      linear-gradient(180deg, rgba(3, 6, 12, 0.86) 0%, rgba(3, 6, 12, 0.3) 26%, transparent 42%, rgba(3, 6, 12, 0.55) 62%, rgba(3, 6, 12, 0.94) 100%);
+  }
+
+  .screen-title .title-shade::after {
+    display: none;
+  }
+
+  .title-embers i {
+    left: calc(var(--x) * 1%);
   }
 }
 
+/* ----- short screens (small phones held sideways) ----- */
 @media (max-height: 380px) {
+  .screen-title .title-logo {
+    top: 16px;
+  }
+
+  .title-emblem {
+    width: 54px;
+    height: 54px;
+  }
+
   .screen-title h1.title-name {
-    font-size: 36px;
+    font-size: 40px;
   }
 
   .screen-title .title-menu {
-    top: 108px;
+    top: 104px;
+    gap: 6px;
   }
 
   .screen-title .title-menu button.menu-button {
     height: 48px;
   }
+
+  .screen-title .title-small-row {
+    bottom: 12px;
+  }
+
+  .screen-title .title-small-row button.icon-button {
+    height: 46px;
+  }
+}
+
+/* ----- tablets and desktop: the same composition, scaled up ----- */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .screen-title .title-logo {
+    left: 64px;
+    top: 52px;
+    gap: 20px;
+  }
+
+  .title-emblem {
+    width: 96px;
+    height: 96px;
+  }
+
+  .screen-title h1.title-name {
+    font-size: 74px;
+  }
+
+  .screen-title .title-menu {
+    left: 64px;
+    top: 232px;
+    width: 400px;
+    gap: 12px;
+  }
+
+  .screen-title .title-menu button.menu-button {
+    height: 68px;
+  }
+
+  .screen-title .menu-button-title {
+    font-size: 22px;
+  }
+
+  .screen-title .menu-button-sub {
+    font-size: 13px;
+  }
+
+  .screen-title .title-small-row {
+    left: 64px;
+    bottom: 40px;
+  }
+
+  .screen-title .title-shade::after {
+    left: 36px;
+    top: 52px;
+    bottom: 40px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen-title .title-logo,
-  .screen-title .title-menu button.menu-button,
-  .screen-title .title-small-row,
-  .title-rule::after {
-    animation: none;
+  .screen-title *,
+  .screen-title *::before,
+  .screen-title *::after {
+    animation: none !important;
+  }
+
+  .title-embers {
+    display: none;
   }
 }

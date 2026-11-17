@@ -2,6 +2,7 @@ import { button } from './controls';
 import { Hud } from './hud';
 import { drawMapPreview } from './mapPreview';
 import { icon, type IconName } from './icons';
+import { emblem } from './emblem';
 import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './widgets';
 import { APP_VERSION } from '../platform/appInfo';
 import type {
@@ -136,6 +137,10 @@ function formatClock(seconds: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/** How many embers drift across the title picture. */
+const TITLE_EMBERS = 14;
+let titleIntroPlayed = false;
+
 export function createScreens(): Record<ScreenId, ScreenModule> {
   const screens: Record<ScreenId, ScreenModule> = {
     title: makeScreen('title', 'TankCommand', (root, ctx) => {
@@ -144,8 +149,17 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       backdrop.className = 'title-backdrop';
       const shade = document.createElement('div');
       shade.className = 'title-shade';
+      // Drifting embers off the battlefield, in front of the picture and behind the menu.
+      const embers = document.createElement('div');
+      embers.className = 'title-embers';
+      embers.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < TITLE_EMBERS; i += 1) {
+        embers.append(document.createElement('i'));
+      }
       const logo = document.createElement('div');
       logo.className = 'title-logo';
+      const wordmark = document.createElement('div');
+      wordmark.className = 'title-wordmark';
       const name = document.createElement('h1');
       name.className = 'title-name';
       const accent = document.createElement('span');
@@ -156,7 +170,21 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const rule = document.createElement('div');
       rule.className = 'title-rule';
       rule.setAttribute('aria-hidden', 'true');
-      logo.append(name, rule);
+      wordmark.append(name, rule);
+      logo.append(emblem('emblem title-emblem'), wordmark);
+      // The opening plays once per launch; coming back from another screen is a quick fade.
+      // Automated browsers skip it unless asked, like the live backdrop below.
+      let intro = !navigator.webdriver;
+      try {
+        intro = intro || window.localStorage.getItem('tc.titleIntro') === 'on';
+      } catch {
+        // No storage: keep the default.
+      }
+      root.classList.add(intro && !titleIntroPlayed ? 'title-intro' : 'title-return');
+      titleIntroPlayed = true;
+      const curtain = document.createElement('div');
+      curtain.className = 'title-curtain';
+      curtain.setAttribute('aria-hidden', 'true');
 
       const menu = document.createElement('div');
       menu.className = 'title-menu';
@@ -176,6 +204,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
               }
               setMenuButtonSubtitle(resume, parts.join(' · '));
               resume.style.display = '';
+              campaign.classList.remove('lead');
             } else {
               resume.remove();
             }
@@ -184,10 +213,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             resume.remove();
           });
       }
+      // With no game to continue, Campaign is the lit entry.
+      const campaign = menuButton('title', 'campaign', 'Campaign', `Training · ${FACTION_NAMES.human.split(' ')[0]} · ${FACTION_NAMES.alien}`, 'flag', () => {
+        ctx.go('campaignSelect');
+      });
+      campaign.classList.add('lead');
       menu.append(
-        menuButton('title', 'campaign', 'Campaign', `Training · ${FACTION_NAMES.human.split(' ')[0]} · ${FACTION_NAMES.alien}`, 'flag', () => {
-          ctx.go('campaignSelect');
-        }),
+        campaign,
         menuButton('title', 'skirmish', 'Skirmish', 'You vs 1 or 2 AI opponents', 'swords', () => {
           ctx.go('skirmishSetup');
         }),
@@ -209,7 +241,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const version = document.createElement('div');
       version.className = 'title-version';
       version.textContent = `v${APP_VERSION}`;
-      root.append(backdrop, shade, logo, menu, small, version);
+      root.append(backdrop, shade, embers, logo, menu, small, version, curtain);
 
       // Live 3D background. Automated browsers skip it unless asked (keeps e2e runs fast).
       let disposeBackdrop: (() => void) | null = null;
