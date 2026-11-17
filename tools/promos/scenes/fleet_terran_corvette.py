@@ -2,18 +2,19 @@
 lightning thrusters, lashing a Broadside battleship's flank as it passes. Two Terran corvettes
 are on its tail. The hero slaloms after it: down the Broadside's flank, hard across the gap,
 and down the far side of the Dreadnought, its spinal coilgun hammering in three-shot bursts
-(the rail slams back ~80% into the hull on every shot). The third burst tears the Arcadian
-apart beside the Dreadnought; the corvette punches through the smoke and the camera settles
-on a low hero frame of it banking past the Dreadnought's bow, wingman behind.
+(the rail slams back ~80% into the hull on every shot; the wingman fires single heavy shots on
+its own beat). The third burst tears the Arcadian apart; the hero punches through the drifting
+wreck and the camera settles on it against the planet.
 
-Scale: built at 0.3x the models.json ship sizes (corvette 13.5 m, Arcadian corvette 15 m,
-Broadside 78 m, Dreadnought 120 m) so the kit's game-scale effects read correctly.
-The action sits at z ~ 40 so kit debris (which stops at z = 0) never piles up on a plane.
+Scale: built at 0.3x the models.json ship sizes (corvette 13.5 m, Broadside 78 m, Dreadnought
+120 m; the Arcadian corvette is nudged up to 19.5 m so the target reads) so the kit's
+game-scale effects read correctly.
 
-Timeline (s): 0-2.0 low chase off the hero's left wing, the Broadside's flank behind, the
-Arcadian ahead lashing it 0.45-1.05 | 2.0-3.75 side tracking shot across the gap: bursts at
-1.95 (wide), 2.7 (hits) | 3.75-6.0 low front 3/4: last burst 3.35-3.65, Arcadian blows 3.85,
-hero bursts through the smoke, push in and end on the hero big with the Dreadnought behind.
+Timeline (s): 0-1.625 low off the hero's left wing, the Broadside's flank behind, the Arcadian
+ahead lashing it 0.45-1.05 | 1.625-3.92 high chase off the hero's right quarter through the
+hard bank across the gap: bursts 1.95 (wide), 2.6 and 3.2 (hits), wingman 2.3 / 2.95, the
+Arcadian fractures 3.55 | 3.92-6.0 from the inside of the slalom looking out: the hero punches
+through the drifting wreck, push in on it big against the planet.
 
 Ships are film placeholders: loaded by name, nose along +X (models.json kind 'ship'). Terran
 glow is already neon blue + amber; red accents are tinted orange and the glass portholes are
@@ -28,6 +29,7 @@ import bmesh  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 import promo_kit as K  # noqa: E402
+import promo_fx_weapons as WFX  # noqa: E402
 from promo_kit import COL, Promo  # noqa: E402
 
 P = Promo('fleet_terran_corvette', seconds=6.0, seed=23)
@@ -40,7 +42,7 @@ ORANGE = COL['terran_orange']
 
 SCALE = 0.3
 CV_SIZE = 45 * SCALE
-AC_SIZE = 50 * SCALE
+AC_SIZE = 50 * SCALE * 1.3     # nudged up so the target reads at phone size
 BS_SIZE = 260 * SCALE
 DN_SIZE = 400 * SCALE
 
@@ -150,7 +152,7 @@ def spline(keys):
 
 
 # ------------------------------------------------------------------------------- timing
-CUT1, CUT2 = 48 / 24, 94 / 24            # 2.0 s, 3.92 s
+CUT1, CUT2 = 39 / 24, 94 / 24            # 1.625 s, 3.92 s
 T_LASH0, T_LASH1 = 0.45, 1.05
 BURSTS = [(1.95, False), (2.6, True), (3.2, True)]   # (start, hits)
 SHOT_GAP = 0.15
@@ -184,11 +186,11 @@ h_pos = spline([
     (2.2, (70, 12, 40)),
     (2.7, (96, -12, 42)),
     (3.3, (126, -25, 41)),
-    (4.0, (160, -26, 40)),
-    (4.8, (200, -24, 42)),
-    (5.5, (232, -19, 46)),
-    (6.0, (255, -15, 48)),
-    (6.6, (282, -10, 50)),
+    (4.0, (160, -28, 40)),
+    (4.8, (202, -31, 42)),
+    (5.5, (236, -33, 45)),
+    (6.0, (262, -34, 47)),
+    (6.6, (292, -35, 49)),
 ])
 
 
@@ -435,36 +437,32 @@ def attach_new(before, parent):
 
 
 def thrust(actor, t0, t1, length, width):
-    before = set(bpy.data.objects)
+    """Gold lightning thrusters (kit lightning_thruster: crackling bolts that ride the ship)."""
     for p in AC_REAR:
-        P.lightning(p, p + Vector((-length, 0.15 * p.y, 0.1 * p.z)), t0, t1, color=GOLD,
-                    width=width, jag=0.22, branches=1, segs=8, glow=True)
-    attach_new(before, actor.root)
+        WFX.lightning_thruster(P, actor, t0, t1, local=p, axis=(-1, 0.1 * p.y, 0.08 * p.z), length=length,
+                               width=width, n=2, spread=0.3, color=GOLD, light=False)
 
 
-thrust(arc, 0.0, 1.4, 5.5, 0.08)
-thrust(arc, 1.4, T_KILL + 0.05, 7.5, 0.09)
+thrust(arc, 0.0, 1.4, 4.5, 0.05)
+thrust(arc, 1.4, T_KILL + 0.05, 6.0, 0.06)
 
 # Lash the Broadside's flank as it streaks past.
-f0, f1 = int(round(P.T(T_LASH0))), int(round(P.T(T_LASH1)))
-for f in range(f0, f1):
-    t = (f - 1) / FPS
-    hit = BSc(t) + Vector((lerp(-2, 22, (t - T_LASH0) / (T_LASH1 - T_LASH0)), 14.0, 1.5))
-    P.lightning(W(arc, t, AC_NOSE), hit, t, t + 1 / FPS, color=GOLD, width=0.11, jag=0.16,
-                branches=2, segs=12)
-    if (f - f0) % 4 == 0:
-        P.impact(hit, t, size=1.6, color=GOLD)
+def lash_hit(t):
+    return BSc(t) + Vector((lerp(-2, 22, (t - T_LASH0) / (T_LASH1 - T_LASH0)), 14.0, 1.5))
 
 
-def kill(actor, t, size=3.6):
-    p = W(actor, t)
-    before = set(bpy.data.objects)
-    P.explosion(p, t, size=size, debris=12)
-    for o in list(bpy.data.objects):
-        if o not in before and o.name.split('.')[0] == 'Scorch':
-            bpy.data.objects.remove(o, do_unlink=True)
-    P.puff(p, t + 0.35, size=size * 0.6, n=3, rise=1.0, life=2.0, color=(0.2, 0.19, 0.18), opacity=0.4)
-    actor.vanish(t + 1 / FPS)
+# one bolt with moving ends: from the Arcadian's nose, raking along the flank
+P.lightning(lambda t: W(arc, t, AC_NOSE), lash_hit, T_LASH0, T_LASH1, color=GOLD, width=0.11, jag=0.16,
+            branches=2, segs=12)
+for i in range(4):
+    t = T_LASH0 + 0.02 + i * 0.16
+    P.impact(lash_hit(t), t, size=1.4, color=GOLD)
+
+
+def kill(actor, t, size=5.0):
+    """Space kill: the Arcadian fractures into its own pieces, which drift on without
+    gravity (promo_fx.destroy handles space), with a fireball and sparks."""
+    actor.destroy(t, size=size, wreck=False, debris=12)
 
 
 kill(arc, T_KILL)
@@ -509,19 +507,21 @@ def cam_keys():
         return pos, look, 28
     shot(0, CUT1, 12, s1f)
 
-    # Shot 2: tracking beside the hero across the gap, Dreadnought ahead behind the action.
+    # Shot 2: high chase off the hero's right quarter: hero in the foreground, the Arcadian
+    # ahead taking the bursts, the Dreadnought's flank beyond.
     def s2f(t, u):
         h = h_pos(t)
-        pos = h + Vector((lerp(-12, -9, ss(u)), lerp(17, -15, ss(u)), lerp(-6, -5, ss(u))))
-        look = h.lerp(a_pos(min(t, T_KILL)), 0.4)
-        return pos, look, 24
+        pos = h + Vector((lerp(-19, -13, ss(u)), lerp(-7, -13, ss(u)), lerp(6.5, 6.0, ss(u))))
+        look = h.lerp(a_pos(min(t, T_KILL)), lerp(0.2, 0.36, ss(u)))
+        return pos, look, 26
     shot(CUT1, CUT2, 10, s2f)
 
-    # Shot 3: low front 3/4: the kill, the punch-through, push in to the hero frame.
+    # Shot 3: from the inside of the slalom, ahead and above, looking down and out past the
+    # hero: the planet fills the background, the Arcadian's wreck drifts through, push in.
     def s3f(t, u):
         h = h_pos(t)
-        pos = h + Vector((lerp(24, 11, ss(u)), lerp(-13, -5.5, ss(u)), lerp(-5, -2.5, ss(u))))
-        look = h + Vector((lerp(5, 1, ss(u)), 0, 0))
+        pos = h + Vector((lerp(5, 9, ss(u)), lerp(14, 8, ss(u)), lerp(10, 3.5, ss(u))))
+        look = h + Vector((lerp(-3, 0.5, ss(u)), lerp(-2, -1, ss(u)), lerp(-2, -0.5, ss(u))))
         return pos, look, 30
     shot(CUT2, 6.0, 12, s3f, last=False)
     return keys
@@ -529,5 +529,14 @@ def cam_keys():
 
 P.camera(cam_keys(), lens=28, cuts=(CUT1, CUT2))
 P.cam_shake(T_KILL, 0.25)
+
+# ------------------------------------------------------------------------------- sound cues
+# (the lash is one bolt with moving ends, which the audio recorder can't place)
+P.sfx(T_LASH0, 'zap_lightning', gain=1.0, pos=lash_hit(T_LASH0))
+P.sfx(T_LASH0, 'crackle_loop', gain=0.6, pos=lash_hit(0.75), dur=T_LASH1 - T_LASH0)
+P.sfx(T_LASH0 + 0.05, 'shield_hit', gain=0.4, pos=lash_hit(T_LASH0))
+P.sfx(1.6, 'whoosh', gain=0.8, pos=h_pos(1.8))
+P.sfx(CUT2 + 0.2, 'whoosh', gain=1.0, pos=h_pos(CUT2 + 0.4))
+P.sfx(5.0, 'thruster_blue', gain=0.6, pos=h_pos(5.0), dur=1.0)
 
 P.render()

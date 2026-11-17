@@ -3,12 +3,14 @@ Terran Dreadnought. Far below, two gold Arcadian Stingrays slide across the plan
 peel off one after another, each with a barrel roll, and dive on them. The lead Twin-X runs
 down the first Stingray, its four wingtip guns hammering in alternating pairs, and blows it
 apart; the second ray lashes the right wingman with gold lightning but is caught in a pincer
-by both wingmen and dies. The three re-form and come at the camera, X-wings spread, hero frame.
+by both wingmen (B: slow four-gun salvos, C: 3-round bursts) and dies. The three re-form and
+come at the camera, the Dreadnought behind them and the rays' wreckage drifting past.
 
 Timeline (s): 0-1.75 high over the Dreadnought behind the echelon, peel-offs at 0.5 / 0.75 /
-1.0 | 1.75-3.5 chase cam behind the lead: guns open 2.05, hits from 2.6, ray 1 blows 3.0, lead
-pulls up through the smoke | 3.5-6.0 the pincer: ray 2 lashes C 3.6, B and C open fire 3.85,
-ray 2 blows 4.35, the trio forms up and pushes at camera, end on the lead big and frontal.
+1.0 | 1.75-3.5 chase cam behind the lead: guns open 2.05, hits from 2.6, ray 1 fractures 3.0 |
+3.5-4.5 the pincer: ray 2 lashes C 3.6, B and C open fire 3.85, ray 2 fractures 4.35 |
+4.5-6.0 front 3/4 on the re-formed trio, push in, end on the lead big with the Dreadnought
+behind.
 
 Ships are film placeholders: loaded by name, nose along +X (models.json kind 'ship').
 Twin-X glow materials are tinted to Terran neon blue + orange in this scene only."""
@@ -22,6 +24,7 @@ import bmesh  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 import promo_kit as K  # noqa: E402
+import promo_fx_weapons as WFX  # noqa: E402
 from promo_kit import COL, Promo  # noqa: E402
 
 P = Promo('fleet_terran_twinx', seconds=6.0, seed=47)
@@ -146,7 +149,7 @@ def rel(keys):
 
 
 # ------------------------------------------------------------------------------- timing
-CUT1, CUT2, CUT3 = 42 / 24, 84 / 24, 114 / 24     # 1.75, 3.5, 4.75 s
+CUT1, CUT2, CUT3 = 42 / 24, 84 / 24, 108 / 24     # 1.75, 3.5, 4.5 s
 PEEL = (0.5, 0.75, 1.0)
 T_FIRE_A0, T_FIRE_A1 = 2.05, 2.95
 T_KILL1 = 3.0
@@ -178,8 +181,9 @@ s2_pos = rel([
     (4.0, (134, 62, -70)),
     (4.5, (128, 66, -66)),
 ])
-s1 = P.load('arcadian_stingray', label='ray1')
-s2 = P.load('arcadian_stingray', label='ray2')
+RAY_SIZE = 13.0   # nudged up from 10 so the rays read at phone size
+s1 = P.load('arcadian_stingray', size=RAY_SIZE, label='ray1')
+s2 = P.load('arcadian_stingray', size=RAY_SIZE, label='ray2')
 
 
 def s1_roll(t):
@@ -193,15 +197,17 @@ fly(s2, s2_pos, bank_up(1.4, 60))
 # ------------------------------------------------------------------------------- Twin-X
 # Hero frame: camera low and ahead-right of the lead; wingmen set behind it in camera space so
 # the end frame is a balanced arrowhead.
-S4_OFF0 = Vector((34, -22, -9))
-S4_OFF1 = Vector((18, -12, -6))
+# 3/4 front, a little above: the X-wings read in profile and the Dreadnought fills the
+# background behind the trio (they are heading home past the fleet)
+S4_OFF0 = Vector((21, 15, 6.5))
+S4_OFF1 = Vector((14, 9, 4.5))
 A_END = Vector((152, 22, -47))
 A_END_V = Vector((20, 4, 0))
 _fw = -S4_OFF1.normalized()
 _rt = _fw.cross(Vector((0, 0, 1))).normalized()
 _up = _rt.cross(_fw).normalized()
-WING_B = A_END + _fw * 13 + _rt * 10 + _up * 1.5
-WING_C = A_END + _fw * 13 - _rt * 10 - _up * 2.5
+WING_B = A_END + _fw * 17 + _rt * 10 + _up * 1.0
+WING_C = A_END + _fw * 19 - _rt * 9 - _up * 3.5
 a_pos = rel([
     (-0.5, (-2, 0, 0.3)),
     (0.0, (0, 0, 0)),
@@ -256,14 +262,6 @@ fly(twA, a_pos, bank_up(0.6, 60), roll_extra=peel_roll(PEEL[0]))
 fly(twB, b_pos, bank_up(0.6, 60), roll_extra=peel_roll(PEEL[1]))
 fly(twC, c_pos, bank_up(0.6, 60), roll_extra=peel_roll(PEEL[2]))
 TWINS = (twA, twB, twC)
-
-# Shot 4 looks back past the trio: park a Terran Broadside there so the hero frame has the fleet
-# behind it (every frame needs a backdrop).
-_d = -S4_OFF1.normalized()
-_bs_end = a_pos(6.0) - F(6.0) + _d * 240 + Vector((0, -10, -40))
-BS = P.load('terran_broadside', size=130, label='broadside')
-bs_pos = rel([(0.0, tuple(_bs_end + Vector((48, 0, 0)))), (6.0, tuple(_bs_end))])
-fly(BS, bs_pos, lambda t, p, v, a: Vector((0, 0, 1)))
 
 # Terran glow: the placeholder ships glow violet; tint scene copies to neon blue + orange.
 TINT = {'twinx_arc': (NEON, 3.0), 'twinx_haze': (NEON, 0.7), 'twinx_orb': (ORANGE, 2.6)}
@@ -393,9 +391,12 @@ def hull_kick(actor, t, kick=1.6, back=0.35):
     m.keyframe_insert('rotation_euler', index=1, frame=f + 2.6)
 
 
-def strafe(actor, target, t0, t1, every=3, hit_from=None, miss=3.0, bolt_speed=260):
-    """Alternating diagonal pairs every `every` frames. Shots before hit_from go wide."""
-    pairs = (TIPS[:2], TIPS[2:])
+def strafe(actor, target, t0, t1, every=3, hit_from=None, miss=3.0, bolt_speed=260, salvo=False,
+           burst=0, gap=0):
+    """Each pilot has its own rhythm: alternating diagonal pairs every `every` frames, or all
+    four guns at once (salvo), optionally in bursts of `burst` shots with `gap` frames between.
+    Shots before hit_from go wide."""
+    pairs = (TIPS,) if salvo else (TIPS[:2], TIPS[2:])
     f = int(round(P.T(t0)))
     k = 0
     hits = []
@@ -403,7 +404,7 @@ def strafe(actor, target, t0, t1, every=3, hit_from=None, miss=3.0, bolt_speed=2
         t = (f - 1) / FPS
         tgt = W(target, t + 0.12)
         hit = hit_from is not None and t >= hit_from
-        for key in pairs[k % 2]:
+        for key in pairs[k % len(pairs)]:
             p0 = W(actor, t, actor.gun_muzzles[key].location)
             aim = tgt.copy()
             if not hit:
@@ -416,23 +417,27 @@ def strafe(actor, target, t0, t1, every=3, hit_from=None, miss=3.0, bolt_speed=2
             gun_recoil(actor, key, t)
             if hit:
                 hits.append((th, aim))
-        hull_kick(actor, t)
+        hull_kick(actor, t, kick=2.4 if salvo else 1.6, back=0.5 if salvo else 0.35)
         k += 1
         f += every
+        if burst and k % burst == 0:
+            f += gap
     for i, (th, p) in enumerate(hits):
         if i % 2 == 0:
             P.impact(p, th, size=0.9, color=NEON)
     return hits
 
 
+# lead: fast alternating pairs; B: slow four-gun salvos; C: 3-round bursts
 strafe(twA, s1, T_FIRE_A0, T_FIRE_A1, every=3, hit_from=2.6)
-strafe(twB, s2, T_FIRE_BC0, T_FIRE_BC1, every=3, hit_from=4.05)
-strafe(twC, s2, T_FIRE_BC0 + 0.06, T_FIRE_BC1, every=3, hit_from=4.1)
+strafe(twB, s2, T_FIRE_BC0, T_FIRE_BC1, every=6, hit_from=4.05, salvo=True)
+strafe(twC, s2, T_FIRE_BC0 + 0.1, T_FIRE_BC1, every=2, hit_from=4.1, burst=3, gap=5)
 
 # ------------------------------------------------------------------------------- Stingray fx
-RAY_NOSE = Vector((4.6, 0, -0.5))
-RAY_TRAIL = [Vector((-1.2, 0.9, -0.35)), Vector((-1.2, -0.9, -0.35))]
-RAY_TIPS = [Vector((-0.9, 4.7, 0.2)), Vector((-0.9, -4.7, 0.2))]
+_rk = RAY_SIZE / 10.0
+RAY_NOSE = Vector((4.6, 0, -0.5)) * _rk
+RAY_TRAIL = [Vector((-1.2, 0.9, -0.35)) * _rk, Vector((-1.2, -0.9, -0.35)) * _rk]
+RAY_TIPS = [Vector((-0.9, 4.7, 0.2)) * _rk, Vector((-0.9, -4.7, 0.2)) * _rk]
 
 
 def attach_new(before, parent):
@@ -443,16 +448,14 @@ def attach_new(before, parent):
 
 
 def thrust(actor, t0, t1, length, width, tips=False):
-    """Gold lightning thrusters built in the ray's local space, parented to it."""
-    before = set(bpy.data.objects)
+    """Gold lightning thrusters (kit lightning_thruster: crackling bolts that ride the ray)."""
     for p in RAY_TRAIL:
-        P.lightning(p, p + Vector((-length, 0.25 * p.y, -0.1)), t0, t1, color=GOLD,
-                    width=width, jag=0.22, branches=1, segs=8)
+        WFX.lightning_thruster(P, actor, t0, t1, local=p, axis=(-1, 0.04 * p.y, 0), length=length,
+                               width=width * 0.6, n=2, spread=0.25, color=GOLD, light=False)
     if tips:
         for p in RAY_TIPS:
-            P.lightning(p, p + Vector((-length * 0.45, 0.1 * p.y, 0)), t0, t1, color=GOLD,
-                        width=width * 0.7, jag=0.3, branches=0, segs=5)
-    attach_new(before, actor.root)
+            WFX.lightning_thruster(P, actor, t0, t1, local=p, axis=(-1, 0.03 * p.y, 0), length=length * 0.45,
+                                   width=width * 0.4, n=1, spread=0.3, color=GOLD, light=False)
 
 
 thrust(s1, 0.0, 1.9, 6.5, 0.12, False)
@@ -462,12 +465,9 @@ thrust(s2, 3.4, T_KILL2 + 0.05, 9.0, 0.14, True)
 
 
 def lash(src, dst, t0, t1, hit_local=(0, 0, 0)):
-    f0 = int(round(P.T(t0)))
-    f1 = int(round(P.T(t1)))
-    for f in range(f0, f1):
-        t = (f - 1) / FPS
-        P.lightning(W(src, t, RAY_NOSE), W(dst, t, hit_local), t, t + 1 / FPS, color=GOLD,
-                    width=0.09, jag=0.16, branches=2, segs=12)
+    # one bolt whose ends ride both ships (the kit follows callables per frame)
+    P.lightning(lambda t: W(src, t, RAY_NOSE), lambda t: W(dst, t, hit_local), t0, t1, color=GOLD,
+                width=0.11, jag=0.16, branches=2, segs=12)
     P.impact(W(dst, t0 + 0.05, hit_local), t0 + 0.05, size=1.2, color=GOLD)
 
 
@@ -475,15 +475,11 @@ def lash(src, dst, t0, t1, hit_local=(0, 0, 0)):
 lash(s2, twC, T_LASH, T_LASH1, hit_local=(0.5, 2.6, 2.6))
 
 
-def kill(actor, t, size=3.6):
-    p = W(actor, t)
-    before = set(bpy.data.objects)
-    P.explosion(p, t, size=size, debris=8)
-    for o in list(bpy.data.objects):
-        if o not in before and o.name.split('.')[0] == 'Scorch':
-            bpy.data.objects.remove(o, do_unlink=True)
-    P.puff(p, t + 0.35, size=size * 0.6, n=3, rise=1.0, life=2.0, color=(0.2, 0.19, 0.18), opacity=0.4)
-    actor.vanish(t + 1 / FPS)
+def kill(actor, t, size=5.0):
+    """Space kill: the ray fractures into its own pieces, which drift on without gravity
+    (promo_fx.destroy handles space), plus a fireball and sparks."""
+    actor.destroy(t, size=size, wreck=False, debris=12)
+    P.cam_shake(t + 0.02, 0.25, dur=0.35)
 
 
 kill(s1, T_KILL1)
@@ -553,7 +549,8 @@ def cam_keys():
         a = a_pos(t)
         o = S4_OFF0.lerp(S4_OFF1, ss(u))
         pos = a + o
-        look = a * 0.6 + (b_pos(t) + c_pos(t)) * 0.2 + Vector((-1, 0, 0.5))
+        w = 0.12 * ss(u * 1.3)       # open on the lead, let the wingmen into the frame as they arrive
+        look = a * (1 - 2 * w) + (b_pos(t) + c_pos(t)) * w + Vector((0, 0, lerp(1.0, 3.0, ss(u))))
         return pos, look, lerp(34, 38, ss(u))
     shot(CUT3, 6.0, 10, s4f, last=False)
     return keys
@@ -568,5 +565,15 @@ for _f in range(1, NF + 1):
     bpy.context.scene.frame_set(_f)
     _cam_path.append(P.cam.matrix_world.translation.copy())
 dust_field(avoid=_cam_path)
+
+# ------------------------------------------------------------------------------- sound cues
+for tp, tw in zip(PEEL, TWINS):
+    P.sfx(tp + 0.1, 'whoosh', gain=0.8, pos=W(tw, tp + 0.3))
+P.sfx(T_FIRE_A0 - 0.25, 'lock_pulse', gain=0.5)
+# the lash is one bolt with moving ends (callables), which the audio recorder can't place
+P.sfx(T_LASH, 'zap_lightning', gain=1.0, pos=W(twC, T_LASH))
+P.sfx(T_LASH, 'crackle_loop', gain=0.5, pos=W(twC, T_LASH), dur=T_LASH1 - T_LASH)
+P.sfx(CUT3, 'whoosh', gain=0.9, pos=W(twA, CUT3 + 0.3))
+P.sfx(5.3, 'thruster_blue', gain=0.6, pos=W(twA, 5.3), dur=0.7)
 
 P.render()

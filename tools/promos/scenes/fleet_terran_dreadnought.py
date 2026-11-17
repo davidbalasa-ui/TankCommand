@@ -1,19 +1,21 @@
-"""Terran Dreadnought (fleet flagship): the huge ship slides out of a planet's shadow, sunlight
-sweeping bow to stern while a Twin-X flight streaks past the camera and two Terran corvettes
-hold station beneath it. Two Arcadian corvettes dive in and lash it with gold lightning: a
-translucent blue triangle shield flares and shrugs every bolt off. The port broadside turrets
-roll round, ripple-fire, and blow both corvettes apart; the camera ends low under the bow on
-the whole flagship, shield shimmering, escorts tiny beside it.
+"""Terran Dreadnought (fleet flagship): the huge ship slides out of shadow, sunlight sweeping
+bow to stern while a Twin-X flight streaks past the camera and two Terran corvettes hold
+station beneath it. Two Arcadian corvettes dive in and lash it with gold lightning: a
+translucent blue triangle shield takes every bolt, rings rippling across it (it never breaks).
+The port broadside turrets roll round, ripple-fire, and blow both corvettes apart (their pieces
+drift off without gravity); the camera ends on the whole flagship against the planet, shield
+shimmering, escorts tiny beside it.
 
-Scale: built at 0.3x the models.json ship sizes (Dreadnought 120 m, corvettes ~14 m, Twin-X
-2.7 m) so the kit's game-scale effects read. Fleet ships have no gun pivots, so the broadside
-turrets are built in the scene and mounted on the hull by ray casts.
+Scale: built at 0.3x the models.json ship sizes (Dreadnought 120 m, Terran corvettes 13.5 m,
+Twin-X 2.7 m; the Arcadian corvettes are nudged up to 19.5 m so the attackers read) so the
+kit's game-scale effects read. Fleet ships have no gun pivots, so the broadside turrets are
+built in the scene (1.8x size so they read) and mounted on the hull by ray casts.
 
-Timeline (s): 0-2.25 low long lens ahead of the bow, the shadow line slides off the hull,
-Twin-X flight whips past camera | cut 2.25: over the shoulder of an Arcadian corvette, both
-corvettes lash the shield (hits 2.4 .. 3.7), the turrets roll toward them | cut 3.875: low
-front-quarter on the flagship, salvo 1 ripples 3.9-4.3 and kills corvette A 4.5, last bolt from
-B, salvo 2 4.8-5.15 kills B 5.4 | settle on the hero frame to 6.0."""
+Timeline (s): 0-2.25 low ahead of the bow, the shadow line slides off the hull, Twin-X flight
+whips past camera | cut 2.25: over the shoulder of an Arcadian corvette, both corvettes lash the
+shield (hits 2.4 .. 3.7), the turrets roll toward them | cut 3.875: port side above the deck
+with the planet behind, salvo 1 ripples 3.9-4.26 and kills corvette A 4.5, last bolt from B
+4.62, salvo 2 4.78-5.14 kills B 5.4 | push in to 6.0."""
 import math
 import os
 import sys
@@ -24,6 +26,7 @@ import bmesh  # noqa: E402
 from mathutils import Matrix, Vector  # noqa: E402
 
 import promo_kit as K  # noqa: E402
+import promo_fx_weapons as WFX  # noqa: E402
 from promo_kit import COL, Promo  # noqa: E402
 
 P = Promo('fleet_terran_dreadnought', seconds=6.0, seed=7)
@@ -34,7 +37,7 @@ GOLD = COL['arc_gold']
 
 SCALE = 0.3
 DN_SIZE = 400 * SCALE       # 120 m
-AC_SIZE = 50 * SCALE        # 15 m
+AC_SIZE = 50 * SCALE * 1.3  # 19.5 m (nudged up so the attackers read at phone size)
 TC_SIZE = 45 * SCALE        # 13.5 m
 TX_SIZE = 9 * SCALE         # 2.7 m
 
@@ -123,7 +126,8 @@ U = (Vector((1, 0, 0)) - LDIR * LDIR.x).normalized()
 W_ = LDIR.cross(U).normalized()
 me = bpy.data.meshes.new('Occluder')
 bm = bmesh.new()
-vs = [bm.verts.new(U * a + W_ * b) for a, b in ((-900, -500), (0, -500), (0, 500), (-900, 500))]
+# (kept narrow: a wide plane also shadowed the planet and left it a black disc with a rim)
+vs = [bm.verts.new(U * a + W_ * b) for a, b in ((-300, -500), (0, -500), (0, 500), (-300, 500))]
 bm.faces.new(vs)
 bm.to_mesh(me)
 bm.free()
@@ -149,6 +153,8 @@ for f in range(1, NF + 1, 2):
     occ.location = C(t) - LDIR * 160 + U * edge(t)
     occ.keyframe_insert('location', frame=f)
 K.set_interp(occ, 'LINEAR')
+K.key_hide(occ, 0, False)
+K.key_hide(occ, int(P.T(2.3)), True)
 
 # ------------------------------------------------------------------------------- flight helpers
 
@@ -232,8 +238,8 @@ TX_OFF = [VV(0, 0, 0), VV(-5, -4.5, -1.5), VV(-5.5, 4.0, 0.8)]
 
 
 def TXP(i, t):
-    base = catmull([(0.0, VV(-70, -26, -10)), (0.8, VV(-20, -28, -12)), (1.5, VV(28, -30, -14)),
-                    (2.3, VV(85, -33, -17))], t)
+    base = catmull([(0.0, VV(-70, -36, -12)), (0.8, VV(-18, -40, -16)), (1.5, VV(32, -44, -20)),
+                    (2.3, VV(92, -50, -24))], t)
     return C(t) + base + TX_OFF[i]
 
 
@@ -245,8 +251,8 @@ T_DIE = [4.5, 5.4]
 AC_KEYS = [
     [(0.0, VV(95, -175, 32)), (1.2, VV(70, -140, 26)), (2.3, VV(50, -110, 10)), (3.3, VV(36, -82, 0)),
      (4.5, VV(22, -56, -14))],
-    [(0.0, VV(-60, -190, 0)), (1.3, VV(-50, -150, 4)), (2.5, VV(-34, -118, 2)), (3.8, VV(-10, -88, -2)),
-     (5.4, VV(-4, -62, -12))],
+    [(0.0, VV(-60, -190, 0)), (1.3, VV(-46, -150, 4)), (2.5, VV(-24, -118, 2)), (3.8, VV(4, -90, -2)),
+     (5.4, VV(18, -66, -10))],
 ]
 
 
@@ -278,23 +284,13 @@ pts0 = [inv0 @ (am.matrix_world @ Vector(c)) for c in am.bound_box]
 AX0 = min(p.x for p in pts0)
 AX1 = max(p.x for p in pts0)
 
-# gold lightning thrusters riding each corvette
+# gold lightning thrusters riding each corvette (kit lightning_thruster; no lights: a point
+# light 2 m off the gold hull blows it out)
 for i, a in enumerate(acs):
-    t_end = T_DIE[i] + 1 / FPS
-    t = 0.0
-    while t < t_end:
-        t1 = min(t_end, t + 1.0)
-        for sgn in (1, -1):
-            before = set(bpy.data.objects)
-            p0 = Vector((AX0 + 0.8, 1.6 * sgn, 0.0))
-            p1 = p0 + Vector((-5.0, 0.6 * sgn, 0.0))
-            P.lightning(p0, p1, t, t1, color=GOLD, width=0.1, jag=0.2, branches=1, segs=7, glow=False)
-            # the bolt's point light sits 2 m off the gold hull and blows it out: drop it
-            for o in list(bpy.data.objects):
-                if o not in before and o.type == 'LIGHT':
-                    bpy.data.objects.remove(o, do_unlink=True)
-            reparent_new(before, a.root)
-        t = t1
+    for sgn in (1, -1):
+        WFX.lightning_thruster(P, a, 0.0, T_DIE[i] + 1 / FPS, local=(AX0 + 0.8, 1.6 * sgn, 0.0),
+                               axis=(-1, 0.12 * sgn, 0), length=5.0, width=0.08, n=2, spread=0.3,
+                               color=GOLD, light=False)
 
 # ------------------------------------------------------------------------------- shield
 SH_C = VV(0, 0, -5.0)               # root-local centre
@@ -333,21 +329,39 @@ for i, t, dur in BOLTS:
                 segs=max(10, int(L / 4)), glow=False)
     hits.append((t + 0.02, p1))
 
-before = set(bpy.data.objects)
 shield = P.shield_dome(VV(0, 0, 0), SH_R, 2.38, 6.2)
 shield.parent = dread.root
 shield.location = SH_C
-shield.scale = (SH_AX.x / SH_R, SH_AX.y / SH_R, SH_AX.z / SH_R)
-shield.modifiers['Wire'].thickness = 0.07
-# own, gentler hit flares (the kit's per-hit flash whites out a shield this big)
-SHM = shield.data.materials[0]
-K.key_strength(SHM, P.T(2.37), 0.4)
+shield.scale = (SH_AX.x / SH_R, SH_AX.y / SH_R, SH_AX.z / SH_R)   # ellipsoid hugging the hull
+SH_LAT = next(c for c in shield.children if c.name.startswith('ShieldLattice'))
+SH_LAT.modifiers['Wire'].thickness = SH_R * 0.004
+# tone the shell down: on a hull this size the default opacity reads as a solid blue blob
+for o_, k_ in ((shield, 0.22), (SH_LAT, 0.45)):
+    for fc in K._fcurves(o_.animation_data.action):
+        if fc.data_path == 'color' and fc.array_index == 3:
+            for kp in fc.keyframe_points:
+                kp.co.y *= k_
+                kp.handle_left.y *= k_
+                kp.handle_right.y *= k_
+    o_.color[3] *= k_
+# Kit ripples (rings racing over the shell from each hit; the shield never breaks). The ripple
+# shader works in the shell's unscaled object space, so each hit is mapped onto the unit sphere
+# of the ellipsoid; the kit's own flash/sparks/light assume a round, unparented dome, so they are
+# dropped and a blue impact is placed at the true hit point instead.
 for t, p in hits:
-    K.key_strength(SHM, P.T(t) - 1, 0.4)
-    K.key_strength(SHM, P.T(t), 2.4)
-    K.key_strength(SHM, P.T(t + 0.25), 0.4)
+    loc = p - C(t) - SH_C
+    n = VV(loc.x / SH_AX.x, loc.y / SH_AX.y, loc.z / SH_AX.z).normalized()
+    before = set(bpy.data.objects)
+    WFX.shield_hit(P, shield, SH_LAT, VV(0, 0, 0), SH_R, t, n * SH_R, COL['shield_blue'], False, 6.2)
+    for o in list(bpy.data.objects):
+        if o in before:
+            continue
+        if o.name.startswith('ShieldRipple'):
+            if o.parent is shield:
+                o.scale = (1.004,) * 3      # (the kit divides by the parent's x scale: wrong on an ellipsoid)
+        else:
+            bpy.data.objects.remove(o, do_unlink=True)
     P.impact(p, t, size=2.2, color=COL['shield_blue'])
-K.key_strength(SHM, P.T(5.9), 0.3)
 
 # ------------------------------------------------------------------------------- broadside turrets
 M_TBASE = K.pbr_mat('BSBase', (0.1, 0.11, 0.13), rough=0.45, metal=0.7)
@@ -368,43 +382,45 @@ def cyl(name, r, depth, mat, verts=16):
 
 
 class Turret:
-    BLEN = 7.0
-    SY = 0.75
+    # built big (1.8x) so the turret row reads on a 120 m hull at phone size
+    BLEN = 12.6
+    SY = 1.35
+    BX = 1.08
 
     def __init__(self, i, mount):
         self.i = i
         self.mount = mount
-        base = cyl(f'BS{i}_Base', 2.3, 1.2, M_TBASE, verts=20)
+        base = cyl(f'BS{i}_Base', 4.1, 2.2, M_TBASE, verts=20)
         base.parent = dread.root
-        base.location = mount + Vector((0, 0, 0.4))
-        ring = cyl(f'BS{i}_Ring', 2.4, 0.22, M_TNEON, verts=20)
+        base.location = mount + Vector((0, 0, 0.7))
+        ring = cyl(f'BS{i}_Ring', 4.3, 0.4, M_TNEON, verts=20)
         ring.parent = base
-        ring.location = (0, 0, 0.35)
+        ring.location = (0, 0, 0.63)
         head = K.empty(f'BS{i}_Head')
         head.parent = dread.root
-        head.location = mount + Vector((0, 0, 1.5))
+        head.location = mount + Vector((0, 0, 2.7))
         head.rotation_mode = 'QUATERNION'
-        dome = K.sphere(f'BS{i}_Dome', 1.9, M_TBASE, seg=(16, 8))
+        dome = K.sphere(f'BS{i}_Dome', 3.4, M_TBASE, seg=(16, 8))
         dome.parent = head
         dome.scale = (1.25, 1.0, 0.55)
-        eye = K.sphere(f'BS{i}_Sensor', 0.3, M_TORANGE, seg=(8, 6))
+        eye = K.sphere(f'BS{i}_Sensor', 0.55, M_TORANGE, seg=(8, 6))
         eye.parent = head
-        eye.location = (1.4, 0, 0.75)
+        eye.location = (2.5, 0, 1.35)
         self.head = head
         self.barrels = []
         self.muzzles = []
         for k, sy in enumerate((self.SY, -self.SY)):
-            b = cyl(f'BS{i}_Barrel{k}', 0.32, self.BLEN, M_TBARREL, verts=12)
+            b = cyl(f'BS{i}_Barrel{k}', 0.58, self.BLEN, M_TBARREL, verts=12)
             b.data.transform(Matrix.Rotation(math.pi / 2, 4, 'Y') @ Matrix.Translation((0, 0, self.BLEN / 2)))
             b.parent = head
-            b.location = (0.6, sy, 0.15)
-            tip = cyl(f'BS{i}_Tip{k}', 0.42, 0.7, M_TNEON, verts=12)
+            b.location = (self.BX, sy, 0.27)
+            tip = cyl(f'BS{i}_Tip{k}', 0.75, 1.2, M_TNEON, verts=12)
             tip.data.transform(Matrix.Rotation(math.pi / 2, 4, 'Y'))
             tip.parent = b
-            tip.location = (self.BLEN - 0.3, 0, 0)
+            tip.location = (self.BLEN - 0.5, 0, 0)
             m = K.empty(f'BS{i}_Muzzle{k}')
             m.parent = b
-            m.location = (self.BLEN + 0.1, 0, 0)
+            m.location = (self.BLEN + 0.2, 0, 0)
             self.barrels.append(b)
             self.muzzles.append(m)
         self.aims = {}
@@ -417,7 +433,7 @@ class Turret:
         d = self.dir_at(t)
         side = Vector((0, 0, 1)).cross(d).normalized()
         sy = self.SY if k == 0 else -self.SY
-        return C(t) + self.head.location + d * (0.6 + self.BLEN + 0.1) + side * sy
+        return C(t) + self.head.location + d * (self.BX + self.BLEN + 0.2) + side * sy
 
     def key_aim(self, dirf):
         prev = None
@@ -437,11 +453,11 @@ class Turret:
         b = self.barrels[k]
         f = P.T(t)
         L = self.BLEN * 0.8
-        b.location.x = 0.6
+        b.location.x = self.BX
         b.keyframe_insert('location', index=0, frame=f - 1)
-        b.location.x = 0.6 - L
+        b.location.x = self.BX - L
         b.keyframe_insert('location', index=0, frame=f + 1)
-        b.location.x = 0.6
+        b.location.x = self.BX
         b.keyframe_insert('location', index=0, frame=f + 9)
 
 
@@ -501,8 +517,8 @@ for k, tu in enumerate(turrets):
         p0 = tu.muzzle_world(t, bk)
         tp, tof = lead(tgt, p0, t)
         tp = tp + Vector((R.uniform(-1, 1), R.uniform(-1, 1), R.uniform(-1, 1))) * 1.2
-        P.projectile(p0, tp, t, SHELL_SPEED, COL['tracer'], size=0.45)
-        P.muzzle_flash(tu.muzzles[bk], t, COL['fire'], size=2.2)
+        P.projectile(p0, tp, t, SHELL_SPEED, COL['tracer'], size=0.75)
+        P.muzzle_flash(tu.muzzles[bk], t, COL['fire'], size=3.6)
         tu.recoil(t, bk)
         if t + tof < T_DIE[tgt] - 0.03:
             P.impact(tp, t + tof, size=2.6)
@@ -521,28 +537,10 @@ for t in sorted(kick):
     dm.keyframe_insert('rotation_euler', index=0, frame=f + 10)
 
 # ------------------------------------------------------------------------------- kills
+# space kills: each corvette fractures into its own pieces, which drift on without gravity
+# (promo_fx.destroy handles space), with a fireball and sparks
 for i, a in enumerate(acs):
-    t = T_DIE[i]
-    p = A(i, t)
-    before = set(bpy.data.objects)
-    P.explosion(p, t, size=6.0, debris=16, smoke=True)
-    for o in bpy.data.objects:
-        if o not in before and o.name.startswith('Scorch'):
-            bpy.data.objects.remove(o, do_unlink=True)
-    a.vanish(t + 1 / FPS)
-    v = (A(i, t + 0.02) - A(i, t - 0.02)) / 0.04
-    for n in range(4):
-        frag = K.ico('ACFrag', 1.0, P.charred, sub=0)
-        frag.scale = (2.2, 1.0, 0.25)
-        dv = v * 0.4 + Vector((R.uniform(-1, 1), R.uniform(-1, 1), R.uniform(-1, 1))) * 14
-        f0 = int(P.T(t))
-        for f in range(f0, NF + 1, 2):
-            tt = (f - f0) / FPS
-            frag.location = p + dv * tt
-            frag.rotation_euler = (tt * R.uniform(3, 7), tt * 5, tt * 2)
-            frag.keyframe_insert('location', frame=f)
-            frag.keyframe_insert('rotation_euler', frame=f)
-        K.show_between(frag, f0, NF + 1)
+    a.destroy(T_DIE[i], size=7.0, wreck=False, debris=14)
 
 # ------------------------------------------------------------------------------- camera
 keys = []
@@ -553,9 +551,9 @@ for i in range(7):
         t = CUT1 - 1 / FPS
     u = t / CUT1
     c = C(t)
-    pos = c + VV(lerp(150, 128, ss(u)), lerp(-112, -97, ss(u)), lerp(-46, -41, ss(u)))
-    look = c + VV(lerp(8, -6, ss(u)), 0, lerp(-6, -4, u))
-    keys.append((t, tuple(pos), tuple(look), 50))
+    pos = c + VV(lerp(100, 84, ss(u)), lerp(-70, -60, ss(u)), lerp(-34, -30, ss(u)))
+    look = c + VV(lerp(14, -4, ss(u)), lerp(-4, -8, ss(u)), lerp(-4, -6, u))
+    keys.append((t, tuple(pos), tuple(look), 32))
 # Shot B: over the shoulder of Arcadian corvette A, looking at the flagship's flank.
 for i in range(6):
     t = CUT1 + (CUT2 - CUT1) * i / 5
@@ -563,17 +561,18 @@ for i in range(6):
         t = CUT2 - 1 / FPS
     u = (t - CUT1) / (CUT2 - CUT1)
     a = A(0, t)
-    pos = a + VV(lerp(14, 10, ss(u)), lerp(-28, -24, ss(u)), lerp(20, 17, u))
-    look = a.lerp(C(t) + VV(-16, 0, -4), 0.5)
+    pos = a + VV(lerp(14, 10, ss(u)), lerp(-30, -26, ss(u)), lerp(12, 10, u))
+    look = a.lerp(C(t) + VV(-16, 0, -4), 0.42)
     keys.append((t, tuple(pos), tuple(look), 30))
 # Shot C: low front quarter, the broadside ripple-fires, push in to the hero frame.
 for i in range(9):
     t = CUT2 + (6.0 - CUT2) * i / 8
     u = (t - CUT2) / (6.0 - CUT2)
     c = C(t)
-    pos = c + VV(lerp(50, 42, ss(u)), lerp(-128, -118, ss(u)), lerp(-40, -38, ss(u)))
-    look = c + VV(lerp(6, 0, ss(u)), lerp(-12, -8, ss(u)), lerp(-2, -4, u))
-    keys.append((t, tuple(pos), tuple(look), lerp(30, 33, ss(u))))
+    # port side, a little above the deck so the turret row reads as it ripple-fires
+    pos = c + VV(lerp(88, 80, ss(u)), lerp(-100, -94, ss(u)), lerp(22, 14, ss(u)))
+    look = c + VV(lerp(12, 4, ss(u)), lerp(-20, -12, ss(u)), lerp(-6, -4, u))
+    keys.append((t, tuple(pos), tuple(look), lerp(25, 29, ss(u))))
 P.camera(keys, shake=0.04, cuts=(CUT1, CUT2))
 P.cam_shake(T_DIE[0], 0.4, dur=0.4)
 P.cam_shake(T_DIE[1], 0.45, dur=0.45)
