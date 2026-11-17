@@ -578,4 +578,14 @@ for ob in (P.cam, P.cam_target, P.cam.data):
 for tl in landings:
     P.cam_shake(tl, 0.07, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+_on = False                                           # power-slides: a skid each time the drift kicks in
+for _s in sim:
+    _d = abs(_s['drift']) > 20 and not _s['air'] and _s['speed'] > 4
+    if _d and not _on:
+        P.sfx(_s['t'], 'skid', gain=0.7, pos=(_s['x'], _s['y'], _s['z']))
+    _on = _d
+for _t in takeoffs:                                   # wheels leave the ground: engine flares
+    P.sfx(_t, 'whoosh', gain=0.3, rate=1.2)
+
 P.render()

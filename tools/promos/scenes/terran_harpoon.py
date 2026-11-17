@@ -507,4 +507,10 @@ P.camera([
 for t in T_RIP:
     P.cam_shake(t, 0.035, dur=0.12)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(2.7, 'turret_servo', gain=0.5, rate=0.7)        # battery slews round
+P.sfx(2.95, 'lock_pulse', gain=0.55)                  # tube lights pulse a lock... a pause...
+for _i, _t in enumerate(T_RIP):                       # ...then the ripple: smoke trails over and down
+    P.sfx(_t + 0.15, 'whoosh', gain=0.25, rate=0.9 + 0.05 * (_i % 3))
+
 P.render()

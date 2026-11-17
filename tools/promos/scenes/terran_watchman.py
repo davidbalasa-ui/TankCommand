@@ -457,4 +457,14 @@ keys = [
 P.camera(keys, shake=0.015, cuts=(C1, C2, C3))
 P.cam_shake(1.85, 0.05, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_SPIN, 'whirr_loop', gain=0.3, dur=6.0 - T_SPIN, rate=0.65)  # dish spins up
+for _t, _g in ((T_P1, 0.8), (T_P2, 0.55)):            # radar ping rolling out off the crest
+    P.sfx(_t, 'shockwave', gain=_g, rate=1.25)
+    P.sfx(_t + 0.05, 'power_up_terran', gain=0.3 * _g, rate=1.4)
+for _i, _t in enumerate(reveal):                      # contacts flash into view, then lock
+    P.sfx(_t, 'lock_pulse', gain=0.45, rate=1.0 + 0.06 * _i)
+for _t in T_HITS:                                     # Longbow shells dropping in
+    P.sfx(_t - 0.6, 'whoosh', gain=0.5, rate=0.75)
+
 P.render()

@@ -785,4 +785,13 @@ keys.append((5.0, (9.4, 3.9, 0.95), (0, 0.6, 2.8), 23))
 keys.append((6.0, tuple(CAM_END), tuple(LOOK_END), 27))
 P.camera(keys, shake=0.01)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.3, 'motes_loop', gain=0.35, dur=T_GULP - 0.3) # star-stuff drifting into the crown
+P.sfx(1.0, 'whirr_loop', gain=0.3, dur=T_FLARE - 1.0, rate=0.7)
+P.sfx(T_GULP - 0.45, 'charge_gold', gain=0.8)         # crown gulps the star
+P.sfx(T_GULP, 'beam_start', gain=0.6, rate=0.8)
+P.sfx(T_FLARE, 'shockwave', gain=0.9)                 # flare
+P.sfx(T_FLARE + 0.02, 'power_up_arc', gain=0.6, rate=0.9)
+P.sfx(T_S0 + 0.1, 'whoosh', gain=0.6, rate=0.8)       # new star streaks out
+
 P.render()

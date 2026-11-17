@@ -519,4 +519,25 @@ P.camera([
     (6.0, (22, -3, 4.8), (2.5, 0, 1.4), 26),
 ], shake=0.02)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'thruster_blue', gain=0.55, pos=(-2.0, 1.3, 20.0), dur=0.62)        # retro thrusters, high
+P.sfx(0.55, 'thruster_blue', gain=1.0, pos=(-0.3, 0.2, 5.0), dur=T_LAND - 0.5)  # hard retro burn
+P.sfx(0.6, 'shockwave', gain=0.4, pos=(0, 0, 4.0))                               # burn kicks in
+P.sfx(T_LAND, 'mech_clunk', gain=1.4, pos=(0, 0, 0.5), rate=0.7)                 # slam down on its legs
+P.sfx(T_LAND + 0.02, 'boom_small', gain=0.5, pos=(0, 0, 0.5), rate=0.8)
+for _t0, _t1, _p in ((T_LAND + 0.15, T_LAND + 0.75, (0, 3.3, 1.0)), (T_LAND + 0.25, T_LAND + 0.85, (0, -3.3, 1.0)),
+                     (T_LAND + 0.55, T_LAND + 1.1, (3.6, 0, 1.0))):              # side decks + ramp swing open
+    P.sfx(_t0, 'servo', gain=0.6, pos=_p, rate=0.8)
+    P.sfx(_t1 - 0.02, 'mech_clunk', gain=0.9, pos=_p)
+P.sfx(T_LAND + 0.9, 'power_up_terran', gain=0.9, pos=(0, 0, 1.0))                # deck lights + ring power up
+P.sfx(T_LAND + 0.9, 'whirr_loop', gain=0.15, pos=(0, 0, 3.0), dur=6.0 - T_LAND - 0.9, rate=0.8)  # scanner mast
+for _ta, _tt, _src in ((1.5, 2.35, (-20, -16, 16)), (2.55, 3.5, (-18, 16, 15)), (3.7, 4.65, (-22, -4, 17))):
+    _tr = _tt + 0.16                                                  # delivery lifters: jets in, set down, clamps, away
+    P.sfx(_ta, 'thruster_blue', gain=0.35, pos=_src, dur=_tt - 0.45 - _ta, rate=1.25)
+    P.sfx(_tt - 0.45, 'thruster_blue', gain=0.55, pos=(0, 0, 4.0), dur=1.2, rate=1.25)
+    P.sfx(_tt - 0.3, 'lock_pulse', gain=0.25, pos=(0, 0, 1.0))      # landing-circle ring pulses
+    P.sfx(_tt + 0.02, 'mech_clunk', gain=0.9, pos=(0, 0, DECK))
+    P.sfx(_tr - 0.06, 'hydraulic', gain=0.5, pos=(0, 0, DECK + 2.0))
+    P.sfx(_tr + 0.1, 'mech_clunk', gain=0.45, pos=(0, 0, DECK + 2.0), rate=1.3)
+
 P.render()

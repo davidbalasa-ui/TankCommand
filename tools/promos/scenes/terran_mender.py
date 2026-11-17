@@ -368,4 +368,14 @@ P.camera([
 P.cam_shake(T_MEN_PARK, 0.04, 0.25)
 P.cam_shake(5.6, 0.06, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_SWING0, 'servo', gain=0.45, rate=0.8)         # crane arm swings over the gap
+P.sfx(T_SWING1 - 0.03, 'mech_clunk', gain=0.35, rate=1.1)
+for _t0, _t1 in T_BEAM:                               # repair beam walks over each damage point
+    P.sfx(_t0, 'tractor_loop', gain=0.35, dur=_t1 - _t0)
+    P.sfx(_t0 + 0.1, 'crackle_loop', gain=0.12, dur=0.35)   # scar sizzling closed
+P.sfx(4.9, 'power_up_terran', gain=0.55)              # lights pulse back on
+P.sfx(5.1, 'servo', gain=0.4, rate=0.85)              # arm folds away
+P.sfx(5.45, 'mech_clunk', gain=0.35, rate=1.0)
+
 P.render()

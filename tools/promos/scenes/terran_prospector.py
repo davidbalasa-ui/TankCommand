@@ -216,4 +216,9 @@ P.camera([
 ], shake=0.012)
 P.cam_shake(1.65, 0.06, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_DRUM, 'grind_loop', gain=0.6, dur=6.0 - T_DRUM, pos=DRUM_FACE)  # cutter drum chewing the seam
+for _i, _t in enumerate(times):                       # ore chunks dropping into the hopper (accelerating)
+    P.sfx(_t + FLY, 'impact_dirt', gain=0.12 + 0.004 * _i, rate=1.35 + 0.04 * (_i % 5))
+
 P.render()

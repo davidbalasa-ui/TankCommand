@@ -526,4 +526,13 @@ P.camera([
     (6.0, (8.8, -1.6, 1.85), (-0.3, -2.8, 1.85), 26),
 ], shake=0.012)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.4, dur=T_LAND)      # descent
+for _i in range(3):                                   # horn taps on the crystals
+    P.sfx(T_TAP - 0.12 + 0.07 * _i, 'zap_small', gain=0.5, rate=1.0 + 0.1 * _i)
+P.sfx(T_FLOW, 'motes_loop', gain=0.5, dur=T_FILL - T_FLOW + 0.3)  # strands flowing into the basin
+P.sfx(T_FLOW + 0.05, 'tractor_loop', gain=0.35, dur=2.4)
+P.sfx(T_FILL, 'shield_hit', gain=0.5, rate=1.2)       # basin brims
+P.sfx(4.2, 'crackle_loop', gain=0.35, dur=1.4)        # deposit drains
+
 P.render()

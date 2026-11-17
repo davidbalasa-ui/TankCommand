@@ -163,4 +163,8 @@ P.camera([
     (6.0, (30.6, -6.9, 1.25), (18.6, -7.0, 1.55), 35),
 ], cuts=(1.5, 4.5), shake=0.03)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.3, dur=6.0)         # lifter bolts fizzing under the pack
+P.sfx(1.84, 'boom_small', gain=0.55, rate=1.1)        # shell smashes the rock face: stone shatters
+
 P.render()

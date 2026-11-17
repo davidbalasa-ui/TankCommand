@@ -661,4 +661,13 @@ for o in bpy.data.objects:
         if 'emit_node' in m or m.name.startswith(('SoftFire', 'Fireball')):
             o.visible_shadow = False
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t0 in (T_FIRE1, T_FIRE2):                        # Falcon laser bursts (drawn as lights only)
+    for _k in range(3):
+        P.sfx(_t0 + 0.08 * _k, 'shot_laser', gain=0.45, rate=1.0 + 0.04 * _k)
+P.sfx(T_CHARGE - 0.05, 'charge_gold', gain=0.8)       # ring charges
+P.sfx(T_CHARGE, 'whirr_loop', gain=0.35, dur=T_PASS - T_CHARGE + 0.4, rate=1.2)
+P.sfx(T_LASH + 0.05, 'crackle_loop', gain=0.6, dur=0.5)  # lash crawls over the Falcon
+P.sfx(T_PASS - 0.55, 'whoosh', gain=0.8, rate=0.9)    # halo sweeps through
+
 P.render()

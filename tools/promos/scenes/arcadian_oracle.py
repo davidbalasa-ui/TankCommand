@@ -785,4 +785,15 @@ for mtl in bpy.data.materials:
         em.inputs['Color'].default_value = (1.0, 0.38, 0.05, 1)
         em.inputs['Strength'].default_value = 2.4
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.4, dur=T_LAND)      # glide in
+P.sfx(T_UF0, 'power_up_arc', gain=0.7)                # unfurl
+P.sfx(T_TURN - 0.05, 'servo', gain=0.45, rate=0.75)   # eye turns
+P.sfx(T_PULSE - 0.35, 'charge_gold', gain=0.8)
+P.sfx(T_PULSE, 'shockwave', gain=0.85)                # reveal pulse
+P.sfx(T_PULSE2 - 0.35, 'charge_gold', gain=0.6, rate=1.1)
+P.sfx(T_PULSE2, 'shockwave', gain=0.7, rate=1.1)
+for _i, _t in enumerate(sorted(T_HITS.values())):     # hidden units light up
+    P.sfx(_t - 0.03, 'lock_pulse', gain=0.5, rate=1.0 + 0.08 * _i)
+
 P.render()

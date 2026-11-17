@@ -368,4 +368,12 @@ for mat in bpy.data.materials:
         em = mat.node_tree.nodes[mat['emit_node']]
         em.inputs['Strength'].default_value = 3.0
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.4, dur=T_LAND)      # lightning-leg descent
+P.sfx(T_UNF1, 'charge_gold', gain=0.8)                # crown charges
+P.sfx(T_CHAIN - 0.02, 'servo', gain=0.4, rate=0.8)    # turret swings onto the chain
+P.sfx(T_CHAIN, 'crackle_loop', gain=0.6, dur=0.6)     # chain lightning crawl
+P.sfx(T_GUN - 0.15, 'turret_servo', gain=0.4)
+P.sfx(T_GUN, 'zap_lightning', gain=0.9)               # gun bolt (light too dim for the heuristic)
+
 P.render()

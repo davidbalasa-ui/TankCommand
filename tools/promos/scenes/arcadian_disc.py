@@ -262,4 +262,14 @@ for m in bpy.data.materials:
         em.inputs['Color'].default_value = (1.0, 0.35, 0.05, 1)
         em.inputs['Strength'].default_value = 6.0
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t in (2.5, 2.85, 3.2, 3.6):                                    # pod charge-up before each pulse
+    P.sfx(_t - 0.33, 'charge_gold', gain=0.7)
+for _t, _p in ((2.52, (-13.6, 8.0, 0.2)), (2.87, (-4.6, -0.6, 0.5)), (3.22, (-11.7, 3.6, 0.5)),
+               (3.62, (0.8, -0.2, 0.8))):                           # ground ring blast under each beam
+    P.sfx(_t, 'shockwave', gain=0.8, pos=_p)
+P.sfx(2.55, 'skid', gain=1.0, pos=(-11.2, 6.9, 0.3))                # Hauler brakes hard in front of pulse 1
+for _t in (0.0, 0.7, 1.3):                                          # Hauler crane working
+    P.sfx(_t, 'servo', gain=0.35, pos=(-6.0, 4.6, 2.0), rate=0.8)
+
 P.render()

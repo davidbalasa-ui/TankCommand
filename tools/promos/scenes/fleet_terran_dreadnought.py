@@ -580,4 +580,8 @@ P.cam_shake(T_DIE[1], 0.45, dur=0.45)
 for t in (3.9, 4.78):
     P.cam_shake(t, 0.15, dur=0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t in (2.4, 2.8, 3.15, 3.45, 3.7):                # triangle shield flares and shrugs every bolt off
+    P.sfx(_t + 0.02, 'shield_hit', gain=0.6)
+
 P.render()

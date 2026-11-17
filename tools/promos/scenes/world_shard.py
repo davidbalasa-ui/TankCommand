@@ -827,4 +827,18 @@ cr.color_ramp.elements[0].color = (0.6, 0.06, 0.01, 1)
 cr.color_ramp.elements[1].color = (1.0, 0.38, 0.06, 1)
 fb.node_tree.nodes[fb['emit_node']].inputs['Strength'].default_value = 1.8
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_WAKE, 'shard_wake', gain=0.9)                 # the Shard wakes, world dims
+P.sfx(T_WAKE + 0.3, 'shockwave', gain=0.8, rate=0.8)  # shock ring rolls over both armies
+P.sfx(T_RISE0, 'whirr_loop', gain=0.2, dur=6.0 - T_RISE0, rate=0.55)  # fragments orbiting the core
+for _k in range(6):                                   # fissure: running wave of spikes toward the Lancers
+    _u = _k / 6
+    P.sfx(T_ERUPT + (T_L1 - T_ERUPT) * _u, 'crystal_spike', gain=0.25 + 0.06 * _k, pos=src.lerp(pL1, _u), rate=1.25)
+P.sfx(T_L1, 'crystal_spike', gain=1.0, pos=pL1, rate=0.8)  # crowns burst up under each Lancer
+P.sfx(T_L2, 'crystal_spike', gain=0.9, pos=pL2, rate=0.85)
+for _k in range(4):                                   # javelin volley leaves the core
+    P.sfx(T_VOLLEY - 0.55 + 0.05 * _k, 'whoosh', gain=0.4, rate=1.3 + 0.1 * _k)
+P.sfx(T_HIT1, 'crystal_spike', gain=0.6, rate=1.3)    # javelins spear the Lumens
+P.sfx(T_HIT2, 'crystal_spike', gain=0.6, rate=1.4)
+
 P.render()

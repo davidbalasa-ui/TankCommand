@@ -422,4 +422,14 @@ for mat in bpy.data.materials:
         em.inputs['Color'].default_value = (1.0, 0.35, 0.05, 1)
         em.inputs['Strength'].default_value = 2.4
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_SPIN, 'whirr_loop', gain=0.3, dur=6.0 - T_SPIN, rate=0.6)  # dish turning
+for _t, _g in ((T_P1, 0.8), (T_P2, 0.55)):            # neon ping washing out over the valley
+    P.sfx(_t, 'shockwave', gain=_g, rate=1.25)
+    P.sfx(_t + 0.05, 'power_up_terran', gain=0.3 * _g, rate=1.4)
+for _i, _t in enumerate(sorted(mark_times.values())):  # each contact marked
+    P.sfx(_t, 'lock_pulse', gain=0.4, rate=1.0 + 0.06 * _i)
+for _t in T_HITS:                                     # spotted artillery screaming in
+    P.sfx(_t - 0.6, 'whoosh', gain=0.5, rate=0.75)
+
 P.render()

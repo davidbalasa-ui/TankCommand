@@ -364,4 +364,13 @@ keys += [
 ]
 P.camera(keys, cuts=(C1, C2), shake=0.025)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.75, 'whoosh', gain=0.8)                       # Darter whips past the camera (peak ~1.35)
+P.sfx(2.9, 'whoosh', gain=0.7)                        # bursts over the crest
+P.sfx(3.45, 'zap_small', gain=0.6)
+P.sfx(3.15, 'whoosh', gain=0.45, rate=1.3)            # tracer skims the ridge behind it
+P.sfx(3.9, 'crackle_loop', gain=0.45, dur=0.6)        # drift-stop on its lightning skirt
+P.sfx(4.1, 'zap_small', gain=0.5)
+P.sfx(4.35, 'whoosh', gain=0.4, rate=1.4)             # blind shell sails overhead
+
 P.render()

@@ -561,4 +561,13 @@ P.cam_shake(T_BREAK, 0.35, dur=0.5)
 for t, i, lh in hits:
     P.cam_shake(t, 0.06, dur=0.15)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t in (0.02, 0.12, 0.2, 0.3, 0.38):                             # lightning thrusters igniting on the deck
+    P.sfx(_t, 'zap_small', gain=0.6)
+for _t, _i, _lh in hits:                                            # tail charges before every sting
+    P.sfx(_t - 0.28, 'charge_gold', gain=0.45)
+P.sfx(4.5 - 0.28, 'charge_gold', gain=0.8)                          # the triple strike
+P.sfx(T_BREAK + 0.03, 'debris_metal', gain=1.0)                     # the bomber tears in half
+P.sfx(T_BREAK + 0.45, 'debris_metal', gain=0.5, rate=0.85)
+
 P.render()

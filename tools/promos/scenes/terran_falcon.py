@@ -772,4 +772,15 @@ for o in bpy.data.objects:
         if 'emit_node' in m or m.name.startswith(('SoftFire', 'Fireball')):
             o.visible_shadow = False
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t0, _r in ((2.05, 1.0), (T_HIT1 - 0.1, 1.07), (T_KILL - 0.09, 1.0)):  # twin laser bursts
+    for _s in range(2):
+        P.sfx(_t0 + 0.09 * _s, 'shot_laser', gain=0.75, rate=_r * (1.0 + 0.03 * _s))
+for _s in range(2):                                   # first burst chews the canyon floor
+    P.sfx(2.05 + 0.09 * _s + 0.25, 'impact_dirt', gain=0.45, rate=1.1)
+for _t in (T_HIT1, T_KILL):                           # bursts connect on the ring
+    P.sfx(_t + 0.05, 'impact_energy', gain=0.6, pos=halo_pos(_t + 0.05))
+    P.sfx(_t + 0.07, 'impact_metal', gain=0.35, pos=halo_pos(_t + 0.07))
+P.sfx(T_BREAK + 0.03, 'debris_metal', gain=0.6, pos=halo_pos(T_BREAK))  # ring splits in two
+
 P.render()

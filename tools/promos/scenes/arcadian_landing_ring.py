@@ -845,4 +845,14 @@ for o in bpy.data.objects:
         if 'emit_node' in m or m.name.startswith(('SoftFire', 'Fireball', 'SoftPuff')):
             o.visible_shadow = False
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.4, dur=T_LAND)      # descent on lightning legs
+P.sfx(T_BLOOM, 'power_up_arc', gain=0.8)              # petals bloom open
+P.sfx(T_BLOOM + 0.1, 'servo', gain=0.35, rate=0.8)
+P.sfx(T_COL, 'shockwave', gain=0.6)                   # sky bolt opens the column
+P.sfx(T_COL + 0.1, 'whirr_loop', gain=0.3, dur=3.6, rate=0.8)
+for _t in T_ARR:                                      # each delivery rides the column down
+    P.sfx(_t, 'motes_loop', gain=0.45, dur=0.7)
+    P.sfx(_t + 0.5, 'thruster_blue', gain=0.35, rate=1.1)
+
 P.render()

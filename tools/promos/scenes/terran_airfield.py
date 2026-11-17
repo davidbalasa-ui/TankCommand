@@ -514,4 +514,16 @@ P.cam_shake(T_STOP, 0.1, dur=0.35)
 P.cam_shake(T_LAUNCH + 0.05, 0.05, dur=0.3)
 P.cam_shake(4.83, 0.12, dur=0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_SW0, 'turret_servo', gain=0.5, rate=0.55)     # hangar swivels to face the runway
+P.sfx(T_SW1, 'mech_clunk', gain=0.45, rate=0.8)
+P.sfx(T_SPIN, 'whirr_loop', gain=0.25, dur=6.0 - T_SPIN, rate=0.6)  # tower dish turning
+P.sfx(T_DOOR0, 'hydraulic', gain=0.4)                 # hangar end wall drops as a ramp
+P.sfx(T_DOOR0 + 0.02, 'servo', gain=0.4, rate=0.7)
+P.sfx(T_DOOR1, 'mech_clunk', gain=0.7, rate=0.75)
+P.sfx(T_SPOOL, 'power_up_terran', gain=0.5, rate=1.3)  # catapult lane lights, engine spools
+P.sfx(T_SPOOL, 'thruster_blue', gain=0.35, dur=T_LAUNCH - T_SPOOL + 0.1, rate=1.2)
+P.sfx(T_LAUNCH, 'shockwave', gain=0.6, rate=1.3)      # flung down the deck
+P.sfx(T_LAUNCH + 0.02, 'mech_clunk', gain=0.5, rate=1.1)
+
 P.render()

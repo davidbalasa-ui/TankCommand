@@ -250,4 +250,18 @@ P.camera([
 ], shake=0.015)
 P.cam_shake(1.8, 0.06, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(T_FAN, 'whirr_loop', gain=0.35, dur=6.0 - T_FAN, rate=0.75)  # fan spins up
+P.sfx(T_BEAM0, 'beam_start', gain=0.4, rate=1.2)      # neon intake beam locks onto the outcrop
+P.sfx(T_BEAM0 + 0.1, 'tractor_loop', gain=0.4, dur=6.0 - T_BEAM0 - 0.1)
+for _i, _t in enumerate(shard_ts):                    # crystal shards clattering into the hopper
+    P.sfx(_t + 0.25, 'impact_metal', gain=0.12, pos=HOPPER_MOUTH, rate=1.5 + 0.03 * (_i % 4))
+P.sfx(T_IGN, 'beam_start', gain=0.5, rate=0.6)        # smelter ignites
+P.sfx(T_IGN + 0.1, 'fire_loop', gain=0.3, dur=6.0 - T_IGN - 0.1)
+P.sfx(T_IGN + 0.15, 'hydraulic', gain=0.3, pos=STACK_TOP, rate=0.8)  # stack starts venting
+for _t in (4.1, 4.85, 5.5):                           # ingots slide out in a spray of sparks
+    P.sfx(_t, 'mech_clunk', gain=0.45, rate=1.05)
+    P.sfx(_t + 0.02, 'impact_metal', gain=0.2, rate=1.25)
+    P.sfx(_t + 0.05, 'crackle_loop', gain=0.15, dur=0.35)
+
 P.render()

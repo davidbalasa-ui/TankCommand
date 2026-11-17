@@ -6,15 +6,21 @@ How it works
     unfold/... call is recorded as a sound event with its time and position. Recording never
     changes what the method does or returns, and any recording error is swallowed (printed once).
   * Continuous beds (engines, hover hums, lifters, jets) are not events: at mix time every actor's
-    root is sampled per frame; speed drives each bed's pitch and loudness.
+    root is sampled per frame; speed drives each bed's pitch and loudness, acceleration adds
+    engine load (revs + level), fast fliers get Doppler, ground vehicles get a separate running-
+    gear bed (tracks_loop / tyres_loop) that follows ground speed only, and hard stops get a skid.
+    Each unit has its own 'voice' (pitch, variant rotation, tone) hashed from its label.
   * mix(P) builds a 48 kHz stereo mix (panning + distance from the keyed camera, ambience ducked
     under big hits, reverb send, bus glue, loudness to about -14 LUFS, true-peak limiter at
     -1.5 dBFS); mix_and_mux(P, mp4) puts it into the mp4 as AAC 192k (video stream copied).
   * Sounds come from the baked library in $PROMO_SFX (default /mnt/project-files/promos/sfx),
     made by audio/sfx_gen.py (baked automatically if missing).
 
-Explicit cues from a scene (optional):  P.sfx(t, 'boom_big', gain=1.0, pos=(x, y, z), dur=None, rate=1.0)
-  (name = a library sound, e.g. zap_lightning, servo, thruster_blue; dur for loops; gain linear)
+Explicit cues from a scene (for effects the scene draws itself, which the wrappers can't see):
+  P.sfx(t, 'boom_big', gain=1.0, pos=(x, y, z), dur=None, rate=1.0)
+  (name = a library sound, e.g. zap_lightning, servo, thruster_blue; dur for loops; gain linear;
+  list: audio/sfx_gen.py or the manifest.json in the library.) Scenes keep them in one block
+  just before P.render().
 
 CLI (add sound to an already rendered clip without re-rendering video):
   /home/user/artenv/venv/bin/python tools/promos/promo_audio.py <scene_id> [--mp4 in.mp4] [--out out.mp4]
@@ -34,6 +40,7 @@ import subprocess
 import sys
 import tempfile
 import wave
+import zlib
 
 import numpy as np
 
@@ -443,14 +450,35 @@ class Mix:
         self.rr[name] = k + 1 + int(self.rng.integers(0, 2))
         return k
 
+    def voice(self, key):
+        """Stable per-unit voice from its label: (rate, variant offset, darkness 0..0.6). Two units
+        with the same weapon get a different pitch/size, their own variant rotation and EQ."""
+        h = zlib.crc32(str(key).encode())
+        rate = 0.91 + 0.18 * ((h & 0xFF) / 255.0)
+        dark = 0.6 * (((h >> 8) & 0xFF) / 255.0) ** 1.5
+        return rate, (h >> 16) & 0xFF, dark
+
     def place(self, name, t, gain_db=0.0, pos=None, bus='fx', rate=1.0, dur=None, gain_min=0.1, var=None,
-              fade_out=0.05, width=1.0):
-        """One-shot (or a loop for `dur` s) at time t, spatialised at pos at time t."""
+              fade_out=0.05, width=1.0, voice=None):
+        """One-shot (or a loop for `dur` s) at time t, spatialised at pos at time t. voice: a unit
+        label; its sounds get that unit's own pitch, variant rotation and tone, plus a small
+        per-shot pitch jitter so bursts don't machine-gun."""
+        dark = 0.0
+        if voice is not None:
+            vr, off, dark = self.voice(voice)
+            rate = rate * vr * float(self.rng.uniform(0.975, 1.025))
+            if var is None:
+                k = (name, voice)
+                c = self.rr.get(k, off)
+                self.rr[k] = c + 1
+                var = c
         try:
             x = load(name, self.variant(name) if var is None else var)
         except KeyError:
             _warn('nosound' + name, f'no library sound {name!r}')
             return
+        if dark > 0.05:
+            x = (x * (1 - dark) + _lp1(x, 3500).astype(np.float32) * dark).astype(np.float32)
         if dur is not None and is_loop(name):
             x = self._loop(x, dur * rate + 0.05)
         x = _resample(x, rate)
@@ -609,7 +637,7 @@ def build(P, S):
             else:
                 name, vref, idle, r0, r1 = 'hover_arc', 14, 0.65, 0.92, 1.12
         else:
-            if air:
+            if air or any(k in model for k in ('falcon', 'condor')):
                 name, vref, idle, r0, r1 = 'jet_terran', 30, 0.6, 0.85, 1.2
             elif hover:
                 name, vref, idle, r0, r1 = 'hover_terran', 14, 0.6, 0.9, 1.2
@@ -631,12 +659,50 @@ def build(P, S):
         if model == hero or model == P.id or model.startswith(hero):
             size_db += 5.0  # the clip's star unit is mixed forward
         loud = float(np.max(g * gain_lin))
-        beds.append((loud, a, name, g * gain_lin, pan, cut, rate, size_db, d, spd, air))
+        # engine load: pulling away revs up and gets louder, coasting/braking drops off
+        acc = np.gradient(spd) * fps
+        acc = np.where(np.abs(acc) > 60, 0, acc)
+        acc = np.convolve(acc, np.ones(7) / 7, mode='same')
+        load = np.clip(acc / (vref * 0.8), -1, 1)
+        if name.startswith('eng_'):
+            rate = rate * (1 + 0.07 * load)
+            gain_lin = gain_lin * 10 ** (np.where(load > 0, 3.5, 2.0) * load / 20)
+        # Doppler on fast movers (cuts excluded): fly-bys bend down in pitch as they pass
+        vrad = np.gradient(d) * fps
+        vrad = np.where(np.abs(vrad) > 150, 0, vrad)
+        vrad = np.convolve(vrad, np.ones(5) / 5, mode='same')
+        if air or kind == 'ship':
+            rate = rate * np.clip(343.0 / (343.0 + 1.6 * vrad), 0.8, 1.25)
+        beds.append((loud, a, name, g * gain_lin, pan, cut, rate, size_db, d, spd, air, g * vis))
+        # hard braking from speed: tracks/tyres skid (the kit's dust ring has no sound of its own)
+        if name in ('eng_tracked', 'eng_wheeled') and kind != 'ship':
+            # a real stop: from a good clip down to a crawl inside ~0.6 s; the skid sits on the
+            # hardest deceleration of that window
+            w = int(0.6 * fps)
+            i = w
+            while i < nf:
+                if spd[i] < 0.12 * vref and spd[i - w:i].max() > 0.5 * vref and vis[i - w:i + 1].min() > 0:
+                    j = i - w + int(np.argmin(acc[i - w:i + 1]))
+                    if any(e.get('kind') == 'sfx' and e.get('name') == 'skid' and abs(e['t'] - j / fps) < 0.4
+                           for e in ev):
+                        i += int(1.5 * fps)
+                        continue  # the scene cued this one itself
+                    M.place('skid', j / fps - 0.1, -9.0 + size_db * 0.5, tuple(pos[j]), voice=a.name, gain_min=1.0)
+                    i += int(1.5 * fps)
+                i += 1
     beds.sort(key=lambda b: -b[0])
     nb = max(1, len(beds))
-    for k, (loud, a, name, g, pan, cut, rate, size_db, d, spd, air) in enumerate(beds[:8]):
+    for k, (loud, a, name, g, pan, cut, rate, size_db, d, spd, air, gpos) in enumerate(beds[:8]):
         crowd = -10 * math.log10(max(1, min(nb, 6)) ** 0.5)  # many units: each a bit quieter
-        M.bed(name, g, pan, cut, rate, gain_db=-18.0 + size_db + crowd - (3.0 if k >= 3 else 0.0))
+        vr, voff, _ = M.voice(a.name)
+        gdb = -18.0 + size_db + crowd - (3.0 if k >= 3 else 0.0)
+        M.bed(name, g, pan, cut, rate * (0.5 + 0.5 * vr), gain_db=gdb, var=voff)
+        # running gear is its own layer: it follows ground speed only (silent at a standstill)
+        gear = {'eng_tracked': ('tracks_loop', 8.0), 'eng_wheeled': ('tyres_loop', 14.0)}.get(name)
+        if gear:
+            sg = np.clip(spd / gear[1], 0, 1.3)
+            M.bed(gear[0], gpos * sg, pan, cut, (0.7 + 0.45 * np.clip(sg, 0, 1)) * (0.5 + 0.5 * vr),
+                  gain_db=gdb + 1.0, var=voff)
         # close, fast fly-bys get a whoosh centred on the closest approach
         if air:
             dm = d.copy()
@@ -647,6 +713,7 @@ def build(P, S):
 
     # ---- one-shot events
     seen_strike = []
+    in_space = getattr(P, "_audio_env", "") == "space"
 
     def near_strike(t, tol=0.07):
         return any(abs(t - u) < tol for u in seen_strike)
@@ -661,7 +728,7 @@ def build(P, S):
             name, gdb = FIRE_SOUND.get(wk, ('shot_cannon', 0.0))
             gdb += 0.5 * _db(e.get('size', 1.0))
             p = apos(a, t)
-            M.place(name, t, gdb, p, bus='hit' if wk in ('heavy', 'shell', 'cannon') else 'fx')
+            M.place(name, t, gdb, p, bus='hit' if wk in ('heavy', 'shell', 'cannon') else 'fx', voice=a.name)
             if wk == 'lightning':
                 seen_strike.append(t)
         elif k == 'explosion':
@@ -670,7 +737,7 @@ def build(P, S):
             rate = float(np.clip(1.12 - 0.06 * s, 0.82, 1.1))
             M.place(name, t, gdb, e['pos'], bus='hit', rate=rate, gain_min=0.35)
         elif k == 'destroy':
-            M.place('debris_metal', t + 0.04, -5.0, apos(e['actor'], t), bus='fx', gain_min=0.2)
+            M.place('debris_metal', t + 0.04, -5.0, apos(e['actor'], t), bus='fx', gain_min=0.2, voice=e['actor'].name)
         elif k == 'impact':
             c = e.get('color')
             size = max(0.3, min(2.5, e.get('size', 1.0)))
@@ -684,8 +751,8 @@ def build(P, S):
                 M.place('impact_energy', t, gdb, e['pos'], rate=1.15 if _is_green(c) else 1.0, gain_min=0.15)
             else:
                 fk = e.get('fire_kind')
-                if e.get('fire_target_actor') and fk not in ('shell', 'bomb', 'missile'):
-                    M.place('impact_metal', t, gdb, e['pos'], gain_min=0.15)
+                if (e.get('fire_target_actor') and fk not in ('shell', 'bomb', 'missile')) or in_space:
+                    M.place('impact_metal', t, gdb, e['pos'], gain_min=0.15)  # (no dirt in space)
                 else:
                     M.place('impact_dirt', t, gdb, e['pos'], gain_min=0.15)
                 if fk in ('shell', 'bomb', 'missile', 'heavy') or size >= 1.5:
@@ -694,6 +761,12 @@ def build(P, S):
             if 'fire' in par:
                 continue
             dur = e['dur']
+            # a looping bolt (thruster lightning re-issued every second) continues, it doesn't re-strike
+            cont = any(o is not e and o['kind'] == 'lightning' and abs(o['t'] + o['dur'] - t) < 0.06
+                       and np.linalg.norm(np.subtract(o['pos'], e['pos'])) < 4.0 for o in ev)
+            if cont or dur >= 0.9:   # (a second-long bolt is a sustained effect: thrusters, tethers)
+                M.place('crackle_loop', t, -12.0, e['pos'], dur=dur, gain_min=0.15)
+                continue
             if dur < 0.12 and e.get('length', 5) < 6:
                 M.place('zap_small', t, -9.0, e['pos'], gain_min=0.1)
             else:
@@ -723,9 +796,17 @@ def build(P, S):
         elif k == 'muzzle':
             if 'fire' in par:
                 continue
-            if _is_gold(e.get('color')):
+            gun = any(abs(o['t'] - t) < 0.03 and o['kind'] == 'projectile' for o in ev if o is not e)
+            # Terran orange and Arcadian gold are nearly the same colour: an orange flash with a
+            # tracer is a gun, and in a Terran clip a bare orange flash is a launcher tube
+            arc_clip = P.id.startswith(('arcadian', 'fleet_arcadian', 'world'))
+            if gun:
+                continue  # the tracer's own event already carries the shot
+            if _is_gold(e.get('color')) and not gun and arc_clip:
                 M.place('zap_lightning', t, 0.0 + 6 * math.log10(max(e.get('size', 1.0), 0.2)), e['pos'], gain_min=0.25)
                 seen_strike.append(t)
+            elif _is_gold(e.get('color')) and not gun:
+                M.place('shot_missile', t, -4.0, e['pos'], gain_min=0.15)
             else:
                 M.place('shot_autocannon', t, -6.0, e['pos'], gain_min=0.15)
         elif k == 'light':
@@ -754,8 +835,9 @@ def build(P, S):
             gdb = float(np.clip(_db(amt / 0.25) * 0.8, -14, 1.0))
             M.place('sub_boom', t, gdb - 5.0 - (4.0 if amt < 0.1 else 0.0), None, bus='hit', width=0.3)
             # a jolt with nothing exploding nearby is a landing/slam: add a heavy suspension thud
-            if not any(abs(o['t'] - t) < 0.12 and o['kind'] in ('explosion', 'impact', 'fire', 'light', 'lightning', 'destroy')
-                       for o in ev if o is not e):
+            if not in_space and not any(abs(o['t'] - t) < 0.12 and o['kind'] in ('explosion', 'impact', 'fire', 'light',
+                                                                                    'lightning', 'destroy')
+                                        for o in ev if o is not e):
                 M.place('mech_clunk', t, gdb - 1.0, None, rate=0.7, width=0.5)
                 M.place('impact_dirt', t + 0.01, gdb - 4.0, None, rate=0.8, width=0.6)
         elif k == 'shield':
@@ -768,20 +850,20 @@ def build(P, S):
             t1 = e['t1']
             span = max(0.2, t1 - t)
             if actor_faction(a, P.id) == 'arc':
-                M.place('zap_small', t, -6.0, p)
-                M.place('crackle_loop', t, -14.0, p, dur=span)
-                M.place('servo', t + span * 0.1, -12.0, p, rate=0.75)
-                M.place('mech_clunk', t1 - 0.02, -8.0, p, rate=0.8)
-                M.place('power_up_arc', t1 - 0.05, -4.0, p)
+                M.place('zap_small', t, -6.0, p, voice=a.name)
+                M.place('crackle_loop', t, -14.0, p, dur=span, voice=a.name)
+                M.place('servo', t + span * 0.1, -12.0, p, voice=a.name, rate=0.75)
+                M.place('mech_clunk', t1 - 0.02, -8.0, p, voice=a.name, rate=0.8)
+                M.place('power_up_arc', t1 - 0.05, -4.0, p, voice=a.name)
             else:
-                M.place('mech_clunk', t, -5.0, p)
-                M.place('hydraulic', t + 0.06, -12.0, p)
+                M.place('mech_clunk', t, -5.0, p, voice=a.name)
+                M.place('hydraulic', t + 0.06, -12.0, p, voice=a.name)
                 for i, u in enumerate((0.05, 0.35, 0.62)):
-                    M.place('servo', t + span * u, -14.0 - i, p, rate=0.85 + 0.1 * i)
-                M.place('hydraulic', t1 - 0.25, -14.0, p)
-                M.place('mech_clunk', t1 - 0.03, -3.0, p)
-                M.place('mech_clunk', t1 + 0.1, -8.0, p, rate=1.2)
-                M.place('power_up_terran', t1 + 0.05, -10.0, p)
+                    M.place('servo', t + span * u, -14.0 - i, p, voice=a.name, rate=0.85 + 0.1 * i)
+                M.place('hydraulic', t1 - 0.25, -14.0, p, voice=a.name)
+                M.place('mech_clunk', t1 - 0.03, -3.0, p, voice=a.name)
+                M.place('mech_clunk', t1 + 0.1, -8.0, p, voice=a.name, rate=1.2)
+                M.place('power_up_terran', t1 + 0.05, -10.0, p, voice=a.name)
         elif k == 'spin':
             part = e['part'].lower()
             p = apos(e['actor'], t)
@@ -789,12 +871,12 @@ def build(P, S):
                 continue
             rate = float(np.clip(abs(e['rate']) / 400.0, 0.75, 1.35))
             if 'drum' in part or 'grind' in part or 'drill' in part:
-                M.place('grind_loop', t, -14.0, p, rate=rate, dur=e['dur'])
+                M.place('grind_loop', t, -14.0, p, rate=rate, dur=e['dur'], voice=e['actor'].name)
             else:
-                M.place('whirr_loop', t, -20.0, p, rate=rate, dur=e['dur'])
+                M.place('whirr_loop', t, -20.0, p, rate=rate, dur=e['dur'], voice=e['actor'].name)
         elif k == 'aim':
             rate = float(np.clip(0.5 / max(e['dur'], 0.1), 0.8, 1.4))
-            M.place('turret_servo', t, -17.0, apos(e['actor'], t), rate=rate)
+            M.place('turret_servo', t, -17.0, apos(e['actor'], t), rate=rate, voice=e['actor'].name)
         elif k == 'sfx':
             name = e['name']
             M.place(name, t, _db(e['gain']), e['pos'], dur=e.get('dur'), rate=e.get('rate', 1.0),

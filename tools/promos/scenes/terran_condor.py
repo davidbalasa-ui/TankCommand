@@ -563,4 +563,16 @@ for o in bpy.data.objects:
         if 'emit_node' in m or m.name.startswith(('SoftFire', 'Fireball', 'SoftPuff')):
             o.visible_shadow = False
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _a, _t in ((lumA, 0.42), (lumB, 0.78), (lumA, 1.12)):  # Lumens crack lightning up; it frays out
+    P.sfx(_t, 'zap_lightning', gain=0.6, pos=_a.pos_at(_t))
+    P.sfx(_t + 0.05, 'crackle_loop', gain=0.35, dur=0.25, pos=_a.pos_at(_t))
+P.sfx(T_BAY0, 'servo', gain=0.5, rate=0.6)            # belly bay doors swing open
+P.sfx(T_BAY0 + 0.05, 'hydraulic', gain=0.4, rate=0.8)
+P.sfx(T_BAY1, 'mech_clunk', gain=0.5, rate=0.7)
+for _t in T_DROP:                                     # bombs released: rack clunk + falling whistle
+    P.sfx(_t, 'shot_bomb', gain=0.8)
+P.sfx(T_BAYC0, 'servo', gain=0.35, rate=0.6)          # bay closes
+P.sfx(T_BAYC1, 'mech_clunk', gain=0.35, rate=0.7)
+
 P.render()

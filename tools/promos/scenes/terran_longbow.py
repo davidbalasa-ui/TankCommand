@@ -202,4 +202,14 @@ P.camera(keys, shake=0.02, cuts=(T_C1, T_C2))
 for th in T_HITS:
     P.cam_shake(th, 0.07, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _t in T_SHOTS:                                    # shells screaming downrange (camera rides along)
+    P.sfx(_t + 0.9, 'whoosh', gain=0.4, rate=0.7)
+for _t in T_HITS:                                     # and overtaking the camera as they drop
+    P.sfx(_t - 0.6, 'whoosh', gain=0.45, rate=0.8)
+P.sfx(4.4, 'servo', gain=0.45, rate=0.6)              # barrel drops to the loading angle
+P.sfx(4.9, 'mech_clunk', gain=0.5, rate=0.75)         # breech opens: reload
+P.sfx(5.05, 'hydraulic', gain=0.3)
+P.sfx(5.25, 'servo', gain=0.45, rate=0.65)            # and swings back up to the sky
+
 P.render()

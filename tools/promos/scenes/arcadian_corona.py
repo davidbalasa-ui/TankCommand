@@ -718,4 +718,16 @@ for m_ in bpy.data.materials:
         em.inputs['Color'].default_value = (1.0, 0.35, 0.05, 1)
         em.inputs['Strength'].default_value = 3.0
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.5, dur=1.5)         # dropping in on lightning legs
+P.sfx(1.6, 'power_up_arc', gain=0.8)                  # claw blooms open
+P.sfx(1.75, 'whoosh', gain=0.9)                       # Falcons scream over the claw (peak ~2.35)
+P.sfx(1.95, 'whoosh', gain=0.7, rate=0.9)
+P.sfx(2.7, 'servo', gain=0.4, rate=0.7)               # crown slews after them
+P.sfx(2.75, 'charge_gold', gain=0.7)                  # pods pulse a lock...
+P.sfx(2.95, 'charge_gold', gain=0.5, rate=1.2)
+P.sfx(3.15, 'motes_loop', gain=0.45, dur=0.9)         # seeker orbs streaming up and over
+for _t in (3.1, 3.24, 3.38):
+    P.sfx(_t - 0.3, 'whoosh', gain=0.35, rate=1.2)
+
 P.render()

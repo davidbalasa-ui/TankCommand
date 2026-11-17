@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dsp import (SR, bp, brown, conv, env_ad, env_exp, fade, glide, hp, impulses, loopify,  # noqa: E402
-                 lp, modal, norm, osc, peak, pink, reverb_ir, sat, secs, slapback, smooth_random,
+                 lp, modal, norm, osc, pink, reverb_ir, sat, secs, smooth_random,
                  stereoize, sweep_lp, tv_bandpass, white)
 
 OUT = os.environ.get('PROMO_SFX', '/mnt/project-files/promos/sfx')
@@ -111,22 +111,106 @@ def rumble(rng, dur=3.0, cutoff=160, decay=1.4, attack=0.05):
     return x * env_ad(n, attack, decay, 2.6)
 
 
-def debris_patter(rng, dur=2.5, t0=0.25, rate0=60, rate1=4, metal=0.5):
-    """Bits of rock and metal landing: sparse filtered clicks + a few metal 'tinks'."""
+def metal_hit(rng, f0=None, dur=0.5, bright=0.5, damp=0.08, n_modes=10, noise=0.5):
+    """Noise-excited struck metal: many inharmonic modes that die faster the higher they are,
+    excited by a short filtered noise burst (not a sine 'ping'), plus the click of the contact.
+    bright 0..1 = hardness of the strike; damp = decay time of the lowest mode (s)."""
     n = secs(dur)
+    f0 = f0 or rng.uniform(250, 900)
     t = np.arange(n) / SR
-    rate = np.where(t > t0, rate0 * np.exp(-(t - t0) / (dur * 0.35)) + rate1, 0)
-    imp = impulses(n, rng, rate, 2.5)
-    rocks = bp(conv(imp, np.hanning(secs(0.004)))[:n], 300, 3500, 2)
-    rocks += 0.5 * bp(imp, 2000, 7000, 1)
-    out = rocks * np.exp(-np.clip(t - t0, 0, None) / (dur * 0.6))
-    # metal tinks
-    for _ in range(int(metal * 7)):
-        ti = rng.uniform(t0 + 0.05, dur * 0.7)
-        f = rng.uniform(900, 2600)
-        tk = modal(secs(0.35), rng, [f, f * 2.76, f * 5.4], [0.09, 0.05, 0.03], [1, 0.5, 0.25])
-        out += at(tk * rng.uniform(0.04, 0.12) * np.exp(-ti), ti, dur)
+    # plate/shell-like mode spread: ratios cluster irregularly (no clean harmonic series)
+    ratios = np.sort(np.concatenate([[1.0], rng.uniform(1.3, 2.6, 3), rng.uniform(2.6, 6.5, n_modes - 4)]))
+    ir = np.zeros(n)
+    for k, r in enumerate(ratios):
+        f = f0 * r
+        if f > SR / 2.4:
+            continue
+        tau = damp / (1 + 0.9 * k) * rng.uniform(0.6, 1.4)
+        a = rng.uniform(0.4, 1.0) / (1 + 0.35 * k) * (1 + bright * k * 0.15)
+        # slight beating: each mode is a close pair (real objects are never perfectly symmetric)
+        d = rng.uniform(0.5, 4.0)
+        ir += a * (np.sin(2 * np.pi * f * t + rng.uniform(0, 6)) + 0.6 * np.sin(2 * np.pi * (f + d) * t)) * np.exp(-t / tau)
+    exc_n = secs(rng.uniform(0.001, 0.004))
+    exc = rng.standard_normal(exc_n) * np.hanning(exc_n)
+    exc = lp(exc, 2500 + 9000 * bright, 2)
+    ring = conv(exc, ir)[:n]
+    ring /= (np.max(np.abs(ring)) + 1e-9)
+    click = hp(rng.standard_normal(secs(0.012)), 1500 + 3000 * bright, 2) * env_exp(secs(0.012), 0.0018)
+    rattle = bp(rng.standard_normal(n), f0 * 1.5, min(f0 * 8, 15000), 1) * env_exp(n, damp * 0.4)
+    return mix(ring, click * noise * 1.2, rattle * noise * 0.35)
+
+
+def grain_debris(rng, dur=2.5, t0=0.2, n_grains=90, rock=1.0, metal=0.3, chunks=4, spread=0.7):
+    """Granular debris rain: each grain is synthesised on its own (rock tick, pebble, metal bit,
+    heavy chunk thud) with its own pitch, length, level and distance (darker when far), with a
+    density that peaks as things come back down and thins out."""
+    n = secs(dur)
+    out = np.zeros(n)
+    for _ in range(n_grains):
+        # most debris lands 0.3-1.2 s after the blast, a long thin trickle after
+        ti = t0 + abs(rng.normal(0.45, 0.35)) * spread * dur / 1.6 + (rng.exponential(0.4) if rng.random() < 0.3 else 0)
+        if ti >= dur - 0.05:
+            continue
+        far = rng.uniform(0, 1)
+        g = rng.uniform(0.15, 1.0) ** 1.6 * (1 - 0.6 * far)
+        kind = rng.random()
+        if kind < metal * 0.35:
+            x = metal_hit(rng, rng.uniform(700, 3500), 0.25, rng.uniform(0.4, 1.0), rng.uniform(0.02, 0.07), 8, 0.6) * 0.5
+        else:
+            L = secs(rng.uniform(0.003, 0.025))
+            x = rng.standard_normal(L) * env_exp(L, L / SR / 4)
+            fc = rng.uniform(500, 5000)
+            x = bp(x, fc * 0.5, min(fc * 2, 20000), 1) * rock
+        x = lp(x, 14000 - 10000 * far, 1) if len(x) > 32 else x
+        out += at(x * g, ti, dur)
+    for _ in range(chunks):  # a few big pieces thudding into the ground
+        ti = t0 + rng.uniform(0.35, 1.3) * spread
+        if ti >= dur - 0.2:
+            continue
+        L = secs(0.18)
+        th = np.sin(2 * np.pi * rng.uniform(55, 110) * np.arange(L) / SR) * env_exp(L, 0.04)
+        th += lp(rng.standard_normal(L), 900, 2) * env_exp(L, 0.02) * 0.8
+        out += at(th * rng.uniform(0.3, 0.8), ti, dur)
     return out
+
+
+def outdoor(x, rng, size=1.0, dur_extra=1.6):
+    """Outdoor acoustics for a loud event: a ground reflection, a handful of terrain echoes
+    (each later one quieter, darker and more smeared by distance and air absorption), and a
+    low 'rolling' tail like distant thunder."""
+    n = len(x)
+    extra = secs(dur_extra * size)
+    y = np.zeros(n + extra)
+    y[:n] += x
+    d = secs(rng.uniform(0.004, 0.012))  # ground bounce
+    y[d:d + n] += lp(x, 6000, 1) * 0.35
+    nt = int(4 + 3 * size)
+    for k in range(nt):
+        delay = rng.uniform(0.09, 0.35) + k * rng.uniform(0.08, 0.22) * size
+        i = secs(delay)
+        if i >= len(y) - 10:
+            continue
+        g = 0.3 * np.exp(-delay / (0.55 * size)) * rng.uniform(0.6, 1.2)
+        cut = 3500 / (1 + delay * 3)
+        smear_n = secs(rng.uniform(0.02, 0.08) * (1 + delay))
+        smear = rng.standard_normal(smear_n) * np.hanning(smear_n)
+        smear /= np.sqrt(np.sum(smear ** 2)) + 1e-9
+        e = conv(lp(x, cut, 2), smear)
+        m = min(len(e), len(y) - i)
+        y[i:i + m] += e[:m] * g
+    # rolling low tail
+    roll_n = len(y)
+    rl = lp(rng.standard_normal(roll_n), 120, 2)
+    env = np.interp(np.arange(roll_n), [0, secs(0.15), secs(0.5 * size), roll_n], [0, 1, 0.7, 0])
+    lumpy = 0.6 + 0.4 * smooth_random(roll_n, rng, 3, 0, 1)
+    pk = np.max(np.abs(x)) + 1e-9
+    y += rl / (np.max(np.abs(rl)) + 1e-9) * env * lumpy * pk * 0.25 * size
+    return y
+
+
+def debris_patter(rng, dur=2.5, t0=0.25, rate0=60, rate1=4, metal=0.5):
+    """Back-compat wrapper: granular debris with a density roughly matching rate0."""
+    return grain_debris(rng, dur, t0, n_grains=int(rate0 * 1.4), metal=metal, chunks=int(2 + 3 * metal))
 
 
 def electric_crackle(rng, dur, rate=900, color=(1500, 9000), buzz_hz=None, buzz=0.0, amp_pow=3.2):
@@ -161,14 +245,37 @@ def gold_shimmer(rng, dur, base=None, decay=0.5, trem=23):
 
 
 def servo_tone(rng, n, speed, base=420, gear=0.4):
-    """Motor whine whose pitch follows `speed` (0..1 per-sample)."""
-    f = base * (0.45 + 0.75 * speed)
-    m = osc(f, shape='saw') * 0.5 + 0.35 * osc(f * 2.0, shape='sine') + 0.25 * osc(f * 3.97, shape='sine')
-    # gear teeth: AM at a fraction of the motor freq + gritty noise
-    teeth = 0.75 + 0.25 * osc(f / 7.0, shape='square')
-    grit = bp(white(n, rng), 1500, 6000, 2) * 0.15 * speed
-    y = bp(m * teeth, 150, 3000, 2) + gear * grit
-    return y * np.clip(speed * 1.3, 0, 1)
+    """Electric actuator: the motor is noise-band-limited around its commutation harmonics (a
+    rough, breathy whine, not a pure saw), the gearbox is a train of tiny metallic tooth ticks,
+    plus friction rasp; pitch wobbles with load."""
+    jitter = 1 + 0.03 * smooth_random(n, rng, 9, -1, 1)
+    f = base * (0.4 + 0.75 * speed) * jitter
+    motor = np.zeros(n)
+    for k, a in ((1, 1.0), (2, 0.5), (3, 0.35), (5, 0.2)):
+        car = np.sin(2 * np.pi * np.cumsum(f * k) / SR + rng.uniform(0, 6))
+        nb = lp(rng.standard_normal(n), 180 + 120 * k, 2)        # noise band around each harmonic = rough tone
+        nb /= np.std(nb) + 1e-9
+        motor += a * car * (0.15 + 0.85 * np.abs(nb))
+    motor = bp(motor, 120, 3500, 2)
+    # gear mesh ticks at the tooth rate (motor / reduction), each a tiny metal tick
+    tooth = f / rng.uniform(3.5, 6.0)
+    ph = np.cumsum(tooth) / SR
+    idx = np.nonzero(np.diff(np.floor(ph)) > 0)[0]
+    # worn gears: teeth never land on an exact grid (that would ring as a pitch), and each tooth
+    # pair sounds a bit different
+    gap = np.diff(np.concatenate([[0], idx]))
+    idx = np.clip(idx + (rng.uniform(-0.3, 0.3, len(idx)) * gap).astype(int), 0, n - 1)
+    mesh = np.zeros(n)
+    irs = [metal_hit(rng, rng.uniform(1500, 3800), 0.03, 0.8, 0.005, 6, 0.4) for _ in range(4)]
+    for k in range(4):
+        tk = np.zeros(n)
+        sel = idx[k::4]
+        tk[sel] = rng.uniform(0.2, 1.0, len(sel))
+        mesh += conv(tk, irs[k])[:n]
+    mesh *= 0.25
+    rasp = bp(rng.standard_normal(n), 900, 5000, 2) * (0.3 + 0.7 * smooth_random(n, rng, 25, 0, 1))
+    y = motor * 0.35 + gear * (mesh * 1.2 + rasp * 0.3)
+    return y * np.clip(speed * 1.4, 0, 1)
 
 
 # =================================================================== explosions & impacts
@@ -182,12 +289,13 @@ def boom_big(rng):
     body = fireball_roar(rng, 2.6, rng.uniform(5000, 7000), 180, 0.75, 0.7)
     low = lp(fireball_roar(rng, 2.6, 900, 90, 1.0, 0.5), 300)
     rum = rumble(rng, 4.2, 120, 1.6, 0.08)
-    deb = debris_patter(rng, 3.0, 0.3, 70, 3, 0.8)
-    x = mix(sub * 0.7, cr * 0.8, body * 1.0, low * 0.6, lowmid * 0.9, rum * 0.45, deb * 0.45)
+    deb = grain_debris(rng, 3.4, 0.3, 140, rock=1.0, metal=0.6, chunks=7, spread=1.0)
+    x = mix(sub * 0.7, cr * 0.8, body * 1.0, low * 0.6, lowmid * 0.9, rum * 0.45)
     x = sat(x * 1.3, 1.6)
-    x = slapback(x, rng, ((0.16, 0.32), (0.34, 0.2), (0.6, 0.1)), 1400)
+    x = outdoor(x, rng, 1.3, 1.4)          # terrain echoes + rolling thunder tail
+    x = mix(x, deb * 0.55)                 # debris lands after, dry-ish and close
     x = pad(x, D)
-    y = room(x, rng, 0.22, 1.8, (3500, 500))
+    y = room(x, rng, 0.16, 1.6, (3500, 500))
     return fade(pad(y, D), 0.0005, 0.3)
 
 
@@ -200,11 +308,11 @@ def boom_med(rng):
     cr = crack(rng, 0.1, 900, 11000, 0.022)
     body = fireball_roar(rng, 1.8, rng.uniform(5500, 8000), 220, 0.5, 0.6)
     rum = rumble(rng, 2.8, 150, 0.9, 0.05)
-    deb = debris_patter(rng, 2.2, 0.2, 50, 2, 0.5)
-    x = mix(sub * 0.7, cr * 0.8, body * 1.0, lowmid * 0.8, rum * 0.35, deb * 0.4)
+    deb = grain_debris(rng, 2.6, 0.2, 90, rock=1.0, metal=0.4, chunks=4, spread=0.8)
+    x = mix(sub * 0.7, cr * 0.8, body * 1.0, lowmid * 0.8, rum * 0.35)
     x = sat(x * 1.2, 1.5)
-    x = slapback(x, rng, ((0.14, 0.25), (0.3, 0.13)), 1600)
-    y = room(pad(x, D), rng, 0.2, 1.5)
+    x = mix(outdoor(x, rng, 1.0, 1.1), deb * 0.5)
+    y = room(pad(x, D), rng, 0.16, 1.4)
     return fade(pad(y, D), 0.0005, 0.25)
 
 
@@ -214,10 +322,11 @@ def boom_small(rng):
     sub = sub_thump(rng, rng.uniform(95, 120), rng.uniform(40, 50), 0.8, 0.07, 0.25, 1.8)
     cr = crack(rng, 0.08, 1000, 12000, 0.015)
     body = fireball_roar(rng, 1.0, 7000, 300, 0.28, 0.5)
-    dirt = debris_patter(rng, 1.4, 0.08, 80, 3, 0.1)
-    x = mix(sub * 0.7, cr * 0.8, body * 1.0, dirt * 0.5)
+    dirt = grain_debris(rng, 1.6, 0.06, 60, rock=1.0, metal=0.1, chunks=1, spread=0.5)
+    x = mix(sub * 0.7, cr * 0.8, body * 1.0)
     x = sat(x * 1.2, 1.4)
-    y = room(pad(x, D), rng, 0.2, 1.2)
+    x = mix(outdoor(x, rng, 0.6, 0.6), dirt * 0.55)
+    y = room(pad(x, D), rng, 0.15, 1.1)
     return fade(pad(y, D), 0.0005, 0.2)
 
 
@@ -231,23 +340,18 @@ def sub_boom(rng):
     return fade(st(pad(x, D), rng, 0.2), 0.001, 0.3)
 
 
-@sound('debris_metal', 4, desc='destroyed vehicle: metal crunch + falling parts')
+@sound('debris_metal', 5, desc='destroyed vehicle: metal crunch + rain of parts, each part its own metal/rock grain')
 def debris_metal(rng):
-    D = 2.6
+    D = 2.8
     n = secs(D)
-    # crunch: dense band noise burst with metallic resonances
-    cr = bp(white(secs(0.35), rng), 400, 5000, 2) * env_ad(secs(0.35), 0.002, 0.12, 4)
-    for f in rng.uniform(300, 1400, 4):
-        cr = peak(cr, f, 12, 12)
-    hits = np.zeros(n)
-    for _ in range(9):
-        ti = rng.uniform(0.15, 1.8)
-        f = rng.uniform(250, 1600)
-        tk = modal(secs(0.5), rng, [f, f * 2.32, f * 4.25, f * 6.8], [0.14, 0.08, 0.05, 0.03])
-        tk += 0.6 * lp(white(len(tk), rng), 3000) * env_exp(len(tk), 0.01)
-        hits += at(tk * rng.uniform(0.15, 0.5) * np.exp(-ti * 0.9), ti, D)
-    x = mix(sat(cr * 1.5, 2), hits)
-    return fade(room(pad(x, D), rng, 0.25, 1.2), 0.001, 0.2)[:n]
+    crunch = np.zeros(secs(0.5))
+    for _ in range(int(rng.integers(5, 9))):  # the hull tearing: a quick cluster of heavy hits
+        h = metal_hit(rng, rng.uniform(150, 600), 0.45, rng.uniform(0.3, 0.8), rng.uniform(0.05, 0.12), 12, 0.9)
+        crunch += at(h * rng.uniform(0.3, 1.0), rng.uniform(0, 0.12), 0.5)
+    crunch += bp(white(len(crunch), rng), 300, 4000, 2) * env_ad(len(crunch), 0.002, 0.1, 4) * 0.6
+    rain = grain_debris(rng, D, 0.25, 70, rock=0.6, metal=1.0, chunks=4, spread=0.9)
+    x = mix(sat(crunch * 0.8, 1.5), rain * 0.8)
+    return fade(room(pad(x, D), rng, 0.22, 1.2), 0.001, 0.2)[:n]
 
 
 @sound('impact_dirt', 5, desc='round hitting ground: thud + dirt spray')
@@ -261,15 +365,15 @@ def impact_dirt(rng):
     return fade(room(pad(x, D), rng, 0.15, 0.9), 0.0005, 0.15)[:secs(D)]
 
 
-@sound('impact_metal', 5, desc='round hitting armour: clang + sparks')
+@sound('impact_metal', 6, desc='round hitting armour: hard clang (noisy, damped) + sparks')
 def impact_metal(rng):
-    D = 1.4
-    f = rng.uniform(380, 700)
-    ring = modal(secs(1.0), rng, [f, f * 1.83, f * 2.71, f * 4.33, f * 6.1], [0.09, 0.07, 0.05, 0.035, 0.025])
+    D = 1.3
+    h = metal_hit(rng, rng.uniform(300, 800), 0.8, rng.uniform(0.6, 1.0), rng.uniform(0.05, 0.11), 12, 1.0)
     th = sub_thump(rng, 140, 60, 0.3, 0.03, 0.08, 1.5)
     cr = crack(rng, 0.05, 2000, 12000, 0.008)
-    sparks = electric_crackle(rng, 0.4, 600, (3000, 12000)) * env_exp(secs(0.4), 0.08)
-    x = mix(ring * 0.3, th * 0.8, cr * 0.8, sparks * 0.3)
+    sparks = electric_crackle(rng, 0.4, 600, (3000, 12000)) * env_exp(secs(0.4), 0.06)
+    bits = grain_debris(rng, 1.0, 0.05, 14, rock=0.4, metal=0.8, chunks=0, spread=0.3)
+    x = mix(h * 0.45, th * 0.8, cr * 0.8, sparks * 0.25, bits * 0.3)
     return fade(room(pad(sat(x, 1.3), D), rng, 0.18, 1.0), 0.0005, 0.15)[:secs(D)]
 
 
@@ -301,12 +405,11 @@ def gun(rng, D, crack_amt, sub_f, sub_dec, body_dec, tail_dec, mech=0.3, echo=Tr
     blast = bp(white(secs(0.25), rng), 200, 4000, 1) * env_ad(secs(0.25), 0.0008, body_dec, 5)
     sub = sub_thump(rng, sub_f, sub_f * 0.45, 0.8, 0.05, sub_dec, 2.2)
     tail = lp(pink(secs(D), rng), 1800) * env_ad(secs(D), 0.01, tail_dec, 3.0)
-    f = rng.uniform(900, 1500)
-    clank = modal(secs(0.25), rng, [f, f * 1.7, f * 2.9], [0.05, 0.035, 0.02]) * mech
-    x = mix(cr * 1.1, sat(blast * 1.3, 2) * 1.1, sub * 0.65, tail * 0.4, at(clank, 0.025, D))
+    clank = metal_hit(rng, rng.uniform(500, 1400), 0.25, 0.7, rng.uniform(0.02, 0.05), 10, 0.9) * mech  # breech
+    x = mix(cr * 1.1, sat(blast * 1.3, 2) * 1.1, sub * 0.65, tail * 0.4, at(clank, rng.uniform(0.02, 0.05), D))
     x = sat(x * 1.2, 1.6)
     if echo:
-        x = slapback(x, rng, ((0.12, 0.22), (0.27, 0.12)), 2200)
+        x = outdoor(x, rng, 0.8 if D > 2 else 0.6, 0.8)
     return fade(room(pad(x, D), rng, 0.18, 1.1), 0.0003, 0.15)[:secs(D)]
 
 
@@ -478,34 +581,41 @@ def shield_loop(rng):
 
 
 # =================================================================== mechanics
-@sound('servo', 6, desc='servo/actuator move: whine rising and settling')
+@sound('servo', 8, desc='servo/actuator move: rough motor + gear-tooth ticks + friction, start/stop clicks')
 def servo(rng):
     D = rng.uniform(0.6, 1.1)
     n = secs(D)
     u = np.linspace(0, 1, n)
-    speed = np.clip(np.sin(np.pi * u) ** 0.6, 0, 1)
-    y = servo_tone(rng, n, speed, rng.uniform(260, 420), gear=1.2)
-    return fade(room(st(y * 0.6, rng, 0.4), rng, 0.15, 0.8), 0.01, 0.05)
+    speed = np.clip(np.sin(np.pi * u) ** 0.6 * (1 + 0.15 * smooth_random(n, rng, 4, -1, 1)), 0, 1)
+    y = servo_tone(rng, n, speed, rng.uniform(180, 380), gear=1.0)
+    clk = metal_hit(rng, rng.uniform(1200, 2500), 0.06, 0.7, 0.01, 6, 0.6) * 0.25
+    x = mix(y * 0.6, clk, at(clk * 0.7, D - 0.04, D))
+    return fade(room(st(x, rng, 0.4), rng, 0.15, 0.8), 0.005, 0.05)
 
 
-@sound('turret_servo', 4, desc='short turret traverse whir')
+@sound('turret_servo', 6, desc='short turret traverse: geared slewing ring grind')
 def turret_servo(rng):
     D = 0.5
     n = secs(D)
     u = np.linspace(0, 1, n)
     speed = np.clip(np.sin(np.pi * u) ** 0.5, 0, 1)
-    y = servo_tone(rng, n, speed, rng.uniform(550, 750), gear=0.6)
-    return fade(st(y * 0.5, rng, 0.3), 0.01, 0.05)
+    y = servo_tone(rng, n, speed, rng.uniform(350, 600), gear=1.4)
+    ring = bp(pink(n, rng), 80, 700, 2) * speed * (0.6 + 0.4 * smooth_random(n, rng, 30, 0, 1)) * 0.25
+    clat = np.zeros(n)                       # ball race / ring rollers knocking round
+    for _ in range(int(rng.integers(4, 9))):
+        h = metal_hit(rng, rng.uniform(400, 1200), 0.08, 0.5, 0.015, 6, 0.6)
+        clat += at(h * rng.uniform(0.05, 0.2), rng.uniform(0.02, D - 0.1), D)
+    return fade(st(mix(y * 0.4, ring, clat * speed), rng, 0.3), 0.005, 0.05)
 
 
-@sound('mech_clunk', 6, desc='heavy mechanical lock: thud + metal')
+@sound('mech_clunk', 8, desc='heavy mechanical lock: latch click, then thud + damped metal')
 def mech_clunk(rng):
     D = 0.9
-    f = rng.uniform(180, 320)
-    m = modal(secs(0.6), rng, [f, f * 2.1, f * 3.6, f * 5.9], [0.09, 0.05, 0.035, 0.02])
-    th = sub_thump(rng, rng.uniform(85, 110), 45, 0.4, 0.03, 0.1, 2)
-    click = crack(rng, 0.02, 2000, 9000, 0.003)
-    x = mix(m * 0.5, th, click * 0.4)
+    latch = metal_hit(rng, rng.uniform(1500, 3000), 0.08, 0.9, 0.01, 6, 0.8) * 0.35
+    body = metal_hit(rng, rng.uniform(120, 300), 0.6, rng.uniform(0.2, 0.5), rng.uniform(0.04, 0.09), 12, 0.8)
+    th = sub_thump(rng, rng.uniform(80, 110), 45, 0.4, 0.03, 0.09, 2)
+    pre = rng.uniform(0.015, 0.05)
+    x = mix(latch, at(body * 0.6, pre, D), at(th, pre, D))
     return fade(room(pad(sat(x, 1.3), D), rng, 0.2, 0.8), 0.0003, 0.1)
 
 
@@ -576,6 +686,38 @@ def fire_loop(rng):
     return loopify(st(mix(roar * 0.6, pops * 0.5, hiss), rng, 0.8), 0.4)
 
 
+@sound('crystal_spike', 5, desc='crystal spike bursting out of the ground: rock heave + crunch, then a cold '
+       'inharmonic crystalline ring that shimmers away (struck, not glass breaking)')
+def crystal_spike(rng):
+    D = 2.2
+    heave = sub_thump(rng, f0=rng.uniform(70, 95), f1=35, dur=0.8, tau=0.06, decay=0.3) * 0.5
+    crunch = grain_debris(rng, 1.4, 0.0, 70, rock=1.0, metal=0.0, chunks=2, spread=0.35) * 0.6
+    ring = np.zeros(secs(D))
+    for _ in range(3):  # a few facets, each its own pitch, ringing long
+        h = metal_hit(rng, rng.uniform(900, 2400), 1.6, 0.9, rng.uniform(0.35, 0.7), 10, 0.25)
+        ring += at(h * rng.uniform(0.3, 0.6), rng.uniform(0.0, 0.05), D)
+    t = np.arange(len(ring)) / SR
+    ring *= 1 + 0.25 * np.sin(2 * np.pi * rng.uniform(5, 8) * t)
+    x = mix(pad(heave, D), pad(crunch, D), hp(ring, 700, 2) * 0.35)
+    return fade(st(outdoor(x, rng, 0.7)[:secs(D + 0.8)], rng, 0.7), 0.001, 0.4)
+
+
+@sound('shard_wake', 2, desc='the Shard wakes: deep inharmonic swell, crystalline shimmer rising, ends in a low whoomp')
+def shard_wake(rng):
+    D = 2.5
+    n = secs(D)
+    t = np.arange(n) / SR
+    sw = np.clip(t / 0.5, 0, 1) ** 2 * np.exp(-np.clip(t - 0.5, 0, None) / 0.9)
+    drone = sum(a * np.sin(2 * np.pi * f * t + rng.uniform(0, 6)) for f, a in ((43, 1), (61.7, .7), (97.3, .4), (151, .2)))
+    sh = np.zeros(n)
+    for k in range(8):
+        f = rng.uniform(1200, 4200) * (1 + 0.15 * t)
+        sh += np.sin(2 * np.pi * np.cumsum(np.full(n, 1.0) * f) / SR) * np.exp(-((t - rng.uniform(0.3, 0.9)) / 0.4) ** 2)
+    whoomp = sub_thump(rng, f0=80, f1=30, dur=1.2, tau=0.1, decay=0.5)
+    x = mix(sat(drone * 0.8, 2) * sw * 0.5, sh * sw * 0.03, at(whoomp * 0.5, 0.45, D))
+    return fade(st(x, rng, 0.7), 0.01, 0.3)
+
+
 @sound('whoosh', 4, desc='fast fly-by whoosh (peak at 0.6 s)')
 def whoosh(rng):
     D = 1.2
@@ -587,52 +729,219 @@ def whoosh(rng):
     return fade(st(x * 0.8, rng, 0.8), 0.01, 0.05)
 
 
-# =================================================================== engines (loops, modulated at mix)
-@sound('eng_tracked', 2, loop=True, desc='Terran ground vehicle: diesel-turbine rumble + tread clatter')
-def eng_tracked(rng):
+@sound('skid', 4, desc='tracks/tyres braking hard: gravel scrape + rubber/metal squeal + spray')
+def skid(rng):
+    D = 0.9
+    n = secs(D)
+    e = env_ad(n, 0.02, 0.45, 2.2)
+    scrape = bp(pink(n, rng), 300, 4000, 2) * (0.6 + 0.4 * smooth_random(n, rng, 30, 0, 1))
+    gravel = grain_debris(rng, D, 0.0, 70, rock=1.0, metal=0.05, chunks=0, spread=0.4)
+    f = rng.uniform(700, 1200) * (1 - 0.15 * np.linspace(0, 1, n))
+    squeal = bp(np.sin(2 * np.pi * np.cumsum(f) / SR) * (0.5 + 0.5 * np.abs(lp(white(n, rng), 120, 2)) / 0.1), 400, 5000, 1)
+    x = mix(scrape * e * 0.6, gravel * 0.5, squeal * e * 0.05)
+    return fade(room(st(x, rng, 0.6), rng, 0.15, 0.8), 0.005, 0.1)
+
+
+@sound('shockwave', 4, desc='energy/ground shockwave: whoomp with an air-pressure sweep and low thump (no crack)')
+def shockwave(rng):
+    D = 2.0
+    n = secs(1.6)
+    th = sub_thump(rng, rng.uniform(70, 90), 35, 1.2, 0.12, 0.45, 2.2)
+    sweep = sweep_lp(pink(n, rng), 3500, 120) * env_ad(n, 0.01, 0.5, 2.5)
+    air = tv_bandpass(pink(n, rng), 300 + 2500 * np.exp(-np.arange(n) / SR / 0.25), 1.2) * env_ad(n, 0.005, 0.4, 3)
+    x = mix(th, sweep * 0.8, air * 0.5)
+    return fade(room(pad(outdoor(x, rng, 0.7, 0.6), D), rng, 0.2, 1.3), 0.002, 0.2)
+
+
+@sound('lock_pulse', 3, desc='Terran target-lock: three soft synthetic thrums rising (no beeps, no words)')
+def lock_pulse(rng):
+    D = 0.9
+    out = np.zeros(secs(D))
+    base = rng.uniform(140, 180)
+    for i in range(3):
+        L = secs(0.14)
+        t = np.arange(L) / SR
+        f = base * (1 + 0.25 * i)
+        y = (np.sin(2 * np.pi * f * t) + 0.5 * np.sin(2 * np.pi * 2 * f * t) + 0.2 * np.sin(2 * np.pi * 3.01 * f * t))
+        y *= env_ad(L, 0.01, 0.08, 3)
+        out += at(y, 0.22 * i, D)
+    return fade(room(st(lp(out, 3000), rng, 0.5), rng, 0.25, 0.9), 0.003, 0.1)
+
+
+@sound('tractor_loop', 2, loop=True, desc='Terran neon tractor/repair beam: smooth phasing hum with a fizzing edge')
+def tractor_loop(rng):
     D = 3.4
     n = secs(D)
     t = np.arange(n) / SR
-    fire_hz = rng.uniform(28, 34)
-    # combustion: pulse train with jitter, each pulse a low thump
-    pulses = np.zeros(n)
+    f = rng.uniform(95, 120)
+    y = sum(a * np.sin(2 * np.pi * f * r * t + rng.uniform(0, 6)) * (0.7 + 0.3 * np.sin(2 * np.pi * rng.uniform(0.5, 2) * t))
+            for r, a in ((1, 1), (2, .6), (3.01, .35), (5, .15)))
+    fizz = bp(white(n, rng), 3000, 9000) * (0.5 + 0.5 * smooth_random(n, rng, 12, 0, 1)) * 0.08
+    return loopify(st(mix(lp(y, 2500) * 0.3, fizz), rng, 0.7), 0.4)
+
+
+@sound('motes_loop', 2, loop=True, desc='stream of gold motes / liquid light: glittering granular sparkle over a soft whoosh')
+def motes_loop(rng):
+    D = 3.4
+    n = secs(D)
+    sparkle = np.zeros(n)
+    for _ in range(int(D * 70)):
+        L = secs(rng.uniform(0.03, 0.12))
+        f = rng.uniform(1800, 6000)
+        g = np.sin(2 * np.pi * f * np.arange(L) / SR) * np.hanning(L)
+        sparkle += at(g * rng.uniform(0.05, 0.4), rng.uniform(0, D - 0.13), D)
+    flow = bp(pink(n, rng), 400, 3000, 1) * (0.6 + 0.4 * smooth_random(n, rng, 2, 0, 1)) * 0.3
+    ck = electric_crackle(rng, D, 250, (2000, 10000)) * 0.3
+    return loopify(st(mix(sparkle * 0.5, flow, ck), rng, 0.9), 0.4)
+
+
+# =================================================================== engines (loops, modulated at mix)
+def piston(rng, D, cyl, rpm_hz, tone=(250, 700), bark=0.035, wob=0.05, misfire=0.015):
+    """Firing pulses of a multi-cylinder engine: each cylinder its own strength and exhaust colour
+    (the 'lope'), crank speed wandering, rare misfires. Returns (exhaust, wander)."""
+    n = secs(D)
+    fire_hz = rpm_hz * cyl / 2
+    prof = rng.uniform(0.55, 1.0, cyl)
+    tones = rng.uniform(tone[0], tone[1], cyl)
+    wander = 1 + wob * smooth_random(n, rng, 0.8, -1, 1)
+    out = np.zeros(n)
+    tt, k = 0.0, 0
+    L = secs(bark)
+    while tt < D:
+        i = secs(tt)
+        c = k % cyl
+        if i + L < n and rng.random() > misfire:
+            b = rng.standard_normal(L) * env_exp(L, bark * 0.23)
+            b = lp(b, tones[c] * rng.uniform(0.85, 1.15), 2)
+            b += 0.25 * np.sin(2 * np.pi * rng.uniform(55, 80) * np.arange(L) / SR) * env_exp(L, 0.01)
+            out[i:i + L] += b * prof[c] * rng.uniform(0.85, 1.1)
+        tt += 1 / (fire_hz * wander[min(i, n - 1)]) * rng.uniform(0.97, 1.03)
+        k += 1
+    return sat(out / (np.max(np.abs(out)) + 1e-9) * 2.0, 1.8), wander
+
+
+def crunch_bed(rng, D, rate):
+    """Gravel/dirt being rolled over: short independent grit grains spread evenly in time."""
+    n = secs(D)
+    out = np.zeros(n)
+    for _ in range(int(D * rate)):
+        L = secs(rng.uniform(0.002, 0.015))
+        x = rng.standard_normal(L) * env_exp(L, L / SR / 4)
+        fc = rng.uniform(600, 6000)
+        x = bp(x, fc * 0.5, min(fc * 2, 20000), 1)
+        i = secs(rng.uniform(0, D - 0.02))
+        out[i:i + L] += x[:n - i] * rng.uniform(0.1, 1.0) ** 1.5
+    return out
+
+
+def tick_train(rng, D, rate_hz, wander=None, jitter=0.0):
+    n = secs(D)
+    x = np.zeros(n)
     tt = 0.0
     while tt < D:
         i = secs(tt)
         if i < n:
-            pulses[i] = rng.uniform(0.6, 1.0)
-        tt += (1 / (fire_hz * (1 + 0.06 * np.sin(2 * np.pi * 0.6 * tt)))) * rng.uniform(0.92, 1.08)
-    k = np.sin(2 * np.pi * 70 * np.arange(secs(0.03)) / SR) * env_exp(secs(0.03), 0.008)
-    eng = lp(conv(pulses, k)[:n], 500)
-    whine = osc(1150 * (1 + 0.01 * smooth_random(n, rng, 3, -1, 1)), n, 'sine') * 0.015
-    # tread: track links clacking on sprockets
-    links = np.zeros(n)
-    tt = 0.0
-    while tt < D:
-        i = secs(tt)
-        if i < n:
-            links[i] = rng.uniform(0.3, 1.0)
-        tt += (1 / 13.0) * rng.uniform(0.85, 1.15)
-    clack = bp(conv(links, np.hanning(secs(0.004)))[:n], 900, 4000) * 2
-    squeal = bp(white(n, rng), 2500, 3200) * 0.06 * smooth_random(n, rng, 2, 0, 1)
-    body = lp(brown(n, rng), 160) * 0.5
-    growl = sat(bp(osc(fire_hz * 3 * (1 + 0.02 * smooth_random(n, rng, 4, -1, 1)), n, 'saw'), 90, 900) * 2, 2)
-    x = mix(sat(eng * 2.5, 2) * 0.5, growl * 0.35, whine, clack * 0.9, squeal, body * 0.4)
-    del t
+            x[i] = rng.uniform(0.2, 1.0)
+        w = wander[min(i, n - 1)] if wander is not None else 1.0
+        tt += 1 / (rate_hz * w) * (1 + jitter * rng.uniform(-1, 1))
+    return x
+
+
+@sound('eng_tracked', 4, loop=True, desc='Terran tracked vehicle engine: lopey multi-cylinder diesel (per-cylinder '
+       'exhaust barks), valve ticks, blower hiss, transmission whine that comes and goes; running gear is tracks_loop')
+def eng_tracked(rng):
+    D = 4.4
+    n = secs(D)
+    cyl = int(rng.choice([4, 6, 8]))
+    rpm_hz = rng.uniform(13, 17)           # crank revs/s at the mixer's 1.0 rate
+    exhaust, wander = piston(rng, D, cyl, rpm_hz)
+    valves = tick_train(rng, D, rpm_hz * cyl * 0.5, wander)
+    valves = bp(conv(valves, np.hanning(secs(0.0015)))[:n], 2500, 7000, 2) * 0.6
+    gf = rng.uniform(500, 900) * wander     # transmission: rough, mostly buried, swells now and then
+    whine = np.sin(2 * np.pi * np.cumsum(gf) / SR) * np.clip(0.3 + np.abs(lp(rng.standard_normal(n), 30, 2)) / 0.4, 0, 2)
+    whine *= smooth_random(n, rng, 0.7, 0, 1) ** 2
+    whine = bp(whine, 300, 3000, 1) * 0.012
+    blower = bp(pink(n, rng), 1800, 6000, 2) * (0.7 + 0.3 * smooth_random(n, rng, 3, 0, 1)) * 0.06
+    knock = np.zeros(n)                     # loose panels/tools buzzing on the hull with the engine
+    for _ in range(int(D * 3)):
+        h = metal_hit(rng, rng.uniform(700, 2500), 0.12, 0.6, 0.02, 6, 0.7)
+        knock += at(h * rng.uniform(0.04, 0.15), rng.uniform(0, D - 0.15), D)
+    body = bp(brown(n, rng), 35, 140, 2) * 0.35
+    x = mix(exhaust * 0.55, valves * 0.15, whine, blower, knock * 0.4, body * 0.6)
     return loopify(st(x, rng, 0.5), 0.4)
 
 
-@sound('eng_wheeled', 2, loop=True, desc='Terran wheeled scout: higher revving engine + tyre/gravel roar')
+@sound('tracks_loop', 4, loop=True, desc='running gear of a tracked vehicle: links slapping sprockets (damped metal), '
+       'road-wheel rumble, gravel crunch, rattles and squeaks; the mixer drives it from ground speed')
+def tracks_loop(rng):
+    D = 4.4
+    n = secs(D)
+    link_rate = rng.uniform(10, 15)
+    link_irs = [metal_hit(rng, rng.uniform(500, 1500), 0.07, rng.uniform(0.35, 0.75), 0.012, 8, 0.85) for _ in range(6)]
+    links = np.zeros(n)
+    tt = 0.0
+    sway = smooth_random(n, rng, 1.5, 0.5, 1.0)
+    while tt < D:
+        ir = link_irs[int(rng.integers(0, 6))] * rng.uniform(0.3, 1.0) * sway[min(secs(tt), n - 1)]
+        i = secs(tt)
+        m = min(len(ir), n - i)
+        if m > 0:
+            links[i:i + m] += ir[:m]
+        tt += 1 / link_rate * rng.uniform(0.85, 1.15)
+    road = bp(pink(n, rng), 60, 350, 2) * (0.6 + 0.4 * smooth_random(n, rng, 6, 0, 1))
+    thumps = conv(tick_train(rng, D, rng.uniform(3, 5), jitter=0.4), env_exp(secs(0.08), 0.02))[:n]
+    thumps = lp(thumps, 180, 2) * 6
+    crunch = crunch_bed(rng, D, 160)
+    rattle = np.zeros(n)
+    for _ in range(int(D * 7)):
+        h = metal_hit(rng, rng.uniform(900, 4000), 0.1, 0.8, 0.015, 6, 0.6)
+        rattle += at(h * rng.uniform(0.05, 0.25), rng.uniform(0, D - 0.1), D)
+    squeak = np.zeros(n)
+    for _ in range(int(rng.integers(1, 4))):
+        L = secs(rng.uniform(0.08, 0.2))
+        f = np.linspace(rng.uniform(1400, 2200), rng.uniform(1800, 3000), L)
+        sq = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.hanning(L) * (0.6 + 0.4 * rng.standard_normal(L).clip(-1, 1))
+        squeak += at(sq * 0.035, rng.uniform(0.1, D - 0.3), D)
+    x = mix(links * 0.55, road * 0.25, thumps * 0.08, crunch * 0.25, rattle * 0.45, squeak)
+    r = np.sqrt(np.mean(x ** 2)) * 5           # tame the odd stray spike so the clatter sits at level
+    x = np.tanh(x / r) * r
+    return loopify(st(x, rng, 0.6), 0.4)
+
+
+@sound('eng_wheeled', 3, loop=True, desc='Terran wheeled scout engine: revvy 4/5-cylinder with a raspy exhaust, '
+       'intake roar and turbo whistle; running gear is tyres_loop')
 def eng_wheeled(rng):
     D = 3.4
     n = secs(D)
-    f = rng.uniform(58, 66) * (1 + 0.02 * smooth_random(n, rng, 2, -1, 1))
-    eng = osc(f, shape='saw') + 0.5 * osc(f * 0.5, shape='square')
-    eng = sat(bp(eng, 60, 2500), 2.2)
-    tyres = bp(pink(n, rng), 200, 1800) * 0.35
-    gravel = bp(conv(impulses(n, rng, 120, 2.5), np.hanning(secs(0.002)))[:n], 1500, 6000) * 1.5
-    x = mix(eng * 0.5, tyres, gravel * 0.3)
+    cyl = int(rng.choice([4, 5]))
+    rpm_hz = rng.uniform(32, 40)
+    exhaust, wander = piston(rng, D, cyl, rpm_hz, tone=(600, 1600), bark=0.02, wob=0.03, misfire=0.0)
+    rasp = bp(exhaust, 900, 4500, 1) * 0.35
+    intake = bp(pink(n, rng), 300, 1500, 2) * (0.7 + 0.3 * smooth_random(n, rng, 5, 0, 1)) * 0.25
+    ft = rng.uniform(2600, 3400) * wander
+    turbo = np.sin(2 * np.pi * np.cumsum(ft) / SR) * smooth_random(n, rng, 0.6, 0.2, 1) * 0.006
+    body = bp(brown(n, rng), 50, 200, 2) * 0.25
+    x = mix(exhaust * 0.45, rasp, intake, turbo, body)
     return loopify(st(x, rng, 0.5), 0.4)
+
+
+@sound('tyres_loop', 3, loop=True, desc='wheeled running gear: tyre roar on dirt, gravel crunch and pings off the '
+       'arches, suspension knocks; driven from ground speed')
+def tyres_loop(rng):
+    D = 3.4
+    n = secs(D)
+    roar = bp(pink(n, rng), 150, 1600, 2) * (0.7 + 0.3 * smooth_random(n, rng, 4, 0, 1))
+    crunch = crunch_bed(rng, D, 260)
+    pings = np.zeros(n)
+    for _ in range(int(D * 10)):
+        h = metal_hit(rng, rng.uniform(1800, 5000), 0.05, 0.9, 0.006, 5, 0.5)
+        pings += at(h * rng.uniform(0.03, 0.15), rng.uniform(0, D - 0.06), D)
+    knocks = conv(tick_train(rng, D, rng.uniform(1.5, 3), jitter=0.5), env_exp(secs(0.1), 0.025))[:n]
+    knocks = lp(knocks, 220, 2) * 5
+    x = mix(roar * 0.35, crunch * 0.4, pings * 0.5, knocks * 0.3)
+    r = np.sqrt(np.mean(x ** 2)) * 5
+    x = np.tanh(x / r) * r
+    return loopify(st(x, rng, 0.7), 0.4)
 
 
 @sound('hover_terran', 2, loop=True, desc='Terran hover/neon hum: clean phasing chord + fan air')
@@ -675,14 +984,31 @@ def wings_arc(rng):
     return loopify(st(mix(buzz * 0.35, ck * 0.45, air), rng, 0.7), 0.4)
 
 
-@sound('jet_terran', 2, loop=True, desc='Terran aircraft: turbine whine + jet roar')
+@sound('jet_terran', 3, loop=True, desc='Terran aircraft: turbulent jet roar, fan blade-pass buzz, rough turbine tones, '
+       'combustion rumble')
 def jet_terran(rng):
-    D = 3.4
+    D = 4.4
     n = secs(D)
-    roar = bp(pink(n, rng), 150, 5000) * 0.7 + bp(brown(n, rng), 60, 300) * 0.3
-    f = rng.uniform(1800, 2300)
-    wh = sum(a * osc(f * r * (1 + 0.003 * smooth_random(n, rng, 2, -1, 1)), n, 'sine') for r, a in ((1, 1), (1.33, .5), (2.1, .3)))
-    x = mix(roar, wh * 0.035)
+    pk = pink(n, rng)
+    roar = np.zeros(n)
+    for lo, hi in ((120, 400), (400, 1200), (1200, 3500), (3500, 9000)):  # turbulence: bands breathe independently
+        roar += bp(pk, lo, hi, 1) * (0.55 + 0.45 * smooth_random(n, rng, rng.uniform(3, 9), 0, 1))
+    bpf = rng.uniform(170, 260) * (1 + 0.01 * smooth_random(n, rng, 1.5, -1, 1))     # fan blade-pass
+    buzz = 0.7 + 0.3 * np.sign(np.sin(2 * np.pi * np.cumsum(bpf) / SR)) * (0.5 + 0.5 * smooth_random(n, rng, 4, 0, 1))
+    fan = bp(white(n, rng), 600, 4000, 2) * buzz * 0.4
+    tones = np.zeros(n)
+    for f, a in ((rng.uniform(900, 1300), 1.0), (rng.uniform(2200, 2800), 0.6), (rng.uniform(4200, 5200), 0.35)):
+        fv = f * (1 + 0.004 * smooth_random(n, rng, 2, -1, 1))
+        rough = 0.4 + 0.6 * np.abs(lp(rng.standard_normal(n), 80, 2)) / 0.2
+        tones += a * np.sin(2 * np.pi * np.cumsum(fv) / SR) * np.clip(rough, 0, 2)
+    combust = lp(brown(n, rng), 200, 2) * (0.6 + 0.4 * smooth_random(n, rng, 2, 0, 1))
+    pops = bp(conv(impulses(n, rng, 8, 2), np.hanning(secs(0.01)))[:n], 80, 600, 2) * 3
+    # shock 'crackle' of a real jet exhaust: sparse sharp one-sided spikes in bursts
+    dens = smooth_random(n, rng, 2.5, 0, 1) ** 2
+    spikes = (rng.random(n) < 0.004 * dens) * rng.uniform(0.3, 1.0, n) ** 2
+    crackle = bp(conv(spikes, env_exp(secs(0.003), 0.0006))[:n], 900, 9000, 1)
+    tones *= smooth_random(n, rng, 0.8, 0.1, 1) ** 2      # turbine tones come and go with the airflow
+    x = mix(roar * 0.6, fan, bp(tones, 500, 7000, 1) * 0.01, combust * 0.35, pops * 0.3, crackle * 0.5)
     return loopify(st(x, rng, 0.7), 0.4)
 
 

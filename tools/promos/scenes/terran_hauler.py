@@ -452,4 +452,22 @@ P.camera([
 P.cam_shake(1.87, 0.04, 0.25)
 P.cam_shake(5.44, 0.03, 0.25)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+for _k in range(7):                                   # last ore chunks tumbling into the bin
+    P.sfx(max(0.0, -0.35 + 0.1 * _k + 0.42), 'impact_dirt', gain=0.15, rate=1.4 + 0.05 * _k)
+P.sfx(0.36, 'mech_clunk', gain=0.45, rate=1.15)       # spreader latches
+P.sfx(0.37, 'lock_pulse', gain=0.25, rate=1.3)        # bin strip flares neon
+P.sfx(0.45, 'servo', gain=0.45, rate=0.8)             # hoist
+P.sfx(0.85, 'turret_servo', gain=0.4, rate=0.7)       # boom swings round
+P.sfx(1.5, 'hydraulic', gain=0.3)                     # lower...
+P.sfx(1.85, 'mech_clunk', gain=0.7, rate=0.8)         # ...thunk onto the bed
+P.sfx(1.86, 'impact_metal', gain=0.25, rate=0.7)
+P.sfx(4.2, 'servo', gain=0.45, rate=0.8)              # hoist again at the pad
+P.sfx(4.45, 'turret_servo', gain=0.4, rate=0.7)       # swing out, turn the bin square
+P.sfx(5.0, 'hydraulic', gain=0.3)
+P.sfx(5.42, 'mech_clunk', gain=0.6, pos=SPOT, rate=0.85)  # set down on the spot
+P.sfx(5.44, 'power_up_terran', gain=0.4, pos=SPOT, rate=1.3)  # spot lights up: cargo ready
+P.sfx(5.55, 'mech_clunk', gain=0.35, rate=1.25)       # hook releases
+P.sfx(5.6, 'servo', gain=0.3, rate=0.9)               # and rises
+
 P.render()

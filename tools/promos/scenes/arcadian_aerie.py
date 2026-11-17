@@ -819,4 +819,15 @@ for o in bpy.data.objects:
         if 'emit_node' in m or m.name.startswith(('SoftFire', 'Fireball', 'SoftPuff')):
             o.visible_shadow = False
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.0, 'crackle_loop', gain=0.45, dur=1.15)       # gliding in on legs of gold lightning
+P.sfx(1.25, 'power_up_arc', gain=0.9)                 # float-apart unfold
+P.sfx(1.25, 'crackle_loop', gain=0.3, dur=1.55)       # arcs crackling in the gaps
+for _t in (1.4, 1.7, 2.0, 2.3, 2.6):                  # ribs lifting out one by one
+    P.sfx(_t, 'zap_small', gain=0.35)
+P.sfx(2.5, 'motes_loop', gain=0.35, dur=0.6)          # cocoons crackle and hatch
+P.sfx(3.85, 'whirr_loop', gain=0.4, dur=0.5, rate=1.3)  # crown spins up before flinging the Halo
+P.sfx(3.45, 'whoosh', gain=0.7)                       # Halo flung straight up (peak ~4.05)
+P.sfx(4.6, 'whoosh', gain=0.6)                        # squadron flypast
+
 P.render()

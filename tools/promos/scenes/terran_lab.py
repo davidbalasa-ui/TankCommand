@@ -350,4 +350,19 @@ P.camera([
 ], shake=0.012, cuts=(1.75,))
 P.cam_shake(T_STOP, 0.04, 0.3)
 
+# ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
+P.sfx(0.5, 'power_up_terran', gain=0.35, rate=1.2)    # lab lights blink on
+P.sfx(1.9, 'servo', gain=0.4, pos=PORT)               # intake opens
+P.sfx(1.92, 'hydraulic', gain=0.35, pos=PORT)
+P.sfx(T_ARC0, 'tractor_loop', gain=0.5, dur=T_ARC1 - T_ARC0, pos=PORT)  # neon tractor arc
+for _k in range(8):                                   # ingots plucked off the bed, dropped into the lab
+    _t = T_FEED0 + FEED_STEP * _k
+    P.sfx(_t, 'impact_metal', gain=0.18, pos=PARK, rate=1.15)
+    P.sfx(_t + FLY, 'mech_clunk', gain=0.3, pos=PORT, rate=1.1 + 0.02 * _k)
+P.sfx(3.35, 'charge_gold', gain=0.25, rate=0.7)       # charge rings crawl up the dome
+P.sfx(3.4, 'power_up_terran', gain=0.5)
+P.sfx(T_DONE, 'shockwave', gain=0.9)                  # research complete: pulse + shockwave
+P.sfx(T_BEAM, 'beam_start', gain=0.7)
+P.sfx(T_BEAM + 0.1, 'beam_blue_loop', gain=0.45, dur=6.0 - T_BEAM - 0.1)
+
 P.render()
