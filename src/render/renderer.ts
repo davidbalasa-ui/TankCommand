@@ -6,7 +6,7 @@ import { Effects } from './effects';
 import { WreckField } from './wrecks';
 import { applyUnfold, readUnfold, type UnfoldData, type UnfoldStart } from './unfold';
 import { AssetLoader } from '../assets/loader';
-import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
+import { DEPOSIT_MODEL_IDS, LANDSCAPE_LOD_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
@@ -1131,7 +1131,7 @@ export class RenderView {
     this.updateLight();
     this.syncUnits(alpha);
     this.syncStructures(world);
-    this.landscape?.sync(world);
+    this.landscape?.sync(world, this.rtsCamera.targetX, this.rtsCamera.targetZ, this.rtsCamera.distance);
     this.syncDropBeams(world);
     this.syncPadTraffic(world, alpha);
     this.syncWorkerCargo(world, alpha);
@@ -1394,6 +1394,7 @@ export class RenderView {
     }
 
     this.landscape?.setShadows(view.shadows);
+    this.landscape?.setFullDetail(level < LOD_QUALITY_LEVEL);
     if (shadowsChanged) {
       this.renderer.shadowMap.needsUpdate = true;
       this.scene.traverse((object) => {
@@ -1461,6 +1462,7 @@ export class RenderView {
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
     this.landscape = new Landscape(this.scene, this.world.map, this.fogUniforms);
+    this.landscape.setFullDetail(this.effectiveQualityLevel() < LOD_QUALITY_LEVEL);
     const waterLevel = this.world.map.waterLevel;
     if (waterLevel !== null) {
       const water = new THREE.Mesh(
@@ -1853,7 +1855,7 @@ export class RenderView {
   // Ground detail texture, ore and metal site models and the scattered props. Any that fail to load
   // leave the plain terrain, the placeholder deposit discs, or no props.
   private async loadLandscape(): Promise<void> {
-    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS].filter((id) =>
+    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS, ...LANDSCAPE_LOD_IDS].filter((id) =>
       this.registry.has(id),
     );
     const results = await Promise.allSettled(ids.map((id) => this.loader.load(id)));
@@ -1883,13 +1885,7 @@ export class RenderView {
         }
         this.loadedModels.push(id);
       } else if (asset instanceof THREE.Object3D && this.landscape) {
-        if (id === DEPOSIT_MODEL_IDS.ore) {
-          this.landscape.addDepositModel('ore', asset);
-        } else if (id === DEPOSIT_MODEL_IDS.metal) {
-          this.landscape.addDepositModel('metal', asset);
-        } else {
-          this.landscape.addPropModel(id, asset);
-        }
+        this.landscape.addModel(id, asset);
         this.loadedModels.push(id);
       }
     });

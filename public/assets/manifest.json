@@ -590,6 +590,22 @@
       }
     },
     {
+      "id": "prop.nature.boulder.lod",
+      "kind": "model",
+      "path": "assets/models/props/boulder_lod.glb",
+      "bytes": 35304,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Boulder (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
       "id": "prop.nature.rock_cluster",
       "kind": "model",
       "path": "assets/models/props/rock_cluster.glb",
@@ -601,6 +617,22 @@
         "title": "Rock cluster",
         "usedFor": "Map scenery"
       }
+    },
+    {
+      "id": "prop.nature.rock_cluster.lod",
+      "kind": "model",
+      "path": "assets/models/props/rock_cluster_lod.glb",
+      "bytes": 39536,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Rock cluster (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
     },
     {
       "id": "prop.nature.slab",
@@ -616,6 +648,22 @@
       }
     },
     {
+      "id": "prop.nature.slab.lod",
+      "kind": "model",
+      "path": "assets/models/props/slab_lod.glb",
+      "bytes": 30264,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Flat rock slab (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
       "id": "prop.nature.cliff",
       "kind": "model",
       "path": "assets/models/props/cliff.glb",
@@ -627,6 +675,22 @@
         "title": "Cliff crag",
         "usedFor": "Map scenery"
       }
+    },
+    {
+      "id": "prop.nature.cliff.lod",
+      "kind": "model",
+      "path": "assets/models/props/cliff_lod.glb",
+      "bytes": 92024,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Cliff crag (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
     },
     {
       "id": "prop.nature.shrub",
@@ -642,6 +706,22 @@
       }
     },
     {
+      "id": "prop.nature.shrub.lod",
+      "kind": "model",
+      "path": "assets/models/props/shrub_lod.glb",
+      "bytes": 29244,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Bush (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
       "id": "prop.nature.grass",
       "kind": "model",
       "path": "assets/models/props/grass.glb",
@@ -653,6 +733,22 @@
         "title": "Grass tuft",
         "usedFor": "Map scenery"
       }
+    },
+    {
+      "id": "prop.nature.grass.lod",
+      "kind": "model",
+      "path": "assets/models/props/grass_lod.glb",
+      "bytes": 19096,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Grass tuft (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
     },
     {
       "id": "prop.nature.dead_tree",
@@ -668,6 +764,22 @@
       }
     },
     {
+      "id": "prop.nature.dead_tree.lod",
+      "kind": "model",
+      "path": "assets/models/props/dead_tree_lod.glb",
+      "bytes": 22892,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Dead tree (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
       "id": "prop.nature.tendril",
       "kind": "model",
       "path": "assets/models/props/tendril.glb",
@@ -679,6 +791,22 @@
         "title": "Alien fronds",
         "usedFor": "Map scenery"
       }
+    },
+    {
+      "id": "prop.nature.tendril.lod",
+      "kind": "model",
+      "path": "assets/models/props/tendril_lod.glb",
+      "bytes": 38404,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Alien fronds (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
     },
     {
       "id": "prop.deposit.ore",
@@ -694,6 +822,22 @@
       }
     },
     {
+      "id": "prop.deposit.ore.lod",
+      "kind": "model",
+      "path": "assets/models/props/deposit_ore_lod.glb",
+      "bytes": 145224,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Ore site (pink crystal) (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
+    },
+    {
       "id": "prop.deposit.metal",
       "kind": "model",
       "path": "assets/models/props/deposit_metal.glb",
@@ -705,6 +849,22 @@
         "title": "Metal site (blue opal)",
         "usedFor": "Metal deposits"
       }
+    },
+    {
+      "id": "prop.deposit.metal.lod",
+      "kind": "model",
+      "path": "assets/models/props/deposit_metal_lod.glb",
+      "bytes": 134052,
+      "faction": "neutral",
+      "credit": {
+        "license": "ORIGINAL",
+        "author": "TankCommand project (scripted Blender)",
+        "title": "Metal site (blue opal) (low detail)",
+        "usedFor": "Low-detail version for far scenery and the lower quality levels"
+      },
+      "tags": [
+        "lod"
+      ]
     },
     {
       "id": "texture.terrain.detail",
