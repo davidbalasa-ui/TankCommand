@@ -419,8 +419,9 @@ export async function winSkirmish(page: Page): Promise<void> {
           return hook.units().filter((unit) => unit.owner === 1 && unit.typeId === 'unit.human.scout').length;
         }),
       // Deliveries land one at a time (2.5 s each on the pad), so eight take a while; longer still
-      // when software rendering of the detailed models slows the frame loop.
-      { timeout: 90_000 },
+      // when software rendering of the detailed models slows the frame loop (the sim then runs
+      // slower than real time, because each frame advances it at most one second).
+      { timeout: 150_000 },
     )
     .toBeGreaterThanOrEqual(8);
 
