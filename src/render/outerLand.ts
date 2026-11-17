@@ -7,6 +7,7 @@
 // terrain exactly, with no seam), spaced further apart the further out they go.
 import * as THREE from 'three';
 import { heightAt, type MapDef } from '../sim/map';
+import { groundNoiseAt } from './groundDetail';
 
 /** How far out the rings go, in metres from the map edge. */
 const RING_OFFSETS = [0, 1, 2, 3.5, 5.5, 8, 11, 15, 20, 26, 34, 44, 56, 72, 92, 118, 150, 190, 240, 300, 370];
@@ -141,6 +142,13 @@ export function buildOuterLandGeometry(map: MapDef, colors: OuterLandColors): TH
       surface[index * 3] = Math.max(0, 1 - dirt - rock);
       surface[index * 3 + 1] = dirt;
       surface[index * 3 + 2] = rock;
+      // The same broad light/dark and lush/dry patches as the battlefield ground, so the edge
+      // does not turn into one flat colour (vertex colours: no extra cost per pixel).
+      const noise = groundNoiseAt(map.seed, x, z);
+      const grassy = Math.max(0, 1 - dirt - rock);
+      color.multiplyScalar(0.8 + noise.light * 0.4);
+      color.r *= 1 + (noise.dry - 0.5) * 0.22 * grassy;
+      color.b *= 1 - (noise.dry - 0.5) * 0.3 * grassy;
       // A little darker than the battlefield, so the playable ground stands out.
       color.multiplyScalar(1 - 0.18 * smoothstep(0, 14, offset));
       color.lerp(colors.haze, smoothstep(map.size * 0.25, map.size * 2.2, offset) * 0.92);

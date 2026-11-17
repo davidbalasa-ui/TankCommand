@@ -109,6 +109,10 @@ def _new(verts, faces, zone, bevel=0.0, seg=1, sharp=35.0, name=None, merge=True
 
 
 def xf(obj, m):
+    if isinstance(obj, (list, tuple)):
+        for o in obj:
+            xf(o, m)
+        return obj
     obj.data.transform(m)
     if m.determinant() < 0:
         obj.data.flip_normals()
@@ -168,6 +172,12 @@ def mark():
 
 def since(m):
     return ST['parts'][m:]
+
+
+def regroup(m, name):
+    """Move every part made since mark m into the named group (its own node in the model)."""
+    for o in since(m):
+        o['group'] = name
 
 
 def rot_all(m, axis, deg, about=(0, 0, 0)):
@@ -602,11 +612,11 @@ class N:
 
 
 UV_PRIORITY = {'track': 0.5, 'wheel': 0.6, 'dark': 0.6, 'under': 0.6, 'slat': 0.6, 'glow': 0.45, 'amber': 0.45,
-               'red': 0.45, 'coil': 0.7}
-EDGE = {'terran': (0.16, 0.17, 0.19, 2.5), 'kesh': (0.5, 0.45, 0.36, 1.2), 'nature': (0.06, 0.055, 0.05, 1.5)}
+               'red': 0.45, 'coil': 0.7, 'neon': 0.45, 'hot': 0.45, 'coilhot': 0.7, 'black': 0.5}
+EDGE = {'terran': (0.27, 0.28, 0.3, 2.5), 'kesh': (0.5, 0.45, 0.36, 1.2), 'nature': (0.06, 0.055, 0.05, 1.5)}
 CYAN = (0.03, 0.62, 1.0)
 AMBER = (1.0, 0.2, 0.012)
-GOLD = (1.0, 0.3, 0.02)
+GOLD = (1.0, 0.46, 0.05)
 
 ZONES = {
     'terran': {
@@ -620,25 +630,42 @@ ZONES = {
         'vent': dict(kind='slats', base=(0.05, 0.055, 0.06), freq=9.0, axis=0),
         'grille': dict(kind='slats', base=(0.05, 0.055, 0.06), freq=9.0, axis=1),
         'glow': dict(kind='glow', emit=CYAN, strength=3.2),
+        'flash': dict(kind='glow', emit=CYAN, strength=3.2),
+        'neon': dict(kind='glow', emit=(0.0, 0.5, 1.0), strength=1.6),
+        'hot': dict(kind='glow', emit=(0.5, 0.82, 1.0), strength=1.25),
+        'coilhot': dict(kind='coil', emit=(0.05, 0.6, 1.0), strength=2.2, freq=9.0),
+        'black': dict(kind='panel', base=(0.006, 0.007, 0.009), rough=0.35, metal=0.8, scale=3.0, var=0.2, wear=0.5, dirt=0.0),
+        'flashw': dict(kind='glow', emit=(0.8, 0.95, 1.0), strength=3.0),
         'amber': dict(kind='glow', emit=AMBER, strength=3.2),
         'red': dict(kind='glow', emit=(1.0, 0.03, 0.02), strength=1.3),
         'coil': dict(kind='coil', emit=CYAN, strength=3.5, freq=7.0),
         'glass': dict(kind='glass', base=(0.008, 0.02, 0.03), emit=CYAN, strength=0.14),
         'hazard': dict(kind='hazard', a=(0.75, 0.42, 0.03), b=(0.03, 0.03, 0.035)),
+        'steel': dict(kind='panel', base=(0.26, 0.255, 0.25), rough=0.36, metal=0.95, scale=3.0, var=0.3, wear=1.0, dirt=0.35),
+        'olive': dict(kind='panel', base=(0.14, 0.145, 0.1), rough=0.78, metal=0.25, scale=1.6, var=0.2, wear=0.8, dirt=0.4),
+        'rubber': dict(kind='panel', base=(0.012, 0.012, 0.013), rough=0.92, metal=0.0, scale=3.0, var=0.1, wear=0.1, dirt=0.6),
+        'yellow': dict(kind='panel', base=(0.5, 0.3, 0.03), rough=0.62, metal=0.25, scale=2.2, var=0.2, wear=1.0, dirt=0.5),
+        'ore': dict(kind='panel', base=(0.1, 0.085, 0.075), rough=0.9, metal=0.1, scale=6.0, var=0.5, wear=0.3, dirt=0.3),
+        'mark': dict(kind='panel', base=(0.55, 0.55, 0.5), rough=0.75, metal=0.0, scale=3.0, var=0.25, wear=1.0, dirt=0.5),
+        'heat': dict(kind='panel', base=(0.2, 0.12, 0.07), rough=0.5, metal=0.9, scale=4.0, var=0.45, wear=0.6, dirt=0.5),
         'concrete': dict(kind='concrete', base=(0.3, 0.3, 0.29)),
         'deck': dict(kind='concrete', base=(0.12, 0.125, 0.135), metal=0.4, grid=0.9),
     },
     'kesh': {
-        'shell': dict(kind='etched', base=(0.66, 0.63, 0.6), base2=(0.5, 0.4, 0.3), rough=0.3, veins=0.2),
-        'bronze': dict(kind='etched', base=(0.52, 0.34, 0.16), base2=(0.3, 0.17, 0.08), rough=0.32, veins=0.3),
-        'under': dict(kind='etched', base=(0.16, 0.11, 0.075), base2=(0.08, 0.05, 0.04), rough=0.42, veins=0.25),
+        'shell': dict(kind='etched', base=(0.74, 0.73, 0.72), base2=(0.55, 0.5, 0.44), rough=0.26, veins=0.2, eng=0.5),
+        'bronze': dict(kind='etched', base=(0.4, 0.235, 0.095), base2=(0.2, 0.105, 0.045), rough=0.32, veins=0.3, eng=0.7),
+        'under': dict(kind='etched', base=(0.07, 0.05, 0.04), base2=(0.035, 0.025, 0.02), rough=0.42, veins=0.25),
         'barrel': dict(kind='etched', base=(0.72, 0.62, 0.45), base2=(0.55, 0.4, 0.2), rough=0.22, veins=0.0, fine=True),
-        'slat': dict(kind='ribs', emit=GOLD, strength=1.7, freq=6.0),
+        'slat': dict(kind='ribs', emit=GOLD, strength=2.0, freq=11.0),
         'glow': dict(kind='glow', emit=GOLD, strength=2.0),
-        'core': dict(kind='orb', emit=GOLD, strength=1.1),
+        'core': dict(kind='orb', emit=GOLD, strength=1.5),
         'violet': dict(kind='glow', emit=(0.35, 0.08, 1.0), strength=2.0),
         'copper': dict(kind='etched', base=(0.3, 0.13, 0.06), base2=(0.16, 0.07, 0.035), rough=0.36, veins=0.25),
-        'wing': dict(kind='membrane', base=(0.8, 0.72, 0.5), emit=GOLD, strength=0.22),
+        'wing': dict(kind='membrane', base=(0.86, 0.74, 0.46), emit=GOLD, strength=0.12),
+        'gold': dict(kind='etched', base=(0.95, 0.68, 0.22), base2=(0.7, 0.42, 0.1), rough=0.2, veins=0.0, fine=True),
+        'bolt': dict(kind='glow', emit=(1.0, 0.95, 0.8), strength=2.6),
+        'flash': dict(kind='glow', emit=(1.0, 0.62, 0.16), strength=2.4),
+        'halo': dict(kind='glow', emit=(1.0, 0.5, 0.06), strength=1.15),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
@@ -768,7 +795,7 @@ def zone_mat(zone):
             eng = n.m('MAXIMUM', sw, n.m('MAXIMUM', n.m('MULTIPLY', sw2, 0.6), n.m('MULTIPLY', cr, 0.12)))
             sel = n.smooth(n.noise(0.7, 2.0), 0.74 - z['veins'] * 0.3, 0.8 - z['veins'] * 0.3)
             vein = n.m('MULTIPLY', sw, sel)
-        col = n.mix(n.m('MULTIPLY', eng, 0.92), col, (b2[0] * 0.1, b2[1] * 0.08, b2[2] * 0.07))
+        col = n.mix(n.m('MULTIPLY', eng, z.get('eng', 0.92)), col, (b2[0] * 0.1, b2[1] * 0.08, b2[2] * 0.07))
         n.edge(0.8)
         n.out(col, n.m('ADD', z['rough'] - 0.06, n.m('ADD', n.m('MULTIPLY', fine, 0.14), n.m('MULTIPLY', eng, 0.25))),
               0.92, GOLD, n.m('MULTIPLY', vein, 1.7) if vein != 0.0 else 0.0)
@@ -781,9 +808,9 @@ def zone_mat(zone):
         # Dark bronze inner body with thin glowing seams across it.
         x = n.sep(n.co)[0]
         f = n.m('FRACT', n.m('MULTIPLY', x, z['freq'] * 1.5))
-        on = n.m('MULTIPLY', n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.07, 0.02), 0.55)
+        on = n.m('MULTIPLY', n.smooth(n.m('ABSOLUTE', n.m('SUBTRACT', f, 0.5)), 0.05, 0.015), 0.55)
         e = z['emit']
-        n.out(n.mix(on, (0.09, 0.055, 0.03), (e[0] * 0.5, e[1] * 0.5, e[2] * 0.5)),
+        n.out(n.mix(on, (0.045, 0.03, 0.02), (e[0] * 0.5, e[1] * 0.5, e[2] * 0.5)),
               n.m('ADD', 0.38, n.m('MULTIPLY', fine, 0.15)), 0.8, e, n.m('MULTIPLY', on, z['strength']))
         n.bump(n.m('SUBTRACT', 1.0, on), 0.7, 0.03)
     elif kind == 'orb':
@@ -793,7 +820,7 @@ def zone_mat(zone):
         swirl = n.smooth(n.noise(2.6, 4.0), 0.3, 0.75)
         e = z['emit']
         n.out((e[0] * 0.7, e[1] * 0.7, e[2] * 0.7), 0.2, 0.0,
-              n.mix(n.m('MULTIPLY', core, swirl), (e[0], e[1] * 0.6, e[2]), (1.0, 0.5, 0.1)),
+              n.mix(n.m('MULTIPLY', core, swirl), (e[0], e[1] * 0.9, e[2]), (1.0, 0.86, 0.5)),
               n.m('ADD', z['strength'] * 0.5, n.m('MULTIPLY', n.m('MULTIPLY', core, swirl), z['strength'] * 0.6)))
     elif kind == 'rock':
         b, b2 = z['base'], z['base2']
@@ -1013,7 +1040,7 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         me.materials.clear()
         me.materials.append(zone_mat(o['zone']))
         att = me.attributes.new('grp', 'INT', 'FACE')
-        gi = groups.index(o['group']) + (100 if (gem and o['zone'] == gem) or (clear and o['zone'] == clear) else 0)
+        gi = groups.index(o['group']) + (100 if (gem and o['zone'] == gem) or (clear and o['zone'] in ((clear,) if isinstance(clear, str) else clear)) else 0)
         att.data.foreach_set('value', [gi] * len(me.polygons))
         uk = me.attributes.new('uvk', 'FLOAT', 'FACE')
         uk.data.foreach_set('value', [float(o.get('uv', UV_PRIORITY.get(o['zone'], 1.0)))] * len(me.polygons))
@@ -1175,12 +1202,15 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
         for g, o in made.items():
             o.parent = root
         plist = [pivot] if pivot and isinstance(pivot[0], str) else (pivot or [])
-        for i, pv in enumerate(plist):
+        ploc = {}
+        for i, pv in enumerate(plist):   # (group, location[, node name[, parent group]]); parents first
             g, loc = pv[0], pv[1]
             e = bpy.data.objects.new(pv[2] if len(pv) > 2 else ('TurretPivot' if i == 0 else f'Pivot{i}'), None)
             scene.collection.objects.link(e)
-            e.parent = root
-            e.location = loc
+            par = pv[3] if len(pv) > 3 else None
+            e.parent = pivots[par] if par else root
+            e.location = tuple(a - b for a, b in zip(loc, ploc[par])) if par else loc
+            ploc[g] = loc
             made[g].parent = e
             made[g].location = tuple(-c for c in loc)
             pivots[g] = e
@@ -1221,8 +1251,11 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
 # ------------------------------------------------------------------ preview
 def preview(meshes, pivots, path, label, tris, views=None, res=(960, 640), samples=32, clip=None):
     scene = bpy.context.scene
-    for e in pivots.values():
-        e.rotation_euler = (0, 0, math.radians(-18))
+    for o in meshes:   # muzzle flashes only show for an instant in game: leave them out of the sheet
+        if o.name.startswith('Flash'):
+            o.hide_render = True
+    meshes = [o for o in meshes if not o.name.startswith('Flash')]
+    # Sheets show every part in its rest pose (turning the turret for the sheet read as a twisted model).
     bpy.context.view_layer.update()
     lo = Vector((1e9, 1e9, 1e9))
     hi = -lo

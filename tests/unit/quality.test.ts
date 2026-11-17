@@ -107,4 +107,29 @@ describe('dynamic quality', () => {
     expect(controller.sample(-16)).toBe(false);
     expect(controller.level).toBe(0);
   });
+
+  it('[PERF-01] a lone very long frame is ignored, but a run of them steps quality down', () => {
+    // A tab switch or one-off stall: one 30 s gap between normal frames changes nothing.
+    const paused = new QualityController();
+    for (let i = 0; i < 10; i += 1) {
+      paused.sample(30);
+    }
+    expect(paused.sample(30_000)).toBe(false);
+    for (let i = 0; i < 10; i += 1) {
+      paused.sample(30);
+    }
+    expect(paused.level).toBe(0);
+
+    // A device that needs over 2 s for every frame at full quality (software rendering on a small
+    // machine) must still step down, one level per slow stretch, rather than stay at full quality.
+    const slow = new QualityController();
+    let changes = 0;
+    for (let i = 0; i < 12; i += 1) {
+      if (slow.sample(2300)) {
+        changes += 1;
+      }
+    }
+    expect(slow.level).toBeGreaterThanOrEqual(3);
+    expect(changes).toBe(slow.level);
+  });
 });

@@ -52,6 +52,20 @@ void main() {
   gl_FragColor = vec4(vColor.rgb * (0.85 + 0.25 * (1.0 - d)), vColor.a * a);
 }`;
 
+// Alpha-blended soft glow, no white core: saturated colour (cyan halos, orange embers and sparks)
+// that must read as itself over bright ground. Additive cyan over grass turns lime, additive
+// orange turns yellow, so only white-hot layers use the additive glow above.
+const HALO_FRAGMENT = /* glsl */ `
+varying vec2 vUv;
+varying vec4 vColor;
+varying float vSeed;
+void main() {
+  float d = length(vUv * 2.0 - 1.0);
+  if (d > 1.0) discard;
+  float a = 1.0 - d;
+  gl_FragColor = vec4(vColor.rgb, vColor.a * a * a);
+}`;
+
 const DECAL_VERTEX = /* glsl */ `
 attribute vec3 aPos;
 attribute vec4 aColor;
@@ -124,6 +138,20 @@ void main() {
   float core = 1.0 - smoothstep(0.0, 0.38, across);
   vec3 color = mix(vColor.rgb, vec3(1.0), core * 0.7);
   gl_FragColor = vec4(color, vColor.a * (soft * soft * 0.8 + core * 0.6));
+}`;
+
+// Alpha-blended flame tongue along the ribbon: soft base, fat body, rounded tapering tip.
+// Also used for spark streaks (bright head at the far end is not needed at game zoom).
+const TONGUE_FRAGMENT = /* glsl */ `
+varying vec2 vUv;
+varying vec4 vColor;
+void main() {
+  float x = clamp(vUv.x, 0.0, 1.0);
+  float w = min(1.0, x * 5.0 + 0.3) * sqrt(max(0.0, 1.0 - x * x));
+  float d = abs(vUv.y) / max(0.02, w);
+  float a = pow(max(0.0, 1.0 - d), 1.4) * pow(1.0 - x, 0.3) * smoothstep(0.0, 0.1, x);
+  if (a <= 0.01) discard;
+  gl_FragColor = vec4(vColor.rgb, vColor.a * a);
 }`;
 
 /** A pool of sprite-like quads with per-instance position, colour+alpha and size/rotation/seed. */
@@ -233,7 +261,13 @@ export class RibbonPool {
   private readonly width: THREE.InstancedBufferAttribute;
   private count = 0;
 
-  constructor(scene: THREE.Scene, readonly capacity: number) {
+  constructor(
+    scene: THREE.Scene,
+    readonly capacity: number,
+    fragment: string = RIBBON_FRAGMENT,
+    blending: THREE.Blending = THREE.AdditiveBlending,
+    renderOrder = 6,
+  ) {
     this.geometry = new THREE.InstancedBufferGeometry();
     // x: 0 at the start, 1 at the end; y: -1..1 across.
     this.geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, -1, 0, 1, -1, 0, 1, 1, 0, 0, 1, 0], 3));
@@ -249,15 +283,15 @@ export class RibbonPool {
     this.geometry.instanceCount = 0;
     const material = new THREE.ShaderMaterial({
       vertexShader: RIBBON_VERTEX,
-      fragmentShader: RIBBON_FRAGMENT,
+      fragmentShader: fragment,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending,
       side: THREE.DoubleSide,
     });
     this.mesh = new THREE.Mesh(this.geometry, material);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 6;
+    this.mesh.renderOrder = renderOrder;
     scene.add(this.mesh);
   }
 
@@ -323,4 +357,14 @@ export function decalPool(scene: THREE.Scene, capacity: number, additive: boolea
     additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     additive ? 2 : 1,
   );
+}
+
+/** Alpha-blended soft glows for saturated colours (drawn after smoke, before the additive glow). */
+export function haloPool(scene: THREE.Scene, capacity: number): QuadPool {
+  return new QuadPool(scene, capacity, SPRITE_VERTEX, HALO_FRAGMENT, THREE.NormalBlending, 5.5);
+}
+
+/** Alpha-blended flame tongues and spark streaks (muzzle blasts). */
+export function tonguePool(scene: THREE.Scene, capacity: number): RibbonPool {
+  return new RibbonPool(scene, capacity, TONGUE_FRAGMENT, THREE.NormalBlending, 5.6);
 }

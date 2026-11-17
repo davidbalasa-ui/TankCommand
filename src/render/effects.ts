@@ -14,7 +14,9 @@
 //   shard        The Shard (neutral crystal): a kinked white-violet lance, prism flash on impact.
 //   spore        Third faction (sample): a slow pod that bursts into a lingering cloud.
 import * as THREE from 'three';
-import { QuadPool, RibbonPool, decalPool, glowPool, smokePool } from './fxPools';
+import { SIM_TICK_HZ } from '../sim/constants';
+import { MUZZLE_HEIGHT } from '../sim/tuning';
+import { QuadPool, RibbonPool, decalPool, glowPool, haloPool, smokePool, tonguePool } from './fxPools';
 
 type Rgb = readonly [number, number, number];
 
@@ -35,6 +37,27 @@ const SMOKE_LIGHT: Rgb = [0.42, 0.38, 0.34];
 const DUST: Rgb = [0.5, 0.44, 0.36];
 const SCORCH: Rgb = [0.03, 0.025, 0.02];
 const SPORE: Rgb = [0.66, 0.74, 0.29];
+// Terran muzzle blast palette (tools/art/v2/viewer/blast.js).
+const HALO: Rgb = [0.45, 0.88, 1];
+const WHITE_HOT: Rgb = [0.88, 0.98, 1];
+const BLAST_CYAN: Rgb = [0.1, 0.5, 1];
+const BLAST_ORANGE: Rgb = [1, 0.58, 0.2];
+const SPARK: Rgb = [1, 0.9, 0.6];
+const BLAST_SMOKE: Rgb = [0.54, 0.57, 0.62];
+const BLAST_SMOKE_HOT: Rgb = [0.68, 0.72, 0.78];
+const BLAST_DUST: Rgb = [0.7, 0.62, 0.48];
+
+/**
+ * Where each Terran gun's muzzle sits on its model: metres forward of the unit's centre and metres
+ * above the ground (the sim fires every shot from the centre at MUZZLE_HEIGHT).
+ */
+const MUZZLE_AT: Record<string, readonly [number, number]> = {
+  autocannon: [1.9, 1.2],
+  cannon: [2.4, 1.3],
+  heavy_cannon: [3, 1.5],
+  shell: [2.6, 3.4],
+  missile: [0.6, 1.7],
+};
 
 /** Visual size per weapon kind (1 = a light tank's cannon). */
 const WEAPON_SCALE: Record<string, number> = {
@@ -52,7 +75,7 @@ const WEAPON_SCALE: Record<string, number> = {
 };
 
 
-type Layer = 0 | 1 | 2 | 3; // glow, smoke, scorch decal, glowing decal
+type Layer = 0 | 1 | 2 | 3 | 4; // glow, smoke, scorch decal, glowing decal, alpha-blended halo
 type Fade = 0 | 1 | 2; // 0 fade out, 1 fade in then out (smoke), 2 hold then fade (decals)
 
 interface Particle {
@@ -93,6 +116,8 @@ interface Ribbon {
   age: number;
   life: number;
   drawn: boolean;
+  /** Alpha-blended flame tongue / spark streak instead of an additive tracer. */
+  soft?: boolean;
 }
 
 interface Chunk {
@@ -142,6 +167,8 @@ export class Effects {
   private readonly scorch: QuadPool;
   private readonly groundGlow: QuadPool;
   private readonly ribbons: RibbonPool;
+  private readonly halo: QuadPool;
+  private readonly tongues: RibbonPool;
   private readonly chunkMesh: THREE.InstancedMesh;
   private readonly particles: Particle[] = [];
   private readonly spare: Particle[] = [];
@@ -169,6 +196,8 @@ export class Effects {
     this.scorch = decalPool(scene, 160, false);
     this.groundGlow = decalPool(scene, 160, true);
     this.ribbons = new RibbonPool(scene, 2400);
+    this.halo = haloPool(scene, 900);
+    this.tongues = tonguePool(scene, 900);
     this.chunkMesh = new THREE.InstancedMesh(this.chunkGeometry, this.chunkMaterial, 260);
     this.chunkMesh.count = 0;
     this.chunkMesh.frustumCulled = false;
@@ -438,22 +467,120 @@ export class Effects {
       this.sparks(x, y, z, this.optional(3), GOLD, 4 * s, fx, fz);
       return;
     }
-    // Terran guns: a white-hot flash, a tongue of flame out of the barrel and a puff of smoke.
-    this.spawn(0, x, y, z, 0, 0, 0, 0.08, 0.6 * s, 1.2 * s, WHITE, HOT, 1, 0);
-    const tongues = kind === 'autocannon' ? 1 : 3;
-    for (let i = 1; i <= tongues; i += 1) {
-      const d = i * 0.35 * s;
-      this.spawn(0, x + fx * d, y, z + fz * d, fx * 4 * s, 0.3, fz * 4 * s, 0.12, (0.55 - i * 0.1) * s, 0.9 * s, HOT, FIRE, 0.95, 0);
+    // The sim fires from the shooter's centre at a fixed height and the renderer first sees the shot
+    // a tick later: step back to the shooter and out to roughly where each gun's muzzle sits.
+    const [reach, height] = MUZZLE_AT[kind ?? ''] ?? [1.2, 1.5];
+    const back = len / SIM_TICK_HZ;
+    this.terranBlast(x + fx * (reach - back), y - MUZZLE_HEIGHT + height, z + fz * (reach - back), kind, s, fx, fz, reach);
+  }
+
+  /**
+   * Terran gun blast (look developed in tools/art/v2/viewer/blast.js): a white-hot bloom in a cyan
+   * halo, a short plasma tongue, side jets from the muzzle brake, orange spark streaks, an orange-hot
+   * muzzle that cools, then grey-blue smoke that rolls forward, slows and rises while the bore keeps
+   * venting; heavy guns also blow dust off the ground. Saturated colours are alpha-blended (they read
+   * as cyan and orange over any ground); only the white-hot core is additive.
+   * Cost per shot (high / low quality): light gun ~23 / 12 sprites, autocannon ~14 / 8, artillery ~44 / 20.
+   */
+  private terranBlast(x: number, y: number, z: number, kind: string | undefined, scale: number, fx: number, fz: number, reach0: number): void {
+    const missile = kind === 'missile';
+    const quick = kind === 'autocannon';
+    // Gun size in metres and heaviness (0 light tank .. 1 artillery), from the weapon's visual scale.
+    const S = 0.36 * Math.pow(scale, 0.9);
+    const H = Math.min(1, Math.max(0, (scale - 1) / 0.6));
+    // Light guns get a relatively punchier flash (it has to read at game zoom), heavy ones mass instead.
+    const P = 1 + 0.25 * (1 - H);
+    const T = quick ? 0.7 : 1; // autocannon: shorter, snappier
+    const rich = this.detail >= 0.6; // the cosmetic extras drop out on low quality
+    // Side vector (horizontal, perpendicular to the shot).
+    const sx = -fz;
+    const sz = fx;
+    const at = (d: number): [number, number, number] => [x + fx * d, y, z + fz * d];
+
+    // White-hot core (additive) inside a cyan halo (alpha-blended) and a cyan inner glow.
+    const [cx, cy, cz] = at(0.45 * S);
+    this.spawn(4, cx, cy, cz, 0, 0, 0, 0.1 * T, S * (2.5 + 0.6 * H) * P, S * (2.9 + 0.7 * H) * P, HALO, HALO, 0.6, 0);
+    this.spawn(0, cx, cy, cz, 0, 0, 0, 0.1 * T, S * (1.75 + 0.5 * H) * P, S * (1.9 + 0.5 * H) * P, BLAST_CYAN, BLAST_CYAN, 0.7, 0);
+    this.spawn(0, cx, cy, cz, 0, 0, 0, 0.1 * T, S * (0.85 + 0.3 * H) * P, S * (0.9 + 0.3 * H) * P, WHITE, WHITE, 1, 0);
+
+    // Plasma tongue down the barrel line: cyan sheath (alpha) and white-hot inner tongue (additive).
+    const reach = S * (missile ? 1.6 : 3 + 0.8 * Math.random() + 0.8 * H) * P;
+    const [bx, by, bz] = at(-0.2 * S);
+    const [tx, ty, tz] = at(-0.2 * S + reach);
+    this.ribbonList.push({ ax: bx, ay: by, az: bz, bx: tx, by: ty, bz: tz, c: HALO, alpha: 0.8, width: S * (1.3 + 0.3 * H) * P, age: 0, life: 0.1 * T, drawn: false, soft: true });
+    const [ix, iy, iz] = at(-0.2 * S + reach * 0.7);
+    this.ribbonList.push({ ax: bx, ay: by, az: bz, bx: ix, by: iy, bz: iz, c: WHITE_HOT, alpha: 0.95, width: S * 0.55 * P, age: 0, life: 0.1 * T, drawn: false, soft: true });
+
+    // Telescoping barrels snap back as they fire: for a few frames plasma keeps pouring out of the
+    // retracting tip, so the bloom never floats ahead of a collapsed barrel.
+    if (!missile && !quick) {
+      const [rx, ry, rz] = at(-reach0 * 0.55);
+      this.ribbonList.push({ ax: rx, ay: ry - 0.1, az: rz, bx: cx, by: cy, bz: cz, c: HALO, alpha: 0.7, width: S * 0.6 * P, age: 0, life: 0.09, drawn: false, soft: true });
+      this.ribbonList.push({ ax: rx, ay: ry - 0.1, az: rz, bx: cx, by: cy, bz: cz, c: WHITE_HOT, alpha: 0.8, width: S * 0.25 * P, age: 0, life: 0.07, drawn: false, soft: true });
     }
-    const puffs = this.optional(kind === 'autocannon' ? 1 : 2);
+
+    // Muzzle-brake side jets.
+    if (rich && !missile) {
+      for (const side of [-1, 1]) {
+        const jx = sx * side + fx * 0.45;
+        const jz = sz * side + fz * 0.45;
+        this.spawn(4, x, y, z, jx * 20 * S, 0, jz * 20 * S, 0.08 * T, 0.5 * S, 0.8 * S, BLAST_CYAN, HALO, 0.8, 0, 10);
+      }
+      // A faint pressure wisp swelling round the bloom.
+      this.spawn(4, cx, cy, cz, 0, 0, 0, 0.16, 0.8 * S, (2.5 + 0.5 * H) * S, HALO, HALO, 0.12, 0);
+    }
+
+    // Spark streaks thrown forward (alpha-blended orange: additive orange on grass goes yellow).
+    const sparks = missile ? 0 : this.optional(Math.round((quick ? 3 : 6) + 5 * H));
+    for (let i = 0; i < sparks; i += 1) {
+      const spread = (Math.random() - 0.5) * 1.2;
+      const dx = fx + sx * spread;
+      const dz = fz + sz * spread;
+      const n = Math.hypot(dx, dz) || 1;
+      const lift = (Math.random() - 0.3) * 1.2;
+      const d0 = S * rand(0.8, 2);
+      const d1 = d0 + S * rand(1.2, 2.6) * (1 + 0.5 * H);
+      this.ribbonList.push({
+        ax: x + (dx / n) * d0, ay: y + lift * d0 * 0.5, az: z + (dz / n) * d0,
+        bx: x + (dx / n) * d1, by: y + lift * d1 * 0.5 - 0.1, bz: z + (dz / n) * d1,
+        c: i % 3 === 0 ? SPARK : BLAST_ORANGE, alpha: 1, width: 0.13 * S, age: 0, life: rand(0.12, 0.24), drawn: false, soft: true,
+      });
+    }
+
+    // The muzzle stays orange-hot for a moment.
+    this.spawn(4, x, y, z, 0, 0, 0, 0.35 * T, 0.7 * S, 0.35 * S, BLAST_ORANGE, EMBER, 0.85, 0);
+
+    // Smoke: puffs pushed forward at a spread of speeds, dragging to a stop and rising.
+    const puffs = this.optional(Math.round((quick ? 2 : missile ? 6 : 5) + 3 * H));
     for (let i = 0; i < puffs; i += 1) {
-      this.spawn(1, x + fx * 0.6 * s, y, z + fz * 0.6 * s, fx * rand(1.5, 3) + rand(-0.4, 0.4), rand(0.3, 0.8), fz * rand(1.5, 3) + rand(-0.4, 0.4), rand(0.8, 1.3), 0.4 * s, 1.4 * s, SMOKE_LIGHT, SMOKE_LIGHT, 0.4, 1);
+      const f = (i + 0.5) / Math.max(1, puffs);
+      const v = (0.6 + 13 * Math.pow(f, 1.5) * rand(0.75, 1.25)) * S * (1 - 0.45 * H) * (missile ? 0.5 : 1);
+      const spread = rand(-0.35, 0.35);
+      const [px, py, pz] = at(0.3 * S);
+      this.spawn(1, px, py, pz, (fx + sx * spread) * v, rand(0.3, 0.8) * S * 2, (fz + sz * spread) * v, (1.2 + 0.8 * H) * T * rand(0.75, 1.25), 0.45 * S, (1.8 + 0.6 * H) * S * rand(0.7, 1.3), BLAST_SMOKE_HOT, BLAST_SMOKE, 0.7 - 0.12 * H, 1, 3.5);
     }
-    if (s >= 1.4) {
-      // Heavy guns and artillery kick dust off the ground and shake the air.
-      this.decal(3, x, y - 0.8, z, 0.4 * s, 2 * s, DUST, 0.3, 0.3, 10);
-      for (let i = 0; i < this.optional(3); i += 1) {
-        this.spawn(1, x + rand(-1, 1), y - 0.6, z + rand(-1, 1), rand(-1.5, 1.5), 0.4, rand(-1.5, 1.5), rand(1, 1.6), 0.6 * s, 1.6 * s, DUST, DUST, 0.35, 1);
+    // The hot bore keeps venting slow puffs, so the plume stays joined to the gun as it drifts off.
+    const vents = this.optional(Math.round((quick ? 0 : 1) + 6 * H));
+    for (let i = 0; i < vents; i += 1) {
+      this.later(0.06 + i * (0.07 + 0.05 * H), () => {
+        const [vx, vy, vz] = at(0.5 * S);
+        this.spawn(1, vx, vy, vz, fx * rand(0.8, 2) * S + rand(-0.2, 0.2), rand(0.4, 0.9) * S * 2, fz * rand(0.8, 2) * S + rand(-0.2, 0.2), (1 + H) * rand(0.8, 1.2), 0.55 * S, (1.5 + 0.4 * H) * S, BLAST_SMOKE, BLAST_SMOKE, (0.45 + 0.05 * H) * (1 - (0.5 * i) / Math.max(1, vents)), 1, 1);
+      });
+    }
+
+    if (H >= 0.5) {
+      // Heavy guns and artillery: the pressure wave blows dust off the ground under the barrel.
+      const gy = y - 0.8;
+      this.decal(2, x - fx * 0.8, gy, z - fz * 0.8, 0.8 * S, (2 + 3.5 * H) * S, BLAST_DUST, 0.22 * H, 1.1, 1);
+      const dust = this.optional(Math.round(2 + 4 * H));
+      for (let i = 0; i < dust; i += 1) {
+        const ang = ((i + 0.5) / dust - 0.5) * 3.6 + rand(-0.2, 0.2);
+        const c = Math.cos(ang);
+        const sn = Math.sin(ang);
+        const dx = fx * c - sx * sn;
+        const dz = fz * c - sz * sn;
+        const v = rand(4, 7) * S * 4 * (0.55 + 0.45 * c);
+        this.spawn(1, x - fx * 0.6, gy + 0.3, z - fz * 0.6, dx * v, 0.3, dz * v, rand(1.2, 2), 0.7 * S, (1.6 + 1.4 * H) * S, BLAST_DUST, BLAST_DUST, 0.3 * H, 1, 4);
       }
     }
   }
@@ -827,6 +954,7 @@ export class Effects {
     this.smoke.begin();
     this.scorch.begin();
     this.groundGlow.begin();
+    this.halo.begin();
     for (let i = this.delayed.length - 1; i >= 0; i -= 1) {
       const job = this.delayed[i];
       if (job && job.at <= this.time) {
@@ -850,7 +978,7 @@ export class Effects {
       this.updateBurner(b, dt);
     }
 
-    const pools = [this.glow, this.smoke, this.scorch, this.groundGlow];
+    const pools = [this.glow, this.smoke, this.scorch, this.groundGlow, this.halo];
     let write = 0;
     for (let i = 0; i < this.particles.length; i += 1) {
       const p = this.particles[i];
@@ -893,6 +1021,7 @@ export class Effects {
     this.particles.length = write;
 
     this.ribbons.begin();
+    this.tongues.begin();
     let keep = 0;
     for (let i = 0; i < this.ribbonList.length; i += 1) {
       const q = this.ribbonList[i];
@@ -907,7 +1036,7 @@ export class Effects {
       const fade = Math.max(0.15, 1 - q.age / q.life);
       q.age += dt;
       q.drawn = true;
-      this.ribbons.push(q.ax, q.ay, q.az, q.bx, q.by, q.bz, q.c[0], q.c[1], q.c[2], q.alpha * fade, q.width);
+      (q.soft ? this.tongues : this.ribbons).push(q.ax, q.ay, q.az, q.bx, q.by, q.bz, q.c[0], q.c[1], q.c[2], q.alpha * fade, q.width);
     }
     this.ribbonList.length = keep;
 
@@ -964,13 +1093,15 @@ export class Effects {
       pool.end();
     }
     this.ribbons.end();
+    this.tongues.end();
   }
 
   dispose(): void {
-    for (const pool of [this.glow, this.smoke, this.scorch, this.groundGlow]) {
+    for (const pool of [this.glow, this.smoke, this.scorch, this.groundGlow, this.halo]) {
       pool.dispose(this.scene);
     }
     this.ribbons.dispose(this.scene);
+    this.tongues.dispose(this.scene);
     this.scene.remove(this.chunkMesh);
     this.chunkMesh.dispose();
     this.particles.length = 0;

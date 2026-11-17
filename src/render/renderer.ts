@@ -6,7 +6,7 @@ import { Effects } from './effects';
 import { WreckField } from './wrecks';
 import { applyUnfold, readUnfold, type UnfoldData, type UnfoldStart } from './unfold';
 import { AssetLoader } from '../assets/loader';
-import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
+import { DEPOSIT_MODEL_IDS, LANDSCAPE_LOD_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
@@ -19,7 +19,18 @@ import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
-import { collectPartMotions, pivotIsSpinner, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
+import { addOuterLandDetail, groundDetailGlsl, groundNoiseTexture } from './groundDetail';
+import {
+  collectPartMotions,
+  createUnitFiring,
+  fireKickEnvelope,
+  fireUnit,
+  pivotIsSpinner,
+  updatePartMotions,
+  type PartMotion,
+  type PartMotionState,
+  type UnitFiring,
+} from './partMotion';
 import {
   QUALITY_LADDER,
   QualityController,
@@ -83,7 +94,6 @@ const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
-const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
 const COLORBLIND_ENEMY_TINT = new THREE.Color(0.35, 0.65, 1);
@@ -260,6 +270,8 @@ interface UnitVisual {
   pivotRest: THREE.Vector3 | null;
   /** Moving parts from the model's anim extras (drums, dishes, wings). */
   parts: PartMotion[];
+  /** When it last fired and its whole-body kick (model scene extras.fire). */
+  firing: UnitFiring;
   /** Hover units and aircraft bob gently. */
   floats: boolean;
   /** Aircraft lean into turns (radians of roll, smoothed). */
@@ -386,7 +398,7 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function unitBounds(root: THREE.Object3D): THREE.Box3 {
+function unitBounds(root: THREE.Object3D, hullOnly = false): THREE.Box3 {
   root.updateMatrixWorld(true);
   const bounds = new THREE.Box3();
   const meshBounds = new THREE.Box3();
@@ -395,12 +407,53 @@ function unitBounds(root: THREE.Object3D): THREE.Box3 {
     if (!(object instanceof THREE.Mesh) || (!object.visible && !isInstancedPart(object))) {
       return;
     }
+    if (hullOnly && isGunPart(object, root)) {
+      return;
+    }
     meshBounds.setFromObject(object);
     if (!meshBounds.isEmpty()) {
       bounds.union(meshBounds);
     }
   });
-  return bounds;
+  return hullOnly && bounds.isEmpty() ? unitBounds(root) : bounds;
+}
+
+// Gun barrels, muzzle flashes and missiles (nodes Barrel*, Flash*, Msl* and everything under them).
+// They are left out when a unit is sized, so a long gun does not shrink the hull that carries it.
+const GUN_PART = /^(Barrel|Flash|Msl)/;
+
+// The art pipeline's solid muzzle-flash meshes (under Flash* nodes) are made for a viewer that
+// shows them only for a frame after each shot; the game draws its own muzzle effects, so the meshes
+// are dropped from unit models (and their low-detail files, so both keep the same mesh order).
+// The empty Flash* nodes stay as muzzle anchors.
+function dropFlashMeshes(root: THREE.Object3D): void {
+  const drop: THREE.Object3D[] = [];
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+    for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+      if (node.name.startsWith('Flash')) {
+        drop.push(object);
+        return;
+      }
+    }
+  });
+  for (const mesh of drop) {
+    mesh.removeFromParent();
+    if (mesh instanceof THREE.Mesh) {
+      (mesh.geometry as THREE.BufferGeometry).dispose();
+    }
+  }
+}
+
+function isGunPart(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+    if (GUN_PART.test(node.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function tintMaterial(
@@ -1115,7 +1168,7 @@ export class RenderView {
     this.updateLight();
     this.syncUnits(alpha);
     this.syncStructures(world);
-    this.landscape?.sync(world);
+    this.landscape?.sync(world, this.rtsCamera.targetX, this.rtsCamera.targetZ, this.rtsCamera.distance);
     this.syncDropBeams(world);
     this.syncPadTraffic(world, alpha);
     this.syncWorkerCargo(world, alpha);
@@ -1345,7 +1398,8 @@ export class RenderView {
       return;
     }
     const frameMs = now - previous;
-    if (frameMs <= 0 || frameMs > MAX_FRAME_SAMPLE_MS) {
+    // Long gaps are judged by the controller: a lone one is ignored, a run of them counts.
+    if (frameMs <= 0) {
       return;
     }
     if (this.qualityController.sample(frameMs)) {
@@ -1377,6 +1431,7 @@ export class RenderView {
     }
 
     this.landscape?.setShadows(view.shadows);
+    this.landscape?.setFullDetail(level < LOD_QUALITY_LEVEL);
     if (shadowsChanged) {
       this.renderer.shadowMap.needsUpdate = true;
       this.scene.traverse((object) => {
@@ -1444,6 +1499,7 @@ export class RenderView {
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
     this.landscape = new Landscape(this.scene, this.world.map, this.fogUniforms);
+    this.landscape.setFullDetail(this.effectiveQualityLevel() < LOD_QUALITY_LEVEL);
     const waterLevel = this.world.map.waterLevel;
     if (waterLevel !== null) {
       const water = new THREE.Mesh(
@@ -1598,7 +1654,9 @@ export class RenderView {
     // A plain lit material: this ground fills much of the screen on low or zoomed-out views, and the
     // battlefield's detailed ground shader there cost a third of the frame on slow devices. Nothing
     // casts a shadow out here, so it receives none.
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    addOuterLandDetail(material, this.terrainDetail, DETAIL_TILE);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = false;
     mesh.name = 'OuterLand';
     return mesh;
@@ -1702,20 +1760,22 @@ export class RenderView {
     });
     const uniforms = this.fogUniforms;
     const detail = this.terrainDetail;
+    const groundNoise = groundNoiseTexture(map.seed);
     uniforms.uFogSize.value = map.size;
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uFog = uniforms.uFog;
       shader.uniforms.uFogOn = uniforms.uFogOn;
       shader.uniforms.uFogSize = uniforms.uFogSize;
       shader.uniforms.uDetail = detail;
+      shader.uniforms.uGroundNoise = { value: groundNoise };
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;\nattribute vec3 surface;\nvarying vec3 vSurface;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;\nvSurface = surface;');
+        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;\nattribute vec3 surface;\nvarying vec3 vSurface;\nvarying vec2 vWall;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;\nvSurface = surface;\nvWall = vec2(position.y, normal.y);');
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;\nvarying vec3 vSurface;' +
-            (detail.value ? '\nuniform sampler2D uDetail;' : ''),
+          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;\nvarying vec3 vSurface;\nvarying vec2 vWall;' +
+            (detail.value ? '\nuniform sampler2D uDetail;\nuniform sampler2D uGroundNoise;' : ''),
         )
         .replace(
           '#include <color_fragment>',
@@ -1723,12 +1783,7 @@ export class RenderView {
             // Ground detail: fine grass, pebbles or cracks by ground kind, plus broad patches so a
             // field is not one flat colour. Off until the texture has loaded.
             (detail.value
-              ? `vec3 dFine = texture2D(uDetail, vFogXZ / ${DETAIL_TILE.toFixed(1)}).rgb - 0.5;
-vec3 dBroad = texture2D(uDetail, vFogXZ / ${(DETAIL_TILE * 6.3).toFixed(1)} + 0.37).rgb - 0.5;
-vec3 w = vSurface / max(0.001, vSurface.x + vSurface.y + vSurface.z);
-diffuseColor.rgb *= 1.0 + dot(dFine, w) * 1.3 + dBroad.r * 0.55;
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.82), clamp(dBroad.g * 2.0, 0.0, 1.0) * w.x);
-`
+              ? groundDetailGlsl(DETAIL_TILE)
               : '') +
             'if (uFogOn > 0.5) { float fogLevel = texture2D(uFog, vFogXZ / uFogSize + 0.5).r; diffuseColor.rgb *= fogLevel; }',
         );
@@ -1840,7 +1895,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   // Ground detail texture, ore and metal site models and the scattered props. Any that fail to load
   // leave the plain terrain, the placeholder deposit discs, or no props.
   private async loadLandscape(): Promise<void> {
-    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS].filter((id) =>
+    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS, ...LANDSCAPE_LOD_IDS].filter((id) =>
       this.registry.has(id),
     );
     const results = await Promise.allSettled(ids.map((id) => this.loader.load(id)));
@@ -1864,15 +1919,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         if (terrainMaterial instanceof THREE.Material) {
           terrainMaterial.needsUpdate = true;
         }
+        const outerMaterial = this.outerLand?.material;
+        if (outerMaterial instanceof THREE.Material) {
+          outerMaterial.needsUpdate = true;
+        }
         this.loadedModels.push(id);
       } else if (asset instanceof THREE.Object3D && this.landscape) {
-        if (id === DEPOSIT_MODEL_IDS.ore) {
-          this.landscape.addDepositModel('ore', asset);
-        } else if (id === DEPOSIT_MODEL_IDS.metal) {
-          this.landscape.addDepositModel('metal', asset);
-        } else {
-          this.landscape.addPropModel(id, asset);
-        }
+        this.landscape.addModel(id, asset);
         this.loadedModels.push(id);
       }
     });
@@ -1907,6 +1960,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
         // Geometry only: the low-detail file's placeholder material is replaced by the full model's.
         const geometries: THREE.BufferGeometry[] = [];
+        dropFlashMeshes(result.value);
         result.value.traverse((object) => {
           if (object instanceof THREE.Mesh) {
             geometries.push(object.geometry as THREE.BufferGeometry);
@@ -2039,6 +2093,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       plane.visible = false;
       plane.removeFromParent();
     }
+    dropFlashMeshes(model);
 
     model.updateMatrixWorld(true);
     // New models (tools/art) ship their own TurretPivot; the proof-of-concept tank needs one built.
@@ -2057,7 +2112,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     }
     model.updateMatrixWorld(true);
 
-    const bounds = unitBounds(model);
+    // Sized and centred on the hull: barrels and missiles stick out beyond one tank length.
+    const bounds = unitBounds(model, true);
     if (!bounds.isEmpty()) {
       const size = new THREE.Vector3();
       bounds.getSize(size);
@@ -2065,12 +2121,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       model.scale.multiplyScalar(TANK_LENGTH / footprint);
       model.updateMatrixWorld(true);
 
-      const scaledBounds = unitBounds(model);
+      const scaledBounds = unitBounds(model, true);
       const centre = new THREE.Vector3();
       scaledBounds.getCenter(centre);
       model.position.x -= centre.x;
       model.position.z -= centre.z;
-      model.position.y -= scaledBounds.min.y;
+      model.position.y -= unitBounds(model).min.y;
     }
 
     const root = new THREE.Group();
@@ -2215,6 +2271,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       recoil: 0,
       pivotRest: aimed?.position.clone() ?? null,
       parts,
+      firing: createUnitFiring(root, parts),
       floats: this.world.unitTypes.get(unit.typeId)?.movement === 'hover',
       bank: 0,
     };
@@ -2301,7 +2358,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         visual.turretPivot.rotation.y = rel;
         if (visual.pivotRest) {
           // Recoil: the turret jumps back along its barrel and the hull rocks nose-up.
-          const kick = visual.recoil * 0.28;
+          // Models whose barrels recoil on their own keep the turret still.
+          const kick = visual.firing.barrels ? 0 : visual.recoil * 0.28;
           visual.turretPivot.position.set(
             visual.pivotRest.x - Math.cos(rel) * kick,
             visual.pivotRest.y,
@@ -2309,12 +2367,28 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           );
         }
       }
-      if (visual.recoil > 0.001) {
+      const fireKick = visual.firing.kick;
+      if (fireKick) {
+        // The model's own kick: nose-up (or over to the side) away from the gun, shoved back.
+        const env = fireKickEnvelope(fireKick, performance.now() / 1000 - visual.firing.shotAt);
+        if (env !== 0) {
+          const rel = heading - turretHeading;
+          visual.root.rotation.z += fireKick.kick * env * Math.cos(rel);
+          visual.root.rotation.x += fireKick.kick * env * Math.sin(rel);
+          const shove = fireKick.slide * env * visual.root.scale.x;
+          visual.root.position.x -= Math.cos(turretHeading) * shove;
+          visual.root.position.z -= Math.sin(turretHeading) * shove;
+        }
+      } else if (visual.recoil > 0.001) {
         visual.root.rotation.z += visual.recoil * 0.07 * Math.cos(heading - turretHeading);
-        visual.recoil *= 0.82;
       }
+      visual.recoil *= 0.82;
       if (visual.parts.length > 0) {
-        updatePartMotions(visual.parts, this.unitMotionState(unit, current, previous), this.motionDt);
+        const motion = this.unitMotionState(unit, current, previous);
+        motion.time = performance.now() / 1000;
+        // Low quality keeps barrels and missiles but skips the small extras.
+        motion.lite = this.effectiveQualityLevel() >= QUALITY_LADDER.length - 1;
+        updatePartMotions(visual.parts, motion, this.motionDt);
       }
       if (visual.alien && visual.root.visible && arcBudget > 0 && Math.random() < 0.025) {
         arcBudget -= 1;
@@ -3014,6 +3088,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         });
         ring = new THREE.Mesh(geometry, material);
         ring.rotation.x = -Math.PI / 2;
+        // Rings follow the drawn hull size, so a heavy's ring still clears its hull.
+        const scale = this.world.unitTypes.get(unit.typeId)?.visualScale ?? 1;
+        ring.scale.setScalar(Math.min(1.4, Math.max(0.85, scale)));
         this.scene.add(ring);
         this.selectionRings.set(id, ring);
       }
@@ -3261,6 +3338,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz);
         if (shooter && !airborne) {
           shooter.recoil = 1;
+          fireUnit(shooter.firing, shooter.parts, performance.now() / 1000);
         }
       }
       const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
