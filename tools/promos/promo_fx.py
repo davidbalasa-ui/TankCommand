@@ -42,10 +42,12 @@ LIB_DIRS = [d for d in os.environ.get('PROMO_FLIPBOOKS', '').split(os.pathsep) i
 
 # Wanted effect -> flipbook names to try (first found wins). Globs allowed.
 ALIASES = {
-    'explo_ground': ['explo_ground_a', 'explo_ground_b', 'explo_ground*', 'explosion_ground*', 'explo_*'],
+    'explo_ground': ['explo_ground_a', 'explo_ground_b', 'explosion_ground*'],
     'explo_air': ['explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
     'explo_space': ['explo_space*', 'explosion_space*', 'explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
-    'explo_small': ['explo_small*', 'explosion_small*', 'explo_ground*'],
+    'explo_small': ['explo_small*', 'explosion_small*', 'explo_ground'],
+    'explo_ground_arc': ['explo_ground_arc'],
+    'explo_big': ['explo_big*'],
     'fire_loop': ['fire_loop*', 'fire_*'],
     'smoke_plume': ['smoke_plume*', 'smoke_column*'],
     'smoke_puff': ['smoke_puff*', 'smoke_burst*', 'smoke_trail*', 'smoke_small*'],
@@ -979,7 +981,7 @@ def _space(P):
     return getattr(P, 'ground', 'x') is None
 
 
-def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
+def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True, style=None):
     """Flipbook explosion. Returns False (caller falls back to the old effect) when the library
     has nothing usable."""
     pos = K.V(pos)
@@ -988,6 +990,14 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True):
         air = True
     space = _space(P)
     want = ('explo_space' if space else 'explo_air') if air else 'explo_ground'
+    # library variants: gold Arcadian blast, big structure blast, small shell impact
+    if not air:
+        if style == 'gold' and find_flipbook('explo_ground_arc'):
+            want = 'explo_ground_arc'
+        elif size >= 4.0 and find_flipbook('explo_big'):
+            want = 'explo_big'
+        elif size <= 1.0 and find_flipbook('explo_small'):
+            want = 'explo_small'
     man = find_flipbook(want)
     if man is None:
         return False
@@ -1290,7 +1300,8 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         epos = center
     else:
         epos = Vector((blast.x, blast.y, max(gz + min(0.5, H * 0.2), lo.z + 0.3 * H)))   # hover: at the unit
-    explosion(P, epos, t, size=size, debris=0, smoke=False, light=True)
+    explosion(P, epos, t, size=size, debris=0, smoke=False, light=True,
+              style='gold' if accent == 'gold' else None)
     sparks(P, center, t, n=int(26 * S + 10), speed=10 * S, color=col, size=S, terr=terr,
            extra_v=v_unit if air else None)
     if accent == 'orange':   # a few cyan electrical sparks as Terran power systems short out
