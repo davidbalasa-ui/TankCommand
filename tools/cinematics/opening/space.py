@@ -1112,7 +1112,7 @@ class Space:
                                (self.F_OFF + 7, 0.8), (self.F_OFF + 12, 2.2)])
         impact_flare(b['shield2_w'] - d * 0.5, d, f2, f2 + 7, (1.0, 0.6, 0.2), 4.0, 'ShieldSplash2')
         spark_stream(b['shield2_w'] - d * 1.0, f2, f2 + 7, (1.0, 0.75, 0.3), -d * 0.9, 83, size=0.3, speed=55)
-        shards(b['shield2_w'], f2 + 7, 24, (0.35, 0.7, 1.0), 1.6, 70, seed=64, life=1.4, drift=d * 0.6)
+        # (David 2026-11-16: shields never shatter: no flying triangle shards, the field opens and peels)
         blue_boom(b['shield2_w'], f2 + 7, 4.0, life=0.5, light=1.5e5)
         # brightens as it strains, then fades as it peels away (vis keys are stepped, so key each frame)
         key_node(sm, 'vis', [(self.F_BEAM + 6 + 3 * k, min(1.0, 0.7 + 0.06 * k)) for k in range(6)]
@@ -1132,7 +1132,6 @@ class Space:
                         s0.z * (1 + amp * math.sin(ph + 3.1) + pull))
             sh.keyframe_insert('scale', frame=f)
         show(sh, 1, self.F_OFF + 12, tree=False)
-        shards(b['shield_w'], self.F_BREAK, 30, (0.35, 0.7, 1.0), 1.6, 70, seed=60, life=1.4, drift=-d * 0.6)
         blue_boom(b['shield_w'], self.F_BREAK, 4.0, life=0.5, light=2e5)
         # hull: white-hot spot (0:15-0:15.5), molten hole, spray out of the far side (0:15.5)
         hot = C.uv_sphere('HullHot', 1.0, seg=(20, 10), mat=emit('HullHotM', (1.0, 0.85, 0.6), 30.0))
