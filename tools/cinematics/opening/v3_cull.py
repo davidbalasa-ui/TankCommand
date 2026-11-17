@@ -334,12 +334,13 @@ def planet_glow(shard_dir, keys, radius=700.0):
     d.inputs[1].default_value = tuple(shard_dir * (CLOUD_R + 3))
     dist = d.outputs['Value']
     core = n.math('POWER', n.maprange(dist, 0.0, radius, 1.0, 0.0), 2.2)
-    wide = n.math('POWER', n.maprange(dist, 0.0, radius * 2.6, 1.0, 0.0), 3.0)
+    wide = n.math('POWER', n.maprange(dist, 0.0, radius * 1.4, 1.0, 0.0), 2.0)
     nz = n.node('ShaderNodeTexNoise', Scale=0.004, Detail=8.0, Roughness=0.62)
     n.set(nz.inputs['Vector'], tc.outputs['Object'])
     vein = n.math('POWER', n.maprange(n.math('ABSOLUTE', n.math('SUBTRACT', nz.outputs['Fac'], 0.5)), 0.0, 0.05, 1.0, 0.0), 1.5)
-    k = n.math('ADD', n.math('MULTIPLY', core, 3.5), n.math('ADD', n.math('MULTIPLY', n.math('MULTIPLY', vein, wide), 4.0),
-                                                           n.math('MULTIPLY', wide, 0.5)))
+    hot = n.math('POWER', n.maprange(dist, 0.0, radius * 0.25, 1.0, 0.0), 2.0)
+    k = n.math('ADD', n.math('ADD', n.math('MULTIPLY', core, 3.0), n.math('MULTIPLY', hot, 25.0)),
+               n.math('ADD', n.math('MULTIPLY', n.math('MULTIPLY', vein, wide), 4.0), n.math('MULTIPLY', wide, 0.3)))
     lvl = SP.value_node(m, 'lvl', 0.0)
     em = n.node('ShaderNodeEmission', Color=(0.5, 0.2, 1.0, 1))
     n.set(em.inputs['Strength'], n.math('MULTIPLY', k, lvl.outputs[0]))
@@ -360,7 +361,7 @@ def planet_glow(shard_dir, keys, radius=700.0):
     d2 = n2.node('ShaderNodeVectorMath', operation='DISTANCE')
     n2.set(d2.inputs[0], tc2.outputs['Object'])
     d2.inputs[1].default_value = tuple(shard_dir * (PL.R + 120))
-    k2 = n2.math('POWER', n2.maprange(d2.outputs['Value'], 0.0, radius * 3.2, 1.0, 0.0), 2.0)
+    k2 = n2.math('POWER', n2.maprange(d2.outputs['Value'], 0.0, radius * 2.4, 1.0, 0.0), 2.0)
     lw = n2.node('ShaderNodeLayerWeight', Blend=0.3)
     rim = n2.math('POWER', lw.outputs['Facing'], 2.0)
     lvl2 = SP.value_node(m2, 'lvl', 0.0)
@@ -378,4 +379,9 @@ def planet_glow(shard_dir, keys, radius=700.0):
     hz.location = PC
     hz.visible_shadow = False
     SP.key_node(m2, 'lvl', keys, 'BEZIER')
+    # bloom over the Shard itself
+    bl = V.C.uv_sphere('ShardBloom', 1.0, seg=(32, 16), mat=V.soft_glow('ShardBloomM', (0.6, 0.3, 1.0), 2.0, 2.2))
+    bl.location = PC + shard_dir * (CLOUD_R + 10)
+    bl.visible_shadow = False
+    key_scale(bl, [(f, max(1.0, radius * 0.35 * v)) for f, v in keys])
     return sk, hz
