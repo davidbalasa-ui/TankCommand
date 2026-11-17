@@ -50,7 +50,12 @@ P.orbit(center, radius, height, deg0, deg1, t0, t1, lens, radius1=, height1=)
 P.cam_shake(t, amount)
 P.explosion(p, t, size); P.impact(p, t, size, color); P.lightning(p0, p1, t0, t1, color); P.beam(...)
 P.missile(p0, p1, t0); P.projectile(p0, p1, t0, speed, color); P.puff(...); P.dust(actor, t0, t1)
-P.shield_dome(center, r, t0, t1, hits=[(t, p)])   # shields never shatter
+P.shield_dome(center, r, t0, t1, hits=[(t, p)])   # shields never shatter (gold colour = Arcadian honeycomb)
+# promo_fx_weapons (bodies of the weapon effects above) also offers:
+#   P.lightning(src, dst, t0, t1)  src/dst may be points, Actors, Objects or t->point callables (followed per frame)
+#   W.lightning_thruster(P, actor, t0, t1, local=(-x, 0, 0), length=)   Arcadian thrust as crackling gold bolts
+#   W.shield_push(P, shell, actor, t0, t1)   unit pushing out through a shield stretches it, then it snaps back
+#   look-dev bench: FXCASE=<case> python tools/promos/fx/weapons_bench.py --quality preview --frames ...
 P.render()
 ```
 Colours: `promo_kit.COL` (terran_neon, arc_gold, repair_green, shard_violet, ...).
