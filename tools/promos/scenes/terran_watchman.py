@@ -1,19 +1,18 @@
 """Watchman (Terran radar truck): it sees what you can't.
 
-The Watchman grinds up a hazy ridge and parks on the crest, nose to the valley. The dish spins up,
-and a neon radar ping rolls off the hilltop and out across the ground. Down in the haze the valley
-looks empty, until the ring passes over it: one, two, three Arcadian raiders flash into view as
-glowing outlines (neon on contact, then locked orange) creeping toward the hill. A beat later a
-Longbow barrage from somewhere far behind the ridge drops out of the sky on exactly what the truck
-found: three quick hits. End low in the valley among the burning wrecks, looking up at the
-Watchman on the crest, dish still turning, a second ping rolling out under the camera.
+The Watchman grinds up a dusk ridge and parks on the crest, nose to the valley. The dish spins up,
+and a neon radar ping rolls off the hilltop and out across the ground. Down the slope the ground
+looks empty, until the ring passes over it: one, two, three Arcadian raiders creeping up toward
+the hill flash into view as glowing outlines (white-neon on contact, then locked orange). A beat
+later a Longbow barrage from far behind the ridge drops out of the sky on exactly what the truck
+found: three quick hits. End behind the Watchman's shoulder on the crest, dish still turning, a
+second ping rolling out over the burning wrecks below.
 
-Timeline (s): 0-1.75 climb (low tracking camera) | 1.75 cut: crest, dig in, dish spins up |
-2.2 ping | 2.75 cut: over the shoulder into the valley | ~3.1-3.6 contacts revealed |
-3.95 / 4.2 / 4.45 shells land | 4.9 cut: low hero frame from the valley | 5.2 second ping.
+Timeline (s): 0-1.75 climb (low tracking camera) | 1.75 cut: crest, dish spins up |
+2.45 ping | 3.04 cut: down the slope onto the contacts | ~3.07-3.35 contacts revealed |
+3.95 / 4.2 / 4.45 shells land | 4.92 cut: rear three-quarter hero frame | 5.2 second ping.
 
-Hero loaded by model NAME ('watchman'); its emissive texture is remapped in-scene to neon blue
-with orange accents, so a remodel only needs a re-render."""
+Hero loaded by model NAME ('watchman'); vehicle motion, look and sound beds come from the kit."""
 import math
 import os
 import sys
@@ -52,7 +51,7 @@ def hill(x, y):
     return H * (1 - K.smoothstep(u))
 
 
-P.env('dusk', sun=(70, 0, -150), sun_energy=3.8, props=38,
+P.env('dusk', sun=(70, 0, -60), sun_energy=3.8, props=38,
       clear=[(0, 0, 18), (-14, -2, 8), (17, -2, 10), (10, -9, 6)])
 g = P.ground
 for v in g.data.vertices:
@@ -86,17 +85,7 @@ wm.root.keyframe_insert('rotation_euler', index=1, frame=P.T(6.2))
 # ease the arrival (last segment decelerates)
 K.set_interp(wm.root, 'BEZIER')
 
-m = wm.model_root
-m.rotation_mode = 'XYZ'
-for i in range(0, 21):
-    t = i / 12
-    m.location.z = 0.03 * math.sin(t * 31.0)
-    m.keyframe_insert('location', index=2, frame=P.T(t))
-for t, pitch, z in [(1.7, 0.0, 0.0), (1.85, -2.5, -0.06), (2.05, 1.0, -0.04), (2.3, 0.0, 0.0)]:
-    m.rotation_euler.y = math.radians(pitch)
-    m.location.z = z
-    m.keyframe_insert('rotation_euler', index=1, frame=P.T(t))
-    m.keyframe_insert('location', index=2, frame=P.T(t))
+# (suspension, crest settle and tread scroll come from promo_motion.py)
 P.dust(wm, 0.0, T_TOP, every=0.09, size=0.9, color=SOIL)
 
 # dish: TurretPivot yaw, spinning up from the crest
@@ -125,60 +114,11 @@ if piv is not None:
         f += 2
     K.set_interp(piv, 'LINEAR')
 
-# Terran glow: remap the model's emissive texture to neon blue, orange where the texture is warm
-T_P1, T_P2 = 2.2, 5.2
-for mat in {s.material for o in wm.meshes for s in o.material_slots if s.material}:
-    nt = mat.node_tree
-    b = nt.nodes.get('Principled BSDF')
-    if b is None:
-        continue
-    em_in = b.inputs['Emission Color']
-    src = em_in.links[0].from_socket if em_in.links else None
-    if src is None:
-        continue
-    N, L = nt.nodes, nt.links
-    hsv = N.new('ShaderNodeSeparateColor')
-    hsv.mode = 'HSV'
-    L.new(src, hsv.inputs[0])
-
-    def mth(op, a, bb, clamp=False):
-        n = N.new('ShaderNodeMath')
-        n.operation = op
-        n.use_clamp = clamp
-        for i, x in enumerate((a, bb)):
-            if isinstance(x, (int, float)):
-                n.inputs[i].default_value = x
-            else:
-                L.new(x, n.inputs[i])
-        return n.outputs[0]
-
-    hue, sat, val = hsv.outputs[0], hsv.outputs[1], hsv.outputs[2]
-    warm = mth('MAXIMUM', mth('LESS_THAN', hue, 0.14), mth('GREATER_THAN', hue, 0.93))
-    warm = mth('MULTIPLY', warm, mth('GREATER_THAN', sat, 0.35))
-    mix = N.new('ShaderNodeMix')
-    mix.data_type = 'RGBA'
-    mix.inputs['A'].default_value = (*NEON, 1)
-    mix.inputs['B'].default_value = (*ORANGE, 1)
-    L.new(warm, mix.inputs['Factor'])
-    sc_ = N.new('ShaderNodeMix')
-    sc_.data_type = 'RGBA'
-    sc_.blend_type = 'MULTIPLY'
-    sc_.inputs['Factor'].default_value = 1.0
-    L.new(mix.outputs['Result'], sc_.inputs['A'])
-    vv = N.new('ShaderNodeCombineColor')
-    for i in range(3):
-        L.new(mth('MINIMUM', mth('MULTIPLY', val, 1.6), 1.0), vv.inputs[i])
-    L.new(vv.outputs[0], sc_.inputs['B'])
-    L.new(sc_.outputs['Result'], em_in)
-    es = b.inputs['Emission Strength']
-    for t, v in [(0, 1.8), (T_P1 - 0.05, 1.8), (T_P1, 3.6), (T_P1 + 0.4, 1.8),
-                 (T_P2 - 0.05, 1.8), (T_P2, 3.6), (T_P2 + 0.4, 1.8)]:
-        es.default_value = v
-        es.keyframe_insert('default_value', frame=P.T(t))
+T_P1, T_P2 = 2.45, 5.2
 
 # --------------------------------------------------------------------------- radar ping (own decal)
 PING_R = 48.0
-SPD1, SPD2 = 17.0, 19.0
+SPD1, SPD2 = 13.0, 17.0
 R0 = 2.5
 me = bpy.data.meshes.new('PingDisc')
 bm = bmesh.new()
@@ -322,9 +262,9 @@ def ping_time(dd, t0=T_P1, spd=SPD1):
 
 # --------------------------------------------------------------------------- the hidden Arcadians
 CAST = [  # name, start, end (creeping toward the ridge)
-    ('lumen', (15.0, -6.5), (12.8, -5.4)),
-    ('flare', (19.0, 1.0), (16.6, 0.6)),
-    ('lumen', (22.5, -3.8), (20.0, -3.0)),
+    ('lumen', (10.0, -5.8), (8.2, -4.9)),
+    ('flare', (13.0, 1.6), (11.0, 1.1)),
+    ('lumen', (15.0, -3.6), (13.0, -2.9)),
 ]
 targets = []
 loaded = {}
@@ -393,7 +333,7 @@ def outline(a, t_rev):
             sl.material = M_OUT
         c.visible_shadow = False
         for t, col, al in [(0.0, NEON, 0.0), (t_rev - 0.01, NEON, 0.0), (t_rev, (0.5, 0.82, 1.0), 1.0),
-                           (t_rev + 0.15, NEON, 0.8), (t_rev + 0.5, ORANGE, 0.6), (6.5, ORANGE, 0.55)]:
+                           (t_rev + 0.15, NEON, 0.8), (t_rev + 0.5, ORANGE, 0.45), (6.5, ORANGE, 0.4)]:
             c.color = (*col, al)
             c.keyframe_insert('color', frame=P.T(t))
         shells.append(c)
@@ -425,7 +365,7 @@ for vi, th in zip(ORDER, T_HITS):
     src = tgt + Vector((-62.0 + R.uniform(-4, 4), R.uniform(-8, 8), 58.0))
     dur = (tgt - src).length / SHELL_SPEED
     P.projectile(src, tgt, th - dur, SHELL_SPEED, COL['tracer'], size=0.22, arc=0.0)
-    a.destroy(th, size=2.4)
+    a.destroy(th, size=1.9)
     P.cam_shake(th, 0.06, 0.3)
     # hover wrecks: put them on the ground
     w = bpy.data.objects.get(a.name + '_Wreck')
@@ -436,23 +376,26 @@ for vi, th in zip(ORDER, T_HITS):
         K.key_hide(o, 0, True)
 
 # --------------------------------------------------------------------------- camera
-C1, C2, C3 = cut_t(43), cut_t(67), cut_t(119)   # 1.75, 2.75, 4.92
+C1, C2, C3 = cut_t(43), cut_t(74), cut_t(119)   # 1.75, 3.04, 4.92
 crest = Vector((0, 0, gz(0, 0)))
+VAL = Vector((10.8, -2.6, gz(10.8, -2.6) + 1.3))   # middle of the contact group
 keys = [
     # shot A: low on the slope, truck grinding up toward and past the lens
-    (0.0, (-7.5, -8.5, gz(-7.5, -8.5) + 0.7), wm.pos_at(0.0) + Vector((0, 0, 1.9)), 30),
-    (0.9, (-5.6, -8.0, gz(-5.6, -8.0) + 0.8), wm.pos_at(0.9) + Vector((0, 0, 2.0)), 30),
-    (C1 - 1 / FPS, (-3.8, -8.4, gz(-3.8, -8.4) + 1.0), wm.pos_at(C1) + Vector((0, 0, 2.3)), 27),
-    # shot B: crest, low front three-quarter, dish spinning up, ping rolls past the lens
+    (0.0, (-7.5, -8.5, gz(-7.5, -8.5) + 0.7), wm.pos_at(0.0) + Vector((0, 0, 1.6)), 30),
+    (0.9, (-5.6, -8.0, gz(-5.6, -8.0) + 0.8), wm.pos_at(0.9) + Vector((0, 0, 1.7)), 30),
+    (C1 - 1 / FPS, (-3.8, -8.4, gz(-3.8, -8.4) + 1.0), wm.pos_at(C1) + Vector((0, 0, 2.0)), 27),
+    # shot B: crest, low front three-quarter, dish spinning up, ping rolls out past the lens
     (C1, (4.2, -3.9, crest.z + 0.45), crest + Vector((-0.4, 0, 2.2)), 22),
     (C2 - 1 / FPS, (3.5, -3.3, crest.z + 0.55), crest + Vector((-0.5, 0, 2.5)), 21),
-    # shot C: over the shoulder into the valley, pushing in on the contacts
-    (C2, (-8.6, -3.6, crest.z + 3.4), Vector((15.5, -2.4, 1.0)), 32),
-    (3.7, (-6.6, -3.9, crest.z + 3.5), Vector((16.0, -2.4, 0.9)), 40),
-    (C3 - 1 / FPS, (-5.2, -4.0, crest.z + 3.4), Vector((16.5, -2.4, 0.9)), 47),
-    # shot D: low rear three-quarter from the other side: dish turning, wrecks burning below
-    (C3, (-6.4, 6.3, crest.z + 2.1), Vector((2.6, -1.6, crest.z + 1.1)), 27),
-    (6.0, (-5.3, 6.6, crest.z + 1.7), Vector((2.2, -1.8, crest.z + 1.5)), 31),
+    # shot C: down the slope ahead of the truck, the ring rolling out under the lens and on into
+    # the valley; the camera cranes down onto the contacts as they light up and the shells land
+    (C2, (-1.2, -7.2, crest.z + 2.6), VAL + Vector((0.2, 0, 0)), 30),
+    (4.1, (1.0, -7.8, crest.z + 1.5), VAL + Vector((0.6, 0, -0.2)), 34),
+    (C3 - 1 / FPS, (2.3, -8.8, gz(2.3, -8.8) + 1.9), VAL + Vector((0.9, 0, -0.2)), 34),
+    # shot D: low behind the Watchman's shoulder on the crest (rear three-quarter), dish still
+    # turning, looking down past it at the burning wrecks while a second ping rolls out over them
+    (C3, (-8.0, -9.0, crest.z + 2.1), Vector((5.4, -0.9, crest.z + 0.6)), 31),
+    (6.0, (-7.2, -8.5, crest.z + 1.9), Vector((5.4, -0.8, crest.z + 0.65)), 33),
 ]
 P.camera(keys, shake=0.015, cuts=(C1, C2, C3))
 P.cam_shake(1.85, 0.05, 0.3)
