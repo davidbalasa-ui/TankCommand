@@ -437,9 +437,9 @@ P.camera([
 P.cam_shake(T_DIG, 0.05, 0.3)
 
 # ---- sound cues for effects drawn in this script (promo_audio.py hears the kit calls itself)
-P.sfx(0.0, 'gold_shimmer', gain=0.35, pos=DEP, rate=0.7)              # the crystals catch the dawn
+P.sfx(0.0, 'motes_loop', gain=0.25, pos=DEP, rate=0.7)              # the crystals catch the dawn
 P.sfx(T_DIG, 'grind_loop', gain=0.6, dur=6.0 - T_DIG, pos=DRUM_FACE)  # cutter drum chewing the west side
-P.sfx(T_DIG, 'crunch_bed', gain=0.5, pos=OUT_E)                       # jaws slam down on the east side
+P.sfx(T_DIG, 'impact_dirt', gain=0.5, pos=OUT_E)                       # jaws slam down on the east side
 P.sfx(T_DIG + 0.1, 'motes_loop', gain=0.35, dur=5.9 - T_DIG, pos=OUT_E)  # gold motes pouring into the crop
 P.sfx(0.0, 'crackle_loop', gain=0.15, dur=6.0, pos=SIF_STOP)          # Sifter lifter crackle
 for _i, _t in enumerate(p_lands):                                     # ore chunks dropping into the hopper
