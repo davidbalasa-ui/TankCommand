@@ -608,7 +608,7 @@ export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   return renderer;
 }
 

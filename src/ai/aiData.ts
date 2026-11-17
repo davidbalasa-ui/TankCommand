@@ -52,7 +52,9 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
     strategicEveryTicks: 30,
     attackThresholdValue: 800,
     reserveOre: 60,
-    minersWanted: 3,
+    // A third miner costs the early army more than it earns back before the first fights: with
+    // three, Hard lost every soak match to Normal.
+    minersWanted: 2,
     focusFire: true,
     retreatLossFraction: 0.7,
     fightersPerTurret: 4,

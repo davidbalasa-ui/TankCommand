@@ -84,9 +84,9 @@ import { missionAllows } from './sim/triggers';
 import { upgradeRejection } from './sim/upgrades';
 import { UPGRADE_COST_METAL, UPGRADE_COST_ORE } from './sim/tuning';
 import { perceivedUnits } from './sim/vision';
-import { stepWithAi } from './ai/driver';
+import { addAi, stepWithAi } from './ai/driver';
 import { missionMarkers } from './sim/triggers';
-import type { StructureState } from './sim/types';
+import type { AiDifficulty, StructureState } from './sim/types';
 import type { BaseAction, BaseView, ResearchNodeView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
 
@@ -1441,6 +1441,11 @@ export class App {
    * that for the enemy (standing in for two NPC teams), lined up to fight across the middle.
    * Returns how many units were added.
    */
+  /** Test-only: the AI plays `player` from now on (whole-match browser playthroughs). */
+  autoplayForTest(player: number, difficulty: AiDifficulty): void {
+    addAi(this.world, player, difficulty);
+  }
+
   stressSpawnForTest(perSide: number, withEnemies = true): number {
     const world = this.world;
     const ground = (faction: string) =>

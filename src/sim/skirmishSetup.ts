@@ -58,11 +58,23 @@ export function buildSkirmishSetup(
   const startUnits: StartUnit[] = [];
   const startStructures: StartStructure[] = [];
 
+  // The start layout (tanks, miner and tug round the pad) is laid out for the first start and
+  // turned with each start's facing toward the middle, so every side gets the same layout: on a
+  // mirrored map no side starts with its miner nearer the ore or its tanks behind the pad.
+  const first = [...map.starts].sort((a, b) => a.player - b.player)[0];
+  const facing = (point: { x: number; z: number }): number => Math.atan2(-point.z, -point.x);
   for (const assignment of factions) {
     const start = map.starts.find((item) => item.player === assignment.player);
     if (!start) {
       continue;
     }
+    const turn = first ? facing(start) - facing(first) : 0;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const at = (offset: { x: number; z: number }): { x: number; z: number } => ({
+      x: start.x + offset.x * cos - offset.z * sin,
+      z: start.z + offset.x * sin + offset.z * cos,
+    });
     const units = unitsOf(unitTypes, assignment.faction);
     const structures = structuresOf(structureTypes, assignment.faction);
     const pad = structures.find((type) => type.kind === 'pad');
@@ -82,8 +94,7 @@ export function buildSkirmishSetup(
         startUnits.push({
           owner: assignment.player,
           typeId: tank.id,
-          x: start.x + offset.x,
-          z: start.z + offset.z,
+          ...at(offset),
           heading: Math.atan2(-start.z, -start.x),
         });
       }
@@ -93,9 +104,8 @@ export function buildSkirmishSetup(
       startUnits.push({
         owner: assignment.player,
         typeId: miner.id,
-        x: start.x + SKIRMISH_MINER_OFFSET.x,
-        z: start.z + SKIRMISH_MINER_OFFSET.z,
-        heading: SKIRMISH_TANK_HEADING,
+        ...at(SKIRMISH_MINER_OFFSET),
+        heading: SKIRMISH_TANK_HEADING + turn,
       });
     }
     const tug = units.find((type) => type.workerKind === 'tug');
@@ -103,9 +113,8 @@ export function buildSkirmishSetup(
       startUnits.push({
         owner: assignment.player,
         typeId: tug.id,
-        x: start.x + SKIRMISH_TUG_OFFSET.x,
-        z: start.z + SKIRMISH_TUG_OFFSET.z,
-        heading: SKIRMISH_TANK_HEADING,
+        ...at(SKIRMISH_TUG_OFFSET),
+        heading: SKIRMISH_TANK_HEADING + turn,
       });
     }
   }
