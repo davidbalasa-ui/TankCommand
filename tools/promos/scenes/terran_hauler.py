@@ -3,17 +3,24 @@ last glowing pink chunks rattle up its conveyor into the bin sitting in its hopp
 parked alongside, has its telescoping crane boom out over the Prospector; the hook drops, the
 spreader latches (bin strip flares neon blue), and the brimming bin is hoisted out, swung round
 behind the cab and lowered onto the Hauler's bed with a thunk. The crane keeps it clamped while
-the Hauler tears off along the edge of a Landing Pad, brakes alongside, hoists the bin again,
-turns it square and sets it down on the pad's marked delivery spot, which lights up blue and
-orange: cargo ready for lift. The hook rises away.
+the Hauler pulls away down the road past the Landing Pad's tower, parks alongside the deck,
+hoists the bin again, turns it square and sets it down on the pad's marked delivery spot, which
+lights up blue and orange: cargo ready for lift. The hook rises away; the Prospector is still
+working the seam in the distance.
 
 Crane boom, cable, hook rig and the cargo bin are built here and keyed per frame from the
-Hauler's animated pose; the model's own CranePivot yaws with the boom.
+Hauler's animated pose; the model's own CranePivot yaws with the boom. Suspension, lean and
+tread scroll come from the kit (promo_motion.py).
+
+Shots: A 0-2.0 front three-quarter down the road (Hauler big left, Prospector right, seam
+behind), tilts up with the hoist | B 2.0-4.0 long lens from across the road, trucking with the
+Hauler as it passes the pad tower | C 4.0-6.0 from the pad deck: spot in front, Hauler behind,
+Prospector far left.
 
 Timeline (s): 0-0.45 last chunks into the bin, hook latches | 0.45-1.0 hoist | 0.85-1.5 swing
 round | 1.5-1.85 lower onto the bed, thunk | CUT 2.0 | 1.95-4.1 drive past the pad |
 CUT 4.0 | 4.2-4.55 hoist | 4.45-5.05 swing out over the pad, bin turns square |
-5.0-5.42 set down, spot lights up | 5.55-6.0 hook releases and rises; hero frame on the ore."""
+5.0-5.42 set down, spot lights up | 5.55-6.0 hook releases and rises."""
 import math
 import os
 import sys
@@ -37,8 +44,8 @@ NEON = COL['terran_neon']
 ORANGE = COL['terran_orange']
 
 # ------------------------------------------------------------------------------ layout
-PROS_AT = (0.35, -3.4)          # prospector, heading 180 (drum faces -X into the seam)
-DEP = (-5.3, -3.7)
+PROS_AT = (0.35, 3.4)           # prospector, heading 180 (drum faces -X into the seam); north of
+DEP = (-5.3, 3.7)               # the road so the final pad shot sees it past the pad tower
 PAD_AT = (11.2, -9.3)           # landing pad, heading 0; its +Y side deck faces the road
 SPOT = Vector((PAD_AT[0] + 3.0, PAD_AT[1] + 5.6, 0.0))   # delivery spot on the side deck,
 # on the clear east half (the pad's tower stands at the west end of that side)
@@ -46,15 +53,15 @@ PARK_X = SPOT.x - 0.63          # hauler parks with its crane post abreast of th
 T_GO, T_PARK = 1.95, 4.1
 
 P.env('desert', sun=(52, 0, -60), sun_energy=4.0, props=24,
-      clear=[(4, -3, 14), (12, -9, 11), (14, 3, 9), DEP + (5,)])
-P.flatten(4, -2, 12)
+      clear=[(4, 0, 14), (12, -9, 11), (14, 3, 9), DEP + (5,)])
+P.flatten(4, 1, 12)
 P.flatten(PAD_AT[0], PAD_AT[1], 10)
 P.flatten(DEP[0], DEP[1], 5)
 bpy.context.view_layer.update()
 
 dep = P.load('deposit_ore', at=DEP, heading=20, size=6.0)
 dep.root.location.z = P.ground_z(*DEP) - 0.2
-for (x, y), s, h in [((-4.0, 3.5), 0.35, 40), ((-9.0, -8.0), 0.45, 150), ((-1.5, -9.5), 0.3, 260)]:
+for (x, y), s, h in [((-4.0, -3.5), 0.35, 40), ((-9.0, 8.0), 0.45, 150), ((-1.5, 9.5), 0.3, 260)]:
     c = P.copy(dep, at=(x, y), heading=h)
     c.root.scale = (s, s, s)
     c.root.location.z = P.ground_z(x, y) - 0.1
@@ -66,33 +73,10 @@ hl = P.load('hauler', at=(0, 0), heading=0, label='hauler')
 # ------------------------------------------------------------------------------ hauler drive
 hl.path([(0.0, (0, 0), 0.0), (T_GO, (0, 0), 0.0), (T_GO + 0.55, (2.0, 0), 0.0), (T_PARK - 0.5, (PARK_X - 2.3, 0), 0.0),
          (T_PARK, (PARK_X, 0), 0.0), (6.2, (PARK_X, 0), 0.0)])
-hm = hl.model_root
-hm.rotation_mode = 'XYZ'
-for t, pitch in [(0.0, 0), (T_GO, 0.0), (T_GO + 0.2, -2.2), (T_GO + 0.6, 0.0), (T_PARK - 0.25, 0.0),
-                 (T_PARK + 0.05, 2.6), (T_PARK + 0.3, -0.8), (T_PARK + 0.5, 0.0), (6.2, 0.0)]:
-    hm.rotation_euler.y = math.radians(pitch)
-    hm.keyframe_insert('rotation_euler', index=1, frame=P.T(t))
-# suspension: bin lands on the bed (dip), bin leaves the bed (rise)
-for t, z in [(0.0, 0.0), (1.8, 0.0), (1.9, -0.07), (2.05, 0.01), (2.15, 0.0),
-             (4.22, 0.0), (4.32, 0.035), (4.5, 0.0), (6.2, 0.0)]:
-    hm.location.z = z
-    hm.keyframe_insert('location', index=2, frame=P.T(t))
-# engine idle shiver while driving
-t = T_GO
-while t < T_PARK:
-    hm.location.z = 0.015 * math.sin(t * 40)
-    hm.keyframe_insert('location', index=2, frame=P.T(t))
-    t += 1 / 12
 P.dust(hl, T_GO + 0.1, T_PARK + 0.1, every=0.08, size=0.85, color=SAND)
 
 # prospector keeps grinding the seam
 pros.spin('DrumPivot', -600, 0.0, 6.2, axis=1)
-pm = pros.model_root
-t = 0.0
-while t < 6.2:
-    pm.location.z = 0.012 * math.sin(t * 47.0)
-    pm.keyframe_insert('location', index=2, frame=P.T(t))
-    t += 1 / 12
 PM = pros.root.matrix_world.copy()
 
 
@@ -434,20 +418,25 @@ sc.frame_set(1)
 # ------------------------------------------------------------------------------ camera
 CUT1, CUT = 2.0, 4.0
 P.camera([
-    # A: from the seam side, over the prospector's shoulder: the full bin in its hopper, the
-    # hauler's crane hook dropping onto it, then the swing across onto the hauler's bed
-    (0.0, (-0.6, -11.2, 3.0), (-0.5, -2.2, 1.9), 34),
-    (0.9, (-1.0, -10.8, 3.6), (-0.6, -1.8, 2.7), 34),
-    (CUT1 - 1 / 24, (-2.0, -9.3, 4.0), (-0.8, -0.8, 1.8), 35),
-    # B: cut ahead of the hauler on the open side; it tears off past the pad
-    (CUT1, (4.6, 5.9, 2.4), (0.2, -0.3, 1.3), 28),
-    (2.8, (6.4, 6.0, 2.5), hl, 28),
-    (3.5, (10.6, 5.8, 2.5), hl, 28),
-    (CUT - 1 / 24, (13.6, 5.4, 2.6), hl, 28),
-    # C: cut onto the pad deck: the delivery, the bin big in the foreground at the end
-    (CUT, (PARK_X + 2.4, -8.2, 3.4), (PARK_X - 0.4, -1.6, 1.7), 26),
-    (5.0, (PARK_X + 2.2, -8.0, 3.0), (PARK_X + 0.1, -2.6, 1.6), 26),
-    (6.0, (PARK_X + 2.4, -7.6, 3.1), (PARK_X + 0.1, -2.4, 1.4), 26),
+    # A: from down the road, front three-quarter: the Hauler big on the left, its boom reaching
+    # over to the Prospector's brimming bin, the seam behind; the camera tilts up with the hoist
+    # and the bin swings toward us onto the bed
+    (0.0, (7.6, -1.6, 3.0), (-0.2, 1.7, 1.6), 32),
+    (0.9, (7.5, -1.5, 3.4), (-0.3, 1.4, 2.1), 30),
+    (1.4, (7.4, -1.4, 3.6), (-0.4, 0.9, 2.3), 29),
+    (CUT1 - 1 / 24, (7.0, -1.2, 3.4), (-0.5, 0.4, 1.6), 30),
+    # B: cut across the road, long lens: the loaded Hauler pulls away from the Prospector and
+    # rolls past the pad tower; the camera trucks along and widens out with it
+    (CUT1, (8.2, 7.0, 2.5), hl, 40),
+    (2.5, (8.8, 6.9, 2.55), hl, 38),
+    (3.0, (9.8, 6.6, 2.6), hl, 34),
+    (3.5, (11.0, 6.4, 2.75), hl, 32),
+    (CUT - 1 / 24, (12.6, 6.2, 2.9), hl, 30),
+    # C: cut onto the pad deck from the south-east: the delivery spot in front, Hauler and boom
+    # behind it, the Prospector still working the seam far behind
+    (CUT, (17.8, -11.6, 4.8), (13.8, -1.4, 1.8), 28),
+    (5.0, (17.3, -10.4, 4.4), (13.9, -2.0, 1.4), 28),
+    (6.0, (16.8, -9.2, 4.1), (13.6, -2.4, 1.2), 28),
 ], shake=0.01, cuts=(CUT1, CUT))
 P.cam_shake(1.87, 0.04, 0.25)
 P.cam_shake(5.44, 0.03, 0.25)
