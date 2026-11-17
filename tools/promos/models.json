@@ -1,0 +1,1089 @@
+{
+ "terran_air_base_packed": {
+  "files": [
+   "human/air_base_packed.glb"
+  ],
+  "faction": "terran",
+  "native": 6.54,
+  "kind": "ground",
+  "packed": true,
+  "game": "Airfield (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "bastion_packed": {
+  "files": [
+   "human/bastion_packed.glb"
+  ],
+  "faction": "terran",
+  "native": 7.472,
+  "kind": "ground",
+  "packed": true,
+  "game": "Bastion (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "bulwark": {
+  "files": [
+   "human/bulwark.glb"
+  ],
+  "faction": "terran",
+  "native": 12.845,
+  "kind": "ground",
+  "game": "Bulwark",
+  "role": "tank",
+  "size": 5.85,
+  "weapon": {
+   "id": "heavy_cannon",
+   "range": 13,
+   "reloadSec": 3.5,
+   "projectileSpeed": 38,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 5
+ },
+ "condor": {
+  "files": [
+   "human/condor.glb"
+  ],
+  "faction": "terran",
+  "native": 10.028,
+  "kind": "air",
+  "game": "Condor",
+  "role": "air",
+  "size": 7.65,
+  "weapon": {
+   "id": "bombs",
+   "range": 3,
+   "reloadSec": 4.0,
+   "projectileSpeed": 20,
+   "burst": 3,
+   "burstIntervalSec": 0.25,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 12
+ },
+ "falcon": {
+  "files": [
+   "human/falcon.glb"
+  ],
+  "faction": "terran",
+  "native": 9.8,
+  "kind": "air",
+  "game": "Falcon",
+  "role": "air",
+  "size": 5.175,
+  "weapon": {
+   "id": "laser",
+   "range": 14,
+   "reloadSec": 1.7,
+   "projectileSpeed": 45,
+   "burst": 2,
+   "burstIntervalSec": 0.15,
+   "targets": [
+    "air",
+    "ground"
+   ]
+  },
+  "speed": 18
+ },
+ "hauler": {
+  "files": [
+   "human/hauler.glb"
+  ],
+  "faction": "terran",
+  "native": 7.14,
+  "kind": "ground",
+  "game": "Hauler",
+  "role": "worker",
+  "size": 4.725,
+  "speed": 7
+ },
+ "javelin": {
+  "files": [
+   "human/javelin.glb"
+  ],
+  "faction": "terran",
+  "native": 6.74,
+  "kind": "ground",
+  "game": "Javelin",
+  "role": "tank",
+  "size": 4.725,
+  "weapon": {
+   "id": "missile",
+   "range": 18,
+   "reloadSec": 5.0,
+   "projectileSpeed": 30,
+   "burst": 4,
+   "burstIntervalSec": 0.2,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  },
+  "speed": 7
+ },
+ "lancer": {
+  "files": [
+   "human/lancer.glb"
+  ],
+  "faction": "terran",
+  "native": 10.095,
+  "kind": "ground",
+  "game": "Lancer",
+  "role": "tank",
+  "size": 4.5,
+  "weapon": {
+   "id": "cannon",
+   "range": 12,
+   "reloadSec": 1.8,
+   "projectileSpeed": 40,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 8
+ },
+ "longbow": {
+  "files": [
+   "human/longbow.glb"
+  ],
+  "faction": "terran",
+  "native": 12.854,
+  "kind": "ground",
+  "game": "Longbow",
+  "role": "artillery",
+  "size": 6.075,
+  "weapon": {
+   "id": "shell",
+   "range": 34,
+   "reloadSec": 3.0,
+   "projectileSpeed": 25,
+   "burst": 3,
+   "burstIntervalSec": 0.4,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 4
+ },
+ "mender": {
+  "files": [
+   "human/mender.glb"
+  ],
+  "faction": "terran",
+  "native": 6.818,
+  "kind": "ground",
+  "game": "Mender",
+  "role": "support",
+  "size": 4.5,
+  "speed": 7
+ },
+ "terran_metal_station_packed": {
+  "files": [
+   "human/metal_station_packed.glb"
+  ],
+  "faction": "terran",
+  "native": 6.54,
+  "kind": "ground",
+  "packed": true,
+  "game": "Metal Station (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "outrider": {
+  "files": [
+   "human/outrider.glb"
+  ],
+  "faction": "terran",
+  "native": 6.24,
+  "kind": "ground",
+  "game": "Outrider",
+  "role": "scout",
+  "size": 3.825,
+  "weapon": {
+   "id": "autocannon",
+   "range": 8,
+   "reloadSec": 1.3,
+   "projectileSpeed": 55,
+   "burst": 3,
+   "burstIntervalSec": 0.15,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 11
+ },
+ "prospector": {
+  "files": [
+   "human/prospector.glb"
+  ],
+  "faction": "terran",
+  "native": 8.43,
+  "kind": "ground",
+  "game": "Prospector",
+  "role": "worker",
+  "size": 4.95,
+  "speed": 6
+ },
+ "terran_radar_tower_packed": {
+  "files": [
+   "human/radar_tower_packed.glb"
+  ],
+  "faction": "terran",
+  "native": 6.54,
+  "kind": "ground",
+  "packed": true,
+  "game": "Radar Tower (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "skimmer": {
+  "files": [
+   "human/skimmer.glb"
+  ],
+  "faction": "terran",
+  "native": 7.985,
+  "kind": "hover",
+  "game": "Skimmer",
+  "role": "tank",
+  "size": 4.275,
+  "weapon": {
+   "id": "cannon",
+   "range": 11,
+   "reloadSec": 2.15,
+   "projectileSpeed": 42,
+   "burst": 2,
+   "burstIntervalSec": 0.25,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 10
+ },
+ "spire_packed": {
+  "files": [
+   "human/spire_packed.glb"
+  ],
+  "faction": "terran",
+  "native": 6.54,
+  "kind": "ground",
+  "packed": true,
+  "game": "Harpoon (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "watchman": {
+  "files": [
+   "human/watchman.glb"
+  ],
+  "faction": "terran",
+  "native": 6.74,
+  "kind": "ground",
+  "game": "Watchman",
+  "role": "support",
+  "size": 4.5,
+  "speed": 7
+ },
+ "arcadian_air_base_packed": {
+  "files": [
+   "alien/air_base_packed.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.8,
+  "kind": "hover",
+  "packed": true,
+  "game": "Aerie (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "carapace": {
+  "files": [
+   "alien/carapace.glb"
+  ],
+  "faction": "arcadian",
+  "native": 12.717,
+  "kind": "hover",
+  "game": "Aegis",
+  "role": "tank",
+  "size": 5.85,
+  "weapon": {
+   "id": "heavy_cannon",
+   "range": 13,
+   "reloadSec": 3.5,
+   "projectileSpeed": 38,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 5
+ },
+ "darter": {
+  "files": [
+   "alien/darter.glb"
+  ],
+  "faction": "arcadian",
+  "native": 7.23,
+  "kind": "hover",
+  "game": "Darter",
+  "role": "scout",
+  "size": 4.05,
+  "weapon": {
+   "id": "autocannon",
+   "range": 8,
+   "reloadSec": 1.3,
+   "projectileSpeed": 55,
+   "burst": 3,
+   "burstIntervalSec": 0.15,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 11
+ },
+ "disc": {
+  "files": [
+   "alien/disc.glb"
+  ],
+  "faction": "arcadian",
+  "native": 8.743,
+  "kind": "air",
+  "game": "Disc",
+  "role": "air",
+  "size": 5.625,
+  "weapon": {
+   "id": "ground_beam",
+   "range": 4,
+   "reloadSec": 3.5,
+   "projectileSpeed": 60,
+   "burst": 4,
+   "burstIntervalSec": 0.12,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 14
+ },
+ "dragonfly": {
+  "files": [
+   "alien/dragonfly.glb"
+  ],
+  "faction": "arcadian",
+  "native": 13.116,
+  "kind": "air",
+  "game": "Dragonfly",
+  "role": "air",
+  "size": 5.4,
+  "weapon": {
+   "id": "lightning",
+   "range": 14,
+   "reloadSec": 1.7,
+   "projectileSpeed": 45,
+   "burst": 2,
+   "burstIntervalSec": 0.15,
+   "targets": [
+    "air",
+    "ground"
+   ]
+  },
+  "speed": 18
+ },
+ "ferrier": {
+  "files": [
+   "alien/ferrier.glb"
+  ],
+  "faction": "arcadian",
+  "native": 6.1,
+  "kind": "hover",
+  "game": "Ferrier",
+  "role": "worker",
+  "size": 4.725,
+  "speed": 7
+ },
+ "glider": {
+  "files": [
+   "alien/glider.glb"
+  ],
+  "faction": "arcadian",
+  "native": 7.462,
+  "kind": "hover",
+  "game": "Glider",
+  "role": "tank",
+  "size": 5.175,
+  "weapon": {
+   "id": "cannon",
+   "range": 11,
+   "reloadSec": 2.15,
+   "projectileSpeed": 42,
+   "burst": 2,
+   "burstIntervalSec": 0.25,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 10
+ },
+ "gorger": {
+  "files": [
+   "alien/gorger.glb"
+  ],
+  "faction": "arcadian",
+  "native": 8.411,
+  "kind": "hover",
+  "game": "Sifter",
+  "role": "worker",
+  "size": 4.95,
+  "speed": 6
+ },
+ "halo": {
+  "files": [
+   "alien/halo.glb"
+  ],
+  "faction": "arcadian",
+  "native": 6.377,
+  "kind": "air",
+  "game": "Halo",
+  "role": "air",
+  "size": 5.4
+ },
+ "arcadian_metal_station_packed": {
+  "files": [
+   "alien/metal_station_packed.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.8,
+  "kind": "hover",
+  "packed": true,
+  "game": "Metal Siphon (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "mortar_beast": {
+  "files": [
+   "alien/mortar_beast.glb"
+  ],
+  "faction": "arcadian",
+  "native": 7.641,
+  "kind": "hover",
+  "game": "Sunfall",
+  "role": "artillery",
+  "size": 6.075,
+  "weapon": {
+   "id": "shell",
+   "range": 34,
+   "reloadSec": 3.0,
+   "projectileSpeed": 25,
+   "burst": 3,
+   "burstIntervalSec": 0.4,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 4
+ },
+ "arcadian_radar_tower_packed": {
+  "files": [
+   "alien/radar_tower_packed.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.8,
+  "kind": "hover",
+  "packed": true,
+  "game": "Oracle (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "seer": {
+  "files": [
+   "alien/seer.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.2,
+  "kind": "hover",
+  "game": "Seer",
+  "role": "support",
+  "size": 4.5,
+  "speed": 7
+ },
+ "spitter": {
+  "files": [
+   "alien/spitter.glb"
+  ],
+  "faction": "arcadian",
+  "native": 8.405,
+  "kind": "hover",
+  "game": "Flare",
+  "role": "tank",
+  "size": 4.725,
+  "weapon": {
+   "id": "missile",
+   "range": 18,
+   "reloadSec": 5.0,
+   "projectileSpeed": 30,
+   "burst": 4,
+   "burstIntervalSec": 0.2,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  },
+  "speed": 7
+ },
+ "spore_tower_packed": {
+  "files": [
+   "alien/spore_tower_packed.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.8,
+  "kind": "hover",
+  "packed": true,
+  "game": "Corona (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "stinger": {
+  "files": [
+   "alien/stinger.glb"
+  ],
+  "faction": "arcadian",
+  "native": 9.696,
+  "kind": "hover",
+  "game": "Lumen",
+  "role": "tank",
+  "size": 4.5,
+  "weapon": {
+   "id": "cannon",
+   "range": 12,
+   "reloadSec": 1.8,
+   "projectileSpeed": 40,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "speed": 8
+ },
+ "thornmound_packed": {
+  "files": [
+   "alien/thornmound_packed.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.8,
+  "kind": "hover",
+  "packed": true,
+  "game": "Sentinel (packed)",
+  "role": "structure",
+  "size": 3.825,
+  "speed": 2.5
+ },
+ "weaver": {
+  "files": [
+   "alien/weaver.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.895,
+  "kind": "hover",
+  "game": "Weaver",
+  "role": "support",
+  "size": 4.5,
+  "speed": 7
+ },
+ "boulder": {
+  "files": [
+   "props/boulder.glb"
+  ],
+  "faction": "neutral",
+  "native": 2.69,
+  "kind": "prop",
+  "game": "boulder",
+  "size": 1.21
+ },
+ "cliff": {
+  "files": [
+   "props/cliff.glb"
+  ],
+  "faction": "neutral",
+  "native": 5.883,
+  "kind": "prop",
+  "game": "cliff",
+  "size": 2.647
+ },
+ "dead_tree": {
+  "files": [
+   "props/dead_tree.glb"
+  ],
+  "faction": "neutral",
+  "native": 1.736,
+  "kind": "prop",
+  "game": "dead_tree",
+  "size": 0.781
+ },
+ "deposit_metal": {
+  "files": [
+   "props/deposit_metal.glb"
+  ],
+  "faction": "neutral",
+  "native": 5.654,
+  "kind": "prop",
+  "game": "deposit_metal",
+  "size": 2.544
+ },
+ "deposit_ore": {
+  "files": [
+   "props/deposit_ore.glb"
+  ],
+  "faction": "neutral",
+  "native": 8.208,
+  "kind": "prop",
+  "game": "deposit_ore",
+  "size": 3.694
+ },
+ "grass": {
+  "files": [
+   "props/grass.glb"
+  ],
+  "faction": "neutral",
+  "native": 1.518,
+  "kind": "prop",
+  "game": "grass",
+  "size": 0.683
+ },
+ "rock_cluster": {
+  "files": [
+   "props/rock_cluster.glb"
+  ],
+  "faction": "neutral",
+  "native": 3.097,
+  "kind": "prop",
+  "game": "rock_cluster",
+  "size": 1.394
+ },
+ "shrub": {
+  "files": [
+   "props/shrub.glb"
+  ],
+  "faction": "neutral",
+  "native": 2.0,
+  "kind": "prop",
+  "game": "shrub",
+  "size": 0.9
+ },
+ "slab": {
+  "files": [
+   "props/slab.glb"
+  ],
+  "faction": "neutral",
+  "native": 4.144,
+  "kind": "prop",
+  "game": "slab",
+  "size": 1.865
+ },
+ "tendril": {
+  "files": [
+   "props/tendril.glb"
+  ],
+  "faction": "neutral",
+  "native": 1.876,
+  "kind": "prop",
+  "game": "tendril",
+  "size": 0.844
+ },
+ "kesh_gene_vault": {
+  "files": [
+   "structures/kesh_gene_vault.glb"
+  ],
+  "faction": "arcadian",
+  "native": 7.6,
+  "kind": "structure",
+  "game": "Star Vault",
+  "size": 4.0,
+  "footprint_m": 4.0
+ },
+ "kesh_hive_roost": {
+  "files": [
+   "structures/kesh_hive_roost.glb"
+  ],
+  "faction": "arcadian",
+  "native": 11.4,
+  "kind": "tower",
+  "game": "Aerie",
+  "size": 7.518,
+  "footprint_m": 6.0,
+  "packed_model": "arcadian_air_base_packed"
+ },
+ "kesh_landing_nest": {
+  "files": [
+   "structures/kesh_landing_nest.glb"
+  ],
+  "faction": "arcadian",
+  "native": 12.146,
+  "kind": "structure",
+  "game": "Landing Ring",
+  "size": 12.0,
+  "footprint_m": 12.0
+ },
+ "kesh_metal_siphon": {
+  "files": [
+   "structures/kesh_metal_siphon.glb"
+  ],
+  "faction": "arcadian",
+  "native": 7.4,
+  "kind": "tower",
+  "game": "Metal Siphon",
+  "size": 4.88,
+  "footprint_m": 4.0,
+  "packed_model": "arcadian_metal_station_packed"
+ },
+ "kesh_seer_spire": {
+  "files": [
+   "structures/kesh_seer_spire.glb"
+  ],
+  "faction": "arcadian",
+  "native": 4.496,
+  "kind": "tower",
+  "game": "Oracle",
+  "size": 2.965,
+  "footprint_m": 2.0,
+  "packed_model": "arcadian_radar_tower_packed"
+ },
+ "kesh_spore_tower": {
+  "files": [
+   "structures/kesh_spore_tower.glb"
+  ],
+  "faction": "arcadian",
+  "native": 3.812,
+  "kind": "tower",
+  "game": "Corona",
+  "size": 2.514,
+  "footprint_m": 4.0,
+  "weapon": {
+   "range": 20,
+   "reloadSec": 2.7,
+   "projectileSpeed": 35,
+   "burst": 3,
+   "burstIntervalSec": 0.25,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  },
+  "packed_model": "spore_tower_packed"
+ },
+ "kesh_thornmound": {
+  "files": [
+   "structures/kesh_thornmound.glb"
+  ],
+  "faction": "arcadian",
+  "native": 5.677,
+  "kind": "tower",
+  "game": "Sentinel",
+  "size": 3.744,
+  "footprint_m": 4.0,
+  "weapon": {
+   "range": 14,
+   "reloadSec": 2.0,
+   "projectileSpeed": 45,
+   "burst": 2,
+   "burstIntervalSec": 0.3,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "packed_model": "thornmound_packed"
+ },
+ "shard_core": {
+  "files": [
+   "structures/shard_core.glb"
+  ],
+  "faction": "shard",
+  "native": 8.431,
+  "kind": "structure",
+  "game": "The Shard",
+  "size": 8.0,
+  "footprint_m": 8.0,
+  "weapon": {
+   "range": 26,
+   "reloadSec": 3,
+   "projectileSpeed": 50,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  }
+ },
+ "shard_spire": {
+  "files": [
+   "structures/shard_spire.glb"
+  ],
+  "faction": "shard",
+  "native": 4.199,
+  "kind": "structure",
+  "game": "Shard Spire",
+  "size": 4.0,
+  "footprint_m": 4.0,
+  "weapon": {
+   "range": 18,
+   "reloadSec": 2,
+   "projectileSpeed": 50,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  }
+ },
+ "terran_air_base": {
+  "files": [
+   "structures/terran_air_base.glb"
+  ],
+  "faction": "terran",
+  "native": 12.12,
+  "kind": "tower",
+  "game": "Airfield",
+  "size": 7.089,
+  "footprint_m": 6.0,
+  "packed_model": "terran_air_base_packed"
+ },
+ "terran_lab": {
+  "files": [
+   "structures/terran_lab.glb"
+  ],
+  "faction": "terran",
+  "native": 8.094,
+  "kind": "structure",
+  "game": "Research Lab",
+  "size": 4.0,
+  "footprint_m": 4.0
+ },
+ "terran_landing_pad": {
+  "files": [
+   "structures/terran_landing_pad.glb"
+  ],
+  "faction": "terran",
+  "native": 12.4,
+  "kind": "structure",
+  "game": "Landing Pad",
+  "size": 12.0,
+  "footprint_m": 12.0
+ },
+ "terran_metal_station": {
+  "files": [
+   "structures/terran_metal_station.glb"
+  ],
+  "faction": "terran",
+  "native": 8.094,
+  "kind": "tower",
+  "game": "Metal Station",
+  "size": 4.734,
+  "footprint_m": 4.0,
+  "packed_model": "terran_metal_station_packed"
+ },
+ "terran_missile_battery": {
+  "files": [
+   "structures/terran_missile_battery.glb"
+  ],
+  "faction": "terran",
+  "native": 4.068,
+  "kind": "tower",
+  "game": "Harpoon Battery",
+  "size": 2.379,
+  "footprint_m": 4.0,
+  "weapon": {
+   "range": 20,
+   "reloadSec": 2.7,
+   "projectileSpeed": 35,
+   "burst": 3,
+   "burstIntervalSec": 0.25,
+   "targets": [
+    "ground",
+    "air",
+    "structure"
+   ]
+  },
+  "packed_model": "spire_packed"
+ },
+ "terran_radar": {
+  "files": [
+   "structures/terran_radar.glb"
+  ],
+  "faction": "terran",
+  "native": 4.068,
+  "kind": "tower",
+  "game": "Radar Tower",
+  "size": 2.379,
+  "footprint_m": 2.0,
+  "packed_model": "terran_radar_tower_packed"
+ },
+ "terran_turret": {
+  "files": [
+   "structures/terran_turret.glb"
+  ],
+  "faction": "terran",
+  "native": 6.459,
+  "kind": "tower",
+  "game": "Bastion Gun",
+  "size": 3.306,
+  "footprint_m": 4.0,
+  "weapon": {
+   "range": 14,
+   "reloadSec": 2.0,
+   "projectileSpeed": 45,
+   "burst": 2,
+   "burstIntervalSec": 0.3,
+   "targets": [
+    "ground",
+    "structure"
+   ]
+  },
+  "packed_model": "bastion_packed"
+ },
+ "terran_fighter": {
+  "files": [
+   "fleet/terran_twinx_fighter.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Twin-X fighter",
+  "native": 1.444,
+  "size": 1.444
+ },
+ "terran_corvette": {
+  "files": [
+   "fleet/terran_corvette.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Corvette",
+  "native": 10.572,
+  "size": 10.572
+ },
+ "terran_frigate": {
+  "files": [
+   "fleet/terran_frigate.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Frigate",
+  "native": 22.024,
+  "size": 22.024
+ },
+ "terran_missile_ship": {
+  "files": [
+   "fleet/terran_missile_ship.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Missile ship",
+  "native": 32.635,
+  "size": 32.635
+ },
+ "terran_battleship": {
+  "files": [
+   "fleet/terran_broadside_battleship.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Broadside battleship",
+  "native": 48.35,
+  "size": 48.35
+ },
+ "terran_dreadnought": {
+  "files": [
+   "fleet/terran_dreadnought.blend"
+  ],
+  "faction": "terran",
+  "kind": "ship",
+  "game": "Dreadnought",
+  "native": 70.046,
+  "size": 70.046
+ },
+ "arcadian_fighter": {
+  "files": [
+   "fleet/arcadian_stingray_fighter.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Stingray fighter",
+  "native": 1.772,
+  "size": 1.772
+ },
+ "arcadian_corvette": {
+  "files": [
+   "fleet/arcadian_corvette.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Corvette",
+  "native": 17.65,
+  "size": 17.65
+ },
+ "orb": {
+  "files": [
+   "fleet/arcadian_orb_rigged_animated.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Orb anti-fighter",
+  "native": 15.61,
+  "size": 15.61
+ },
+ "arcadian_shell_mothership": {
+  "files": [
+   "fleet/arcadian_shell_mothership.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Shell mothership",
+  "native": 84.571,
+  "size": 84.571
+ },
+ "arcadian_crescent_mothership": {
+  "files": [
+   "fleet/arcadian_crescent_mothership.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Crescent mothership",
+  "native": 56.767,
+  "size": 56.767
+ },
+ "arcadian_lens_mothership": {
+  "files": [
+   "fleet/arcadian_lens_mothership.blend"
+  ],
+  "faction": "arcadian",
+  "kind": "ship",
+  "game": "Lens mothership",
+  "native": 57.01,
+  "size": 57.01
+ }
+}
