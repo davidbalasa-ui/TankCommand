@@ -14,7 +14,7 @@ STYLE = dict(
     smoke_density=3.0,                # multiplier on the density grid
     detail=0.35,                      # noise modulation of density (upres look)
     detail_scale=6.0,
-    fire_strength=5.0,               # emission strength at heat=1
+    fire_strength=7.0,               # emission strength at heat=1
     flame_boost=2.5,                 # extra emission from active burning
     heat_lo=0.6, heat_hi=2.0,        # heat -> ramp position
     # fire ramp: dark red -> orange -> yellow -> near white (no purple ever)
@@ -119,7 +119,10 @@ def build_scene(cfg):
     es.inputs[1].default_value = st['flame_boost']
     Lk.new(a_f.outputs['Fac'], es.inputs[0])
     hs = N.new('ShaderNodeMath'); hs.operation = 'MULTIPLY'; hs.inputs[1].default_value = st['fire_strength']
-    Lk.new(hm.outputs['Result'], hs.inputs[0])
+    # emission ~ heat^2: cooling gas stops glowing quickly instead of tinting the smoke salmon/pink
+    hp = N.new('ShaderNodeMath'); hp.operation = 'POWER'; hp.inputs[1].default_value = st.get('heat_power', 2.0)
+    Lk.new(hm.outputs['Result'], hp.inputs[0])
+    Lk.new(hp.outputs[0], hs.inputs[0])
     Lk.new(hs.outputs[0], es.inputs[2])
     # break the fire up: second noise, high contrast, so flames come in licks and pockets
     nz2 = N.new('ShaderNodeTexNoise'); nz2.noise_dimensions = '4D'
@@ -144,7 +147,7 @@ def build_scene(cfg):
     # soot near the fire is dark (it is lit from inside by the flames, not by the sun); only cooled smoke is pale grey.
     # Without this, orange emission + sunlit grey soot reads as pastel salmon / cream.
     hf = N.new('ShaderNodeMath'); hf.operation = 'MULTIPLY'; hf.use_clamp = True
-    hf.inputs[1].default_value = st.get('hot_soot_gain', 2.0)
+    hf.inputs[1].default_value = st.get('hot_soot_gain', 3.0)
     Lk.new(hm.outputs['Result'], hf.inputs[0])
     mix = N.new('ShaderNodeMix'); mix.data_type = 'RGBA'
     mix.inputs[6].default_value = (*st['smoke_color'], 1)
