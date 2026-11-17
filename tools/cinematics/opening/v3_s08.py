@@ -245,7 +245,9 @@ def build(draft=True):
                         life=0.9)
         show(f, 1, ft + 36, tree=False)
         # the grab itself: a jolt of light where the harpoons go in
-        SP.impact_flare(pw, Vector((1, 0, 0)), fg, fg + 6, (1.0, 0.75, 0.35), 3.0, f'Grab{fi}')
+        # (on the fighter where the arms close on it, not parked where it will be torn apart a second later)
+        gfl = SP.impact_flare(pw, Vector((1, 0, 0)), fg, fg + 6, (1.0, 0.62, 0.2), 1.4, f'Grab{fi}')
+        follow_pos(lambda f_: f.matrix_world.translation.copy(), fg, fg + 6, gfl)
         return pw
     w1 = tear(0, T_GRAB1, T_TEAR1, 41)
     w2 = tear(1, T_GRAB2, T_TEAR2, 52)
