@@ -29,6 +29,7 @@ import json
 import math
 import os
 import random
+import zlib
 
 import bpy  # noqa: I001
 import bmesh
@@ -1121,7 +1122,7 @@ def smoke_column(P, pos, t0, t1, size=1.0):
 # ============================================================================ destroy
 def destroy(actor, t, size=None, wreck=True, debris=14):
     P = actor.P
-    rnd = random.Random(hash((actor.name, round(t, 3))) & 0xffffffff)
+    rnd = random.Random(zlib.crc32(("%s|%.3f" % (actor.name, t)).encode()))
     size = size or actor.size * 0.5
     f_t = P.T(t)
     groups = _collect_meshes(actor, t)
