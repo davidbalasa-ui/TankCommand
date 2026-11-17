@@ -27,6 +27,14 @@ describe('moving model parts', () => {
     expect(readPartMotion(null)).toBeNull();
   });
 
+  it('[PART-01] an idle-only turret sweep is ignored, so the turret stays aimed rather than becoming a spinner', () => {
+    expect(readPartMotion({ type: 'swing', axis: [0, 1, 0], amp: 0.25, speed: 0.16, when: 'idle' })).toBeNull();
+    const sweep = model({ type: 'swing', axis: [0, 1, 0], amp: 0.25, speed: 0.16, when: 'idle' }, 'TurretPivot');
+    const parts = collectPartMotions(sweep.root);
+    expect(parts).toHaveLength(0);
+    expect(pivotIsSpinner(parts)).toBe(false);
+  });
+
   it('[PART-01] a mining drum spins up only while mining, about its own axis on top of its rest pose', () => {
     const { root, node } = model({ type: 'spin', axis: [1, 0, 0], speed: 6, when: 'mining' });
     const parts = collectPartMotions(root);

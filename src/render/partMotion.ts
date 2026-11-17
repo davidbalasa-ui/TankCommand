@@ -69,6 +69,11 @@ export function readPartMotion(raw: unknown): PartMotionSpec | null {
     return null;
   }
   const item = raw as Record<string, unknown>;
+  // 'idle' motions (an aimed turret sweeping while it has no target) belong to the art viewer: in
+  // the game the turret is aimed every frame, so such a part is left alone (and stays aimable).
+  if (item.when === 'idle') {
+    return null;
+  }
   const when = typeof item.when === 'string' && WHENS.has(item.when) ? (item.when as PartMotionWhen) : 'always';
   const busy = typeof item.busySpeed === 'number' && Number.isFinite(item.busySpeed) ? item.busySpeed : null;
   if (item.type === 'scroll') {
