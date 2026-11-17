@@ -45,6 +45,12 @@ def _is_ballistic_col(col):
     return col is None or any(sum(abs(a - b) for a, b in zip(col, f)) < 0.02 for f in FIRE_COLS)
 
 
+def _space(P):
+    """The kit's space mode: P.space() sets P.ground = None (an env() scene has a ground; a scene
+    with neither keeps the old 'no ground' behaviour)."""
+    return hasattr(P, 'ground') and P.ground is None
+
+
 def _gz(P, x, y):
     try:
         return P.ground_z(x, y) if getattr(P, 'ground', None) else 0.0
@@ -312,7 +318,8 @@ def _mesh(P, kind):
     return me
 
 
-def _fxobj(o):
+def _fxobj(o, tag='fx'):
+    o['fx_helper'] = tag     # promo_fx.destroy never fractures tagged helpers hung on a model
     o.visible_shadow = False
     try:
         o.visible_diffuse = False
@@ -367,6 +374,7 @@ def _const(o, path):
 
 def flicker_light(P, pos, t0, t1, color, energy, radius=0.3, every=1, lo=0.55, hi=1.1, parent=None):
     L = K.link(bpy.data.objects.new('FxLight', bpy.data.lights.new('FxLight', 'POINT')))
+    L['fx_helper'] = 'light'
     L.location = pos
     if parent is not None:
         L.parent = parent
@@ -396,7 +404,10 @@ def smoke_puff(P, pos, t, r0=0.15, r1=0.8, life=1.6, vel=(0, 0, 0), color=None, 
     o['fx_d'] = 3.0 * dens
     o['fx_w'] = 0.0
     vel = Vector(vel)
-    wind = Vector(wind) * (1.0 if getattr(P, 'ground', None) else 0.25)
+    if _space(P):          # P.space(): no air, no wind (puffs just coast on their own velocity)
+        wind = Vector()
+    else:
+        wind = Vector(wind) * (1.0 if getattr(P, 'ground', None) else 0.25)
     pos = Vector(pos)
     o.rotation_mode = 'QUATERNION'
     if stretch is not None:
@@ -785,9 +796,11 @@ def projectile(P, p0, p1, t0, speed, color, size=0.15, arc=0.0, streak=True, sty
     return t0 + dur
 
 
-def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True):
+def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True, size=1.0):
     """Missile: metal body, white-hot motor with a flickering flame and a light, a lingering
-    volumetric smoke trail that expands, drifts and fades, corkscrew wobble, accelerating."""
+    volumetric smoke trail that expands, drifts and fades, corkscrew wobble, accelerating.
+    size scales the missile, its flame, light and smoke trail (1.0 = ~0.8 m long)."""
+    size = float(size or 1.0)
     p0, p1 = K.V(p0), K.V(p1)
     d = p1 - p0
     dist = d.length
@@ -852,13 +865,16 @@ def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True
         flame.keyframe_insert('location', frame=fr)
         flame.keyframe_insert('scale', frame=fr)
     K.set_interp(rig, 'LINEAR')
+    if size != 1.0:
+        rig.scale = (size,) * 3       # body, fins, motor, flame and light all ride the rig
     f0, f1 = P.T(t0), P.T(t0 + dur) + 1
     for o in [body, band, motor, flame, halo] + fins:
         K.show_between(o, f0, f1)
-    L = flicker_light(P, (-0.6, 0, 0), t0, t0 + dur, col, 260, radius=0.15, lo=0.75, hi=1.1, parent=rig)
+    L = flicker_light(P, (-0.6, 0, 0), t0, t0 + dur, col, 260 * size, radius=0.15 * size, lo=0.75, hi=1.1,
+                      parent=rig)
     if trail:
         # emit by distance (not time) so the fast end of the flight has no gaps
-        spacing = 0.32
+        spacing = 0.32 * max(1.0, size)
         acc = 0.0
         ns = 600
         prev = at(U(0.0))
@@ -873,8 +889,8 @@ def missile(P, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True
             q = at(U(min(1.0, tau + 0.005))) - at(U(max(0.0, tau - 0.005)))
             q = q.normalized() if q.length > 1e-6 else fwd
             tp = t0 + dur * tau
-            smoke_puff(P, p - q * 0.5, tp, r0=0.1, r1=P.rnd.uniform(0.9, 1.35),
-                       life=P.rnd.uniform(2.8, 3.6), vel=-q * 1.0 + _rand_perp(P, q) * 0.35, dens=1.1,
+            smoke_puff(P, p - q * 0.5 * size, tp, r0=0.1 * size, r1=P.rnd.uniform(0.9, 1.35) * size,
+                       life=P.rnd.uniform(2.8, 3.6), vel=(-q * 1.0 + _rand_perp(P, q) * 0.35) * size, dens=1.1,
                        hot=1.6, stretch=(q, spacing * 1.3), wind=(0.45, 0.2, 0.3), fade_in=0.0)
     return t0 + dur
 
@@ -936,11 +952,22 @@ def _world_at_frame(obj, f):
     return obj.matrix_world.translation.copy()
 
 
+def _pool_ok(ob):
+    """A pooled light object that still exists, with its light data."""
+    try:
+        return ob.name in bpy.data.objects and ob.type == 'LIGHT' and ob.data is not None \
+            and ob.data.name in bpy.data.lights
+    except ReferenceError:
+        return False
+
+
 def _pool_light(P, f0, f1, color, energy, radius, pos_fn, lo=0.5, hi=1.0):
     """Borrow one of at most 4 shared point lights for frames f0..f1 (lightning is called
     every few frames by some scenes; one light per call is too heavy). Skips when all busy."""
     c = _c(P)
     pool = c.setdefault('lpool', [])
+    # a scene may have deleted a pooled light (or its light data): drop it, a new one replaces it
+    pool[:] = [ent for ent in pool if _pool_ok(ent[0])]
     L = None
     for ent in pool:
         if ent[1] < f0 - 1:
@@ -950,12 +977,18 @@ def _pool_light(P, f0, f1, color, energy, radius, pos_fn, lo=0.5, hi=1.0):
         if len(pool) >= 4:
             return None
         ob = K.link(bpy.data.objects.new('FxBoltLight', bpy.data.lights.new('FxBoltLight', 'POINT')))
+        ob['fx_helper'] = 'pool_light'
         ob.data.energy = 0
         ob.data.keyframe_insert('energy', frame=0)
         L = [ob, -99]
         pool.append(L)
     ob, _ = L
     L[1] = f1 + 1
+    if ob.parent is not None:      # keys are world positions: never ride a parent a scene gave it
+        ob.parent = None
+        ob.matrix_parent_inverse.identity()
+    if not ob.users_collection:    # unlinked by a scene: put it back
+        K.link(ob)
     d = ob.data
     d.color = color
     d.shadow_soft_size = radius
@@ -1041,6 +1074,7 @@ def bolt(P, p0, p1, f0, nframes, color, width=0.05, jag=0.18, branches=2, glow_=
         q0 = (p1 - p0).to_track_quat('X', 'Z')
         T0 = Matrix.LocRotScale(p0, q0, Vector((1, 1, 1)))
         rig = K.empty('BoltRig')
+        rig['fx_helper'] = 'bolt'
         rig.rotation_mode = 'QUATERNION'
         for f in range(f0, f0 + nframes):
             a, b_ = fn0(f), fn1(f)
@@ -1140,6 +1174,7 @@ def lightning_thruster(P, obj, t0, t1, local=(0, 0, 0), axis=(-1, 0, 0), length=
                  flick=[1.0, 0.65, 0.85], follow=(start, endf))
             f += nfr
     o = _glow(P, 'ThrustCore', color, scale=(width * 6,) * 3, fx_e=3.0, fx_p=1.5, fx_hot=0.9)
+    o['fx_helper'] = 'thruster'
     o.parent = ob
     o.location = loc
     K.show_between(o, f0, f1)
@@ -1149,10 +1184,19 @@ def lightning_thruster(P, obj, t0, t1, local=(0, 0, 0), axis=(-1, 0, 0), length=
 
 
 # ----------------------------------------------------------------------------- beams
-def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
+BEAM_STRENGTH = 8.0     # default glow strength (10 clipped core + haze under the Standard view transform)
+
+
+def beam(P, p0, p1, t0, t1, color, width=0.15, strength=None, light_energy=None):
     """Energy beam: white-hot core, coloured glow with energy scrolling source -> target,
     wide haze, snap-on / pinch-off, gentle flicker, bright contact with sparks and smoke.
-    p0 / p1 may be points, Actors, Objects or callables t -> point (followed per frame)."""
+    p0 / p1 may be points, Actors, Objects or callables t -> point (followed per frame).
+    strength: core/glow brightness (default BEAM_STRENGTH; effective range 6-14).
+    light_energy: contact light energy in W; the mid-beam fill light scales with it (0 = no
+    lights). Default: from strength and length (an explicit strength keeps the old values)."""
+    dflt = strength is None
+    if dflt:
+        strength = BEAM_STRENGTH
     fn0, mv0 = _endpoint(P, p0, lift=False)
     fn1, mv1 = _endpoint(P, p1)
     moving = mv0 or mv1
@@ -1235,9 +1279,21 @@ def beam(P, p0, p1, t0, t1, color, width=0.15, strength=10):
         smoke_puff(P, b + Vector((0, 0, 0.1)), tt, r0=0.08, r1=0.4, life=1.2, vel=(0, 0, 0.8), dens=0.35)
         tt += 0.12
     fi0, fi1 = int(round(f0)), int(round(f1))
-    _pool_light(P, fi0, fi1, color, 600 * k, 0.3, lambda fr: fn1(fr) + Vector((0, 0, 0.3)), lo=0.75, hi=1.0)
-    _pool_light(P, fi0, fi1, color, 400 + 40 * d.length, d.length * 0.2,
-                lambda fr: (fn0(fr) + fn1(fr)) / 2, lo=0.8, hi=1.0)
+    mid = 400 + 40 * d.length
+    if light_energy is not None:
+        e_end = float(light_energy)
+        e_mid = e_end * min(2.0, mid / 600.0)
+    elif dflt:     # moderated defaults: the long-beam fill no longer grows without bound
+        e_end = 600 * k
+        e_mid = min(1200.0, mid * k)
+    else:          # explicit strength: the values scenes were tuned with
+        e_end = 600 * k
+        e_mid = mid
+    if e_end > 0:
+        _pool_light(P, fi0, fi1, color, e_end, 0.3, lambda fr: fn1(fr) + Vector((0, 0, 0.3)), lo=0.75, hi=1.0)
+    if e_mid > 0:
+        _pool_light(P, fi0, fi1, color, e_mid, d.length * 0.2,
+                    lambda fr: (fn0(fr) + fn1(fr)) / 2, lo=0.8, hi=1.0)
     bpy.context.scene.frame_set(cur)
     return t1
 
@@ -1314,7 +1370,7 @@ def shot(P, src, target, kind, t, color=None, size=1.0, speed=None, impact=True,
         d_ = dur or (0.45 if kind == 'beam' else 0.14 * max(1.0, size))
         w_ = width if width is not None else (0.18 if kind == 'beam' else 0.07) * size
         beam(P, (lambda tt: fn0(int(round(P.T(tt))))) if host is not None else p0,
-             target if moving_t else p1, t, t + d_, col, width=w_, strength=10 if kind == 'beam' else 9)
+             target if moving_t else p1, t, t + d_, col, width=w_, strength=None if kind == 'beam' else 9)
         t_hit = t + 0.03
     elif kind == 'missile':
         t_hit = missile(P, p0, p1, t, speed=spd, color=col, arc=arc if arc is not None else 2.5)
@@ -1524,10 +1580,41 @@ def shield_dome(P, center, radius, t0, t1, color=None, hits=()):
     return shell
 
 
-def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
-    n = (p - center)
-    n = n.normalized() if n.length > 1e-4 else UP
-    surf = center + n * R
+def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end, space=None):
+    """Ripple + flash + glancing sparks where `p` hits the shield `shell` (the shield_dome()
+    object). Works on scaled (ellipsoid), rotated and parented shells: the hit is mapped through
+    the shell's world matrix at time t, so the rings stay round on the surface and the
+    flash/sparks/light sit on the real surface point. The shield never shatters.
+    space: 'world' = center/p are world points (center = the shell's world centre at t);
+    'object' = (p - center) is a direction in the shell's own unscaled space (center is then
+    ignored for placement); None = 'world' when center matches the shell's world centre at t,
+    else 'object' (the convention older scenes used to work around ellipsoid shells)."""
+    sc = bpy.context.scene
+    cur = sc.frame_current
+    f_t = int(round(P.T(t)))
+    if cur != f_t:
+        sc.frame_set(f_t)
+    M = shell.matrix_world.copy()
+    if cur != f_t:
+        sc.frame_set(cur)
+    c_w = M.translation.copy()
+    center = K.V(center)
+    p = K.V(p)
+    if space is None:
+        space = 'world' if (center - c_w).length <= max(1e-3, 0.05 * R) else 'object'
+    if space == 'world':
+        try:
+            loc = M.inverted() @ p
+        except ValueError:      # degenerate matrix: fall back to the plain direction
+            loc = p - c_w
+    else:
+        loc = p - center
+    n = loc.normalized() if loc.length > 1e-6 else UP.copy()        # shell object space
+    surf = M @ (n * R)                                               # world surface point
+    nw = (M.to_3x3().inverted_safe().transposed() @ n)
+    nw = nw.normalized() if nw.length > 1e-6 else UP.copy()          # world surface normal
+    sx, sy, sz = M.to_scale()
+    Rw = R * abs(sx * sy * sz) ** (1.0 / 3.0)                        # world-size radius (flash, light)
     life = 1.1
     f0 = P.T(t)
     f1 = min(P.T(t + life), P.T(t_end))
@@ -1537,13 +1624,20 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
     else:
         layers = ((shell, 1.004, 2.2, 0.85, 0.7, 0.06, 0.06), (lat, 1.006, 3.0, 1.0, 0.8, 0.5, 0.06))
     for src, scale, e, a, spot, local, wk in layers:
+        if src is None:
+            continue
         o = src.copy()
         K.link(o)
         o.animation_data_clear()
         o.parent = src
         o.matrix_parent_inverse.identity()
         o.location = (0, 0, 0)
-        o.scale = (scale / (src.scale.x or 1),) * 3
+        o.rotation_euler = (0, 0, 0)
+        o.rotation_quaternion = (1, 0, 0, 0)
+        # `scale` is relative to the shell; the ripple is parented to src, so divide out src's
+        # own scale relative to the shell (the lattice's 1.002), per axis, never the shell's scale
+        rel = src.scale if src is not shell else Vector((1, 1, 1))
+        o.scale = tuple(scale / (r or 1.0) for r in rel)
         o.name = 'ShieldRipple'
         for s in o.material_slots:
             s.link = 'OBJECT'
@@ -1564,11 +1658,11 @@ def shield_hit(P, shell, lat, center, R, t, p, color, arc, t_end):
         o.keyframe_insert('["fx_age"]', frame=f0 + life * P.fps)
         K.set_interp(o, 'LINEAR')
         K.show_between(o, int(f0), int(f1) + 1)
-    # surface flash + sparks glancing off along the surface
-    flash(P, surf, t, 0.12 + R * 0.012, color, frames=(1, 1, 3), e=3.0, hot=0.7, name='ShieldFlash')
-    sparks(P, surf, t, n=10, speed=8.0, color=color, axis=n, spread=75, life=(0.15, 0.45), width=0.02,
+    # surface flash + sparks glancing off along the surface (on the real, world-space surface)
+    flash(P, surf, t, 0.12 + Rw * 0.012, color, frames=(1, 1, 3), e=3.0, hot=0.7, name='ShieldFlash')
+    sparks(P, surf, t, n=10, speed=8.0, color=color, axis=nw, spread=75, life=(0.15, 0.45), width=0.02,
            gravity=4.0)
-    P.light(surf + n * 0.6, t, color, energy=900, dur=0.15, radius=0.25)
+    P.light(surf + nw * 0.6, t, color, energy=900, dur=0.15, radius=0.25)
 
 
 def shield_push(P, shell, actor, t0, t1, release=0.6, reach=None, stretch=None):
@@ -1632,3 +1726,15 @@ def shield_push(P, shell, actor, t0, t1, release=0.6, reach=None, stretch=None):
         col = tuple(shell.color)[:3]
         shield_hit(P, shell, lat_o, c, R, (fr_rel - 1) / P.fps, contact, col, _is_gold(col), P.seconds)
     return tgt
+
+
+# sound: promo_audio records the helpers scenes call directly (installed by promo_kit; this
+# covers a scene importing this module before promo_kit has finished loading)
+def _audio_hook():
+    import sys
+    pa = sys.modules.get('promo_audio')
+    if pa is not None and hasattr(pa, '_install_weapons'):
+        pa._install_weapons()
+
+
+_audio_hook()

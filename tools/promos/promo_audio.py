@@ -16,6 +16,12 @@ How it works
   * Sounds come from the baked library in $PROMO_SFX (default /mnt/project-files/promos/sfx),
     made by audio/sfx_gen.py (baked automatically if missing).
 
+  * P.shot and the promo_fx_weapons helpers that scenes call directly (W.lightning, W.beam,
+    W.missile, W.projectile, W.impact, W.muzzle_flash, W.lightning_thruster) record too
+    ('auto' events). An auto event is dropped when the scene already cues the same kind of
+    sound itself at that moment (a P.sfx of the same family within ~0.1 s / overlapping a loop),
+    so scenes that hand-cued these effects don't get doubled sounds.
+
 Explicit cues from a scene (for effects the scene draws itself, which the wrappers can't see):
   P.sfx(t, 'boom_big', gain=1.0, pos=(x, y, z), dur=None, rate=1.0)
   (name = a library sound, e.g. zap_lightning, servo, thruster_blue; dur for loops; gain linear;
@@ -77,6 +83,36 @@ def _vec(p):
         return None
 
 
+def _pt(P, x, t):
+    """World point of an effect endpoint at time t: a point, an Actor (body centre), a bpy Object
+    (its world origin) or a callable t -> point. None if it can't be evaluated."""
+    v = None
+    try:
+        if hasattr(x, 'pos_at') and hasattr(x, 'root'):
+            v = _vec(x.pos_at(t))
+        elif callable(x):
+            v = _vec(x(t))
+        elif hasattr(x, 'matrix_world'):
+            import bpy
+            sc = bpy.context.scene
+            cur = sc.frame_current
+            f = int(round(1 + t * P.fps))
+            if f != cur:
+                sc.frame_set(f)
+            v = _vec(x.matrix_world.translation)
+            if f != cur:
+                sc.frame_set(cur)
+        else:
+            v = _vec(x)
+    except Exception:
+        v = None
+    return v
+
+
+def _is_point(x):
+    return not (callable(x) or hasattr(x, 'matrix_world') or hasattr(x, 'root')) and _vec(x) is not None
+
+
 def _events(P):
     ev = getattr(P, '_audio_events', None)
     if ev is None:
@@ -124,6 +160,13 @@ def _wrap(cls, name, rec):
     setattr(cls, name, w)
 
 
+_FIRE_LIKE = ('fire', 'shot', 'W.shot')   # weapon calls whose sub-effects are voiced by the call itself
+
+
+def _fire_like(par):
+    return any(n in _FIRE_LIKE for n in par)
+
+
 def _parent_names(parents):
     return [n for n, _ in parents]
 
@@ -137,7 +180,7 @@ def _add(obj, kind, t, parents, **kw):
     e = dict(kind=kind, t=float(t), parents=_parent_names(parents), **kw)
     # remember what the outermost fire() was shooting with (impact sound choice)
     for n, a in parents:
-        if n == 'fire':
+        if n in _FIRE_LIKE:
             e['fire_kind'] = a.get('kind', 'cannon')
             e['fire_target_actor'] = hasattr(a.get('target'), 'root')
     _events(P).append(e)
@@ -162,15 +205,24 @@ def _r_impact(P, a, res, parents):
 
 
 def _r_lightning(P, a, res, parents):
-    p0, p1 = _vec(a['p0']), _vec(a['p1'])
+    # endpoints may be points, Actors, Objects or callables: evaluate at the strike time (an
+    # unreadable end falls back to the other one)
+    t0 = float(a['t0'])
+    p0, p1 = _pt(P, a['p0'], t0), _pt(P, a['p1'], t0)
+    p0 = p0 or p1 or (0.0, 0.0, 0.0)
+    p1 = p1 or p0
     mid = tuple((x + y) / 2 for x, y in zip(p0, p1))
-    _add(P, 'lightning', a['t0'], parents, pos=mid, p1=p1, dur=float(a['t1']) - float(a['t0']),
-         length=math.dist(p0, p1), width=float(a.get('width', 0.05) or 0.05))
+    # moving ends used to fail to record (no sound): scenes may have cued those themselves
+    auto = not (_is_point(a['p0']) and _is_point(a['p1']))
+    _add(P, 'lightning', t0, parents, pos=mid, p1=p1, dur=float(a['t1']) - t0,
+         length=math.dist(p0, p1), width=float(a.get('width', 0.05) or 0.05), auto=auto)
 
 
 def _r_beam(P, a, res, parents):
-    _add(P, 'beam', a['t0'], parents, pos=_vec(a['p1']), p0=_vec(a['p0']), dur=float(a['t1']) - float(a['t0']),
-         color=_vec(a['color']))
+    t0 = float(a['t0'])
+    p0, p1 = _pt(P, a['p0'], t0), _pt(P, a['p1'], t0)
+    _add(P, 'beam', t0, parents, pos=p1 or p0, p0=p0 or p1, dur=float(a['t1']) - t0,
+         color=_vec(a['color']), auto=not (_is_point(a['p0']) and _is_point(a['p1'])))
 
 
 def _r_missile(P, a, res, parents):
@@ -206,6 +258,106 @@ def _r_shield(P, a, res, parents):
 def _r_fire_patch(P, a, res, parents):
     _add(P, 'burn', a['t0'], parents, pos=_vec(a['pos']), dur=float(a['t1']) - float(a['t0']),
          size=float(a.get('size', 0.6)))
+
+
+def _r_shot(P, a, res, parents):
+    """P.shot / W.shot: the weapon sound at the origin (like Actor.fire); its tracer, beam,
+    lightning and impact record themselves beneath it (the impact keeps its own sound)."""
+    t = float(a['t'])
+    kind = a.get('kind', 'cannon')
+    src = a.get('src', a.get('p0'))
+    if isinstance(src, tuple) and len(src) == 2 and not isinstance(src[0], (int, float)):
+        host, off = src
+        ob = host.root if hasattr(host, 'root') else host
+        pos = None
+        try:
+            import bpy
+            from mathutils import Vector
+            sc = bpy.context.scene
+            cur = sc.frame_current
+            sc.frame_set(int(round(1 + t * P.fps)))
+            pos = _vec(ob.matrix_world @ Vector(off))
+            sc.frame_set(cur)
+        except Exception:
+            pos = None
+    else:
+        pos = _pt(P, src.root if hasattr(src, 'root') and not hasattr(src, 'pos_at') else src, t)
+    dur = a.get('dur')
+    _add(P, 'shot', t, parents, pos=pos, weapon=kind, size=float(a.get('size', 1.0) or 1.0),
+         t_hit=float(res) if res is not None else None, dur=float(dur) if dur else None,
+         color=_vec(a['color']) if a.get('color') is not None else None, auto=True)
+
+
+def _r_thruster(P, a, res, parents):
+    obj = a.get('obj')
+    ob = obj.root if hasattr(obj, 'root') else obj
+    t0, t1 = float(a['t0']), float(a['t1'])
+    _add(P, 'thruster', t0, parents, pos=_pt(P, ob, (t0 + t1) / 2), dur=t1 - t0,
+         host=getattr(ob, 'name', '?'), auto=True)
+
+
+def _auto(rec):
+    """Recorder variant for the direct W.* helpers: its events are marked auto (see build)."""
+    def r(P, a, res, parents):
+        ev = _events(P)
+        n = len(ev)
+        rec(P, a, res, parents)
+        for e in ev[n:]:
+            e['auto'] = True
+    return r
+
+
+def _wrap_fn(mod, name, rec, only_top=False):
+    """Wrap module function mod.<name> (first arg P). It records only when called straight from
+    a scene, or under P.shot / W.shot (whose sub-effects the kit methods' wrappers never see);
+    inside any other recorded call (P.lightning -> W.lightning, Actor.fire -> W.beam, ...) the
+    outer call already carries the sound. only_top: record only when nothing is in progress."""
+    orig = mod.__dict__.get(name)
+    if orig is None or getattr(orig, '_audio_wrapped', False) or not callable(orig):
+        return None
+    tag = 'W.' + name.lstrip('_')
+
+    @functools.wraps(orig)
+    def w(P, *a, **k):
+        args = _bind(orig, P, a, k)
+        parents = list(_stack)
+        on = (not parents) if only_top else all(n in _FIRE_LIKE for n, _ in parents)
+        _stack.append((tag, args))
+        try:
+            res = orig(P, *a, **k)
+        finally:
+            _stack.pop()
+        if on:
+            try:
+                rec(P, args, res, parents)
+            except Exception as e:  # recording must never break a render
+                _warn(tag, f'could not record {tag}: {e!r}')
+        return res
+
+    w._audio_wrapped = True
+    w._audio_orig = orig
+    setattr(mod, name, w)
+    return w
+
+
+def _install_weapons():
+    """Record the promo_fx_weapons helpers scenes call directly (and P.shot's sub-effects)."""
+    try:
+        import promo_fx_weapons as W
+    except Exception as e:  # bpy-less tooling: nothing to wrap
+        _warn('wfx', f'promo_fx_weapons not wrapped: {e!r}')
+        return
+    if getattr(W, '_audio_installed', False) or not callable(W.__dict__.get('shot')):
+        return      # (half-imported module: promo_fx_weapons installs itself when it finishes)
+    for n, r in [('lightning', _auto(_r_lightning)), ('beam', _auto(_r_beam)), ('missile', _auto(_r_missile)),
+                 ('projectile', _auto(_r_projectile)), ('muzzle_flash', _auto(_r_muzzle_flash)),
+                 ('impact', _auto(_r_impact)), ('lightning_thruster', _r_thruster)]:
+        _wrap_fn(W, n, r)
+    _wrap_fn(W, 'shot', _r_shot, only_top=True)
+    # W.shot calls its impact through the module alias _impact
+    if getattr(W.impact, '_audio_wrapped', False):
+        W._impact = W.impact
+    W._audio_installed = True
 
 
 def _r_load(P, a, res, parents):
@@ -255,7 +407,21 @@ def _r_hover(A, a, res, parents):
 
 def sfx(self, t, name, gain=1.0, pos=None, dur=None, rate=1.0):
     """Explicit sound cue: library sound `name` at time t (seconds). gain is linear; pos a world
-    point (None = centred, no distance falloff); dur for looping sounds; rate = pitch/speed."""
+    point (None = centred, no distance falloff); dur for looping sounds; rate = pitch/speed.
+    Unknown names (not in the library's manifest.json) print a warning: they stay silent."""
+    lib = None
+    try:      # only read an existing library here (never bake from a cue)
+        if _manifest is not None or os.path.exists(os.path.join(SFX_DIR, 'manifest.json')):
+            lib = _lib()
+    except Exception:
+        lib = None
+    if lib is not None and name not in lib and ('sfx_unknown', name) not in _warned:
+        _warned.add(('sfx_unknown', name))
+        import difflib
+        near = difflib.get_close_matches(str(name), list(lib), n=3, cutoff=0.5)
+        print(f'[promo_audio] WARNING: P.sfx({t}, {name!r}): no such sound in '
+              f'{os.path.join(SFX_DIR, "manifest.json")} - this cue will be SILENT.'
+              + (f' Did you mean: {", ".join(near)}?' if near else ''), file=sys.stderr)
     _events(self).append(dict(kind='sfx', t=float(t), name=name, gain=float(gain), pos=_vec(pos) if pos is not None else None,
                               dur=dur, rate=float(rate), parents=[]))
     return self
@@ -275,6 +441,8 @@ def install(kit):
     for n, r in [('fire', _r_fire), ('destroy', _r_destroy), ('unfold', _r_unfold), ('spin', _r_spin),
                  ('aim', _r_aim), ('hover_bob', _r_hover)]:
         _wrap(Actor, n, r)
+    _wrap(Promo, 'shot', _r_shot)
+    _install_weapons()
     if 'sfx' not in Promo.__dict__:
         Promo.sfx = sfx
     _wrap_render(Promo)
@@ -582,6 +750,14 @@ def _db(x):
 
 
 # ------------------------------------------------------------------------------------- rules
+# sounds that count as "the same cue" when an auto event yields to a scene's own P.sfx
+SFX_FAMILY = dict(zap_lightning='zap', zap_small='zap', impact_gold='impact', impact_energy='impact',
+                  impact_metal='impact', impact_dirt='impact', shield_hit='impact', crackle_loop='crackle',
+                  beam_start='beam', beam_blue_loop='beam_loop', tractor_loop='beam_loop',
+                  shot_cannon='shot', shot_heavy='shot', shot_autocannon='shot', shot_laser='shot',
+                  shot_missile='shot', shot_shell='shot', shot_bomb='shot',
+                  boom_small='boom', boom_med='boom', boom_big='boom')
+
 FIRE_SOUND = dict(cannon=('shot_cannon', 0.0), heavy=('shot_heavy', 1.0), autocannon=('shot_autocannon', -4.0),
                   laser=('shot_laser', -2.0), missile=('shot_missile', -2.0), shell=('shot_shell', 0.0),
                   lightning=('zap_lightning', -1.0), beam=('beam_start', -2.0), bomb=('shot_bomb', -4.0))
@@ -714,6 +890,27 @@ def build(P, S):
     # ---- one-shot events
     seen_strike = []
     in_space = getattr(P, "_audio_env", "") == "space"
+    cues = [e for e in ev if e['kind'] == 'sfx']
+
+    def cued(name, t, dur=None, tol=0.12):
+        """The scene cues this kind of sound itself around t (or over the loop t..t+dur)."""
+        fam = SFX_FAMILY.get(name, name)
+        a0, a1 = t - tol, t + (dur or 0.0) + tol
+        for c in cues:
+            if SFX_FAMILY.get(c['name'], c['name']) != fam:
+                continue
+            c0 = c['t']
+            c1 = c0 + float(c.get('dur') or 0.0)
+            if c0 <= a1 and c1 >= a0:
+                return True
+        return False
+
+    def put(e, name, t, *a, **k):
+        """M.place for an event; auto events yield to the scene's own cue of the same sound."""
+        if e.get('auto') and cued(name, t, k.get('dur')):
+            M.log.append((round(t, 3), name + ' (auto, scene cues it)', 0.0, '-'))
+            return
+        M.place(name, t, *a, **k)
 
     def near_strike(t, tol=0.07):
         return any(abs(t - u) < tol for u in seen_strike)
@@ -731,6 +928,23 @@ def build(P, S):
             M.place(name, t, gdb, p, bus='hit' if wk in ('heavy', 'shell', 'cannon') else 'fx', voice=a.name)
             if wk == 'lightning':
                 seen_strike.append(t)
+        elif k == 'shot':
+            # P.shot: voiced like Actor.fire, at the origin (sub-effects record beneath it)
+            wk = e.get('weapon', 'cannon')
+            name, gdb = FIRE_SOUND.get(wk, ('shot_cannon', 0.0))
+            gdb += 0.5 * _db(e.get('size', 1.0))
+            put(e, name, t, gdb, e.get('pos'), bus='hit' if wk in ('heavy', 'shell', 'cannon') else 'fx',
+                gain_min=0.15)
+            if wk == 'lightning':
+                seen_strike.append(t)
+                if (e.get('dur') or 0.18) > 0.25:
+                    put(e, 'crackle_loop', t, -9.0, e.get('pos'), dur=e['dur'], gain_min=0.15)
+        elif k == 'thruster':
+            # lightning thrusters: one quiet crackle per host (several thrusters on a ship merge)
+            if any(o is not e and o['kind'] == 'thruster' and o.get('host') == e.get('host')
+                   and o['t'] <= t and o['t'] + o['dur'] >= t and ev.index(o) < ev.index(e) for o in ev):
+                continue
+            put(e, 'crackle_loop', t, -20.0, e.get('pos'), dur=e['dur'], gain_min=0.1)
         elif k == 'explosion':
             s = e['size'] * (1.3 if 'destroy' in par else 1.0)
             name, gdb = ('boom_big', 3.0) if s >= 2.4 else (('boom_med', 2.0) if s >= 1.3 else ('boom_small', 0.0))
@@ -743,58 +957,61 @@ def build(P, S):
             size = max(0.3, min(2.5, e.get('size', 1.0)))
             gdb = -4.0 + 12 * math.log10(size)
             if 'shield_dome' in par:
-                M.place('shield_hit', t, -1.0, e['pos'], gain_min=0.3)
+                put(e, 'shield_hit', t, -1.0, e['pos'], gain_min=0.3)
             elif _is_gold(c):
-                M.place('impact_gold', t, gdb, e['pos'], gain_min=0.15)
+                put(e, 'impact_gold', t, gdb, e['pos'], gain_min=0.15)
                 seen_strike.append(t)
             elif _is_blue(c) or _is_green(c):
-                M.place('impact_energy', t, gdb, e['pos'], rate=1.15 if _is_green(c) else 1.0, gain_min=0.15)
+                put(e, 'impact_energy', t, gdb, e['pos'], rate=1.15 if _is_green(c) else 1.0, gain_min=0.15)
             else:
                 fk = e.get('fire_kind')
                 if (e.get('fire_target_actor') and fk not in ('shell', 'bomb', 'missile')) or in_space:
-                    M.place('impact_metal', t, gdb, e['pos'], gain_min=0.15)  # (no dirt in space)
+                    put(e, 'impact_metal', t, gdb, e['pos'], gain_min=0.15)  # (no dirt in space)
                 else:
-                    M.place('impact_dirt', t, gdb, e['pos'], gain_min=0.15)
+                    put(e, 'impact_dirt', t, gdb, e['pos'], gain_min=0.15)
                 if fk in ('shell', 'bomb', 'missile', 'heavy') or size >= 1.5:
-                    M.place('boom_small', t, gdb - 2, e['pos'], bus='hit', gain_min=0.2)
+                    put(e, 'boom_small', t, gdb - 2, e['pos'], bus='hit', gain_min=0.2)
         elif k == 'lightning':
-            if 'fire' in par:
+            if _fire_like(par):
                 continue
             dur = e['dur']
             # a looping bolt (thruster lightning re-issued every second) continues, it doesn't re-strike
             cont = any(o is not e and o['kind'] == 'lightning' and abs(o['t'] + o['dur'] - t) < 0.06
                        and np.linalg.norm(np.subtract(o['pos'], e['pos'])) < 4.0 for o in ev)
             if cont or dur >= 0.9:   # (a second-long bolt is a sustained effect: thrusters, tethers)
-                M.place('crackle_loop', t, -12.0, e['pos'], dur=dur, gain_min=0.15)
+                put(e, 'crackle_loop', t, -12.0, e['pos'], dur=dur, gain_min=0.15)
                 continue
             if dur < 0.12 and e.get('length', 5) < 6:
-                M.place('zap_small', t, -9.0, e['pos'], gain_min=0.1)
+                put(e, 'zap_small', t, -9.0, e['pos'], gain_min=0.1)
             else:
                 if not near_strike(t, 0.04):
-                    M.place('zap_lightning', t, -2.0, e.get('p1') or e['pos'], gain_min=0.2)
+                    if not (e.get('auto') and cued('zap_lightning', t)):
+                        M.place('zap_lightning', t, -2.0, e.get('p1') or e['pos'], gain_min=0.2)
                     seen_strike.append(t)
                 if dur > 0.25:
-                    M.place('crackle_loop', t, -9.0, e['pos'], dur=dur, gain_min=0.15)
+                    put(e, 'crackle_loop', t, -9.0, e['pos'], dur=dur, gain_min=0.15)
                 if dur >= 0.25 and e.get('length', 0) >= 6:  # a long fat bolt: add a beam-like whomp
-                    M.place('beam_start', t, -5.0, e.get('p1') or e['pos'], rate=0.8, gain_min=0.2)
+                    put(e, 'beam_start', t, -5.0, e.get('p1') or e['pos'], rate=0.8, gain_min=0.2)
         elif k == 'beam':
             gold = _is_gold(e.get('color'))
-            if 'fire' not in par:
-                M.place('beam_start', t, -3.0, e['pos'], rate=0.85 if gold else 1.1, gain_min=0.2)
-            M.place('crackle_loop' if gold else 'beam_blue_loop', t, -6.0, e['pos'], dur=e['dur'], gain_min=0.2)
+            if not _fire_like(par):
+                put(e, 'beam_start', t, -3.0, e['pos'], rate=0.85 if gold else 1.1, gain_min=0.2)
+            elif 'fire' not in par and e['dur'] < 0.25:
+                continue   # a P.shot laser zap: its shot sound carries it (as Actor.fire's lasers)
+            put(e, 'crackle_loop' if gold else 'beam_blue_loop', t, -6.0, e['pos'], dur=e['dur'], gain_min=0.2)
         elif k == 'missile':
-            if 'fire' in par:
+            if _fire_like(par):
                 continue
-            M.place('shot_missile', t, -4.0, e['pos'], gain_min=0.15)
+            put(e, 'shot_missile', t, -4.0, e['pos'], gain_min=0.15)
         elif k == 'projectile':
-            if 'fire' in par or 'missile' in par:
+            if _fire_like(par) or 'missile' in par or 'W.missile' in par:
                 continue
             if e['speed'] >= 100:
-                M.place('shot_autocannon', t, -9.0, e['pos'], rate=1.08, gain_min=0.08)
+                put(e, 'shot_autocannon', t, -9.0, e['pos'], rate=1.08, gain_min=0.08)
             else:
-                M.place('shot_cannon', t, -5.0, e['pos'], gain_min=0.12)
+                put(e, 'shot_cannon', t, -5.0, e['pos'], gain_min=0.12)
         elif k == 'muzzle':
-            if 'fire' in par:
+            if _fire_like(par):
                 continue
             gun = any(abs(o['t'] - t) < 0.03 and o['kind'] == 'projectile' for o in ev if o is not e)
             # Terran orange and Arcadian gold are nearly the same colour: an orange flash with a
@@ -803,12 +1020,12 @@ def build(P, S):
             if gun:
                 continue  # the tracer's own event already carries the shot
             if _is_gold(e.get('color')) and not gun and arc_clip:
-                M.place('zap_lightning', t, 0.0 + 6 * math.log10(max(e.get('size', 1.0), 0.2)), e['pos'], gain_min=0.25)
+                put(e, 'zap_lightning', t, 0.0 + 6 * math.log10(max(e.get('size', 1.0), 0.2)), e['pos'], gain_min=0.25)
                 seen_strike.append(t)
             elif _is_gold(e.get('color')) and not gun:
-                M.place('shot_missile', t, -4.0, e['pos'], gain_min=0.15)
+                put(e, 'shot_missile', t, -4.0, e['pos'], gain_min=0.15)
             else:
-                M.place('shot_autocannon', t, -6.0, e['pos'], gain_min=0.15)
+                put(e, 'shot_autocannon', t, -6.0, e['pos'], gain_min=0.15)
         elif k == 'light':
             if par or not _is_gold(e.get('color')):
                 continue

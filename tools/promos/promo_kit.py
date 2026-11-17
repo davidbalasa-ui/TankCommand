@@ -397,12 +397,31 @@ class Actor:
             self.turret.keyframe_insert('rotation_euler', index=2, frame=self.P.T(t))
         return self
 
-    def split_barrels(self, max_frac=0.45, thin=0.42):
+    def split_barrels(self, max_frac=0.45, thin=0.42, adaptive=True):
         """Cut the gun barrel(s) off the turret mesh into their own object(s) so they can
         collapse back on recoil. Heuristic: the front-most run of thin cross-sections along +X.
-        Returns the barrel objects (also self.barrels)."""
+        Returns the barrel objects (also self.barrels).
+        adaptive: when nothing is found with the given settings, retry looser (thin + 0.04,
+        then max_frac >= 0.6 / thin >= 0.65: the settings scenes used to retry with by hand)."""
         if self.barrels:
             return self.barrels
+        tries = [(max_frac, thin)]
+        if adaptive:
+            tries += [(max_frac, thin + 0.04), (max(max_frac, 0.6), max(thin, 0.65))]
+        done = set()
+        for mf, th in tries:
+            if (mf, th) in done:
+                continue
+            done.add((mf, th))
+            res = self._split_barrels(mf, th)
+            if res:
+                if (mf, th) != (max_frac, thin):
+                    print(f'[promo_kit] split_barrels({self.name}): nothing at max_frac={max_frac} '
+                          f'thin={thin}; split with max_frac={mf} thin={th:.2f}')
+                return res
+        return []
+
+    def _split_barrels(self, max_frac, thin):
         host = None
         if self.turret:
             kids = [c for c in self.turret.children if c.type == 'MESH']
@@ -607,12 +626,16 @@ class Actor:
             key_hide(o, self.P.T(t), True)
         return self
 
-    def destroy(self, t, size=None, wreck=True, debris=14):
+    def destroy(self, t, size=None, wreck=True, debris=14, debris_speed=1.0, debris_height=1.0):
         """Big explosion; the unit breaks into pieces of its own model (promo_fx): a burning,
-        smoking wreck plus flying debris (wreck=False: debris only, no fire)."""
+        smoking wreck plus flying debris (wreck=False: debris only, no fire). debris_speed /
+        debris_height scale how fast and how high the pieces fly (1.0 = default)."""
         P = self.P
         import promo_fx
-        if promo_fx.find_flipbook('explo_ground') and promo_fx.destroy(self, t, size=size, wreck=wreck, debris=debris):
+        # fracture whenever any explosion flipbook is baked (explo_ground falls back to the others)
+        if promo_fx.find_flipbook('explo_ground') and promo_fx.destroy(self, t, size=size, wreck=wreck, debris=debris,
+                                                                       debris_speed=debris_speed,
+                                                                       debris_height=debris_height):
             self.vanish(t + 1 / P.fps)
             self.alive_until = t
             return self
@@ -1002,10 +1025,12 @@ class Promo:
         import promo_fx_weapons as W
         return W.projectile(self, p0, p1, t0, speed, color, size=size, arc=arc, streak=streak)
 
-    def missile(self, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True):
-        """Missile with a smoke trail, flying a lofted path. Returns hit time."""
+    def missile(self, p0, p1, t0, speed=32, color=None, arc=2.5, wobble=0.4, trail=True, size=1.0):
+        """Missile with a smoke trail, flying a lofted path. size scales the body, flame, light
+        and trail (1.0 = the ~0.8 m tactical missile). Returns hit time."""
         import promo_fx_weapons as W
-        return W.missile(self, p0, p1, t0, speed=speed, color=color, arc=arc, wobble=wobble, trail=trail)
+        return W.missile(self, p0, p1, t0, speed=speed, color=color, arc=arc, wobble=wobble, trail=trail,
+                         size=size)
 
     def lightning(self, p0, p1, t0, t1, color=None, width=0.05, jag=0.18, branches=2, segs=10, glow=True):
         """Arcadian gold lightning p0 -> p1, re-striking every 2-3 frames with forks. p0/p1 may be
@@ -1014,10 +1039,13 @@ class Promo:
         return W.lightning(self, p0, p1, t0, t1, color=color, width=width, jag=jag, branches=branches,
                            segs=segs, glow=glow)
 
-    def beam(self, p0, p1, t0, t1, color, width=0.15, strength=10):
-        """Solid energy beam with a flickering width."""
+    def beam(self, p0, p1, t0, t1, color, width=0.15, strength=None, light_energy=None):
+        """Solid energy beam with a flickering width. strength: glow brightness (default 8;
+        10 was the old default, which clips under the Standard view transform); light_energy:
+        the contact light in W (the mid-beam fill light scales with it; 0 = no lights;
+        default from strength and beam length)."""
         import promo_fx_weapons as W
-        return W.beam(self, p0, p1, t0, t1, color, width=width, strength=strength)
+        return W.beam(self, p0, p1, t0, t1, color, width=width, strength=strength, light_energy=light_energy)
 
     def shot(self, p0, target, kind, t, color=None, **kw):
         """Fire from a point (ships without turrets): p0 = point, Actor, Object or
@@ -1338,7 +1366,11 @@ class Promo:
             rows = (len(picks) + cols - 1) // cols
             w, h = res
             lay = '|'.join(f'{(i % cols) * w}_{(i // cols) * h}' for i in range(len(picks)))
-            sheet = os.path.join(out, f'{self.id}_stills.jpg')
+            # the key-stills sheet spans the clip; a partial re-check (a few frames) gets its own
+            # sheet so it never overwrites the full one
+            full = min(picks) <= 1 + self.nf * 0.15 and max(picks) >= self.nf * 0.8
+            sheet = os.path.join(out, f'{self.id}_stills.jpg' if full
+                                 else f'{self.id}_stills_f{min(picks)}-{max(picks)}.jpg')
             subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', *ins, '-filter_complex',
                             ''.join(f'[{i}]' for i in range(len(picks))) + f'xstack=inputs={len(picks)}:layout={lay}:fill=black',
                             '-q:v', '3', sheet], check=True)
@@ -1364,7 +1396,11 @@ class Promo:
             _audio.mix_and_mux(self, mp4)  # sound mix muxed in (promo_audio.py); PROMO_AUDIO=0 = off
             # contact sheet of 8 frames for review
             pick = [files[int(i * (len(files) - 1) / 7)] for i in range(8)]
-            sheet = os.path.join(out, f'{self.id}_{q}_sheet.jpg')
+            # a --frames range that does not cover the clip gets its own sheet name
+            nums = [int(f_[2:-4]) for f_ in files if f_[2:-4].isdigit()]
+            full = not nums or (min(nums) <= 1 + step and max(nums) >= self.nf - step)
+            sheet = os.path.join(out, f'{self.id}_{q}_sheet.jpg' if full
+                                 else f'{self.id}_{q}_sheet_f{min(nums)}-{max(nums)}.jpg')
             ins = []
             for p_ in pick:
                 ins += ['-i', os.path.join(frames, p_)]

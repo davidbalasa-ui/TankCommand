@@ -41,14 +41,20 @@ import promo_kit as K
 LIB_DIRS = [d for d in os.environ.get('PROMO_FLIPBOOKS', '').split(os.pathsep) if d] + [
     '/mnt/project-files/fx-library/flipbooks']
 
-# Wanted effect -> flipbook names to try (first found wins). Globs allowed.
+# Wanted effect -> flipbook names to try (first found wins). Globs allowed. Each explosion
+# falls back to the nearest baked explosion that exists (card sizes come from each flipbook's
+# own extent_m, so a stand-in still lands at the right size); when none at all is baked,
+# lookups return None and the callers use the kit's procedural effects.
+_EXPLO_ANY = ['explo_ground_a', 'explo_ground', 'explosion_ground*', 'explo_big*', 'explo_air*',
+              'explosion_air*', 'explo_small*', 'explosion_small*']
 ALIASES = {
-    'explo_ground': ['explo_ground_a', 'explo_ground_b', 'explosion_ground*'],
-    'explo_air': ['explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
-    'explo_space': ['explo_space*', 'explosion_space*', 'explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'],
-    'explo_small': ['explo_small*', 'explosion_small*', 'explo_ground'],
+    'explo_ground': ['explo_ground_a', 'explo_ground_b', 'explosion_ground*'] + _EXPLO_ANY,
+    'explo_air': ['explo_air*', 'explosion_air*', 'explo_ground_a', 'explo_ground*'] + _EXPLO_ANY,
+    'explo_space': ['explo_space*', 'explosion_space*', 'explo_air*', 'explosion_air*', 'explo_ground_a',
+                    'explo_ground*'] + _EXPLO_ANY,
+    'explo_small': ['explo_small*', 'explosion_small*', 'explo_ground'] + _EXPLO_ANY,
     'explo_ground_arc': ['explo_ground_arc'],
-    'explo_big': ['explo_big*'],
+    'explo_big': ['explo_big*', 'explosion_big*', 'explo_ground_a', 'explo_ground'] + _EXPLO_ANY,
     'fire_loop': ['fire_loop*', 'fire_*'],
     'smoke_plume': ['smoke_plume*', 'smoke_column*'],
     'smoke_puff': ['smoke_puff*', 'smoke_burst*', 'smoke_trail*', 'smoke_small*'],
@@ -241,12 +247,14 @@ def card(P, name, pos, t, size=1.0, mode='camera', speed=1.0, tint=None, rot_jit
     em_val = emission if emission is not None else man['emission']
     mat = _card_mat(man, f0, loop, rate, f1, tint, opacity, em_val, phase)
     e = K.link(bpy.data.objects.new('FxCard_' + man['name'], None))
+    e['fx_helper'] = 'card'
     e.empty_display_size = 0.3
     if parent is not None:
         e.parent = parent
     e.location = K.V(pos)
     me = _plane_mesh(man, size)
     pl = K.link(bpy.data.objects.new('FxCardPlane_' + man['name'], me))
+    pl['fx_helper'] = 'card'
     pl.parent = e
     if not me.materials:
         me.materials.append(mat)
@@ -751,8 +759,29 @@ def _ancestors(o, stop):
         p = p.parent
 
 
+def _glow_only(m):
+    """A kit emission material (emit_mat / FxGlow / shield...): glow, not hull plating."""
+    if m is None or not m.get('emit_node'):
+        return False
+    nt = m.node_tree
+    return nt is None or not any(n.bl_idname == 'ShaderNodeBsdfPrincipled' for n in nt.nodes)
+
+
+def _is_fx_helper(o, stop=None):
+    """Bolts, glows, cards, sparks, lights... hung on a model: never part of the wreck. Kit helpers
+    carry the 'fx_helper' tag (or the W.glow 'fx_e' property); scene-made glow meshes are caught by
+    their emission-only kit materials. Checks the ancestors up to `stop` too."""
+    for c in [o] + list(_ancestors(o, stop)):
+        if c.get('fx_helper') or 'fx_e' in c.keys():
+            return True
+    if o.type == 'MESH' and o.material_slots and all(_glow_only(s.material) for s in o.material_slots):
+        return True
+    return False
+
+
 def _collect_meshes(actor, t):
-    """Visible mesh objects of the actor at time t, grouped: 'hull' and pivot sub-trees."""
+    """Visible mesh objects of the actor at time t, grouped: 'hull' and pivot sub-trees.
+    Effect helpers parented under the model (bolts, glow cards, thruster cores...) are skipped."""
     P = actor.P
     bpy.context.scene.frame_set(int(round(P.T(t))))
     groups = {}
@@ -760,6 +789,8 @@ def _collect_meshes(actor, t):
         if o.type != 'MESH':
             continue
         if o.hide_render or 'shield' in o.name.lower():
+            continue
+        if _is_fx_helper(o, actor.model_root):
             continue
         # the folded carrier / packed-only parts of structures never join the wreck
         chain = [o] + list(_ancestors(o, actor.model_root))
@@ -925,6 +956,7 @@ def sparks(P, pos, t, n=24, speed=9.0, color=None, life=(0.35, 1.0), size=1.0, u
     space = _space(P)
     for i in range(n):
         o = K.link(bpy.data.objects.new('FxSpark', me))
+        o['fx_helper'] = 'spark'
         if not me.materials:
             me.materials.append(mat)
         for attr in ('visible_shadow', 'visible_diffuse', 'visible_glossy'):
@@ -1020,7 +1052,8 @@ def explosion(P, pos, t, size=2.0, debris=8, smoke=True, light=True, style=None)
     if light:
         P.light(pos + Vector((0, 0, size * 0.6)), t, (1.0, 0.5, 0.18), energy=500 * size * size, dur=0.4,
                 radius=size * 0.5)
-    sparks(P, pos + Vector((0, 0, size * 0.1)), t, n=int(10 + 6 * size), speed=5 + 3 * size, size=size * 0.6,
+    ss = min(size, 8.0)     # huge blasts (ship kills) keep a sane spark count / speed
+    sparks(P, pos + Vector((0, 0, size * 0.1)), t, n=int(10 + 6 * ss), speed=5 + 3 * ss, size=ss * 0.6,
            up=0.0 if space else 0.6)
     if debris:
         _dirt_chunks(P, pos if air else Vector((pos.x, pos.y, gz + 0.1)), t, size, debris, air)
@@ -1120,8 +1153,17 @@ def smoke_column(P, pos, t0, t1, size=1.0):
 
 
 # ============================================================================ destroy
-def destroy(actor, t, size=None, wreck=True, debris=14):
+DEBRIS_SIZE_CAP = 10.0   # unit size (m) above which debris speed / spark count stop growing
+
+
+def destroy(actor, t, size=None, wreck=True, debris=14, debris_speed=1.0, debris_height=1.0):
+    """Fracture the actor's own meshes into flying, burning pieces (see the module docstring).
+    debris_speed scales how fast the pieces are thrown; debris_height scales how high they
+    arc (apex height; 0.5 = half as high, shorter hang time). Both 1.0 = the default look.
+    Returns False when the actor has no usable meshes (callers fall back)."""
     P = actor.P
+    debris_speed = max(0.0, float(debris_speed))
+    vz_k = math.sqrt(max(0.0, float(debris_height)))
     rnd = random.Random(zlib.crc32(("%s|%.3f" % (actor.name, t)).encode()))
     size = size or actor.size * 0.5
     f_t = P.T(t)
@@ -1158,7 +1200,8 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
     # hover units (a metre or two up) are ground units whose wreck drops and crashes; only real
     # flyers break up in the air
     air = space or (lo.z - gz > max(2.5, 0.8 * H) and kind != 'structure')
-    S = max(0.4, actor.size / 4.5)
+    # blast scale: grows with the unit up to ~10 m (a 114 m ship must not throw 660 sparks at 250 m/s)
+    S = max(0.4, min(actor.size, DEBRIS_SIZE_CAP) / 4.5)
     blast_dir = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), 0)).normalized()
     blast = center + blast_dir * R * 0.35 - Vector((0, 0, H * 0.15))
     # ---------------------------------------------------------------- cells per group
@@ -1249,12 +1292,17 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         else:
             v = dirn * rnd.uniform(1.5, 4.0) * S + Vector((0, 0, rnd.uniform(2.5, 5.5) * S ** 0.5))
             w = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized() * rnd.uniform(2.5, 7)
+        if debris_speed != 1.0:
+            v = v * debris_speed
+            w = w * debris_speed ** 0.5
+        if vz_k != 1.0 and not air:
+            v.z *= vz_k            # apex height ~ vz^2: debris_height scales the arc height
         if air:
-            v = v_unit * rnd.uniform(0.75, 1.0) + dirn * (v.length * 0.6) + Vector((0, 0, rnd.uniform(0, 2)))
+            v = v_unit * rnd.uniform(0.75, 1.0) + dirn * (v.length * 0.6) + Vector((0, 0, rnd.uniform(0, 2) * vz_k))
         elif kind != 'structure':
             v = v + Vector((v_unit.x, v_unit.y, 0)) * rnd.uniform(0.4, 0.7)   # keep some momentum
         if space:
-            v = v_unit + dirn * rnd.uniform(1.0, 4.0) * S
+            v = v_unit + dirn * rnd.uniform(1.0, 4.0) * S * debris_speed
             w = w * 0.5
         b = Body(pc['hull_pts'], pc['hull_f'], pc['vol'] * 2.0, pc['com'], v, w)
         pc['body'] = b
@@ -1301,8 +1349,10 @@ def destroy(actor, t, size=None, wreck=True, debris=14):
         epos = center
     else:
         epos = Vector((blast.x, blast.y, max(gz + min(0.5, H * 0.2), lo.z + 0.3 * H)))   # hover: at the unit
-    explosion(P, epos, t, size=size, debris=0, smoke=False, light=True,
-              style='gold' if accent == 'gold' else None)
+    if not explosion(P, epos, t, size=size, debris=0, smoke=False, light=True,
+                     style='gold' if accent == 'gold' else None):
+        # no explosion flipbook baked at all: the kit's procedural fireball
+        P.explosion(epos, t, size=size, debris=0, smoke=False, light=True)
     sparks(P, center, t, n=int(26 * S + 10), speed=10 * S, color=col, size=S, terr=terr,
            extra_v=v_unit if air else None)
     if accent == 'orange':   # a few cyan electrical sparks as Terran power systems short out
@@ -1416,14 +1466,76 @@ def _burn(P, pc, t, size, terr, air, smoke=True, light=True, delay=True):
     local = q.to_matrix().transposed() @ (top - x)
     local.z -= 0.12 * pc['ext']
     fs = max(0.4, min(1.8, pc['ext'] * 0.58))
-    fire_patch(P, local, t_fire, P.seconds + 0.5, size=fs, parent=o, light=light)
+    if not fire_patch(P, local, t_fire, P.seconds + 0.5, size=fs, parent=o, light=light):
+        _proc_fire(P, local, t_fire, P.seconds + 0.5, fs, o, light)
     if smoke:
-        smoke_column(P, top + Vector((0, 0, 0.1)), t_fire + 0.25, P.seconds + 0.5, size=max(0.7, fs * 1.4))
+        sp = top + Vector((0, 0, 0.1))
+        if not smoke_column(P, sp, t_fire + 0.25, P.seconds + 0.5, size=max(0.7, fs * 1.4)):
+            _proc_smoke(P, sp, t_fire + 0.25, P.seconds + 0.5, max(0.7, fs * 1.4))
+
+
+def _proc_fire(P, local, t0, t1, size, parent, light=True):
+    """No fire flipbook: the kit's soft procedural flames (Promo.fire_patch) riding a piece."""
+    fm = P.soft_fire_mat()
+    rnd = P.rnd
+    for i in range(4):
+        o = K.sphere('Flame', 1.0, fm, seg=(12, 8))
+        o['fx_helper'] = 'flame'
+        o.visible_shadow = False
+        o.parent = parent
+        o.location = K.V(local) + Vector((rnd.uniform(-.4, .4), rnd.uniform(-.4, .4), 0)) * size * 2
+        f = P.T(t0)
+        while f < P.T(t1):
+            s_ = size * rnd.uniform(0.25, 0.45)
+            o.scale = (s_, s_, s_ * 2.0)
+            o.color = (1.0, rnd.uniform(0.22, 0.4), 0.04, rnd.uniform(0.5, 0.9))
+            o.keyframe_insert('scale', frame=f)
+            o.keyframe_insert('color', frame=f)
+            f += 2
+        K.show_between(o, P.T(t0), P.T(t1) + 1)
+    if light:
+        L = K.link(bpy.data.objects.new('FxFireLight', bpy.data.lights.new('FxFireLight', 'POINT')))
+        L['fx_helper'] = 'fire_light'
+        L.data.color = (1.0, 0.45, 0.12)
+        L.data.shadow_soft_size = size * 0.6
+        L.parent = parent
+        L.location = K.V(local) + Vector((0, 0, size * 0.8))
+        f = P.T(t0)
+        L.data.energy = 0
+        L.data.keyframe_insert('energy', frame=f - 1)
+        while f < P.T(t1):
+            L.data.energy = (260 * size * size + 60) * rnd.uniform(0.7, 1.15)
+            L.data.keyframe_insert('energy', frame=f + 3)
+            f += 3
+        L.data.energy = 0
+        L.data.keyframe_insert('energy', frame=P.T(t1) + 1)
+
+
+def _proc_smoke(P, pos, t0, t1, size):
+    """No smoke flipbook: soft volumetric puffs rising from pos (promo_fx_weapons.smoke_puff)."""
+    import promo_fx_weapons as W
+    rnd = P.rnd
+    tt = t0
+    while tt < min(t1, P.seconds):
+        W.smoke_puff(P, K.V(pos) + Vector((rnd.uniform(-.3, .3), rnd.uniform(-.3, .3), 0.2)) * size, tt,
+                     r0=0.15 * size, r1=rnd.uniform(0.5, 0.9) * size, life=2.2,
+                     vel=(rnd.uniform(-.3, .3), rnd.uniform(-.3, .3), 1.6 * size), color=(0.2, 0.18, 0.17),
+                     dens=0.45)
+        tt += 0.15
 
 
 def _smoke_trail(P, pc, t, size):
     """Smoke puffs left behind a falling piece until it lands."""
     if find_flipbook('smoke_puff') is None and find_flipbook('smoke_plume') is None:
+        import promo_fx_weapons as W      # no smoke flipbook: volumetric puffs instead
+        b = pc['body']
+        t_land = b.landed if b.landed is not None else P.seconds
+        tt = t + 0.05
+        k = max(0.25, pc['ext'] * 0.35)
+        while tt < min(t_land, P.seconds):
+            x, q = pose_at(b, P.T(tt))
+            W.smoke_puff(P, x, tt, r0=0.3 * k, r1=1.2 * k, life=1.4, color=(0.2, 0.18, 0.17), dens=0.5)
+            tt += 0.09
         return
     name = 'smoke_puff' if find_flipbook('smoke_puff') else 'smoke_plume'
     b = pc['body']
