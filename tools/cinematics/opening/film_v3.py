@@ -21,7 +21,7 @@ FPS = 24
 # scene id: seconds (order = film order)
 SCENES = [('s01', 8.0), ('s02', 8.0), ('s03', 3.0), ('s04', 9.0), ('s05', 9.0), ('s06', 5.0), ('s07', 6.0),
           ('s08', 19.0), ('s10', 5.0), ('s11', 5.0), ('s12', 12.0), ('s13', 10.0), ('s14', 6.0),
-          ('s15', 5.0), ('s16', 5.0)]
+          ('s15', 8.0), ('s16', 8.0)]
 # fades baked into frames at stitch time: scene -> [(kind, seconds)]
 FADES = {'s11': [('out_white', 0.5)], 's12': [('in_white', 0.4)]}
 QUALITY = {
