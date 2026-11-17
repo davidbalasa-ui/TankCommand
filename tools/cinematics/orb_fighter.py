@@ -614,8 +614,16 @@ def animate_orb(root, legs, f0, f1, grabs=(), f_die=None, seed=3, fps=24, scale=
                     tgt = hold + rad * 6.5 - ax * 1.8 + tan * g['spin'] * 3.0   # rip it apart
                     w, z, stroking = 26.0, 0.5, 0.9
             if f_die is not None and f >= f_die:
-                tgt = b + (rad * 1.0 + tan * (rnd.random() - 0.5)).normalized() * L * 1.1
-                w, z, stroking = 18.0, 0.3, 0.0
+                S.setdefault('dtan', rnd.random() - 0.5)          # one fling direction per leg (no per-frame jitter)
+                if f < f_die + 14:                                # the blast flings every arm out
+                    tgt = b + (rad * 1.0 + tan * S['dtan']).normalized() * L * 1.1
+                    w, z, stroking = 18.0, 0.3, 0.0
+                else:                                            # then dead: limp, slowly folding and drifting
+                    td = (f - f_die - 14) / fps
+                    tgt = b + (rad * 0.8 - ax * 0.45 + tan * (S['dtan'] + 0.35 * math.sin(td * 0.7 + S['ph']))
+                               ).normalized() * L * 0.62
+                    w, z, stroking = 3.2, 0.22, 0.0
+                    S['wave_k'] = 0.35
             # ---- its own physics: carry last frame's tip through the body's spin, push it with the body's
             # acceleration, then spring toward where the leg wants to be
             x = R_delta @ S['x']

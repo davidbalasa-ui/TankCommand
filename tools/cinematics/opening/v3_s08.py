@@ -176,7 +176,7 @@ def build(draft=True):
     # leg motion: every leg on its own clock (stroke, reach, clutch, swirl), see orb_fighter.animate_orb
     # every leg on its own physics, stroke clock and thruster; two grabs with different legs
     hold = Vector((OF.ORB_RC + 3.3, 0, 0))
-    OF.animate_orb(orb, legs, 1, fr(T_DIE) + 31, seed=8, scale=ORB_K, f_die=fr(T_DIE),
+    OF.animate_orb(orb, legs, 1, nf, seed=8, scale=ORB_K, f_die=fr(T_DIE),
                    grabs=[dict(f_reach=fr(T_REACH1) - 4, f_grab=fr(T_GRAB1), f_tear=fr(T_TEAR1), hold=hold,
                                legs=[0, 1, 3, 4, 6]),
                           dict(f_reach=fr(T_REACH2) - 4, f_grab=fr(T_GRAB2), f_tear=fr(T_TEAR2), hold=hold,
@@ -321,7 +321,7 @@ def build(draft=True):
     SP.shards(pd, fr(T_DIE), 90, (1.0, 0.7, 0.3), 0.9, 45, seed=77, life=2.2, kind='hex', strength=10.0)
     SP.spark_stream(pd, fr(T_DIE), fr(T_DIE) + 10, (1.0, 0.6, 0.2), Vector((0, 0, 0)), 78, n=14, size=0.8, speed=60,
                     life=1.2)
-    # the Orb breaks: core and thrusters die, legs fling out as it swells apart, then it is gone
+    # the Orb breaks: core and thrusters die, legs fling out
     for o in orb.children_recursive:
         if 'Plume' in o.name or 'Core' in o.name:
             o.hide_render = False
@@ -329,15 +329,43 @@ def build(draft=True):
             o.hide_render = True
             o.keyframe_insert('hide_render', frame=fr(T_DIE))
             SP._interp_where(o, 'hide_render', 'CONSTANT')
+    # it does not vanish: the blast swells it a little, then the dead wreck drifts on along its charge, tumbling
+    # slowly, arms gone limp, its core a cooling ember
     rig.keyframe_insert('scale', frame=fr(T_DIE))
-    rig.scale = (ORB_K * 1.8, ORB_K * 1.8, ORB_K * 1.8)
-    rig.keyframe_insert('scale', frame=fr(T_DIE) + 30)
-    for x in [orb] + list(orb.children_recursive):
-        x.hide_render = False
-        x.keyframe_insert('hide_render', frame=1) if 'Plume' not in x.name and 'Core' not in x.name else None
-        x.hide_render = True
-        x.keyframe_insert('hide_render', frame=fr(T_DIE) + 31)
-        SP._interp_where(x, 'hide_render', 'CONSTANT')
+    rig.scale = (ORB_K * 1.2,) * 3
+    rig.keyframe_insert('scale', frame=fr(T_DIE) + 8)
+    rig.scale = (ORB_K * 1.12,) * 3
+    rig.keyframe_insert('scale', frame=fr(T_DIE) + 24)
+    drift = (lane * 1.0 + Vector((0, 0, -0.35))).normalized()
+    sc_.frame_set(fr(T_DIE) + 2)
+    q0 = rig.rotation_quaternion.copy()
+    sc_.frame_set(1)
+    from mathutils import Quaternion as _Q
+    tumble_ax = (s1_ * 0.8 + s2_ * 0.6).normalized()
+    for f_ in range(fr(T_DIE) + 3, nf + 1, 3):
+        tt = (f_ - fr(T_DIE)) / 24.0
+        rig.location = pd + drift * (9.0 * tt - 2.2 * tt * tt / 3.7) + Vector((0, 0, -0.5 * tt))
+        rig.keyframe_insert('location', frame=f_)
+        rig.rotation_quaternion = _Q(tumble_ax, math.radians(38 * tt)) @ q0
+        rig.keyframe_insert('rotation_quaternion', frame=f_)
+    # the dead core: a dark cooling ember with a dull orange glow that gutters out
+    ember = SP.C.uv_sphere('OrbEmber', OF.ORB_RC * 0.92, seg=(32, 16),
+                           mat=OF._core_mat('OrbEmberM', hot=(0.55, 0.13, 0.015), rim=(0.12, 0.02, 0.0), kh=0.55, kr=0.08))
+    ember.parent = orb
+    ember.location = (OF.ORB_X, 0, 0)
+    show(ember, fr(T_DIE), nf)
+    el = bpy.data.objects.new('OrbEmberLight', bpy.data.lights.new('OrbEmberLight', 'POINT'))
+    V.link(el)
+    el.parent = orb
+    el.data.color = (1.0, 0.4, 0.08)
+    for f_, e_ in [(fr(T_DIE), 900.0), (fr(T_DIE) + 20, 260.0), (fr(T_DIE) + 40, 160.0), (nf, 50.0)]:
+        el.data.energy = e_
+        el.data.keyframe_insert('energy', frame=f_)
+    for i_, t_ in enumerate((0.4, 1.3, 2.1, 3.0)):                 # last crackles of dying lightning
+        sc_.frame_set(fr(16.0 + t_))
+        SP.spark_stream(rig.matrix_world.translation.copy(), fr(16.0 + t_), fr(16.0 + t_) + 3, (1.0, 0.7, 0.3),
+                        drift * 0.2, 400 + i_, n=4, size=0.35, speed=18, life=0.6)
+    sc_.frame_set(1)
     # ---------------------------------------------------------------- cameras
     def cam_follow(ob, t, off, look_off=Vector((0, 0, 0))):
         p = at(ob, t)
@@ -382,6 +410,14 @@ def build(draft=True):
     c1_, l1_ = d2cam(16.0, pd)
     sc.shot('D2', fr(T_HIT), fr(16.0) - 1, [(fr(T_HIT), c0_, l0_, 36), (fr(16.0) - 1, c1_ + perp * 8, l1_, 36)],
             shake=[(fr(T_HIT), 1.5, 14), (fr(T_DIE), 4.0, 24)])
-    sc.shot('E', fr(16.0), nf,
-            [(fr(16.0), pd + Vector((-70, -60, 20)), pd, 26), (nf, pd + Vector((-80, -75, 24)), at(tf, 18.0) * 0.4 + pd * 0.6, 26)])
+    # E: close on the drifting wreck, the frigate sliding past behind it
+    def ecam(t):
+        w_ = at(rig, t)
+        t_ = at(tf, t)
+        aw = (w_ - t_).normalized()
+        side = aw.cross(UP).normalized()
+        return w_ + aw * 44 + side * 34 - UP * 12, w_ * 0.55 + t_ * 0.45
+    e0, l0 = ecam(16.0)
+    e1, l1 = ecam(18.9)
+    sc.shot('E', fr(16.0), nf, [(fr(16.0), e0, l0, 30), (nf, e1 + (e1 - l1).normalized() * 4, l1, 30)])
     return sc
