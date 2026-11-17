@@ -61,10 +61,25 @@ test('[MSN-06] trigger messages show as a toast and the objectives sheet works b
   await gotoQuiet(page);
   await waitForHook(page);
   await openTrainingMission(page, true);
+  // The toast lasts 6 s of wall time, which a slow runner's long frames can use up before the
+  // next check gets a turn, so the page records every toast as it is added.
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { seenToasts: string[] }).seenToasts = seen;
+    new MutationObserver(() => {
+      for (const toast of document.querySelectorAll('.hud-toast')) {
+        const text = toast.textContent ?? '';
+        if (!seen.includes(text)) seen.push(text);
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   await page.getByRole('button', { name: 'Start mission', exact: true }).click();
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'inGame');
-  await expect(page.locator('.hud-toast')).toBeVisible();
-  await expect(page.locator('.hud-toast')).toContainText('Command');
+  await expect
+    .poll(async () => page.evaluate(() => (window as unknown as { seenToasts: string[] }).seenToasts.join('\n')), {
+      timeout: 30_000,
+    })
+    .toContain('Command');
   const open = page.getByRole('button', { name: 'Objectives', exact: true });
   await open.tap();
   await expect(page.locator('.objective-list li')).toHaveCount(2);
