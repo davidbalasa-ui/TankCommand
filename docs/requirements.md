@@ -120,6 +120,7 @@
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | HINT-01 | Hint bubbles grow to fit their text on a phone screen instead of cutting it off, and every mission objective, mission message and help hint stays within the word limits set in src/ui/textLimits.ts. |
 | PART-01 | Model parts with anim extras (spin or swing about their own axis) move only while their condition holds (always, mining, working, moving), use busySpeed while working, and a spinning TurretPivot is never aimed. |
+| PART-02 | Firing parts play on each shot the unit fires: recoil parts (telescoping barrels) slide back and return, launch parts (missiles) fly out, vanish and reload, swing and slide snaps (lids, pod nods) kick and settle, and the model's scene fire kick rocks the hull away from the gun. A shot plays the parts whose delay falls on its place in the art's firing cycle. Low quality skips the snaps but keeps barrels and missiles. |
 | PAN-01 | A flick of the map keeps the camera gliding after the finger lifts and slows it smoothly to a stop; a finger that rests before lifting, or a new touch, stops it. Two fingers moving together pan the map. |
 | TITLE-01 | The title screen shows a live skirmish behind the menu: raids keep arriving at a Terran pad and its defenders, the fight never ends and nothing in it is saved or scored. |
 | DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |

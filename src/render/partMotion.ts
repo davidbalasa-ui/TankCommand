@@ -17,6 +17,23 @@
 //
 // A TurretPivot that carries an anim is a spinner, not an aimed turret.
 //
+// Firing parts (timed from the unit's shots; see fireUnit):
+//
+//   { type: 'recoil', axis, dist, attack, recover, delay, repeat?, every? }
+//       slides back along -axis by dist * hit(tf - delay) (telescoping barrel sleeves)
+//   { type: 'slide', axis, amp, speed, phase?, snap?, attack?, recover? }
+//       offset = amp * sin(2 pi speed t + phase) + snap * hit(tf) metres along axis
+//   { type: 'swing', ..., phase?, snap?, attack?, recover? }   adds snap * hit(tf) radians
+//   { type: 'launch', axis, delay, travel, dur, reload }
+//       a missile: in its tube until tf >= delay, flies travel * (x / dur)^2 out along axis, is
+//       hidden until tf >= reload, then sits back in its tube
+//
+// hit(x) = x / attack while x < attack, then (1 - (x - attack) / recover)^2 until 0. The art's
+// delays describe a whole firing cycle (the scene's extras.fire `repeat` shots `every` seconds
+// apart: a Lancer's lances in turn, a Javelin's four tubes); the sim fires one projectile per
+// shot, so each projectile plays the parts whose delay falls on its place in that cycle, at once.
+// 'flash' and 'flicker' parts are not played here (the game draws its own muzzle blasts).
+//
 // A scroll part does not move its node: it writes the texture offset to userData.uvScroll on each
 // mesh under it, and the unit instancing (unitInstances.ts) passes that per instance to the
 // shader, so every tank's treads run on their own.
@@ -25,12 +42,51 @@ import * as THREE from 'three';
 export type PartMotionWhen = 'always' | 'mining' | 'working' | 'moving';
 
 export interface PartMotionSpec {
-  type: 'spin' | 'swing' | 'scroll';
+  type: 'spin' | 'swing' | 'scroll' | 'slide' | 'recoil' | 'launch';
   axis: THREE.Vector3;
   speed: number;
   amp: number;
   when: PartMotionWhen;
   busySpeed: number | null;
+  /** Firing timing, for recoil, launch and swing or slide parts with a snap. */
+  fire: PartFireSpec | null;
+  /** Swing and slide: starting phase (radians), so paired parts move out of step. */
+  phase?: number;
+}
+
+/** How a part reacts to the unit firing. */
+export interface PartFireSpec {
+  /** recoil: distance (metres); swing: radians; slide: metres; launch: travel (metres). */
+  snap: number;
+  attack: number;
+  recover: number;
+  delay: number;
+  repeat: number;
+  every: number;
+  /** launch only: flight time and when (seconds after the shot) the tube is filled again. */
+  dur: number;
+  reload: number;
+}
+
+/** The model's whole-body firing kick (glTF scene extras.fire). */
+export interface FireKick {
+  kick: number;
+  slide: number;
+  attack: number;
+  recover: number;
+  /** Shots in one firing cycle and the spacing of the art's delays between them. */
+  repeat: number;
+  every: number;
+}
+
+/** Per-unit firing state: when it last fired and where in its firing cycle it is. */
+export interface UnitFiring {
+  kick: FireKick | null;
+  /** Seconds (renderer clock) of the last shot; -Infinity before the first. */
+  shotAt: number;
+  shots: number;
+  /** True when barrels recoil on their own (the whole turret then stays put). */
+  barrels: boolean;
 }
 
 export interface PartMotion {
@@ -43,6 +99,16 @@ export interface PartMotion {
   blend: number;
   /** Scroll only: texture tiles per metre along +X on the top run (signed), or null if unknown. */
   tilesPerMetre: number | null;
+  /** Rest position and scale (slide, recoil and launch move or hide the node). */
+  restPos: THREE.Vector3;
+  restScale: THREE.Vector3;
+  /** The axis in the parent's space (the node's own axis turned by its rest rotation). */
+  dir: THREE.Vector3;
+  /** Renderer-clock seconds of the shot this part last answered, and its delays after it. */
+  shotAt: number;
+  offsets: number[];
+  /** A firing part still moving (false once it has settled back at rest). */
+  live: boolean;
 }
 
 /** What the owning unit or structure is doing this frame. */
@@ -54,6 +120,10 @@ export interface PartMotionState {
   pace?: number;
   /** Ground speed in world units per second; drives tread scroll. */
   travel?: number;
+  /** Renderer clock (seconds), for firing parts. */
+  time?: number;
+  /** Low quality: skip the small extras (snaps, sliding masts); barrels and missiles still play. */
+  lite?: boolean;
 }
 
 /** userData key a scrolling mesh carries its texture offset (in tiles) under. */
@@ -80,28 +150,159 @@ export function readPartMotion(raw: unknown): PartMotionSpec | null {
     if (typeof item.speed !== 'number' || !Number.isFinite(item.speed)) {
       return null;
     }
-    return { type: 'scroll', axis: new THREE.Vector3(1, 0, 0), speed: item.speed, amp: 0, when, busySpeed: busy };
+    return { type: 'scroll', axis: new THREE.Vector3(1, 0, 0), speed: item.speed, amp: 0, when, busySpeed: busy, fire: null };
+  }
+  const type = item.type;
+  if (type !== 'spin' && type !== 'swing' && type !== 'slide' && type !== 'recoil' && type !== 'launch') {
+    return null;
   }
   const axis = item.axis;
-  if (
-    (item.type !== 'spin' && item.type !== 'swing') ||
-    !Array.isArray(axis) ||
-    axis.length !== 3 ||
-    !axis.every((value) => typeof value === 'number' && Number.isFinite(value)) ||
-    typeof item.speed !== 'number' ||
-    !Number.isFinite(item.speed)
-  ) {
+  if (!Array.isArray(axis) || axis.length !== 3 || !axis.every((value) => typeof value === 'number' && Number.isFinite(value))) {
     return null;
   }
   const vector = new THREE.Vector3(axis[0] as number, axis[1] as number, axis[2] as number);
   if (vector.lengthSq() < 1e-8) {
     return null;
   }
-  const amp = typeof item.amp === 'number' && Number.isFinite(item.amp) ? item.amp : 0;
-  if (item.type === 'swing' && amp === 0) {
+  vector.normalize();
+  if (type === 'recoil' || type === 'launch') {
+    const size = num(type === 'recoil' ? item.dist : item.travel, type === 'recoil' ? 0 : 9);
+    if (size === 0) {
+      return null;
+    }
+    const fire: PartFireSpec = {
+      snap: size,
+      attack: Math.max(1e-3, num(item.attack, 0.04)),
+      recover: Math.max(1e-3, num(item.recover, 0.45)),
+      delay: Math.max(0, num(item.delay, 0)),
+      repeat: Math.max(1, Math.round(num(item.repeat, 1))),
+      every: Math.max(0, num(item.every, 0)),
+      dur: Math.max(1e-3, num(item.dur, 0.45)),
+      reload: num(item.reload, 2.4),
+    };
+    return { type, axis: vector, speed: 0, amp: 0, when: 'always', busySpeed: null, fire };
+  }
+  if (typeof item.speed !== 'number' || !Number.isFinite(item.speed)) {
     return null;
   }
-  return { type: item.type, axis: vector.normalize(), speed: item.speed, amp, when, busySpeed: busy };
+  const amp = num(item.amp, 0);
+  const snap = num(item.snap, 0);
+  if (type !== 'spin' && amp === 0 && snap === 0) {
+    return null;
+  }
+  const fire: PartFireSpec | null =
+    type !== 'spin' && snap !== 0
+      ? {
+          snap,
+          attack: Math.max(1e-3, num(item.attack, 0.04)),
+          recover: Math.max(1e-3, num(item.recover, 0.45)),
+          delay: 0,
+          repeat: 1,
+          every: 0,
+          dur: 0,
+          reload: 0,
+        }
+      : null;
+  const phase = num(item.phase, 0);
+  return { type, axis: vector, speed: item.speed, amp, when, busySpeed: busy, fire, ...(phase !== 0 ? { phase } : {}) };
+}
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** Reads the glTF scene's extras.fire (the whole-body kick); null when it has none. */
+export function readFireKick(raw: unknown): FireKick | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const item = raw as Record<string, unknown>;
+  const kick = num(item.kick, 0);
+  const slide = num(item.slide, 0);
+  if (kick === 0 && slide === 0) {
+    return null;
+  }
+  return {
+    kick,
+    slide,
+    attack: Math.max(1e-3, num(item.attack, 0.05)),
+    recover: Math.max(1e-3, num(item.recover, 0.6)),
+    repeat: Math.max(1, Math.round(num(item.repeat, 1))),
+    every: Math.max(0, num(item.every, 0)),
+  };
+}
+
+/** Firing state for a unit model: its kick (scene extras on the model or the root) and parts. */
+export function createUnitFiring(root: THREE.Object3D, parts: readonly PartMotion[]): UnitFiring {
+  let kick = readFireKick(root.userData.fire);
+  for (const child of root.children) {
+    kick ??= readFireKick(child.userData.fire);
+  }
+  return { kick, shotAt: -Infinity, shots: 0, barrels: parts.some((part) => part.spec.type === 'recoil') };
+}
+
+/** The art's hit envelope: a linear rise over `attack`, then a squared fall over `recover`. */
+export function fireHit(x: number, attack: number, recover: number): number {
+  if (x < 0) {
+    return 0;
+  }
+  if (x < attack) {
+    return x / attack;
+  }
+  const r = 1 - (x - attack) / recover;
+  return r > 0 ? r * r : 0;
+}
+
+/** The whole-body kick envelope: a rise over attack, then exp(-4u) cos(6u) (0 once settled). */
+export function fireKickEnvelope(kick: FireKick, tf: number): number {
+  if (tf < 0) {
+    return 0;
+  }
+  if (tf < kick.attack) {
+    return tf / kick.attack;
+  }
+  const u = (tf - kick.attack) / kick.recover;
+  return u > 2 ? 0 : Math.exp(-4 * u) * Math.cos(6 * u);
+}
+
+/**
+ * The unit fired one shot at `now` (renderer clock, seconds): each firing part that belongs to
+ * this shot's place in the art's firing cycle starts its hit.
+ */
+export function fireUnit(firing: UnitFiring, parts: readonly PartMotion[], now: number): void {
+  const repeat = firing.kick?.repeat ?? 1;
+  const every = firing.kick?.every ?? 0;
+  const slot = firing.shots % repeat;
+  firing.shots += 1;
+  firing.shotAt = now;
+  for (const part of parts) {
+    const fire = part.spec.fire;
+    if (!fire) {
+      continue;
+    }
+    const offsets: number[] = [];
+    if (part.spec.type === 'swing' || part.spec.type === 'slide') {
+      // Snaps (lids, claws, pod nods) answer every shot.
+      offsets.push(0);
+    } else {
+      for (let i = 0; i < fire.repeat; i += 1) {
+        const at = fire.delay + i * fire.every;
+        if (repeat > 1 && every > 0) {
+          const place = Math.round(at / every);
+          if (place % repeat === slot) {
+            offsets.push(Math.max(0, at - place * every));
+          }
+        } else {
+          offsets.push(at);
+        }
+      }
+    }
+    if (offsets.length > 0) {
+      part.shotAt = now;
+      part.offsets = offsets;
+      part.live = true;
+    }
+  }
 }
 
 /** Every moving part under a model, with its rest rotation. Call on the cloned model. */
@@ -114,9 +315,15 @@ export function collectPartMotions(root: THREE.Object3D): PartMotion[] {
         node,
         spec,
         rest: node.quaternion.clone(),
-        phase: 0,
+        phase: spec.phase ?? 0,
         blend: spec.when === 'always' ? 1 : 0,
         tilesPerMetre: spec.type === 'scroll' ? treadTilesPerMetre(node) : null,
+        restPos: node.position.clone(),
+        restScale: node.scale.clone(),
+        dir: spec.axis.clone().applyQuaternion(node.quaternion),
+        shotAt: -Infinity,
+        offsets: [],
+        live: false,
       });
       if (spec.type === 'scroll') {
         node.traverse((child) => {
@@ -219,11 +426,57 @@ function active(when: PartMotionWhen, state: PartMotionState): boolean {
 
 const turn = new THREE.Quaternion();
 
+/** The strongest of a part's hits at time `now` (0 when it has none running). */
+function partHit(part: PartMotion, fire: PartFireSpec, now: number): number {
+  const tf = now - part.shotAt;
+  let most = 0;
+  for (const offset of part.offsets) {
+    most = Math.max(most, fireHit(tf - offset, fire.attack, fire.recover));
+  }
+  return most;
+}
+
+/** Poses a recoil or launch part; returns false once it is back at rest and need not be posed. */
+function poseFiringPart(part: PartMotion, fire: PartFireSpec, now: number): boolean {
+  const { node } = part;
+  if (part.spec.type === 'recoil') {
+    const hit = partHit(part, fire, now);
+    node.position.copy(part.restPos).addScaledVector(part.dir, -fire.snap * hit);
+    // Settled once every hit is past its attack and back to 0.
+    const last = Math.max(...part.offsets) + fire.attack;
+    return hit > 0 || now - part.shotAt < last;
+  }
+  // launch
+  const tf = now - part.shotAt;
+  const x = tf - (part.offsets[0] ?? 0);
+  if (x < 0 || tf >= fire.reload) {
+    node.position.copy(part.restPos);
+    node.scale.copy(part.restScale);
+    return tf < fire.reload;
+  }
+  if (x < fire.dur) {
+    const t = x / fire.dur;
+    node.position.copy(part.restPos).addScaledVector(part.dir, fire.snap * t * t);
+    node.scale.copy(part.restScale);
+  } else {
+    // Gone from the tube until it is reloaded (a zero scale draws nothing in the instanced batch).
+    node.scale.setScalar(0);
+  }
+  return true;
+}
+
 /** Advances and poses every part. `dt` is real seconds since the last frame. */
 export function updatePartMotions(parts: readonly PartMotion[], state: PartMotionState, dt: number): void {
   const step = Math.min(Math.max(dt, 0), 0.1);
+  const now = state.time ?? 0;
   for (const part of parts) {
     const { spec } = part;
+    if (spec.type === 'recoil' || spec.type === 'launch') {
+      if (part.live && spec.fire) {
+        part.live = poseFiringPart(part, spec.fire, now);
+      }
+      continue;
+    }
     const on = active(spec.when, state);
     part.blend = on ? Math.min(1, part.blend + step * EASE_PER_SEC) : Math.max(0, part.blend - step * EASE_PER_SEC);
     const speed = state.working && spec.busySpeed !== null ? spec.busySpeed : spec.speed;
@@ -248,6 +501,21 @@ export function updatePartMotions(parts: readonly PartMotion[], state: PartMotio
       });
       continue;
     }
+    // A snap (lids kicking open, a pod nodding) on top of the idle motion; skipped on low quality.
+    let snap = 0;
+    if (part.live && spec.fire) {
+      snap = state.lite ? 0 : spec.fire.snap * partHit(part, spec.fire, now);
+      part.live = snap !== 0 || now - part.shotAt < spec.fire.attack;
+    }
+    if (spec.type === 'slide') {
+      if (state.lite && !part.live && part.node.position.equals(part.restPos)) {
+        continue;
+      }
+      part.phase = (part.phase + speed * Math.PI * 2 * step) % (Math.PI * 2);
+      const idle = state.lite ? 0 : Math.sin(part.phase) * spec.amp * part.blend;
+      part.node.position.copy(part.restPos).addScaledVector(part.dir, idle + snap);
+      continue;
+    }
     if (spec.type === 'spin') {
       // Spins up and winds down rather than snapping, and stops where it is.
       part.phase = (part.phase + speed * part.blend * step) % (Math.PI * 2);
@@ -255,7 +523,7 @@ export function updatePartMotions(parts: readonly PartMotion[], state: PartMotio
     } else {
       // speed is in Hz; the swing settles back to rest as blend falls.
       part.phase = (part.phase + speed * Math.PI * 2 * step) % (Math.PI * 2);
-      turn.setFromAxisAngle(spec.axis, Math.sin(part.phase) * spec.amp * part.blend);
+      turn.setFromAxisAngle(spec.axis, Math.sin(part.phase) * spec.amp * part.blend + snap);
     }
     part.node.quaternion.copy(part.rest).multiply(turn);
   }
