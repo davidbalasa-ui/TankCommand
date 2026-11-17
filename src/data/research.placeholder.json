@@ -14,6 +14,7 @@
     "unlocks": [
       "structure.alien.air_base",
       "unit.alien.fighter",
+      "unit.alien.dragonfly",
       "unit.alien.saucer"
     ],
     "upgrades": [],

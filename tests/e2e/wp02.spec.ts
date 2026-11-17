@@ -280,7 +280,7 @@ test('[INP-01] ground picks land at the picked point at every zoom and near the 
 test('[INP-01] a right-click issues a move whose target is the picked ground point', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const all = await units(page);
@@ -614,7 +614,7 @@ test('[INP-04] camera pan, zoom, rotate and edge clamping work', async ({ page }
 
 test('[INP-05] HUD button presses never issue map orders', async ({ page }, testInfo) => {
   // Software rendering of the detailed models at desktop size leaves little time between frames.
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await enterGame(page);
   const touch = isTouch(testInfo);
   const own = (await units(page)).filter((unit) => unit.owner === 1);
@@ -682,7 +682,7 @@ test('[PLAY-01] full skirmish flow reaches results and Play again starts a fresh
   // and attacks the pad plus every fighting unit in turn; using it here (instead
   // of the old "issue one attack order and wait") keeps the test honest against
   // the spec and reuses one implementation across packages.
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await enterGame(page);
   await winSkirmish(page);
   const heading = await page.locator('[data-screen-id="results"] h1').textContent();

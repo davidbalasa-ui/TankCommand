@@ -308,6 +308,12 @@ function hitsAir(type: SimUnitType | undefined): boolean {
   return type?.weapon?.targets?.includes('air') ?? false;
 }
 
+// Interceptors (air-only weapons, e.g. the Dragonfly) can't strike ground targets.
+function hitsGround(type: SimUnitType | undefined): boolean {
+  const targets = type?.weapon?.targets;
+  return targets === undefined ? type?.weapon !== null && type?.weapon !== undefined : targets.includes('ground') || targets.includes('structure');
+}
+
 // Air base, aircraft purchases and air strikes. Aircraft fly from their base to a target and come
 // home by themselves when ammunition or fuel runs low (sim/air.ts), so the AI only buys and launches.
 function airOps(
@@ -351,6 +357,7 @@ function airOps(
     const pick =
       (enemyAir.length > 0 ? airTypes.find((t) => hitsAir(t)) : undefined) ??
       airTypes
+        .filter((t) => hitsGround(t))
         .map((t) => ({ t, count: owned.filter((u) => u.typeId === t.id).length }))
         .sort((x, y) => x.count - y.count || x.t.id.localeCompare(y.t.id))[0]?.t;
     if (pick) {
@@ -386,7 +393,8 @@ function airOps(
       return;
     }
   }
-  if (ready.length < data.airStrikeSize) {
+  const strikers = ready.filter((u) => hitsGround(planner.unitType(u)));
+  if (strikers.length < data.airStrikeSize) {
     return;
   }
   // Strike: radar and turrets first (they blind and guard), then pads; workers if no structure is known.
@@ -400,7 +408,7 @@ function airOps(
         a.id - b.id,
     )[0];
   const worker = view.units.find((u) => isHostile(world, planner.player, u.owner) && u.job !== null);
-  const ids = ready.map((u) => u.id);
+  const ids = strikers.map((u) => u.id);
   if (target) {
     planner.commands.push({ kind: 'air', unitIds: ids, action: 'launch' });
     planner.commands.push({ kind: 'attackMove', unitIds: ids, x: target.x, z: target.z });

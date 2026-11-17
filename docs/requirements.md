@@ -155,6 +155,7 @@
 | AIR-03 | Weapons honour their target list: ground-only weapons cannot hit airborne units, parked aircraft count as ground. |
 | AIR-04 | Fighters can shoot air; bombers never target air. |
 | AIR-05 | Aircraft ammo is spent one per attack run (one per shot for single-shot weapons, one per burst otherwise) and an empty aircraft stops firing. |
+| AIR-06 | Interceptors (air-only weapons, e.g. the Arcadian Dragonfly) never fire at ground units or structures; the computer buys them only against enemy aircraft and never sends them on ground strikes. |
 | MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
 | MSN-02 | Every condition and action type has a unit test that fires it. |
 | MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). |

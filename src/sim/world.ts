@@ -668,6 +668,16 @@ function selectTarget(
   return best;
 }
 
+// An ordered target can be one the weapon can't reach (an interceptor told to attack a tank, a
+// bomber told to attack an aircraft in flight): the unit follows the order but never fires.
+function canHitTarget(world: WorldState, weapon: WeaponStats, target: TargetRef): boolean {
+  if (target.kind === 'structure') {
+    return weaponCanHit(weapon, 'structure');
+  }
+  const unit = world.units.find((other) => other.id === target.id);
+  return unit !== undefined && weaponCanHit(weapon, unitTargetKind(unit));
+}
+
 function isHoldingFirePosition(
   world: WorldState,
   unit: UnitState,
@@ -1151,6 +1161,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
         Math.abs(angleDiff(unit.turretHeading, bearing)) <=
         TURRET_ALIGN_TOLERANCE_DEG * DEG_TO_RAD + 0.000001;
       const canFire =
+        canHitTarget(world, weapon, target) &&
         aligned &&
         distance <= weapon.range &&
         (type.fireOnMove || unit.speed <= FIRE_MOVE_SPEED_MAX) &&

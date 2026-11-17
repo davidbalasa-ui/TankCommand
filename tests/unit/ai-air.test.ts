@@ -103,4 +103,38 @@ describe('enemy AI air', () => {
     expect(commands).toContainEqual(expect.objectContaining({ kind: 'air', action: 'launch', unitIds: [fighter.id] }));
     expect(commands).toContainEqual(expect.objectContaining({ kind: 'attack', unitIds: [fighter.id], targetId: intruder.id }));
   });
+
+  it('[AI-10] [AIR-06] interceptors stay home when the AI strikes ground targets', () => {
+    const world = setUp();
+    const pad = world.structures.find((s) => s.owner === 1 && s.typeId.endsWith('landing_pad'));
+    if (!pad) {
+      throw new Error('no pad');
+    }
+    addStructure(world, { owner: 1, typeId: 'structure.human.air_base', x: pad.x + 14, z: pad.z });
+    addStructure(world, { owner: 1, typeId: 'structure.human.air_base', x: pad.x + 14, z: pad.z + 10 });
+    const jets = ['unit.human.fighter', 'unit.human.fighter', 'unit.alien.dragonfly'].map((typeId, i) => {
+      const jet = addUnit(world, { owner: 1, typeId, x: pad.x + 14, z: pad.z + i * 5 });
+      if (!jet) {
+        throw new Error(`no ${typeId}`);
+      }
+      assignHome(world, jet);
+      return jet;
+    });
+    const state = world.aiStates.find((s) => s.player === 1);
+    if (!state) {
+      throw new Error('no ai');
+    }
+    let strike: { unitIds: number[] } | undefined;
+    for (let round = 0; round < 6 && !strike; round += 1) {
+      world.tick = 40 * (round + 1) - 7;
+      const { commands } = thinkAi(world, state);
+      strike = commands.find(
+        (c) => (c.kind === 'attackMove' || c.kind === 'attack') && c.unitIds.includes(jets[0]?.id ?? -1),
+      ) as { unitIds: number[] } | undefined;
+    }
+    expect(strike).toBeDefined();
+    const dragonfly = jets[2];
+    expect(strike?.unitIds).not.toContain(dragonfly?.id);
+    expect(strike?.unitIds.length ?? 0).toBeGreaterThan(0);
+  });
 });
