@@ -65,6 +65,8 @@ export interface UnitState {
   // goal), and where that path ended, so a path set by anything else is never mistaken for it.
   pathGoal?: { x: number; z: number; endX: number; endZ: number };
   reloadLeft: number;
+  /** Shots still to come in the burst under way (0 between bursts). */
+  burstLeft?: number;
   stuckTicks: number;
   /** Ticks spent waiting for an oncoming friend at a narrow spot (0 when not waiting). */
   yieldTicks?: number;
@@ -89,7 +91,12 @@ export interface WeaponStats {
   targets?: WeaponTarget[];
   damage: number;
   range: number;
+  /** Pause after the last shot of a burst before the next burst starts. */
   reloadSec: number;
+  /** Shots per burst (default 1). */
+  burst?: number;
+  /** Seconds between shots inside a burst. */
+  burstIntervalSec?: number;
   projectileSpeed: number;
   accuracy: number;
   splashRadius: number;
@@ -190,6 +197,7 @@ export interface StructureState {
   depositId: number | null;
   upgrades: string[];
   reloadLeft: number;
+  burstLeft?: number;
   turretHeading: number;
   // Pack or dismantle in progress; the structure can't fire while it runs.
   work: { kind: 'pack' | 'dismantle'; left: number } | null;
@@ -222,6 +230,8 @@ export interface ProjectileState {
   kind?: string;
   shooterId?: number;
   aimDistance?: number;
+  /** Render-only: which shot of its burst this is (0 = first), set only for burst weapons. */
+  burstShot?: number;
 }
 
 export interface RubbleState {

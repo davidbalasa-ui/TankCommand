@@ -158,11 +158,31 @@ function isPlayerOrder(command: Command): boolean {
 }
 
 /** How far the title camera's target sits to the screen-left of the fight, keeping it clear of the menu. */
-const TITLE_SIDE_OFFSET = 12;
+const TITLE_SIDE_OFFSET = 10;
 /** Where the title fight centres, metres from the pad toward the raiders. */
 const TITLE_FIGHT_REACH = 14;
 /** The title camera's pitch: well below the in-match range, for a cinematic, near-ground view. */
-const TITLE_PITCH = (24 * Math.PI) / 180;
+const TITLE_PITCH = (15 * Math.PI) / 180;
+/** How close the title camera sits: near enough that the tanks read as machines, not counters. */
+const TITLE_DISTANCE = 29;
+/**
+ * The title scene's light: last light of the day, the sun low behind the fight so hulls catch a
+ * warm rim and throw long shadows toward the camera, under a deep blue sky. `sunOffset` is filled
+ * in per view, from the camera's heading.
+ */
+const TITLE_MOOD = {
+  skyZenith: '#070d1f',
+  skyMid: '#3a2f5c',
+  skyHorizon: '#f29a55',
+  skyHorizonBand: 0.11,
+  haze: '#8e6a5c',
+  sunColor: 0xffb47a,
+  sunIntensity: 3.4,
+  skyLight: 0x7f95d8,
+  groundLight: 0x2a1f1c,
+  ambientIntensity: 0.42,
+  reflectionIntensity: 0.4,
+} as const;
 
 export class App {
   public readonly router: ScreenRouter;
@@ -1701,7 +1721,15 @@ export class App {
           { fog: false, mapId: this.mapIdValue, resources: 'normal', force: 'padForce' },
         );
         const battle = new scene.TitleBattle(world);
-        const view = new mod.RenderView(canvas, this.registry, battle.current());
+        const { x: padX, z: padZ, approach } = battle.focus;
+        const baseYaw = Math.atan2(-Math.sin(approach), Math.cos(approach));
+        // The sun sits beyond the fight and off to screen-right, low in the sky.
+        const sunOffset: [number, number, number] = [
+          Math.sin(baseYaw) * 52 - Math.cos(baseYaw) * 58,
+          21,
+          Math.cos(baseYaw) * 52 + Math.sin(baseYaw) * 58,
+        ];
+        const view = new mod.RenderView(canvas, this.registry, battle.current(), { ...TITLE_MOOD, sunOffset });
         // Low and side-on, so the hills behind the fight show; no health bars on scenery.
         view.setShotPitch(TITLE_PITCH);
         view.setHealthBarsHidden(true);
@@ -1710,7 +1738,6 @@ export class App {
         void view.whenReady().then(() => {
           canvas.classList.add('ready');
         });
-        const { x: padX, z: padZ, approach } = battle.focus;
         // The middle of the fight: a little past the defenders' line, toward the raiders.
         const fightX = padX + Math.cos(approach) * TITLE_FIGHT_REACH;
         const fightZ = padZ + Math.sin(approach) * TITLE_FIGHT_REACH;
@@ -1729,7 +1756,7 @@ export class App {
             const t = (now - started) / 1000;
             // Side-on to the raid line, swaying slowly so both sides and the pad stay in shot.
             const sway = Math.sin(t * 0.045) * 0.45;
-            const yaw = Math.atan2(-Math.sin(approach), Math.cos(approach)) + sway;
+            const yaw = baseYaw + sway;
             // The camera's screen-left, in world x/z (the camera looks along (sin yaw, cos yaw)).
             const leftX = Math.cos(yaw);
             const leftZ = -Math.sin(yaw);
@@ -1737,7 +1764,7 @@ export class App {
             view.setCamera({
               targetX: fightX + leftX * TITLE_SIDE_OFFSET,
               targetZ: fightZ + leftZ * TITLE_SIDE_OFFSET,
-              distance: 36,
+              distance: TITLE_DISTANCE,
               yaw,
             });
             view.render(alpha, battle.current());

@@ -14,9 +14,9 @@ import {
   STRUCTURE_DAMAGE_LIGHT,
   TARGET_HEIGHT,
   TURRET_ALIGN_TOLERANCE_DEG,
-  UPGRADE_FIRE_RATE_FACTOR,
 } from './tuning';
 import type { Rng } from './rng';
+import { tickReload, afterShot } from './weaponCycle';
 import type { Command } from './commands';
 import type { SimStructureType, StructureState, UnitState, WeaponStats, WorldState } from './types';
 
@@ -256,7 +256,7 @@ export function updateTurrets(world: WorldState, rng: Rng, fire: FireFn): void {
     if (!type || !weapon) {
       continue;
     }
-    turret.reloadLeft = Math.max(0, turret.reloadLeft - DT);
+    turret.reloadLeft = tickReload(turret.reloadLeft);
     if (turret.work) {
       continue;
     }
@@ -300,9 +300,7 @@ export function updateTurrets(world: WorldState, rng: Rng, fire: FireFn): void {
       continue;
     }
     fire(turret, best.x, best.z, weapon, rng, best.structure ? best.id : undefined);
-    turret.reloadLeft = turret.upgrades.includes('fireRate')
-      ? weapon.reloadSec * UPGRADE_FIRE_RATE_FACTOR
-      : weapon.reloadSec;
+    afterShot(turret, weapon, turret.upgrades.includes('fireRate'));
   }
 }
 

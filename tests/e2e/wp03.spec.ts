@@ -779,10 +779,10 @@ test('[MM-02] minimap tap/drag jumps the camera; right-click orders a move', asy
 
 test('[HUD-01] command bar buttons disable with no selection and activate by tap', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'desktop', 'touch-only command bar test');
-  // Under software rendering this test takes ~29 s on the tablet profile, right
-  // at the default 30 s limit, so it gets a longer budget (same before and after
-  // the context-only HUD change).
-  test.setTimeout(60_000);
+  // Under software rendering this test takes ~42 s locally on the tablet profile and
+  // 50-60 s on the CI runners (six taps, each waiting on rendered frames), so it gets
+  // a budget well clear of that.
+  test.setTimeout(90_000);
   await enterGame(page);
   await page.evaluate(() => window.__TC_TEST__?.setSelection([]));
   await expect
@@ -1172,7 +1172,7 @@ test('[GRP-01] control groups assign, select and centre by keyboard and by touch
 test('[DESK-01] right/middle-drag pan, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', DESKTOP_ONLY);
   // Five input families in one test; CI renders in software at 1080p, about twice as slow as local.
-  test.setTimeout(150_000);
+  test.setTimeout(300_000);
   await enterGame(page);
 
   const start = await cameraOf(page);

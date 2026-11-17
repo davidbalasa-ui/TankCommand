@@ -84,6 +84,8 @@ export const UPGRADE_COST_ORE = 60; // placeholder until Stage 0
 export const UPGRADE_COST_METAL = 30; // placeholder until Stage 0
 export const UPGRADE_FIRE_RATE_FACTOR = 0.7; // placeholder until Stage 0
 export const UPGRADE_ARMOR_BONUS = 3; // placeholder until Stage 0
+// Armor never stops more than 75% of a hit, so fast light guns still chip heavy armor.
+export const ARMOR_MIN_DAMAGE_FRACTION = 0.25;
 export const STRUCTURE_DAMAGE_LIGHT = 0.75; // placeholder until Stage 0
 export const STRUCTURE_DAMAGE_HEAVY = 0.5; // placeholder until Stage 0
 export const STRUCTURE_DAMAGE_CRITICAL = 0.25; // placeholder until Stage 0

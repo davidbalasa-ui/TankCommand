@@ -67,7 +67,8 @@ import {
   loadResearchSides,
   updateResearch,
 } from './research';
-import { applyUpgradeCommand, reloadSeconds, unitArmor, structureArmor } from './upgrades';
+import { applyUpgradeCommand, unitArmor, structureArmor } from './upgrades';
+import { burstSize, tickReload, afterShot, damageAfterArmor, isLastShotOfBurst } from './weaponCycle';
 import { resolveRepairCommand, updateRepair } from './repair';
 import {
   applyDeployCommand,
@@ -667,6 +668,16 @@ function selectTarget(
   return best;
 }
 
+// An ordered target can be one the weapon can't reach (an interceptor told to attack a tank, a
+// bomber told to attack an aircraft in flight): the unit follows the order but never fires.
+function canHitTarget(world: WorldState, weapon: WeaponStats, target: TargetRef): boolean {
+  if (target.kind === 'structure') {
+    return weaponCanHit(weapon, 'structure');
+  }
+  const unit = world.units.find((other) => other.id === target.id);
+  return unit !== undefined && weaponCanHit(weapon, unitTargetKind(unit));
+}
+
 function isHoldingFirePosition(
   world: WorldState,
   unit: UnitState,
@@ -686,7 +697,7 @@ function isHoldingFirePosition(
 
 function fireProjectile(
   world: WorldState,
-  shooter: { owner: PlayerId; x: number; z: number; id?: number },
+  shooter: { owner: PlayerId; x: number; z: number; id?: number; burstLeft?: number },
   targetX: number,
   targetZ: number,
   weapon: WeaponStats,
@@ -724,6 +735,11 @@ function fireProjectile(
   }
   if (weapon.kind !== undefined) {
     projectile.kind = weapon.kind;
+  }
+  const burst = burstSize(weapon);
+  if (burst > 1) {
+    const left = shooter.burstLeft ?? 0;
+    projectile.burstShot = left > 0 ? burst - left : 0;
   }
   if (shooter.id !== undefined) {
     projectile.shooterId = shooter.id;
@@ -780,7 +796,7 @@ function applySplash(
     if (unit.id === directUnitId || distance <= radius + UNIT_RADIUS) {
       const type = world.unitTypes.get(unit.typeId);
       const armor = unitArmor(unit, type);
-      const damage = Math.max(1, projectile.damage - armor);
+      const damage = damageAfterArmor(projectile.damage, armor);
       unit.hp = Math.max(0, unit.hp - damage);
       provoke(world, unit.owner, projectile.owner);
       touchProvocation(world, unit.owner, projectile.owner);
@@ -804,7 +820,7 @@ function applySplash(
     const structureHitRadius = structureRadius(world, type);
     const distance = Math.hypot(structure.x - x, structY - y, structure.z - z);
     if (structure.id === directStructureId || distance <= radius + structureHitRadius) {
-      const damage = Math.max(1, projectile.damage - structureArmor(structure.upgrades, type));
+      const damage = damageAfterArmor(projectile.damage, structureArmor(structure.upgrades, type));
       structure.hp = Math.max(0, structure.hp - damage);
       provoke(world, structure.owner, projectile.owner);
       touchProvocation(world, structure.owner, projectile.owner);
@@ -1123,7 +1139,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
       continue;
     }
 
-    unit.reloadLeft = Math.max(0, unit.reloadLeft - DT);
+    unit.reloadLeft = tickReload(unit.reloadLeft);
     const target = selectTarget(world, unit, type);
 
     if (target) {
@@ -1145,6 +1161,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
         Math.abs(angleDiff(unit.turretHeading, bearing)) <=
         TURRET_ALIGN_TOLERANCE_DEG * DEG_TO_RAD + 0.000001;
       const canFire =
+        canHitTarget(world, weapon, target) &&
         aligned &&
         distance <= weapon.range &&
         (type.fireOnMove || unit.speed <= FIRE_MOVE_SPEED_MAX) &&
@@ -1159,10 +1176,11 @@ function updateUnits(world: WorldState, rng: Rng): void {
           rng,
           target.kind === 'structure' ? target.id : undefined,
         );
-        unit.reloadLeft = reloadSeconds(unit, weapon.reloadSec);
-        if (unit.air) {
+        // Aircraft spend one ammo per attack run: the burst's last shot uses it.
+        if (unit.air && isLastShotOfBurst(unit, weapon)) {
           unit.air.ammo -= 1;
         }
+        afterShot(unit, weapon, unit.upgrades.includes('fireRate'));
       }
     }
   }
@@ -1391,6 +1409,7 @@ export function hashWorld(world: WorldState): string {
         stance: unit.stance,
         path: unit.path,
         reloadLeft: unit.reloadLeft,
+        ...(unit.burstLeft !== undefined ? { burstLeft: unit.burstLeft } : {}),
         stuckTicks: unit.stuckTicks,
         yieldTicks: unit.yieldTicks ?? 0,
         speed: unit.speed,

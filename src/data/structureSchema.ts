@@ -30,6 +30,8 @@ export const structureRowSchema = z
         damage: z.number().nonnegative(),
         range: z.number().positive(),
         reloadSec: z.number().positive(),
+        burst: z.number().int().positive().optional(),
+        burstIntervalSec: z.number().nonnegative().optional(),
         projectileSpeed: z.number().positive(),
         accuracy: z.number().min(0).max(1),
         splashRadius: z.number().nonnegative(),

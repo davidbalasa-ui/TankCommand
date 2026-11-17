@@ -17,34 +17,63 @@ test('[LAY-01] orders show in the top queue strip; tapping one cancels it and Un
   // Software rendering of the full models is slow; taps wait for stable frames.
   test.setTimeout(90_000);
   await enterGame(page);
+  // Deliveries land one at a time and a landing order can't be cancelled. On a slow runner a lone
+  // order can land before the tap arrives, so the test cancels a second order waiting behind the
+  // first, with the sim at half speed.
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(0.5));
+  const unearnedOre = (): Promise<number> =>
+    page.evaluate(() => {
+      const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+      return side ? side.ore - side.oreGathered : 0;
+    });
   await openBuildMenu(page);
   const item = await page.evaluate(
     () => window.__TC_TEST__?.buildItems().find((entry) => entry.kind === 'unit' && entry.disabledReason === null)?.id ?? null,
   );
   expect(item).not.toBeNull();
   if (!item) return;
-  await page.locator(`[data-control-id="build.item.${item}"]`).tap();
-  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBe(1);
-  const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue[0]?.id ?? null);
+  const cost = await page.evaluate((id) => window.__TC_TEST__?.buildItems().find((entry) => entry.id === id)?.ore ?? 0, item);
+  expect(cost).toBeGreaterThan(0);
+  const startOre = await unearnedOre();
+  for (let count = 1; count <= 2; count += 1) {
+    await page.locator(`[data-control-id="build.item.${item}"]`).tap();
+    await expect.poll(unearnedOre).toBe(startOre - count * cost);
+  }
+  const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.at(-1)?.id ?? null);
   expect(orderId).not.toBeNull();
+  const queued = (): Promise<boolean> =>
+    page.evaluate((id) => window.__TC_TEST__?.hud()?.queue.some((order) => order.id === id) ?? true, orderId);
   // The tile is in the strip at the top of the screen, not inside the drop menu.
   const tile = page.locator(`.hud-queue [data-control-id="build.cancel.${orderId}"]`);
   await expect(tile).toBeVisible();
   const box = await tile.boundingBox();
   expect(box?.y ?? 999).toBeLessThan(60);
-  const ore = await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0);
   await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 1)).toBe(0);
-  expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0)).toBeGreaterThan(ore);
-  // Undo lasts 3 s; slow software frames can eat that, so it is pressed from the page itself.
-  const undone = await page.evaluate(() => {
+  await expect.poll(queued).toBe(false);
+  // Undo lasts 3 s; slow software frames can eat that, so it is pressed from the page itself, straight
+  // after the cancel, reading the money it starts from in the same step.
+  const { undone, unearnedAfterCancel } = await page.evaluate(() => {
+    const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+    const before = { unearnedAfterCancel: side ? side.ore - side.oreGathered : 0 };
     const undo = document.querySelector<HTMLButtonElement>('[data-control-id="inGame.queueUndo"]');
-    if (!undo || undo.hidden) return false;
+    if (!undo || undo.hidden) return { undone: false, ...before };
     undo.click();
-    return true;
+    return { undone: true, ...before };
   });
+  // The cancel refunded the order.
+  expect(unearnedAfterCancel).toBe(startOre - cost);
   expect(undone).toBe(true);
-  await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBe(1);
+  // Undo orders the unit again, which pays for it again. Checked on the money rather than the queue:
+  // on a slow runner the re-ordered unit can be built and gone from the queue before the next read.
+  // Ore minus everything gathered is untouched by deliveries landing meanwhile.
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+        return side ? side.ore - side.oreGathered : 0;
+      }),
+    )
+    .toBe(unearnedAfterCancel - cost);
 });
 
 test('[LAY-02] the drop menu is a bottom strip; card order stays fixed and the tab is remembered', async ({ page }, testInfo) => {

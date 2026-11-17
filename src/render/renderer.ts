@@ -68,6 +68,27 @@ const SKIRT_DEPTH = 10;
 const SKY_ZENITH = '#16233a';
 const SKY_MID = '#4d6b8c';
 const SKY_HORIZON = '#b9a98d';
+/**
+ * The light and sky a view is drawn under. Matches use the default daylight; scenery views (the
+ * title backdrop) can ask for their own, which costs nothing extra to draw.
+ */
+export interface SceneMood {
+  skyZenith: string;
+  skyMid: string;
+  skyHorizon: string;
+  /** How far above the horizon its colour gives way to the middle sky (0 = at once, 1 = overhead). */
+  skyHorizonBand: number;
+  /** What distant hills fade into. */
+  haze: string;
+  sunColor: number;
+  sunIntensity: number;
+  /** Where the sun sits relative to what the camera looks at, in metres (x, up, z). */
+  sunOffset: readonly [number, number, number];
+  skyLight: number;
+  groundLight: number;
+  ambientIntensity: number;
+  reflectionIntensity: number;
+}
 /** Sky dome radius: inside the camera's far plane, beyond the outermost hills. */
 const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
@@ -275,6 +296,20 @@ interface HealthBar {
 }
 
 const ENVIRONMENT_INTENSITY = 0.45;
+export const DAYLIGHT_MOOD: SceneMood = {
+  skyZenith: SKY_ZENITH,
+  skyMid: SKY_MID,
+  skyHorizon: SKY_HORIZON,
+  skyHorizonBand: 0.32,
+  haze: SKY_HORIZON,
+  sunColor: 0xfff3d6,
+  sunIntensity: 2.8,
+  sunOffset: [42, 60, 26],
+  skyLight: 0xd2e6ff,
+  groundLight: 0x3b3524,
+  ambientIntensity: 0.55,
+  reflectionIntensity: ENVIRONMENT_INTENSITY,
+};
 
 interface StructureVisual {
   mesh: THREE.Mesh;
@@ -675,9 +710,11 @@ export class RenderView {
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
   private healthBarsHidden = false;
   private colorBlind = false;
+  private readonly mood: SceneMood;
 
-  constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
+  constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState, mood: SceneMood = DAYLIGHT_MOOD) {
     this.world = world;
+    this.mood = mood;
     this.registry = registry;
     this.renderer = createRenderer(canvas);
     this.basePixelRatio = Math.min(globalThis.devicePixelRatio || 1, 2);
@@ -693,7 +730,7 @@ export class RenderView {
       this.rtsCamera.setTarget(0, 0);
     }
 
-    this.directional = new THREE.DirectionalLight(0xfff3d6, 2.8);
+    this.directional = new THREE.DirectionalLight(mood.sunColor, mood.sunIntensity);
     this.lightTarget = new THREE.Object3D();
     this.buildScene();
 
@@ -792,7 +829,7 @@ export class RenderView {
     this.rtsCamera.pitchOverride = pitch;
   }
 
-  /** Hides health bars entirely (scenery views such as the title backdrop). */
+  /** Hides health bars and worker tags entirely (scenery views such as the title backdrop). */
   setHealthBarsHidden(hidden: boolean): void {
     this.healthBarsHidden = hidden;
   }
@@ -1433,16 +1470,16 @@ export class RenderView {
   private buildScene(): void {
     this.sky = this.buildSky();
     this.scene.add(this.sky);
-    this.scene.background = new THREE.Color(SKY_HORIZON);
+    this.scene.background = new THREE.Color(this.mood.skyHorizon);
 
-    const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
+    const hemisphere = new THREE.HemisphereLight(this.mood.skyLight, this.mood.groundLight, this.mood.ambientIntensity);
     this.scene.add(hemisphere);
 
     // Soft reflected light for metal surfaces. Without an environment, metallic materials only
     // reflect black and the Kesh bronze and Terran gunmetal read dull. Built once, tiny, and cheap.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = ENVIRONMENT_INTENSITY;
+    this.scene.environmentIntensity = this.mood.reflectionIntensity;
     pmrem.dispose();
 
     this.directional.castShadow = true;
@@ -1504,9 +1541,10 @@ export class RenderView {
     const geometry = new THREE.SphereGeometry(SKY_DOME_RADIUS, 24, 12);
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        uZenith: { value: new THREE.Color(SKY_ZENITH) },
-        uMid: { value: new THREE.Color(SKY_MID) },
-        uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+        uZenith: { value: new THREE.Color(this.mood.skyZenith) },
+        uMid: { value: new THREE.Color(this.mood.skyMid) },
+        uHorizon: { value: new THREE.Color(this.mood.skyHorizon) },
+        uBand: { value: this.mood.skyHorizonBand },
       },
       vertexShader: `
         varying vec3 vDir;
@@ -1519,11 +1557,12 @@ export class RenderView {
         uniform vec3 uZenith;
         uniform vec3 uMid;
         uniform vec3 uHorizon;
+        uniform float uBand;
         varying vec3 vDir;
         void main() {
           float h = normalize(vDir).y;
-          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, 0.32, h));
-          color = mix(color, uZenith, smoothstep(0.32, 0.95, h));
+          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, uBand, h));
+          color = mix(color, uZenith, smoothstep(uBand, 0.95, h));
           gl_FragColor = vec4(color, 1.0);
           #include <colorspace_fragment>
         }
@@ -1610,7 +1649,7 @@ export class RenderView {
       grass: new THREE.Color(0x5f7a3c),
       dry: new THREE.Color(0x8d8455),
       rock: new THREE.Color(0x7d7a70),
-      haze: new THREE.Color(SKY_HORIZON),
+      haze: new THREE.Color(this.mood.haze),
     });
     // A plain lit material: this ground fills much of the screen on low or zoomed-out views, and the
     // battlefield's detailed ground shader there cost a third of the frame on slow devices. Nothing
@@ -1774,7 +1813,8 @@ export class RenderView {
     const targetZ = this.rtsCamera.targetZ;
     const targetY = heightAt(this.world.map, targetX, targetZ);
     this.lightTarget.position.set(targetX, targetY, targetZ);
-    this.directional.position.set(targetX + 42, targetY + 60, targetZ + 26);
+    const [sunX, sunY, sunZ] = this.mood.sunOffset;
+    this.directional.position.set(targetX + sunX, targetY + sunY, targetZ + sunZ);
     this.directional.shadow.camera.left = -30;
     this.directional.shadow.camera.right = 30;
     this.directional.shadow.camera.top = 30;
@@ -3221,7 +3261,7 @@ export class RenderView {
     const zoomedIn = this.rtsCamera.distance <= WORKER_LABEL_ZOOM;
     const shown = new Set<number>();
     for (const unit of this.world.units) {
-      if (unit.owner !== 1 || unit.hp <= 0) {
+      if (this.healthBarsHidden || unit.owner !== 1 || unit.hp <= 0) {
         continue;
       }
       const type = this.world.unitTypes.get(unit.typeId);

@@ -5,12 +5,22 @@ const PHONE_ONLY = 'phone-only touch flow';
 
 test('[HUD-05] build menu, live resources, queue and cancel work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  // The open Build drawer over the detailed models renders slowly in software.
-  test.setTimeout(60_000);
+  // The open Build drawer over the detailed models renders slowly in software (about 40 s on CI,
+  // up to 60 s on its slower runners).
+  test.setTimeout(90_000);
   await enterGame(page);
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? -1))
-    .toBe(600);
+  // Money that did not come from gathering: miners keep delivering while a slow runner works
+  // through this test, so every check compares ore minus everything gathered.
+  const unearnedOre = (): Promise<number> =>
+    page.evaluate(() => {
+      const side = window.__TC_TEST__?.snapshot().resources.find((stats) => stats.player === 1);
+      return side ? side.ore - side.oreGathered : -1;
+    });
+  await expect.poll(unearnedOre).toBe(600);
+  const scoutOre = await page.evaluate(
+    () => window.__TC_TEST__?.buildItems().find((item) => item.id === 'unit.human.scout')?.ore ?? 0,
+  );
+  expect(scoutOre).toBeGreaterThan(0);
 
   await openBuildMenu(page);
   await expect
@@ -21,38 +31,41 @@ test('[HUD-05] build menu, live resources, queue and cancel work by touch', asyn
     .not.toBeNull();
 
   await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(525);
+  await expect.poll(unearnedOre).toBe(600 - scoutOre);
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0))
-    .toBe(1);
-  // A second order waits behind the first, so it is still cancellable however slowly the browser
-  // renders (the first can land before a slow tap arrives).
-  await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(450);
+    .toBeGreaterThanOrEqual(1);
+  // Deliveries land one at a time, and taps on the open drawer can take many seconds on a slow
+  // runner, so the order to cancel goes at the back of a queue of four. Half sim speed gives it
+  // well over a minute before it can start landing (an order that is landing can't be cancelled).
+  await page.evaluate(() => window.__TC_TEST__?.setSimSpeed(0.5));
+  for (let count = 2; count <= 4; count += 1) {
+    await page.locator('[data-control-id="build.item.unit.human.scout"]').tap();
+    await expect.poll(unearnedOre).toBe(600 - count * scoutOre);
+  }
   const orderId = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.at(-1)?.id ?? null);
   expect(orderId).not.toBeNull();
   if (orderId === null) {
     return;
   }
-  await page.locator(`[data-control-id="build.cancel.${orderId}"]`).tap();
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.ore ?? 0))
-    .toBe(525);
-  await expect
-    .poll(async () =>
-      page.evaluate((id) => window.__TC_TEST__?.hud()?.queue.some((order) => order.id === id) ?? true, orderId),
-    )
-    .toBe(false);
+  const queued = (): Promise<boolean> =>
+    page.evaluate((id) => window.__TC_TEST__?.hud()?.queue.some((order) => order.id === id) ?? true, orderId);
+  // The queue strip re-renders whenever an order lands, which can swallow a tap that arrives
+  // mid-render on a slow runner: tap again while the order is still there.
+  await expect(async () => {
+    if (await queued()) {
+      await page.locator(`[data-control-id="build.cancel.${orderId}"]`).tap({ timeout: 5_000 });
+    }
+    expect(await queued()).toBe(false);
+  }).toPass({ timeout: 30_000 });
+  await expect.poll(unearnedOre).toBe(600 - 3 * scoutOre);
 });
 
 test('[HUD-05] miner deposit tap, mine command and salvage button work by touch', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  // Full models from the first frame make software rendering slow; this ran at ~29 of 30 s.
-  test.setTimeout(60_000);
+  // Full models from the first frame make software rendering slow: about 40 s on CI, up to 60 s on
+  // its slower runners.
+  test.setTimeout(120_000);
   await enterGame(page);
   const miner = await page.evaluate(() => {
     const hook = window.__TC_TEST__;
@@ -113,7 +126,7 @@ test('[HUD-05] miner deposit tap, mine command and salvage button work by touch'
   await expect(async () => {
     await tapUnit(page, tug.id);
     expect(await page.evaluate((id) => window.__TC_TEST__?.selection().includes(id) ?? false, tug.id)).toBe(true);
-  }).toPass({ timeout: 20_000 });
+  }).toPass({ timeout: 45_000 });
   // The salvage button is enabled for *any* selected worker, so a tap that
   // missed the tug would leave the earlier miner selected and still satisfy the
   // enabled check. Verify the tug actually became the selection before
@@ -344,7 +357,7 @@ test('[DROP-04] structure kit ghost, cancel and confirm work by touch', async ({
 
 test('[MATCH-02] results screen shows outcome, time and match totals', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await enterGame(page);
   await winSkirmish(page);
   const heading = await page.locator('[data-screen-id="results"] h1').textContent();
