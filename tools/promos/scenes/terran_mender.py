@@ -4,16 +4,17 @@ A battered Bulwark limps out of the fight at dusk, listing, scorched, smoking, i
 stuttering. A Mender overtakes it and brakes alongside; its crane arm swings over the gap and a
 blue-green repair beam walks across the damage: the charred patches and their glowing seams
 close up, the fire goes out, the smoke thins away, the hull levels off and the lights come back
-steady. The arm folds away, the Bulwark swings its gun back toward the distant battle and fires:
-back in the fight. Distant flashes and tracers on the horizon throughout.
+steady. The arm folds away, the Bulwark pivots out, swings its gun into profile toward the
+battle and fires: back in the fight. Distant flashes and tracers on the horizon throughout.
 
 Timeline (s): 0-1.5 Bulwark limps in (low tracking camera) | 0.6-2.1 Mender overtakes, brakes |
 2.1-2.75 arm swings over (cut to the front of the gap at 2.5) | 2.75-4.9 beam walks over four
 damage points, scars close, smoke thins, hull levels | 4.9 lights pulse back | 5.0 cut: low hero
-frame on the Mender | 5.1-5.6 arm folds, Bulwark turret swings to the fight | 5.6 heavy shot.
+frame on the Mender, Bulwark behind | 5.0-6 arm folds, Bulwark pivots and creeps out | 5.6 heavy shot.
 
-Models by name only (mender, bulwark): remodels just need a re-render. Glows are tinted to
-Terran neon blue + orange in this scene only (model files untouched)."""
+Models by name only (mender, bulwark): remodels just need a re-render. Model materials keep their
+own neon/orange glow; only the Bulwark gets a scene-only battle-damage overlay (char + hot seams,
+stuttering lights) that the repair closes. Vehicle motion (suspension, braking, lean) is the kit's."""
 import math
 import os
 import sys
@@ -44,7 +45,7 @@ T_MEN_PARK = 2.1
 
 
 # ------------------------------------------------------------------------------- glow tint
-def terran_glow(actor, strength=2.2, damage=None):
+def terran_glow(actor, strength=4.0, damage=None, tint=False):
     """Scene-only: route the emissive texture through a tint (cool -> neon blue, warm ->
     Terran orange) at a safe strength. damage=dict(...) also adds charred patches with hot
     orange seams whose threshold is keyed (see bulwark below). Returns {material: info}."""
@@ -63,7 +64,9 @@ def terran_glow(actor, strength=2.2, damage=None):
                 out[m] = None
                 continue
             info = {'bsdf': bs}
-            if ec.is_linked:
+            if ec.is_linked and not tint:
+                tinted = ec.links[0].from_socket      # the model's own neon/orange texture
+            elif ec.is_linked:
                 src = ec.links[0].from_socket
                 sep = nt.nodes.new('ShaderNodeSeparateColor')
                 nt.links.new(src, sep.inputs[0])
@@ -95,7 +98,6 @@ def terran_glow(actor, strength=2.2, damage=None):
                 tinted = val.outputs[0]
             else:
                 tinted = None
-                ec.default_value = (*NEON, 1)
             bs.inputs['Emission Strength'].default_value = strength
             if damage and tinted is not None:
                 # charred patches: noise in object space, threshold keyed by a Value node
@@ -172,35 +174,29 @@ bul = P.load('bulwark', at=(-15, 4.9), heading=0, label='bulwark')
 men = P.load('mender', at=(-17, 0.2), heading=0, label='mender')
 
 
-BUL_GLOW = terran_glow(bul, 2.0, damage=dict(scale=0.9, thr0=0.6))
-MEN_GLOW = terran_glow(men, 2.2)
+# Bulwark only: battle damage (char + hot seams) that the repair closes. The Mender is untouched.
+BUL_GLOW = terran_glow(bul, 4.0, damage=dict(scale=0.7, thr0=0.63))
 
 # Bulwark limps in: uneven, lurching speed, listing to one side
 bul.path([(0.0, (-8.6, 5.0)), (0.35, (-6.9, 4.9)), (0.55, (-6.3, 4.85)), (0.9, (-4.2, 4.78)),
           (1.1, (-3.1, 4.74)), (1.3, (-1.2, 4.7)), (T_BUL_PARK, (BUL_PARK.x, BUL_PARK.y), 0.0),
-          (6.5, (BUL_PARK.x, BUL_PARK.y), 0.0)])
+          (5.0, (BUL_PARK.x, BUL_PARK.y), 0.0), (5.6, (0.2, 5.3), 24.0),
+          # repaired: pivots out of the line and creeps back toward the fight
+          (6.0, (0.7, 6.3), 56.0), (6.5, (1.1, 7.4), 70.0)])
 bm = bul.model_root
 bm.rotation_mode = 'XYZ'
 LIST = 3.2      # degrees of list from the wrecked suspension (toward the camera side)
-for t, pitch, roll in [(0.0, 0.0, -LIST), (0.3, 1.8, -LIST - 1.5), (0.45, -1.2, -LIST), (0.6, 0.6, -LIST),
-                       (0.95, 1.6, -LIST - 1.2), (1.1, -0.8, -LIST + 0.4), (1.35, 0.4, -LIST),
-                       (T_BUL_PARK, -1.6, -LIST - 0.6), (T_BUL_PARK + 0.25, 0.6, -LIST), (T_BUL_PARK + 0.5, 0.0, -LIST),
-                       (3.2, 0.0, -LIST), (4.5, 0.0, 0.0), (6.0, 0.0, 0.0)]:
-    bm.rotation_euler = (math.radians(roll), math.radians(pitch), 0)
+# a static list from the wrecked suspension that the repair straightens (story, not motion: the
+# kit's motion layer does all braking / bounce / lean on top)
+for t, roll in [(0.0, -LIST), (3.2, -LIST), (4.5, 0.0), (6.0, 0.0)]:
+    bm.rotation_euler = (math.radians(roll), 0, 0)
     bm.keyframe_insert('rotation_euler', index=0, frame=P.T(t))
-    bm.keyframe_insert('rotation_euler', index=1, frame=P.T(t))
 bm.rotation_euler = (0, 0, 0)
 P.dust(bul, 0.0, T_BUL_PARK - 0.1, every=0.14, size=0.6)
 
 # Mender: overtakes on the near side and brakes alongside
 men.path([(0.0, (-21.0, 0.3)), (0.6, (-15.0, 0.25)), (1.4, (-5.2, 0.1)),
           (1.85, (-1.3, 0.0)), (T_MEN_PARK, (MEN_PARK.x, MEN_PARK.y), 0.0), (6.5, (MEN_PARK.x, MEN_PARK.y), 0.0)])
-mm = men.model_root
-mm.rotation_mode = 'XYZ'
-for t, pitch in [(T_MEN_PARK - 0.15, 0.0), (T_MEN_PARK + 0.05, 2.4), (T_MEN_PARK + 0.3, -0.8),
-                 (T_MEN_PARK + 0.55, 0.0)]:
-    mm.rotation_euler.y = math.radians(pitch)
-    mm.keyframe_insert('rotation_euler', index=1, frame=P.T(t))
 P.dust(men, 0.0, T_MEN_PARK, every=0.1, size=0.65)
 
 # ------------------------------------------------------------------------------- the arm
@@ -242,7 +238,7 @@ K.link(tip_l)
 tip_l.parent = EMIT
 tip_l.data.color = TEAL
 tip_l.data.shadow_soft_size = 0.2
-for t, e in [(0, 0), (2.5, 0), (2.75, 25), (4.9, 25), (5.1, 0)]:
+for t, e in [(0, 0), (2.5, 0), (2.75, 4), (4.9, 4), (5.1, 0)]:
     tip_l.data.energy = e
     tip_l.data.keyframe_insert('energy', frame=P.T(t))
 
@@ -294,15 +290,15 @@ for (t0, t1), p in zip(T_BEAM, DMG):
 for info in BUL_GLOW.values():
     if info and 'thr' in info:
         sock = info['thr'].outputs[0]
-        for t, v in [(0.0, 0.6), (2.75, 0.6), (3.3, 0.64), (3.85, 0.69), (4.4, 0.76), (4.9, 0.95), (6.0, 0.95)]:
+        for t, v in [(0.0, 0.63), (2.75, 0.63), (3.3, 0.66), (3.85, 0.7), (4.4, 0.77), (4.9, 0.95), (6.0, 0.95)]:
             sock.default_value = v
             sock.keyframe_insert('default_value', frame=P.T(t))
 fl = []
 t = 0.0
 while t < 3.5:
-    fl.append((t, R.choice([0.15, 0.4, 1.4, 1.8, 0.2, 1.6])))
+    fl.append((t, R.choice([0.3, 0.8, 2.8, 3.6, 0.4, 3.2])))
     t += R.choice([1, 2, 3]) / FPS
-fl += [(3.9, 1.6), (4.9, 1.8), (5.0, 3.0), (5.35, 2.0), (6.0, 2.0)]
+fl += [(3.9, 3.2), (4.9, 3.6), (5.0, 5.5), (5.35, 4.0), (6.0, 4.0)]
 key_emit(BUL_GLOW, fl)
 
 # smoke: black and thick while limping, thinning away during the repair
@@ -329,9 +325,10 @@ for k in range(9):
     sparkle(d, tk, tk + 0.12, every=0.03, mat=M_EMBER, size=0.035, spread=0.9, up=0.6)
 
 # ------------------------------------------------------------------------------- back in the fight
-FIGHT = Vector((-45.0, 62.0, 0.0))
+FIGHT = Vector((-12.0, 70.0, 0.0))     # off frame right in the end shot: the gun swings into profile
 bul.split_barrels(max_frac=0.6, thin=0.65) or bul.split_barrels()
 bul.aim(5.55, FIGHT + Vector((0, 0, 2.0)), dur=0.5)
+bul.aim(6.1, FIGHT + Vector((0, 0, 2.0)), dur=0.4)     # hold on target while the hull pivots
 bul.turret.keyframe_insert('rotation_euler', index=2, frame=P.T(5.05))
 bm.rotation_euler = (0, 0, 0)
 bm.location.x = 0.0
@@ -353,8 +350,8 @@ CUT1 = 2.5
 CUT2 = 5.0
 P.camera([
     # shot 1: low, ahead and left; pan with the limping Bulwark, the Mender overtakes past us
-    (0.0, (-3.8, -1.2, 0.95), (-8.4, 4.8, 1.05), 30),
-    (1.0, (0.4, -3.6, 1.2), (-4.2, 3.8, 1.1), 30),
+    (0.0, (-4.6, 0.4, 0.9), (-8.4, 4.8, 1.1), 30),
+    (1.0, (-0.6, -2.2, 1.1), (-4.2, 4.0, 1.15), 32),
     (1.8, (4.2, -5.0, 1.9), (-1.6, 2.6, 1.1), 29),
     (CUT1 - 1 / FPS, (5.4, -5.3, 2.4), (-1.0, 2.5, 1.3), 29),
     # shot 2: in front of the gap between them, arm arching over, beam walking; slow push in
@@ -362,8 +359,8 @@ P.camera([
     (3.8, (8.2, 1.6, 2.2), (-1.0, 2.6, 1.2), 31),
     (CUT2 - 1 / FPS, (7.0, 1.8, 2.0), (-1.0, 2.7, 1.2), 31),
     # shot 3: low hero angle on the Mender, repaired Bulwark behind swinging to the fight
-    (CUT2, (8.8, -2.6, 0.9), (-0.4, 1.9, 1.75), 36),
-    (6.0, (7.9, -2.2, 0.8), (-0.4, 1.95, 1.8), 37),
+    (CUT2, (7.0, -2.2, 0.72), (-1.2, 2.5, 1.5), 30),
+    (6.0, (6.3, -1.8, 0.66), (-1.0, 2.9, 1.55), 31),
 ], shake=0.015, cuts=[CUT1, CUT2])
 P.cam_shake(T_MEN_PARK, 0.04, 0.25)
 P.cam_shake(5.6, 0.06, 0.3)
