@@ -309,7 +309,10 @@ class Actor:
             if pitch and 0 < i < len(pts) - 1:
                 d = pts[i + 1][1] - pts[i - 1][1]
                 horiz = math.hypot(d.x, d.y)
-                pit = -math.degrees(math.atan2(d.z, max(horiz, 1e-3)))
+                # floor the horizontal run at ~8 m/s so near-stops don't flip the unit; clamp
+                span = max(1e-3, pts[i + 1][0] - pts[i - 1][0])
+                pit = -math.degrees(math.atan2(d.z, max(horiz, 8.0 * span)))
+                pit = max(-50.0, min(50.0, pit))
             self.root.rotation_euler = (math.radians(roll), math.radians(pit), math.radians(heads[i]))
             self.root.keyframe_insert('location', frame=P.T(t))
             self.root.keyframe_insert('rotation_euler', frame=P.T(t))
