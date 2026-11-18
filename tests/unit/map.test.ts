@@ -35,15 +35,19 @@ describe('map', () => {
 
 describe('skirmish maps', () => {
   const skirmishMaps = data.mapRows.filter((row) => !row.campaignOnly);
-  const specs = [1, 2, 3, 4].map((player) => ({
+  const allSpecs = [1, 2, 3, 4].map((player) => ({
     player,
     faction: (player % 2 === 1 ? 'human' : 'alien') as 'human' | 'alien',
     controller: 'human' as const,
   }));
 
   it('[MAP-03] ground units can drive between every pair of start positions on every skirmish map', () => {
-    expect(skirmishMaps.length).toBeGreaterThan(1);
+    expect(skirmishMaps.length).toBeGreaterThanOrEqual(6);
+    expect(skirmishMaps.filter((row) => row.starts.length === 4).length).toBeGreaterThanOrEqual(2);
     for (const row of skirmishMaps) {
+      // A side on every start the map has (two or four); two-start maps also get the two extra
+      // corners createSkirmishWorld falls back on for a third or fourth side.
+      const specs = allSpecs.slice(0, Math.max(row.starts.length, row.placeholder ? 4 : 2));
       for (const seed of [1, 7, 1000, 1001, 2006, 424242]) {
         const world = createSkirmishWorld(data, seed, specs, { mapId: row.id, fog: false });
         // Terrain alone decides whether the bases are joined; buildings and sites only add detours.

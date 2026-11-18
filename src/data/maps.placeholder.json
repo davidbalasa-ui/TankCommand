@@ -1,7 +1,7 @@
 [
   {
     "id": "map.wp02_skirmish",
-    "name": "Utopia Basin",
+    "name": "Cinder Basin",
     "size": 160,
     "cellSize": 2,
     "starts": [
@@ -196,5 +196,1315 @@
       }
     },
     "placeholder": true
+  },
+  {
+    "id": "map.s_twin_ridges",
+    "name": "Twin Ridges",
+    "size": 180,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -58,
+        "z": 54
+      },
+      {
+        "player": 2,
+        "x": 58,
+        "z": -54
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -76,
+        "z": 38,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": 72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -82,
+        "z": 60,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -66,
+        "z": 78,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -78,
+        "z": 72,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -76,
+        "z": 30,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 76,
+        "z": -38,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": -72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 82,
+        "z": -60,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 66,
+        "z": -78,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 78,
+        "z": -72,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 76,
+        "z": -30,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": -36,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": 36,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": 0,
+        "z": 0,
+        "amount": 300
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 2101,
+        "roughness": 0.7,
+        "centreRidge": false,
+        "symmetric": true,
+        "ridges": [
+          {
+            "x0": -86.0,
+            "z0": -54.0,
+            "x1": -52.0,
+            "z1": -20.0,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": 86.0,
+            "z0": 54.0,
+            "x1": 52.0,
+            "z1": 20.0,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": -38.0,
+            "z0": -6.0,
+            "x1": -18.0,
+            "z1": 14.0,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": 38.0,
+            "z0": 6.0,
+            "x1": 18.0,
+            "z1": -14.0,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": 6.0,
+            "z0": 38.0,
+            "x1": 34.0,
+            "z1": 66.0,
+            "height": 9,
+            "width": 7
+          },
+          {
+            "x0": -6.0,
+            "z0": -38.0,
+            "x1": -34.0,
+            "z1": -66.0,
+            "height": 9,
+            "width": 7
+          }
+        ],
+        "hills": [
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 14,
+            "height": 2.5
+          },
+          {
+            "x": -60,
+            "z": -60,
+            "radius": 18,
+            "height": 5
+          },
+          {
+            "x": 60,
+            "z": 60,
+            "radius": 18,
+            "height": 5
+          }
+        ],
+        "flats": [
+          {
+            "x": -58,
+            "z": 54,
+            "radius": 15
+          },
+          {
+            "x": 58,
+            "z": -54,
+            "radius": 15
+          },
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 8,
+            "height": 2.5
+          }
+        ]
+      }
+    },
+    "placeholder": false
+  },
+  {
+    "id": "map.s_fordwater",
+    "name": "Fordwater",
+    "size": 180,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -58,
+        "z": 6
+      },
+      {
+        "player": 2,
+        "x": 58,
+        "z": -6
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -62,
+        "z": -18,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -58,
+        "z": 30,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -82,
+        "z": -4,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -78,
+        "z": 20,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -84,
+        "z": 8,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -58,
+        "z": -24,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 62,
+        "z": 18,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 58,
+        "z": -30,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 82,
+        "z": 4,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 78,
+        "z": -20,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 84,
+        "z": -8,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 58,
+        "z": 24,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -22,
+        "z": -12,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": 22,
+        "z": 12,
+        "amount": 700
+      },
+      {
+        "kind": "ore",
+        "x": -24,
+        "z": 48,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 24,
+        "z": -48,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -26,
+        "z": -60,
+        "amount": 300
+      },
+      {
+        "kind": "metal",
+        "x": 26,
+        "z": 60,
+        "amount": 300
+      }
+    ],
+    "features": {
+      "waterLevel": -0.5,
+      "lakes": [
+        {
+          "x": -40,
+          "z": 62,
+          "radius": 14,
+          "depth": 3
+        },
+        {
+          "x": 40,
+          "z": -62,
+          "radius": 14,
+          "depth": 3
+        }
+      ],
+      "rivers": [
+        {
+          "x0": 0,
+          "z0": -90,
+          "x1": 0,
+          "z1": 90,
+          "width": 10,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.17,
+              "to": 0.25
+            },
+            {
+              "from": 0.45,
+              "to": 0.55
+            },
+            {
+              "from": 0.75,
+              "to": 0.83
+            }
+          ]
+        }
+      ],
+      "terrain": {
+        "seed": 2202,
+        "roughness": 0.8,
+        "centreRidge": false,
+        "symmetric": true,
+        "hills": [
+          {
+            "x": -48,
+            "z": -50,
+            "radius": 16,
+            "height": 4
+          },
+          {
+            "x": 48,
+            "z": 50,
+            "radius": 16,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -58,
+            "z": 6,
+            "radius": 15
+          },
+          {
+            "x": 58,
+            "z": -6,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false
+  },
+  {
+    "id": "map.s_high_table",
+    "name": "High Table",
+    "size": 190,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -62,
+        "z": 58
+      },
+      {
+        "player": 2,
+        "x": 62,
+        "z": -58
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -80,
+        "z": 42,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -48,
+        "z": 76,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -86,
+        "z": 64,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -70,
+        "z": 82,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -80,
+        "z": 76,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -80,
+        "z": 34,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 80,
+        "z": -42,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 48,
+        "z": -76,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 86,
+        "z": -64,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 70,
+        "z": -82,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 80,
+        "z": -76,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 80,
+        "z": -34,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -12,
+        "z": 12,
+        "amount": 800
+      },
+      {
+        "kind": "ore",
+        "x": 12,
+        "z": -12,
+        "amount": 800
+      },
+      {
+        "kind": "ore",
+        "x": 12,
+        "z": 12,
+        "amount": 800
+      },
+      {
+        "kind": "ore",
+        "x": -12,
+        "z": -12,
+        "amount": 800
+      },
+      {
+        "kind": "metal",
+        "x": -56,
+        "z": -40,
+        "amount": 300
+      },
+      {
+        "kind": "metal",
+        "x": 56,
+        "z": 40,
+        "amount": 300
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 2303,
+        "roughness": 0.6,
+        "centreRidge": false,
+        "symmetric": true,
+        "ridges": [
+          {
+            "x0": 17.5,
+            "z0": 29.1,
+            "x1": 0.0,
+            "z1": 34.0,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": 0.0,
+            "z0": 34.0,
+            "x1": -17.5,
+            "z1": 29.1,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": -29.1,
+            "z0": 17.5,
+            "x1": -34.0,
+            "z1": 0.0,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": -34.0,
+            "z0": 0.0,
+            "x1": -29.1,
+            "z1": -17.5,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": -17.5,
+            "z0": -29.1,
+            "x1": -0.0,
+            "z1": -34.0,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": -0.0,
+            "z0": -34.0,
+            "x1": 17.5,
+            "z1": -29.1,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": 29.1,
+            "z0": -17.5,
+            "x1": 34.0,
+            "z1": -0.0,
+            "height": 7,
+            "width": 7
+          },
+          {
+            "x0": 34.0,
+            "z0": -0.0,
+            "x1": 29.1,
+            "z1": 17.5,
+            "height": 7,
+            "width": 7
+          }
+        ],
+        "flats": [
+          {
+            "x": -62,
+            "z": 58,
+            "radius": 15
+          },
+          {
+            "x": 62,
+            "z": -58,
+            "radius": 15
+          },
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 22,
+            "height": 7
+          }
+        ]
+      }
+    },
+    "placeholder": false
+  },
+  {
+    "id": "map.s_crossfall",
+    "name": "Crossfall",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -64,
+        "z": -60
+      },
+      {
+        "player": 2,
+        "x": 64,
+        "z": 60
+      },
+      {
+        "player": 3,
+        "x": 60,
+        "z": -64
+      },
+      {
+        "player": 4,
+        "x": -60,
+        "z": 64
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": -78,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -82,
+        "z": -44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -72,
+        "z": -84,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -88,
+        "z": -66,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -82,
+        "z": -78,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -40,
+        "z": -80,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 50,
+        "z": 78,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 82,
+        "z": 44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 72,
+        "z": 84,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 88,
+        "z": 66,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 82,
+        "z": 78,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 40,
+        "z": 80,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 78,
+        "z": -50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": -82,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 84,
+        "z": -72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 66,
+        "z": -88,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 78,
+        "z": -82,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 80,
+        "z": -40,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -78,
+        "z": 50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": 82,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -84,
+        "z": 72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -66,
+        "z": 88,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -78,
+        "z": 82,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -80,
+        "z": 40,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -34,
+        "z": -16,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 16,
+        "z": -34,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 34,
+        "z": 16,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -16,
+        "z": 34,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -16,
+        "z": -16,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 16,
+        "z": -16,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 16,
+        "z": 16,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -16,
+        "z": 16,
+        "amount": 250
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 2404,
+        "roughness": 0.6,
+        "centreRidge": false,
+        "symmetric": true,
+        "fourWay": true,
+        "ridges": [
+          {
+            "x0": -100.0,
+            "z0": 0.0,
+            "x1": -60.0,
+            "z1": 0.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": -0.0,
+            "z0": -100.0,
+            "x1": -0.0,
+            "z1": -60.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": 100.0,
+            "z0": -0.0,
+            "x1": 60.0,
+            "z1": -0.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": 0.0,
+            "z0": 100.0,
+            "x1": 0.0,
+            "z1": 60.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": -44.0,
+            "z0": 0.0,
+            "x1": -22.0,
+            "z1": 0.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": -0.0,
+            "z0": -44.0,
+            "x1": -0.0,
+            "z1": -22.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": 44.0,
+            "z0": -0.0,
+            "x1": 22.0,
+            "z1": -0.0,
+            "height": 9,
+            "width": 6
+          },
+          {
+            "x0": 0.0,
+            "z0": 44.0,
+            "x1": 0.0,
+            "z1": 22.0,
+            "height": 9,
+            "width": 6
+          }
+        ],
+        "hills": [
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 18,
+            "height": 3
+          }
+        ],
+        "flats": [
+          {
+            "x": -64,
+            "z": -60,
+            "radius": 15
+          },
+          {
+            "x": 64,
+            "z": 60,
+            "radius": 15
+          },
+          {
+            "x": 60,
+            "z": -64,
+            "radius": 15
+          },
+          {
+            "x": -60,
+            "z": 64,
+            "radius": 15
+          },
+          {
+            "x": 0,
+            "z": 0,
+            "radius": 6,
+            "height": 3
+          }
+        ]
+      }
+    },
+    "placeholder": false
+  },
+  {
+    "id": "map.s_fourfold_fen",
+    "name": "Fourfold Fen",
+    "size": 200,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -64,
+        "z": -60
+      },
+      {
+        "player": 2,
+        "x": 64,
+        "z": 60
+      },
+      {
+        "player": 3,
+        "x": 60,
+        "z": -64
+      },
+      {
+        "player": 4,
+        "x": -60,
+        "z": 64
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -50,
+        "z": -78,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -82,
+        "z": -44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -72,
+        "z": -84,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -88,
+        "z": -66,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -82,
+        "z": -78,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -40,
+        "z": -80,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 50,
+        "z": 78,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 82,
+        "z": 44,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 72,
+        "z": 84,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 88,
+        "z": 66,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 82,
+        "z": 78,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 40,
+        "z": 80,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": 78,
+        "z": -50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 44,
+        "z": -82,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 84,
+        "z": -72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": 66,
+        "z": -88,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": 78,
+        "z": -82,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 80,
+        "z": -40,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -78,
+        "z": 50,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -44,
+        "z": 82,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -84,
+        "z": 72,
+        "amount": 500
+      },
+      {
+        "kind": "ore",
+        "x": -66,
+        "z": 88,
+        "amount": 500
+      },
+      {
+        "kind": "metal",
+        "x": -78,
+        "z": 82,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -80,
+        "z": 40,
+        "amount": 250
+      },
+      {
+        "kind": "ore",
+        "x": -40,
+        "z": -20,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 20,
+        "z": -40,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": 40,
+        "z": 20,
+        "amount": 600
+      },
+      {
+        "kind": "ore",
+        "x": -20,
+        "z": 40,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -24,
+        "z": -24,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 24,
+        "z": -24,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": 24,
+        "z": 24,
+        "amount": 250
+      },
+      {
+        "kind": "metal",
+        "x": -24,
+        "z": 24,
+        "amount": 250
+      }
+    ],
+    "features": {
+      "waterLevel": -0.5,
+      "lakes": [
+        {
+          "x": 0,
+          "z": 0,
+          "radius": 18,
+          "depth": 3
+        }
+      ],
+      "rivers": [
+        {
+          "x0": -12.0,
+          "z0": 0.0,
+          "x1": -100.0,
+          "z1": 0.0,
+          "width": 8,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.18,
+              "to": 0.28
+            },
+            {
+              "from": 0.72,
+              "to": 0.82
+            }
+          ]
+        },
+        {
+          "x0": -0.0,
+          "z0": -12.0,
+          "x1": -0.0,
+          "z1": -100.0,
+          "width": 8,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.18,
+              "to": 0.28
+            },
+            {
+              "from": 0.72,
+              "to": 0.82
+            }
+          ]
+        },
+        {
+          "x0": 12.0,
+          "z0": -0.0,
+          "x1": 100.0,
+          "z1": -0.0,
+          "width": 8,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.18,
+              "to": 0.28
+            },
+            {
+              "from": 0.72,
+              "to": 0.82
+            }
+          ]
+        },
+        {
+          "x0": 0.0,
+          "z0": 12.0,
+          "x1": 0.0,
+          "z1": 100.0,
+          "width": 8,
+          "depth": 4,
+          "fords": [
+            {
+              "from": 0.18,
+              "to": 0.28
+            },
+            {
+              "from": 0.72,
+              "to": 0.82
+            }
+          ]
+        }
+      ],
+      "terrain": {
+        "seed": 2505,
+        "roughness": 0.6,
+        "centreRidge": false,
+        "symmetric": true,
+        "fourWay": true,
+        "flats": [
+          {
+            "x": -64,
+            "z": -60,
+            "radius": 15
+          },
+          {
+            "x": 64,
+            "z": 60,
+            "radius": 15
+          },
+          {
+            "x": 60,
+            "z": -64,
+            "radius": 15
+          },
+          {
+            "x": -60,
+            "z": 64,
+            "radius": 15
+          }
+        ]
+      }
+    },
+    "placeholder": false
   }
 ]

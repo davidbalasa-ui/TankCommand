@@ -1,7 +1,8 @@
-"""Builds the campaign maps and missions from the approved outline.
+"""Builds the campaign and training maps and missions from the approved outline.
 
 Writes src/data/maps.campaign.json, src/data/missions/campaign/*.json and the import list
-src/data/missions/campaign.ts. Edit this file, not the generated JSON.
+src/data/missions/campaign.ts, and the training lessons src/data/missions/training_*.json with
+their import list src/data/missions/training.ts. Edit this file, not the generated JSON.
 
     python3 tools/missions/build.py
 
@@ -1424,6 +1425,239 @@ def act3(f):
 act3('human')
 act3('alien')
 
+# ---------------------------------------------------------------- training
+
+# Five short lessons, one idea each, all Terran (the outline: drops, mining, combat, research,
+# air). Every lesson is a chain of steps: the objective line always says what to do next, a
+# step's goal ring only shows once the step before it is done, and Command tops up the ore a
+# step needs, so a player who spent it elsewhere can't get stuck. There is no time limit and
+# nothing in them can destroy the landing pad. The text matches the touch controls (see the
+# Help screen and src/ui/input.ts).
+
+TRAINING = []
+COACH = 'Command'
+H = ROLE['human']
+A = ROLE['alien']
+
+# Drill Yard: a small practice ground. The pad sits in the south-west with ore and a metal site
+# round it; a low ridge with a gap crosses the middle, and the target range is beyond it.
+YARD_PAD = (-40, 32)
+add_map('map.t_drill_yard', 'Drill Yard', 150, [YARD_PAD, (44, -40)], [
+    ('ore', -60, 12, 1500), ('ore', -62, 50, 1500), ('ore', -22, 58, 1200), ('metal', -64, 32, 400),
+], {
+    'seed': 1301, 'roughness': 0.5, 'centreRidge': False, 'symmetric': False,
+    'ridges': [{'x0': -8, 'z0': -74, 'x1': 2, 'z1': -10, 'height': 6, 'width': 6},
+               {'x0': 6, 'z0': 14, 'x1': 14, 'z1': 74, 'height': 6, 'width': 6}],
+    'hills': [{'x': 40, 'z': 40, 'radius': 18, 'height': 3}, {'x': -40, 'z': -40, 'radius': 20, 'height': 4}],
+    'flats': [{'x': YARD_PAD[0], 'z': YARD_PAD[1], 'radius': 15}, {'x': 4, 'z': 2, 'radius': 8}],
+})
+
+# Kestrel Field: open ground for the research and air lessons. Metal by the pad, a target range
+# out to the north-east.
+FIELD_PAD = (-44, 40)
+add_map('map.t_kestrel_field', 'Kestrel Field', 160, [FIELD_PAD, (50, -46)], [
+    ('ore', -64, 22, 1500), ('ore', -26, 62, 1500), ('metal', -66, 58, 600), ('metal', -64, 40, 600),
+], {
+    'seed': 1402, 'roughness': 0.5, 'centreRidge': False, 'symmetric': False,
+    'hills': [{'x': 10, 'z': 20, 'radius': 20, 'height': 3}, {'x': 40, 'z': 50, 'radius': 18, 'height': 4},
+              {'x': -30, 'z': -40, 'radius': 22, 'height': 4}],
+    'flats': [{'x': FIELD_PAD[0], 'z': FIELD_PAD[1], 'radius': 16}, {'x': 34, 'z': -30, 'radius': 12}],
+})
+
+
+def coach(text):
+    return {'t': 'message', 'speaker': COACH, 'text': text}
+
+
+def grant(ore=0, metal=0):
+    g = {'t': 'grant', 'side': 1}
+    if ore:
+        g['ore'] = ore
+    if metal:
+        g['metal'] = metal
+    return g
+
+
+def has(unit, count=1):
+    return {'t': 'unitsAlive', 'side': 1, 'unitType': unit, 'op': '>=', 'count': count}
+
+
+def lesson(order, slug, title, briefing, map_id, player, units, structures, steps, intro, enemy=True,
+           extra=()):
+    """steps: (id, objective text, condition, actions when the step starts). The first step's
+    actions run with the intro; a step's condition is only checked once the step before is done."""
+    triggers = [T('intro', at(0), coach(intro), *steps[0][3])]
+    for i, (sid, _text, cond, _start) in enumerate(steps):
+        when = cond if i == 0 else {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': steps[i - 1][0]}, cond]}
+        do = [done(sid)]
+        if i + 1 < len(steps):
+            nid, ntext, _c, nstart = steps[i + 1]
+            do += [{'t': 'setObjective', 'id': nid, 'status': 'add', 'text': ntext, 'kind': 'primary'}, *nstart]
+        triggers.append(T(sid, when, *do))
+    triggers += list(extra)
+    TRAINING.append({
+        'id': f'mission.training.{order}_{slug}', 'campaign': 'training', 'order': order, 'title': title,
+        'briefing': briefing, 'mapId': map_id, 'sides': [player, enemy_side('alien')], 'units': units,
+        'structures': structures,
+        'objectives': [{'id': steps[0][0], 'text': steps[0][1], 'kind': 'primary'}],
+        'triggers': triggers,
+        'relations': at_war(1, 2) if enemy else [],
+        'placeholder': False,
+    })
+
+
+def ring(x, z, r=7):
+    return area(1, x, z, r)
+
+
+# 1. Drops: everything arrives by orbital drop onto the landing pad.
+px, pz = YARD_PAD
+lesson(1, 'drops', 'Drops',
+       'Welcome, Commander. Nothing is built on Vesper: everything you buy is dropped from orbit onto your '
+       'landing pad. Buy a few units, drive one about, and order your first building.',
+       'map.t_drill_yard',
+       player_side('human', 250, available=avail('human', 'light', 'scout', 'turret')),
+       [], [S(1, H['pad'], px, pz)],
+       [
+           ('buy', 'Tap your landing pad to open Build, then tap the Lancer card', has(H['light']), []),
+           ('more', 'Buy two Outriders. They land one at a time; the strip at the top shows the queue',
+            has(H['scout'], 2),
+            [coach('Lancer down! Everything you buy lands on the pad, then drives off it.'), grant(150)]),
+           ('drive', 'Tap one of your units to select it, then tap inside the ring to drive there',
+            ring(-6, 10), [coach('Good. Close Build with the X when you want the map back.')]),
+           ('tower', 'Buildings come by drop too. Buy a Bastion Gun: it drives out and sets itself up',
+            {'t': 'structureBuilt', 'side': 1, 'structureType': H['turret']},
+            [coach('Nicely driven. Command has sent 150 ore for a gun tower.'), grant(150)]),
+       ],
+       'Your landing pad is the square with lights. Tap it to see what you can buy.',
+       enemy=False)
+
+# 2. Mining: miners dig ore, haulers carry it home, ore pays for everything.
+lesson(2, 'mining', 'Mining',
+       'Ore pays for everything you buy. A Prospector digs ore and stacks it in crates by the field; a '
+       'Hauler carries the crates home to your landing pad. Get the ore flowing and bank some.',
+       'map.t_drill_yard',
+       player_side('human', 0, available=avail('human', 'light', 'miner', 'tug')),
+       [U(1, H['miner'], px - 10, pz - 2, 0.0), U(1, H['tug'], px - 10, pz + 6, 0.0)],
+       [S(1, H['pad'], px, pz)],
+       [
+           ('dig', 'Tap the Prospector, then tap a pink ore field to start digging',
+            {'t': 'resourceReached', 'side': 1, 'ore': 10}, []),
+           ('crew', 'Buy a second Prospector and a second Hauler. Send the new Prospector to dig too',
+            {'t': 'and', 'conds': [has(H['miner'], 2), has(H['tug'], 2)]},
+            [coach('First load home! Haulers fetch the crates by themselves. Here is 150 ore to grow.'),
+             grant(150)]),
+           ('bank', 'Bank 400 ore. The ore count is at the top of the screen',
+            {'t': 'resourceReached', 'side': 1, 'ore': 400},
+            [coach('Two crews dig twice as fast. Keep an idle miner busy: tap it, then an ore field.')]),
+           ('spend', 'Ore buys everything. Spend some: buy a Lancer', has(H['light']),
+            [coach('400 ore banked. Tanks, buildings and workers are all paid in ore.')]),
+       ],
+       'Your Prospector and Hauler are beside the pad. Ore fields are the pink rocks.',
+       enemy=False)
+
+# 3. Combat: select, move, attack, attack-move, hold, groups.
+targets = [(30, 4), (34, -4)]
+road = [(30, -24), (36, -20)]
+end_ring = (46, -40)
+lesson(3, 'combat', 'Combat',
+       'Four Lancers are yours to command. Learn to pick them, move them and fight with them. The '
+       'Arcadian Darters on the range are old and slow to shoot.',
+       'map.t_drill_yard',
+       player_side('human', 0, available=[]),
+       [U(1, H['light'], x, z, 0.0, tag='squad') for x, z in spread(px + 12, pz - 4, 4, 5)]
+       + [U(2, A['scout'], x, z, 3.1, tag='targets') for x, z in targets]
+       + [U(2, A['scout'], x, z, 2.3, tag='road') for x, z in road],
+       [S(1, H['pad'], px, pz)],
+       [
+           ('move', 'Tap a Lancer to select it, then tap inside the ring to move it', ring(-14, 18, 6), []),
+           ('all', 'Double-tap a Lancer to pick all four, or tap All at the bottom. Move them to the ring',
+            ring(4, 2, 8), [coach('Well done. Drag one finger on the map to look around.')]),
+           ('attack', 'Two Darters on the range. With your Lancers selected, tap a Darter to attack it',
+            {'t': 'unitDestroyed', 'tag': 'targets'}, [coach('Through the gap is the target range.')]),
+           ('advance', 'Tap Attack, then tap inside the far ring. Your Lancers fight anything on the way',
+            ring(*end_ring, 8), [coach('Targets down. A plain move drives past enemies; an Attack move fights them.')]),
+           ('hold', 'Raiders incoming! Tap Hold: your Lancers stay put and fire at anything in range',
+            {'t': 'unitDestroyed', 'tag': 'raid'},
+            [coach('Good. Now stand your ground.'),
+             spawn(2, A['scout'], 3, -46, -56, tag='raid'), attack('raid', end_ring[0], end_ring[1])]),
+           ('group', 'Select all, then hold tile 1 at the bottom to save a group. Tap 1, then the ring',
+            ring(-14, 6, 8), [coach('Raid beaten. Groups let you pick a squad again with one tap.')]),
+       ],
+       'Units are selected by tapping them. Move by tapping the ground.',
+       extra=[
+           # Never run out of tanks: reinforcements land whenever only one is left.
+           T('reinforce', {'t': 'unitsAlive', 'side': 1, 'op': '<=', 'count': 1},
+             coach('Reinforcements are landing at your pad.'), spawn(1, H['light'], 3, px + 10, pz - 6, drop=True),
+             repeat=True),
+       ])
+
+# 4. Research: metal from a metal station pays for research and upgrades.
+fx, fz = FIELD_PAD
+lesson(4, 'research', 'Research',
+       'New weapons need research, and research is paid in metal as well as ore. Set up a Metal Station, '
+       'let a Hauler bring the metal home, then research a new tank and upgrade an old one.',
+       'map.t_kestrel_field',
+       player_side('human', 250, available=avail('human', 'light', 'missile', 'station', 'tug')),
+       [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7),
+        U(1, H['tug'], fx - 2, fz - 12, 0.0)],
+       [S(1, H['pad'], fx, fz)],
+       [
+           ('station', 'Buy a Metal Station. It drives to a blue metal site and unpacks there',
+            {'t': 'structureBuilt', 'side': 1, 'structureType': H['station']}, []),
+           ('metal', 'Bank 50 metal. Your Hauler fetches it from the station by itself',
+            {'t': 'resourceReached', 'side': 1, 'metal': 50},
+            [coach('Station up. Haulers carry metal home just like ore.')]),
+           ('research', 'Open Build and tap the locked Javelin card to research Missiles',
+            {'t': 'researchDone', 'side': 1, 'node': 'research.human.missiles'},
+            [coach('Metal pays for research. Here is 100 ore for the rest of the cost.'), grant(100)]),
+           ('upgrade', 'Missiles also unlock Fire rate. Select a Lancer, tap Upgrade, then tap Fire rate',
+            {'t': 'upgraded', 'side': 1, 'upgrade': 'fireRate'},
+            [coach('Missiles researched: the Javelin card is open now.'), grant(100)]),
+           ('javelin', 'Buy a Javelin. Units cost only ore; metal is for research and upgrades',
+            has(H['missile']), [coach('That Lancer fires faster for the rest of the match.'), grant(200)]),
+       ],
+       'Metal sites are the pale blue rocks. Tap your landing pad to open Build.',
+       enemy=False)
+
+# 5. Air: an airfield, fighters, and the few weapons that can hit aircraft.
+range_ring = (34, -30)
+lesson(5, 'air', 'Air',
+       'Aircraft fly over hills and water, but they need an Airfield to land, refuel and rearm. Only '
+       'some weapons can hit them: missiles and other aircraft. Build an air wing and use it.',
+       'map.t_kestrel_field',
+       player_side('human', 300, available=avail('human', 'light', 'missile', 'air_base', 'fighter'),
+                   research_done=research('human', 'air', 'artillery')),
+       [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7)]
+       + [U(2, A['scout'], x, z, 2.3, tag='darters') for x, z in [(range_ring[0] + 3, range_ring[1] - 2),
+                                                                 (range_ring[0] - 3, range_ring[1] + 3)]],
+       [S(1, H['pad'], fx, fz)],
+       [
+           ('airfield', 'Buy an Airfield. Aircraft land, refuel and rearm there',
+            {'t': 'structureBuilt', 'side': 1, 'structureType': H['air_base']}, []),
+           ('antiair', 'Lancers cannot hit aircraft. Buy a Javelin: its missiles can. Shoot down the Dragonflies',
+            {'t': 'and', 'conds': [has(H['missile']), {'t': 'unitDestroyed', 'tag': 'drones'}]},
+            [coach('Arcadian Dragonflies overhead! They only hunt aircraft, but our Lancers cannot touch them.'),
+             grant(200), spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz)]),
+           ('falcon', 'Buy a Falcon. It parks on the Airfield until you launch it', has(H['fighter']),
+            [coach('Only missiles, missile towers and fighters can hit aircraft.'), grant(300)]),
+           ('fly', 'Tap the Falcon on the Airfield, tap Launch, then tap inside the ring',
+            area(1, range_ring[0], range_ring[1], 10, unitType=H['fighter']), []),
+           ('strike', 'Falcons hit ground units too. Destroy both Darters. Empty Falcons fly home; launch them again',
+            {'t': 'unitDestroyed', 'tag': 'darters'},
+            [coach('Falcons carry little fuel and ammunition. They return to the Airfield by themselves.')]),
+       ],
+       'Tap your landing pad to open Build.',
+       extra=[
+           # Dragonflies run out of fuel and crash after a minute: send more until a Javelin is here.
+           T('moreDrones', {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': 'airfield'},
+                                                  {'t': 'not', 'cond': {'t': 'objectiveDone', 'id': 'antiair'}},
+                                                  {'t': 'unitsAlive', 'tag': 'drones', 'op': '<=', 'count': 0},
+                                                  {'t': 'not', 'cond': has(H['missile'])}]},
+             spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz), repeat=True),
+       ])
+
+
 # ---------------------------------------------------------------- site spacing
 
 # Ore and metal sites stay 12-14 m clear of every landing pad's edge, so pad traffic (arrivals
@@ -1450,7 +1684,7 @@ def space_sites():
     for m in MAPS:
         # The pads the missions actually place (map starts are only camera spots in the campaign).
         pads = []
-        users = [ms for ms in MISSIONS if ms['mapId'] == m['id']]
+        users = [ms for ms in MISSIONS + TRAINING if ms['mapId'] == m['id']]
         for ms in users:
             for st in ms['structures']:
                 if st['structureType'].endswith('landing_pad') and (st['x'], st['z']) not in pads:
@@ -1526,7 +1760,24 @@ def write():
     lines.append(f"export const CAMPAIGN_MISSIONS: readonly unknown[] = [{', '.join(names)}];")
     with open(os.path.join(ROOT, 'src/data/missions/campaign.ts'), 'w') as f:
         f.write('\n'.join(lines) + '\n')
-    print(f'{len(MAPS)} maps, {len(MISSIONS)} missions')
+    # Training lessons: src/data/missions/training_<n>_<slug>.json and the import list training.ts.
+    for name in os.listdir(os.path.join(ROOT, 'src/data/missions')):
+        if name.startswith('training_') and name.endswith('.json'):
+            os.remove(os.path.join(ROOT, 'src/data/missions', name))
+    lines = ['// Generated by tools/missions/build.py. Do not edit by hand.']
+    names = []
+    for i, m in enumerate(TRAINING):
+        file = 'training_' + m['id'].split('.')[-1] + '.json'
+        with open(os.path.join(ROOT, 'src/data/missions', file), 'w') as f:
+            json.dump(m, f, indent=2)
+            f.write('\n')
+        lines.append(f"import t{i} from './{file}';")
+        names.append(f't{i}')
+    lines.append('')
+    lines.append(f"export const TRAINING_MISSIONS: readonly unknown[] = [{', '.join(names)}];")
+    with open(os.path.join(ROOT, 'src/data/missions/training.ts'), 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f'{len(MAPS)} maps, {len(MISSIONS)} missions, {len(TRAINING)} training missions')
 
 
 write()

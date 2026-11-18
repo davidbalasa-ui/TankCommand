@@ -31,18 +31,35 @@ test('[MSN-05] locked missions are greyed, the next one unlocks on a win and pro
   const padId = await page.evaluate(
     () => window.__TC_TEST__?.structures().find((s) => s.owner === 1 && s.kind === 'pad')?.id ?? 0,
   );
-  await page.evaluate((id) => {
-    const hook = window.__TC_TEST__;
-    hook?.sendCommand({ kind: 'buy', itemId: 'unit.human.light_tank', padId: id, tick: (hook?.snapshot().tick ?? 0) + 1, issuer: 1 });
-  }, padId);
-  await expect
-    .poll(async () => page.evaluate(() => window.__TC_TEST__?.units().filter((u) => u.owner === 1).length ?? 0), { timeout: 30_000 })
-    .toBeGreaterThanOrEqual(2);
+  // The Drops lesson, step by step: a Lancer, two Outriders, a drive to the ring, a Bastion Gun.
+  const buy = async (itemId: string): Promise<void> => {
+    await page.evaluate(
+      ({ id, item }) => {
+        const hook = window.__TC_TEST__;
+        hook?.sendCommand({ kind: 'buy', itemId: item, padId: id, tick: (hook?.snapshot().tick ?? 0) + 1, issuer: 1 });
+      },
+      { id: padId, item: itemId },
+    );
+  };
+  const ownUnits = async (): Promise<number> =>
+    page.evaluate(() => window.__TC_TEST__?.units().filter((u) => u.owner === 1).length ?? 0);
+  await buy('unit.human.light_tank');
+  await expect.poll(ownUnits, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  await buy('unit.human.scout');
+  await expect.poll(ownUnits, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
+  await buy('unit.human.scout');
+  await expect.poll(ownUnits, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
   await page.evaluate(() => {
     const hook = window.__TC_TEST__;
     const ids = hook?.units().filter((u) => u.owner === 1).map((u) => u.id) ?? [];
-    hook?.sendCommand({ kind: 'move', unitIds: ids, x: -25, z: -25, tick: (hook?.snapshot().tick ?? 0) + 1, issuer: 1 });
+    hook?.sendCommand({ kind: 'move', unitIds: ids, x: -6, z: 10, tick: (hook?.snapshot().tick ?? 0) + 1, issuer: 1 });
   });
+  await expect
+    .poll(async () => page.evaluate(() => window.__TC_TEST__?.units().some((u) => u.owner === 1 && Math.hypot(u.x + 6, u.z - 10) < 7) ?? false), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  await buy('structure.human.turret');
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'results', undefined, { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: 'Mission complete' })).toBeVisible();
   await page.screenshot({ path: 'test-results/shots/wp09-6-mission-results.png' });
@@ -82,7 +99,8 @@ test('[MSN-06] trigger messages show as a toast and the objectives sheet works b
     .toContain('Command');
   const open = page.getByRole('button', { name: 'Objectives', exact: true });
   await open.tap();
-  await expect(page.locator('.objective-list li')).toHaveCount(2);
+  // Lessons add each step's objective as the one before is done: the first is listed at the start.
+  await expect(page.locator('.objective-list li')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/shots/wp09-4-objectives-sheet.png' });
   await page.getByRole('button', { name: 'Close', exact: true }).tap();
   await expect(page.locator('.objective-list')).toHaveCount(0);
@@ -137,6 +155,9 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
   await page.goto('/');
   await waitForHook(page);
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
+  // Two AIs need a four-player map; the last map in the list is one.
+  await page.getByRole('button', { name: 'Previous map', exact: true }).click();
+  await expect(page.locator('.map-name')).toContainText('4 players');
   await page.getByRole('radio', { name: 'Opponents: 2 AI' }).click();
   await expect(page.getByRole('radio', { name: 'Opponents: 2 AI' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: 'Your side: Arcadians' }).click();

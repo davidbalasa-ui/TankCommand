@@ -1,0 +1,262 @@
+{
+  "id": "mission.training.4_research",
+  "campaign": "training",
+  "order": 4,
+  "title": "Research",
+  "briefing": "New weapons need research, and research is paid in metal as well as ore. Set up a Metal Station, let a Hauler bring the metal home, then research a new tank and upgrade an old one.",
+  "mapId": "map.t_kestrel_field",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 250,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.missile_tank",
+        "structure.human.metal_station",
+        "unit.human.tug"
+      ]
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -32,
+      "z": 34,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -30,
+      "z": 42,
+      "heading": -0.7
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.tug",
+      "x": -46,
+      "z": 28,
+      "heading": 0.0
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -44,
+      "z": 40
+    }
+  ],
+  "objectives": [
+    {
+      "id": "station",
+      "text": "Buy a Metal Station. It drives to a blue metal site and unpacks there",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Metal sites are the pale blue rocks. Tap your landing pad to open Build."
+        }
+      ]
+    },
+    {
+      "id": "station",
+      "when": {
+        "t": "structureBuilt",
+        "side": 1,
+        "structureType": "structure.human.metal_station"
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "station",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "metal",
+          "status": "add",
+          "text": "Bank 50 metal. Your Hauler fetches it from the station by itself",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Station up. Haulers carry metal home just like ore."
+        }
+      ]
+    },
+    {
+      "id": "metal",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "station"
+          },
+          {
+            "t": "resourceReached",
+            "side": 1,
+            "metal": 50
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "metal",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "research",
+          "status": "add",
+          "text": "Open Build and tap the locked Javelin card to research Missiles",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Metal pays for research. Here is 100 ore for the rest of the cost."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "metal"
+          },
+          {
+            "t": "researchDone",
+            "side": 1,
+            "node": "research.human.missiles"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "research",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "upgrade",
+          "status": "add",
+          "text": "Missiles also unlock Fire rate. Select a Lancer, tap Upgrade, then tap Fire rate",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Missiles researched: the Javelin card is open now."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ]
+    },
+    {
+      "id": "upgrade",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "research"
+          },
+          {
+            "t": "upgraded",
+            "side": 1,
+            "upgrade": "fireRate"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "upgrade",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "javelin",
+          "status": "add",
+          "text": "Buy a Javelin. Units cost only ore; metal is for research and upgrades",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "That Lancer fires faster for the rest of the match."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 200
+        }
+      ]
+    },
+    {
+      "id": "javelin",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "upgrade"
+          },
+          {
+            "t": "unitsAlive",
+            "side": 1,
+            "unitType": "unit.human.missile_tank",
+            "op": ">=",
+            "count": 1
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "javelin",
+          "status": "done"
+        }
+      ]
+    }
+  ],
+  "relations": [],
+  "placeholder": false
+}

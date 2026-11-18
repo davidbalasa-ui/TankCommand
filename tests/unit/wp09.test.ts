@@ -240,15 +240,18 @@ describe('[MSN-07] neutral armed side', () => {
 });
 
 describe('placeholder missions', () => {
+  // Training lessons are the exception: they can't be lost (tests/unit/training.test.ts, TRN-02).
+  const losable = MISSIONS.filter((m) => m.campaign !== 'training');
+
   it('[MSN-04] every shipped mission has a time limit or a lose action', () => {
-    for (const row of MISSIONS) {
+    for (const row of losable) {
       const hasLose = row.triggers.some((t) => t.do.some((a) => a.t === 'lose'));
       expect(row.timeLimitSec !== undefined || hasLose, row.id).toBe(true);
       expect(row.objectives.some((o) => o.kind === 'primary'), row.id).toBe(true);
     }
   });
 
-  for (const row of MISSIONS) {
+  for (const row of losable) {
     it(`[MSN-03] ${row.id} can be lost by doing nothing`, async () => {
       let w = buildMissionWorld(data, row, 3);
       const limit = ((row.timeLimitSec ?? 900) + 5) * SEC;
@@ -263,31 +266,16 @@ describe('placeholder missions', () => {
   }
 
   it('[MSN-03] training missions are won by scripted commands', () => {
-    const t1 = MISSIONS.find((m) => m.id === 'mission.training.1_drops');
-    const t2 = MISSIONS.find((m) => m.id === 'mission.training.2_mining');
-    if (!t1 || !t2) {
-      throw new Error('missing');
+    // The step-by-step lessons are played through by the scripted beginner (campaignBot.ts);
+    // tests/unit/training.test.ts plays every one of them.
+    for (const id of ['mission.training.1_drops', 'mission.training.2_mining']) {
+      const row = MISSIONS.find((m) => m.id === id);
+      if (!row) {
+        throw new Error(id);
+      }
+      const w = playMission(buildMissionWorld(data, row, 4), 600 * SEC);
+      expect(w.result, id).toEqual({ winner: 1 });
     }
-    let w = buildMissionWorld(data, t1, 4);
-    const pad = w.structures.find((s) => s.owner === 1);
-    w = step(w, [{ kind: 'buy', issuer: 1, tick: w.tick + 1, itemId: 'unit.human.light_tank', padId: pad?.id ?? 0 }]);
-    const tank = w.units.find((u) => u.owner === 1);
-    w = step(w, [{ kind: 'move', issuer: 1, tick: w.tick + 1, unitIds: [tank?.id ?? 0], x: -25, z: -25 }]);
-    for (let i = 0; i < 120 * SEC && !w.result; i += 1) {
-      w = step(w, []);
-    }
-    expect(w.result).toEqual({ winner: 1 });
-
-    let m = buildMissionWorld(data, t2, 4);
-    const miner = m.units.find((u) => u.owner === 1);
-    const deposit = m.deposits.filter((d) => d.kind === 'ore').sort(
-      (a, b) => Math.hypot(a.x + 50, a.z + 50) - Math.hypot(b.x + 50, b.z + 50),
-    )[0];
-    m = step(m, [{ kind: 'mine', issuer: 1, tick: m.tick + 1, unitIds: [miner?.id ?? 0], depositId: deposit?.id ?? 0 }]);
-    for (let i = 0; i < 600 * SEC && !m.result; i += 1) {
-      m = step(m, []);
-    }
-    expect(m.result).toEqual({ winner: 1 });
   }, 120_000);
 
   it('[MSN-03] the combat missions can be won by a scripted attack', () => {
@@ -305,7 +293,7 @@ describe('placeholder missions', () => {
   it('[MSN-05] each campaign has an ordered chain and nextMission walks it', () => {
     const first = MISSIONS.find((m) => m.id === 'mission.training.1_drops');
     expect(first && nextMission(first)?.id).toBe('mission.training.2_mining');
-    const last = MISSIONS.find((m) => m.id === 'mission.training.2_mining');
+    const last = MISSIONS.find((m) => m.id === 'mission.training.5_air');
     expect(last && nextMission(last)).toBeNull();
   });
 });

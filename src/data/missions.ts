@@ -6,8 +6,7 @@ import { tagUnit, type MissionState } from '../sim/triggers';
 import { convertResearchIds, sideResearch } from '../sim/research';
 import type { SimData } from './simData';
 import type { WorldState } from '../sim/types';
-import training1 from './missions/training_1_drops.json';
-import training2 from './missions/training_2_mining.json';
+import { TRAINING_MISSIONS } from './missions/training';
 import { CAMPAIGN_MISSIONS } from './missions/campaign';
 
 export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
@@ -22,7 +21,7 @@ export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
   return rows.sort((a, b) => a.campaign.localeCompare(b.campaign) || a.order - b.order);
 }
 
-export const MISSIONS: MissionRow[] = loadMissionTable([training1, training2, ...CAMPAIGN_MISSIONS]);
+export const MISSIONS: MissionRow[] = loadMissionTable([...TRAINING_MISSIONS, ...CAMPAIGN_MISSIONS]);
 
 export function missionsOf(campaign: MissionRow['campaign']): MissionRow[] {
   return MISSIONS.filter((mission) => mission.campaign === campaign);

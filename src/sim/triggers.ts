@@ -146,9 +146,19 @@ export function evalCondition(world: WorldState, mission: MissionState, cond: Co
       if (cond.tag) {
         count = aliveIds(world, mission.tags[cond.tag] ?? []).length;
       } else {
-        count = world.units.filter((u) => u.hp > 0 && u.owner === cond.side).length;
+        count = world.units.filter(
+          (u) => u.hp > 0 && u.owner === cond.side && (!cond.unitType || u.typeId === cond.unitType),
+        ).length;
       }
       return cond.op === '>=' ? count >= cond.count : count <= cond.count;
+    }
+    case 'upgraded': {
+      const has = (upgrades: readonly string[]): boolean =>
+        cond.upgrade ? upgrades.includes(cond.upgrade) : upgrades.length > 0;
+      const count =
+        world.units.filter((u) => u.hp > 0 && u.owner === cond.side && has(u.upgrades)).length +
+        world.structures.filter((s) => s.hp > 0 && s.owner === cond.side && has(s.upgrades)).length;
+      return count >= (cond.count ?? 1);
     }
     case 'unitEscorted': {
       const alive = world.units.filter(
@@ -327,7 +337,9 @@ export interface MissionMarker {
 /**
  * Areas the player is meant to reach: every areaEntered (for the player's side), unitEscorted or
  * placed structureBuilt condition in a trigger that hasn't fired yet. Conditions under `not`, and triggers that lose the
- * mission or fail an objective, are skipped because they describe places to avoid. Read-only; the renderer and minimap draw these as goal rings.
+ * mission or fail an objective, are skipped because they describe places to avoid. An `and` that also waits for an
+ * objective not yet done is a later step, so its rings stay hidden until that objective is done. Read-only; the
+ * renderer and minimap draw these as goal rings.
  */
 export function missionMarkers(mission: MissionState | null): MissionMarker[] {
   if (!mission || mission.failReason !== null) {
@@ -335,7 +347,11 @@ export function missionMarkers(mission: MissionState | null): MissionMarker[] {
   }
   const result: MissionMarker[] = [];
   const seen = new Set<string>();
+  const done = new Set(mission.objectives.filter((o) => o.status === 'done').map((o) => o.id));
   const visit = (cond: Condition): void => {
+    if (cond.t === 'and' && cond.conds.some((c) => c.t === 'objectiveDone' && !done.has(c.id))) {
+      return;
+    }
     if (cond.t === 'and' || cond.t === 'or') {
       cond.conds.forEach(visit);
       return;

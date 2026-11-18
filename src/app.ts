@@ -1525,9 +1525,12 @@ export class App {
 
   private newSkirmish(): WorldState {
     const config = this.skirmishConfig;
+    // One side per start: a two-player map takes one AI (the setup screen offers no more).
+    const mapRow = this.mapRows.find((row) => row.id === this.mapIdValue) ?? this.mapRows[0];
+    const seats = Math.max(1, (mapRow?.starts.length ?? 3) - 1);
     const specs = [
       { player: 1, faction: config.faction, controller: 'human' as const },
-      ...config.opponents.map((opponent, index) => ({
+      ...config.opponents.slice(0, seats).map((opponent, index) => ({
         player: index + 2,
         faction: opponent.faction,
         controller: 'ai' as const,

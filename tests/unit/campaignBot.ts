@@ -7,6 +7,7 @@ import { isFightingUnitType } from '../../src/sim/economy';
 import { isHostile } from '../../src/sim/diplomacy';
 import { hasFreeAirSlot } from '../../src/sim/air';
 import { isItemUnlocked, researchDone, researchRejection } from '../../src/sim/research';
+import { upgradeRejection } from '../../src/sim/upgrades';
 import { PAD_RALLY_DISTANCE, padLayout } from '../../src/sim/pad';
 import { placementValidity } from '../../src/sim/spawn';
 import { isPackedOnTheWay } from '../../src/sim/unpack';
@@ -58,7 +59,11 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   const enemyStructures = w.structures.filter((s) => s.hp > 0 && s.owner !== me && isHostile(w, me, s.owner));
 
   // Units the mission wants kept safe or brought somewhere: never thrown into a fight.
-  const triggers = mission.def.triggers.filter((t) => !mission.fired.includes(t.id));
+  // Triggers still to come, leaving out later steps that wait for an objective not yet done.
+  const doneIds = new Set(mission.objectives.filter((o) => o.status === 'done').map((o) => o.id));
+  const waiting = (c: Condition): boolean =>
+    c.t === 'and' && c.conds.some((x) => x.t === 'objectiveDone' && !doneIds.has(x.id));
+  const triggers = mission.def.triggers.filter((t) => !mission.fired.includes(t.id) && !waiting(t.when));
   const escortTags = new Set<string>();
   const keepTags = new Set<string>();
   for (const t of mission.def.triggers) {
@@ -163,17 +168,34 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
     const minerCount = own.filter((u) => w.unitTypes.get(u.typeId)?.workerKind === 'oreMiner').length;
     const tugCount = own.filter((u) => w.unitTypes.get(u.typeId)?.workerKind === 'tug').length;
     const worker = minerType && minerCount < 2 && minerCount <= tugCount ? minerType : tugType && tugCount < minerCount ? tugType : null;
+    // A unit an objective asks for by type ("Buy a Javelin").
+    const unitGoal = open.find(
+      (c): c is Extract<Condition, { t: 'unitsAlive' }> =>
+        c.t === 'unitsAlive' &&
+        c.side === me &&
+        c.op === '>=' &&
+        c.unitType !== undefined &&
+        own.filter((u) => u.typeId === c.unitType).length < c.count &&
+        usable(c.unitType),
+    );
+    const goalType = unitGoal?.unitType ? w.unitTypes.get(unitGoal.unitType) : undefined;
+    const goalBuyable = goalType && (goalType.role !== 'air' || hasFreeAirSlot(w, me));
     if (needType) {
       if (stats.ore >= needType.cost.ore) {
         out.push({ kind: 'buy', itemId: needType.id, padId: pad.id });
+      }
+    } else if (goalType && goalBuyable) {
+      if (stats.ore >= goalType.oreCost && stats.metal >= goalType.metalCost) {
+        out.push({ kind: 'buy', itemId: goalType.id, padId: pad.id });
       }
     } else if (worker && !threat && stats.ore >= worker.oreCost) {
       out.push({ kind: 'buy', itemId: worker.id, padId: pad.id });
     } else if (tower && towers < MAX_TOWERS && !pendingKit && enemyStructures.length === 0 && stats.ore >= tower.cost.ore) {
       out.push({ kind: 'buy', itemId: tower.id, padId: pad.id });
     } else {
-      // While a research goal waits to start, keep enough ore back to start it.
-      const saving = researching && researchIdle ? RESEARCH_SAVINGS : 0;
+      // While a research or upgrade goal waits, keep enough ore back for it.
+      const upgrading = open.some((c) => c.t === 'upgraded' && c.side === me);
+      const saving = (researching && researchIdle) || upgrading ? RESEARCH_SAVINGS : 0;
       const tank = tanks.find((t) => stats.ore >= t.oreCost + saving && stats.metal >= t.metalCost);
       if (tank) {
         out.push({ kind: 'buy', itemId: tank.id, padId: pad.id });
@@ -190,6 +212,19 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
       .sort((a, b) => a.cost.ore + a.cost.metal * 3 - (b.cost.ore + b.cost.metal * 3) || a.id.localeCompare(b.id))[0];
     if (node && researchRejection(w, me, node.id) === null) {
       out.push({ kind: 'research', nodeId: node.id });
+    }
+  }
+  // An objective asks for an upgrade: buy it for the first vehicle that can take it.
+  const upgradeGoal = open.find((c): c is Extract<Condition, { t: 'upgraded' }> => c.t === 'upgraded' && c.side === me);
+  if (upgradeGoal) {
+    const kinds = upgradeGoal.upgrade ? [upgradeGoal.upgrade] : (['fireRate', 'armor', 'stealth'] as const);
+    search: for (const unit of own) {
+      for (const upgrade of kinds) {
+        if (upgradeRejection(w, me, unit.id, upgrade) === null) {
+          out.push({ kind: 'upgrade', targetId: unit.id, upgrade });
+          break search;
+        }
+      }
     }
   }
   const stations = ownStructures.filter((s) => w.structureTypes.get(s.typeId)?.kind === 'metalStation');

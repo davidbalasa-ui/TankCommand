@@ -65,6 +65,8 @@ export interface TerrainFeature {
   centreRidge?: boolean;
   /** Mirror the map so both sides start equal (default true). */
   symmetric?: boolean;
+  /** Also make it the same under quarter turns, so four corner starts are equal (default false). */
+  fourWay?: boolean;
   ridges?: RidgeFeature[];
   hills?: HillFeature[];
   /** Replace the four default flat corners when given. */
@@ -288,6 +290,17 @@ export function generateMap(
     }
   }
 
+  if (terrain?.fourWay) {
+    // Average each vertex with its quarter-turn images about the centre.
+    const source = Float32Array.from(map.heights);
+    const at = (ix: number, iz: number): number => source[iz * stride + ix] ?? 0;
+    for (let iz = 0; iz <= rows; iz += 1) {
+      for (let ix = 0; ix <= cols; ix += 1) {
+        const average = (at(ix, iz) + at(cols - iz, ix) + at(cols - ix, rows - iz) + at(iz, cols - ix)) / 4;
+        setHeight(map, ix, iz, average);
+      }
+    }
+  }
   if (terrain?.flats) {
     for (const flat of terrain.flats) {
       flattenCircle(map, flat.x, flat.z, flat.radius, flat.radius * 1.7, flat.height ?? 0);

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { missionMarkers, type MissionState } from '../../src/sim/triggers';
 import type { Trigger } from '../../src/sim/missionSchema';
 
-function mission(triggers: Trigger[], fired: string[] = []): MissionState {
+function mission(triggers: Trigger[], fired: string[] = [], done: string[] = []): MissionState {
   return {
     def: { id: 'mission.test', triggers, timeLimitTicks: null },
     humanSide: 1,
     fired,
-    objectives: [],
+    objectives: done.map((id) => ({ id, text: id, kind: 'primary' as const, status: 'done' as const })),
     messages: [],
     nextMessage: 0,
     tags: {},
@@ -37,5 +37,18 @@ describe('mission markers', () => {
     ]);
     expect(missionMarkers(mission(triggers, ['reach']))).toEqual([{ x: 5, z: 6, radius: 3 }]);
     expect(missionMarkers(null)).toEqual([]);
+  });
+
+  it('[MSN-08] a later step\'s ring stays hidden until the step before it is done', () => {
+    const triggers: Trigger[] = [
+      { id: 'first', when: { t: 'areaEntered', side: 1, x: 1, z: 1, radius: 4 }, do: win },
+      {
+        id: 'second',
+        when: { t: 'and', conds: [{ t: 'objectiveDone', id: 'first' }, { t: 'areaEntered', side: 1, x: 9, z: 9, radius: 5 }] },
+        do: win,
+      },
+    ];
+    expect(missionMarkers(mission(triggers))).toEqual([{ x: 1, z: 1, radius: 4 }]);
+    expect(missionMarkers(mission(triggers, ['first'], ['first']))).toEqual([{ x: 9, z: 9, radius: 5 }]);
   });
 });

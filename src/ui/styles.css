@@ -841,6 +841,12 @@ button.icon-button {
   background: var(--cyan-d);
 }
 
+/* A start no side uses in this match (a four-player map with fewer sides). */
+.spawn.spare {
+  background: transparent;
+  opacity: 0.55;
+}
+
 .map-nav {
   display: flex;
   align-items: center;

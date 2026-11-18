@@ -278,7 +278,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
 
     campaignSelect: makeScreen('campaignSelect', 'Campaign', (root, ctx) => {
       const choices: Array<[CampaignId, string, string, IconName, string]> = [
-        ['training', 'Training', 'Learn drops, mining and combat', 'help', 'training'],
+        ['training', 'Training', 'Five short lessons: drops, mining, combat, research, air', 'help', 'training'],
         ['human', FACTION_NAMES.human, 'Hold the line with heavy armour', 'unit', 'human'],
         ['alien', FACTION_NAMES.alien, 'Strike fast with hover craft', 'star', 'alien'],
       ];
@@ -400,6 +400,21 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.setSkirmishConfig?.(config);
       }
       const maps = ctx.getSkirmishMaps?.() ?? [];
+      // A map seats as many sides as it has starts: one AI on a two-player map, up to the cap on
+      // a four-player one.
+      const seatsFor = (mapId: string): number => {
+        const map = maps.find((m) => m.id === mapId) ?? maps[0];
+        const starts = map?.preview?.starts.length ?? MAX_AI_OPPONENTS + 1;
+        return Math.max(1, Math.min(MAX_AI_OPPONENTS, starts - 1));
+      };
+      const fitted = (next: SkirmishConfig): SkirmishConfig =>
+        next.opponents.length > seatsFor(next.mapId)
+          ? { ...next, opponents: next.opponents.slice(0, seatsFor(next.mapId)) }
+          : next;
+      if (fitted(config) !== config) {
+        config = fitted(config);
+        ctx.setSkirmishConfig?.(config);
+      }
       const set = (next: SkirmishConfig): void => {
         config = next;
         ctx.setSkirmishConfig?.(next);
@@ -434,7 +449,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         const index = Math.max(0, maps.findIndex((m) => m.id === config.mapId));
         const next = maps[(index + delta + maps.length) % maps.length];
         if (next) {
-          set({ ...config, mapId: next.id });
+          set(fitted({ ...config, mapId: next.id }));
         }
       };
       const prev = iconButton('skirmishSetup', 'mapPrev', 'Previous map', 'left', () => {
@@ -477,7 +492,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           const half = map.preview.size / 2;
           for (const s of map.preview.starts) {
             const marker = document.createElement('span');
-            marker.className = `spawn${s.player === 1 ? ' you' : ''}`;
+            // Starts no side uses in this match are dimmed (1 is you, then one per AI).
+            const spare = s.player > config.opponents.length + 1;
+            marker.className = `spawn${s.player === 1 ? ' you' : ''}${spare ? ' spare' : ''}`;
             marker.textContent = String(s.player);
             marker.style.left = `${((s.x + half) / map.preview.size) * 100}%`;
             marker.style.top = `${((s.z + half) / map.preview.size) * 100}%`;
@@ -493,7 +510,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             'skirmishSetup',
             'opponents',
             'Opponents',
-            Array.from({ length: MAX_AI_OPPONENTS }, (_, i) => ({ value: i + 1, label: `${i + 1} AI` })),
+            Array.from({ length: seatsFor(config.mapId) }, (_, i) => ({ value: i + 1, label: `${i + 1} AI` })),
             config.opponents.length,
             (count) => {
               const opponents = Array.from(
@@ -955,7 +972,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           'Hold: stay put and fire at anything in range.',
           'Waypoints: queue several moves in a row.',
           'Buttons only appear when the selection can use them.',
-          'Set group saves the selection to a tile; tap a tile to pick it, double-tap to look at it.',
+          'Hold a group tile to save the selection in it; tap the tile to pick them, double-tap to look at them.',
         ]],
         ['build', 'Base', [
           'Tap your landing pad to open Build: units and structure kits arrive by orbital drop.',
@@ -963,18 +980,18 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           'Tap any other building of yours to open Base: research, upgrades, pack up or dismantle.',
         ]],
         ['worker', 'Ore and metal', [
-          'Ore pays for everything you buy. Metal pays only for research.',
+          'Ore pays for everything you buy. Metal pays only for research and upgrades.',
           'Miners dig pink ore and stack it in crates beside the deposit.',
           'Haulers carry the crates to your pad, and carry metal home from metal stations.',
           'Build a metal station on a blue metal site so haulers have metal to fetch.',
         ]],
         ['star', 'Research', [
           'Locked cards in Build show what research unlocks them.',
-          'Research costs ore and metal and takes time; tap your research building to start it.',
-          'Upgrades make one unit type tougher or stronger for the rest of the match.',
+          'Tap a locked card to research it. Research costs ore and metal and takes time.',
+          'Research also opens upgrades: select vehicles, tap Upgrade, and buy one for each vehicle.',
         ]],
         ['air', 'Air and sight', [
-          'Aircraft need a free slot at an air base and return there to rearm.',
+          'Aircraft need a free slot at an air base (Airfield or Aerie). Tap one, tap Launch, then tap where to fly.',
           'Many ground weapons cannot hit aircraft: bring anti-air units or towers.',
           'Dark ground is unexplored; you only see what your units, buildings and radar can see.',
         ]],
