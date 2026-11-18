@@ -97,6 +97,11 @@ test('[REND-02] hidden page stops frames and resumes without sim-time jump', asy
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     document.dispatchEvent(new Event('visibilitychange'));
   });
+  // Coming back to a running match shows the pause card first; Resume carries on.
+  const screenNow = (): Promise<string> => page.evaluate(() => window.__TC_TEST__?.screen() ?? '');
+  await expect.poll(screenNow).toBe('pause');
+  await page.locator('[data-control-id="pause.resume"]').first().tap();
+  await expect.poll(screenNow).toBe('inGame');
   const tickBefore = await page.evaluate(() => window.__TC_TEST__?.snapshot().tick ?? 0);
   const started = Date.now();
   await page.waitForTimeout(500);
