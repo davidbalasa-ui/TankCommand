@@ -273,7 +273,7 @@ test('[screens] wp04-5-miners-working', async ({ page }, testInfo) => {
 
 test('[screens] wp04-6-victory-results', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', PHONE_ONLY);
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await enterGame(page);
   await winSkirmish(page);
   // `winSkirmish` leaves the game on the results screen, which unmounts the

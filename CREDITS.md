@@ -5,15 +5,25 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | Asset | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
 | prop.deposit.metal | TankCommand project (scripted Blender) | ORIGINAL | - | Metal deposits |
+| prop.deposit.metal.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.deposit.ore | TankCommand project (scripted Blender) | ORIGINAL | - | Ore deposits |
+| prop.deposit.ore.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.boulder | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.boulder.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.cliff | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.cliff.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.dead_tree | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.dead_tree.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.grass | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.grass.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.rock_cluster | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.rock_cluster.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.shrub | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.shrub.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.slab | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.slab.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | prop.nature.tendril | TankCommand project (scripted Blender) | ORIGINAL | - | Map scenery |
+| prop.nature.tendril.lod | TankCommand project (scripted Blender) | ORIGINAL | - | Low-detail version for far scenery and the lower quality levels |
 | structure.alien.air_base | TankCommand project (scripted Blender) | ORIGINAL | - | Aerie (structure) |
 | structure.alien.lab | TankCommand project (scripted Blender) | ORIGINAL | - | Star Vault (structure) |
 | structure.alien.landing_pad | TankCommand project (scripted Blender) | ORIGINAL | - | Landing Ring (structure) |
@@ -108,3 +118,4 @@ TankCommand asset credits. Generated from `public/assets/manifest.json`; do not 
 | Font | Author | Licence | Source | Used for |
 | --- | --- | --- | --- | --- |
 | Inter (public/fonts) | The Inter Project Authors | SIL OFL 1.1 (public/fonts/OFL.txt) | https://github.com/rsms/inter | Menu and HUD text |
+| Oxanium (public/fonts) | The Oxanium Project Authors | SIL OFL 1.1 (public/fonts/OFL-Oxanium.txt) | https://github.com/sevmeyer/oxanium | Logo and title menu |

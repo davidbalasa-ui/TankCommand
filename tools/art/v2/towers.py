@@ -20,7 +20,7 @@ HIDE = trs(t=(0, 0, 0.03), s=(0.5, 0.5, 0.08))   # the carrier settles flat insi
 
 def register(key, faction, build, unit, structure):
     """unit / structure = (path, label, name)."""
-    crev = dict(crevice=(0.75, 0.55, 0.4)) if faction == 'kesh' else {}
+    crev = dict(crevice=(0.75, 0.55, 0.4), clear=('halo',), clear_alpha=0.3) if faction == 'kesh' else {}
 
     def run_unit(glb, render, report):
         F.begin(faction)
@@ -53,6 +53,19 @@ def terran_carrier():
         TK.chassis(L, hw, top, stowage=False, nose=0.9)
         TU.cab(2.1, 0.0, top + 0.02, 0.6, 0.8, 0.5)
         box((-0.9, 0, top + 0.06), (2.1, 1.5, 0.07), 'armor', bevel=0.03)
+        # Deck edge rails, folded stabiliser legs at the corners, lift rams and stowage.
+        for s in (1, -1):
+            TK.outrigger(-1.6, s * 2.12, 1.46, s, L=1.35, dirn=-1)
+            TK.outrigger(0.4, s * 2.12, 1.46, s, L=1.3, dirn=1)
+            box((-0.9, s * 1.46, top + 0.16), (2.0, 0.03, 0.03), 'steel')
+            for k in range(5):
+                box((-2.8 + k * 0.95, s * 1.46, top + 0.14), (0.03, 0.03, 0.05), 'steel')
+            box((-0.9, s * 1.4, top + 0.135), (1.4, 0.06, 0.008), 'hazard')
+            TK.ram((0.95, s * 1.1, top + 0.2), (-0.2, s * 1.1, top + 0.3), 0.07)
+            box((1.05, s * 1.1, top + 0.2), (0.1, 0.1, 0.1), 'steel', bevel=0.02)
+        box((1.1, 0.0, top + 0.26), (0.14, 0.75, 0.14), 'olive', bevel=0.02)     # stowage crate against the cab
+        for yy in (-0.4, 0.4):
+            box((1.1, yy, top + 0.26), (0.145, 0.03, 0.145), 'rubber')
     return top + 0.13
 
 
@@ -81,6 +94,13 @@ def bastion():
         box((-0.1, 0.45, tz + 1.01), (0.012, 0.1, 0.06), 'glass')
         TK.antenna(-1.0, -0.5, tz + 0.75, 1.0)
     sb = (0.68, 0.68, 0.55)
+    with F.group('Carrier'):   # A-frame travel lock clamping the stowed barrels over the tail
+        gz = deck + tz * sb[2] + 0.4 * 0.78
+        for s in (1, -1):
+            cyl((-2.95, s * 0.95, deck - 0.05), (-2.95, s * 0.36, gz - 0.14), 0.05, 6, 'steel')
+            box((-2.95, s * 0.31, gz), (0.07, 0.15, 0.15), 'yellow', bevel=0.02)
+        box((-2.95, 0, gz - 0.16), (0.05, 0.5, 0.035), 'steel')
+        box((-2.95, 0, gz + 0.16), (0.05, 0.5, 0.03), 'hazard')
     return dict(tz=tz, packed={
         'Base': trs(t=(-0.8, 0, deck), s=sb),
         # Gun turned to the rear and drawn in, seated on the folded footing.
@@ -163,10 +183,10 @@ register('spire', 'terran', spire,
          ('human/spire_packed.glb', 'Terran Spire Missile Battery, packed for transport', 'SpirePacked'),
          ('structures/terran_missile_battery.glb', 'Terran Spire Missile Battery', 'TerranMissileBattery'))
 register('thornmound', 'kesh', thornmound,
-         ('alien/thornmound_packed.glb', 'Kesh Thornmound, packed for transport', 'ThornmoundPacked'),
+         ('alien/thornmound_packed.glb', 'Arcadian Thornmound, packed for transport', 'ThornmoundPacked'),
          ('structures/kesh_thornmound.glb', 'Kesh Thornmound (turret)', 'KeshThornmound'))
 register('spore_tower', 'kesh', spore_tower,
-         ('alien/spore_tower_packed.glb', 'Kesh Spore Tower, packed for transport', 'SporeTowerPacked'),
+         ('alien/spore_tower_packed.glb', 'Arcadian Spore Tower, packed for transport', 'SporeTowerPacked'),
          ('structures/kesh_spore_tower.glb', 'Kesh Spore Tower (missile battery)', 'KeshSporeTower'))
 
 

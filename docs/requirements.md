@@ -122,6 +122,7 @@
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | HINT-01 | Hint bubbles grow to fit their text on a phone screen instead of cutting it off, and every mission objective, mission message and help hint stays within the word limits set in src/ui/textLimits.ts. |
 | PART-01 | Model parts with anim extras (spin or swing about their own axis) move only while their condition holds (always, mining, working, moving), use busySpeed while working, and a spinning TurretPivot is never aimed. |
+| PART-02 | Firing parts play on each shot the unit fires: recoil parts (telescoping barrels) slide back and return, launch parts (missiles) fly out, vanish and reload, swing and slide snaps (lids, pod nods) kick and settle, and the model's scene fire kick rocks the hull away from the gun. A shot plays the parts whose delay falls on its place in the art's firing cycle. Low quality skips the snaps but keeps barrels and missiles. |
 | PAN-01 | A flick of the map keeps the camera gliding after the finger lifts and slows it smoothly to a stop; a finger that rests before lifting, or a new touch, stops it. Two fingers moving together pan the map. |
 | TITLE-01 | The title screen shows a live skirmish behind the menu: raids keep arriving at a Terran pad and its defenders, the fight never ends and nothing in it is saved or scored. |
 | DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |
@@ -147,6 +148,8 @@
 | AI-08 | No unit stays stuck longer than the re-plan time in any of the 10 matches. |
 | AI-09 | The AI never attacks allied or neutral units and attacks a neutral side only after it is hostile; with three sides it handles two hostile opponents. |
 | AI-10 | With aviation researched, the AI builds an air base, buys aircraft and launches them at enemy targets; interceptors go after enemy aircraft near its base. |
+| AI-11 | Hard beats normal in most fixed-seed matches, playing either side. |
+| AI-12 | A defender that locked onto a raider breaks off once it is far from home, instead of chasing it into the enemy base. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |
@@ -165,6 +168,7 @@
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
 | MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
 | SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). |
+| SKR-02 | Every side starts with the same layout of tanks, miner and tug round its pad, turned to face the middle of the map. |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |
 | RES-03 | (Overhaul step 4) Research needs no building and runs one at a time per side; a locked card starts it, queueing a missing parent first; each step is paid as it starts and refunded on cancel; old saves convert to the new tree. |
