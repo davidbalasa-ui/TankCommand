@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 2,
   "title": "Ore Line",
-  "briefing": "The outpost needs ore to call down reinforcements. Put the Prospector to work and bank 400 ore. Expect a small raid.",
+  "briefing": "The machines at Halden came through the rift. We are calling them Arcadians, and there will be more. Put the Prospector to work and bank 400 ore so we can call down reinforcements.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -87,8 +87,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Select the miner, then tap an ore field to start mining. The hauler carries the crates home by itself."
+          "speaker": "Col. Daska",
+          "text": "Select the Prospector, then tap an ore field. The Hauler carries the ore home by itself."
         }
       ]
     },
@@ -101,8 +101,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Raiders coming from the north-east!"
+          "speaker": "Col. Daska",
+          "text": "Arcadian raiders coming from the north-east!"
         },
         {
           "t": "spawn",

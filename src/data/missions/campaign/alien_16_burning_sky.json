@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 16,
   "title": "Burning Sky",
-  "briefing": "Four Terran missile batteries cover the eastern plain, and their Falcons patrol above. Halos rule the sky: sweep the Falcons away so the Sunfalls and Gliders can burn all four batteries.",
+  "briefing": "Four Terran Harpoon Batteries cover the eastern plain, and their Falcons patrol above. Halos rule the sky: sweep the Falcons away so the Sunfalls and Gliders can burn all four batteries.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly"
@@ -183,7 +183,7 @@
   "objectives": [
     {
       "id": "towers",
-      "text": "Destroy the four missile batteries",
+      "text": "Destroy the four Harpoon Batteries",
       "kind": "primary"
     }
   ],
@@ -197,8 +197,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Launch the Halos to clear the sky, then send the ground forces in."
+          "speaker": "Matriarch",
+          "text": "Launch the Halos to clear the sky, then send the ground brood in."
         }
       ]
     },

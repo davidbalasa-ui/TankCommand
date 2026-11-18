@@ -162,6 +162,10 @@ export interface ResultView {
   title: string | null;
   reason: string | null;
   hasNext: boolean;
+  /** The last mission of a story campaign was won: the results screen closes the campaign. */
+  campaignComplete: boolean;
+  /** The campaign's closing text, when campaignComplete. */
+  epilogue: string | null;
 }
 
 export interface HudSnapshot {
@@ -304,7 +308,7 @@ const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
-  results: ['title', 'missionSelect', 'loading'],
+  results: ['title', 'missionSelect', 'briefing', 'loading'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
   saveSlots: ['pause', 'inGame'],

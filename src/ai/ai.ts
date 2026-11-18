@@ -1,10 +1,13 @@
 import type { Command } from '../sim/commands';
 import { isHostile } from '../sim/diplomacy';
-import { isFightingUnitType } from '../sim/economy';
-import { hasFreeAirSlot, isAirborne } from '../sim/air';
+import { crateOre, isFightingUnitType } from '../sim/economy';
+import { hasFreeAirSlot, isAirborne, unitTargetKind, weaponCanHit } from '../sim/air';
 import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
 import { placementValidity } from '../sim/spawn';
+import { padLayout } from '../sim/pad';
+import { clampToMap } from '../sim/map';
+import { UNIT_RADIUS } from '../sim/tuning';
 import { perceivedUnits } from '../sim/vision';
 import { isPackedOnTheWay } from '../sim/unpack';
 import type {
@@ -17,7 +20,7 @@ import type {
   UnitState,
   WorldState,
 } from '../sim/types';
-import { AI_DATA, AI_RESEARCH_ORDER, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
+import { AI_DATA, AI_RESEARCH_ORDER, HOME_PAST_RALLY, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
 
 type Untimed = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
 
@@ -131,6 +134,18 @@ class Planner {
   }
 }
 
+// Where units sent home wait: out past the pad's rally point, toward the map centre, so they stand
+// guard in front of the base and leave the pad and its first arrival spots free for deliveries.
+function homeSpot(world: WorldState, pad: StructureState): { x: number; z: number } {
+  const layout = padLayout(world, pad);
+  return clampToMap(
+    world.map,
+    layout.rallyX + Math.round(Math.cos(layout.facing)) * HOME_PAST_RALLY,
+    layout.rallyZ + Math.round(Math.sin(layout.facing)) * HOME_PAST_RALLY,
+    UNIT_RADIUS,
+  );
+}
+
 function isMiner(type: SimUnitType | undefined): boolean {
   return type?.workerKind === 'oreMiner';
 }
@@ -206,7 +221,7 @@ function placeKits(planner: Planner): void {
             .filter((u) => u.order.kind === 'idle' && Math.hypot(u.x - deposit.x, u.z - deposit.z) < 8)
             .map((u) => u.id);
           if (blockers.length > 0) {
-            planner.commands.push({ kind: 'move', unitIds: blockers, x: pad.x, z: pad.z });
+            planner.commands.push({ kind: 'move', unitIds: blockers, ...homeSpot(world, pad) });
           }
         }
       }
@@ -432,16 +447,23 @@ function strategic(planner: Planner): void {
   placeKits(planner);
   assignWorkers(planner);
 
+  // Skirmish endgame: every ore field is mined out and nothing is still being hauled in, so no
+  // more workers or stations are worth buying. (Missions script their own sides.)
+  const minedOut =
+    world.mission === null &&
+    !world.deposits.some((d) => d.kind === 'ore' && (d.amount > 1 || crateOre(d, planner.player) > 1)) &&
+    !units.some((u) => (u.job?.load ?? 0) > 0);
+
   const stationTypeEarly = planner.myStructureTypes().find((t) => t.kind === 'metalStation');
   const taken = foreignStationDeposits(planner);
   const freeMetal = world.deposits.some((d) => freeMetalDeposit(planner, d.id, taken));
   const stationCount = structures.filter((s) => planner.structureKind(s) === 'metalStation').length;
-  if (stationTypeEarly && stationCount < data.maxStations && freeMetal && !world.pendingKits.some((k) => k.owner === planner.player)) {
+  if (stationTypeEarly && !minedOut && stationCount < data.maxStations && freeMetal && !world.pendingKits.some((k) => k.owner === planner.player)) {
     planner.metalReserve = stationTypeEarly.cost.metal;
   }
   const minerType = types.find((t) => isMiner(t));
   const miners = units.filter((u) => isMiner(planner.unitType(u))).length + (minerType ? planner.queued(minerType.id) : 0);
-  if (minerType && miners < data.minersWanted) {
+  if (minerType && miners < data.minersWanted && !minedOut) {
     planner.buyUnit(minerType, 0);
   }
 
@@ -462,6 +484,7 @@ function strategic(planner: Planner): void {
     ) || units.some((u) => isPackedOnTheWay(u));
   if (
     stationType &&
+    !minedOut &&
     stationCount < data.maxStations &&
     !hasKit &&
     planner.queued(stationType.id) === 0 &&
@@ -475,7 +498,7 @@ function strategic(planner: Planner): void {
   const minerCount = units.filter((u) => isMiner(planner.unitType(u))).length;
   const tugCount = units.filter((u) => isTug(planner.unitType(u))).length;
   const tugsWanted = Math.min(5, Math.max(1, minerCount) + (hasStation || hasKit ? 1 : 0));
-  if (tugType && tugCount < tugsWanted && planner.queued(tugType.id) === 0) {
+  if (tugType && tugCount < tugsWanted && planner.queued(tugType.id) === 0 && !minedOut) {
     planner.buyUnit(tugType, 0);
   }
 
@@ -490,7 +513,15 @@ function strategic(planner: Planner): void {
         structures.some((st) => st.depositId === d.id && planner.structureKind(st) === 'metalStation'),
     );
   const cheapestTankMetal = Math.min(...types.filter((t) => isFighter(t)).map((t) => t.metalCost), Infinity);
-  const desperate = !metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false;
+  const cheapest = types
+    .filter((t) => isFighter(t, true))
+    .sort((a, b) => valueOf(a) - valueOf(b) || a.id.localeCompare(b.id))[0];
+  // Endgame (minedOut): the last ore is spent on whatever fighter it buys (scouts too, no reserve
+  // kept back); once even the cheapest is out of reach no bigger army is ever coming, so whatever
+  // is left attacks instead of idling at home for the rest of the match.
+  const broke = minedOut && (!cheapest || !planner.canAfford(cheapest.oreCost, cheapest.metalCost, 0, false));
+  const armyReserve = minedOut ? 0 : data.reserveOre;
+  const desperate = minedOut || (!metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false);
   const fighters = units.filter((u) => isFighter(planner.unitType(u), desperate));
   const armyValue = fighters.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   const known = knownEnemyStructures(world, planner.player);
@@ -506,8 +537,16 @@ function strategic(planner: Planner): void {
   const activeScout = units.find((u) => u.id === state.scoutId);
   if (activeScout) {
     if (known.length > 0) {
+      // Its job is done: back home, once. A scout already fighting (in the attack group, or on
+      // an attack order) is left to it, or it would be pulled out of every fight it joins.
       state.scoutId = null;
-      planner.commands.push({ kind: 'move', unitIds: [activeScout.id], x: pad.x, z: pad.z });
+      const fighting =
+        state.groupIds.includes(activeScout.id) ||
+        activeScout.order.kind === 'attack' ||
+        activeScout.order.kind === 'attackMove';
+      if (!fighting && Math.hypot(activeScout.x - pad.x, activeScout.z - pad.z) > DEFEND_RADIUS) {
+        planner.commands.push({ kind: 'move', unitIds: [activeScout.id], ...homeSpot(world, pad) });
+      }
     } else if (activeScout.order.kind === 'idle') {
       const points = waypoints(world, pad);
       const point = points[state.waypoint % points.length];
@@ -556,7 +595,7 @@ function strategic(planner: Planner): void {
       .map((t) => ({ t, count: units.filter((u) => u.typeId === t.id).length + planner.queued(t.id) }))
       .sort((x, y) => x.count - y.count || x.t.id.localeCompare(y.t.id));
     for (const entry of order) {
-      if (planner.buyUnit(entry.t, data.reserveOre)) {
+      if (planner.buyUnit(entry.t, armyReserve)) {
         break;
       }
     }
@@ -571,8 +610,8 @@ function strategic(planner: Planner): void {
     if (alive.length === 0) {
       state.groupIds = [];
       state.groupStartValue = 0;
-    } else if (value < state.groupStartValue * (1 - data.retreatLossFraction)) {
-      planner.commands.push({ kind: 'move', unitIds: alive.map((u) => u.id), x: pad.x, z: pad.z });
+    } else if (!broke && value < state.groupStartValue * (1 - data.retreatLossFraction)) {
+      planner.commands.push({ kind: 'move', unitIds: alive.map((u) => u.id), ...homeSpot(world, pad) });
       state.groupIds = [];
     }
   }
@@ -600,7 +639,7 @@ function strategic(planner: Planner): void {
     return;
   }
   const decay = Math.max(0.15, 1 - world.tick / (15 * 1200));
-  const threshold = data.attackThresholdValue * decay;
+  const threshold = broke ? 0 : data.attackThresholdValue * decay;
   const idleValue = idle.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   if (idle.length > 0 && (idleValue >= threshold || (armyValue >= threshold && state.groupIds.length === 0))) {
     let target: { x: number; z: number } | undefined;
@@ -624,8 +663,11 @@ function strategic(planner: Planner): void {
     }
     if (target && idle.length > 0) {
       planner.commands.push({ kind: 'attackMove', unitIds: idle.map((u) => u.id), x: target.x, z: target.z });
-      state.groupIds = idle.map((u) => u.id);
-      state.groupStartValue = idleValue;
+      // New units join the group already out fighting rather than replacing it: a member dropped
+      // from the group while on an attack order would be recalled home as a stray defender.
+      const staying = fighters.filter((u) => state.groupIds.includes(u.id) && u.order.kind !== 'idle');
+      state.groupIds = [...staying, ...idle].map((u) => u.id);
+      state.groupStartValue = [...staying, ...idle].reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
     }
   }
 }
@@ -657,22 +699,27 @@ function tactical(planner: Planner): void {
       !state.groupIds.includes(unit.id) &&
       Math.hypot(unit.x - pad.x, unit.z - pad.z) > DEFEND_RADIUS * 2
     ) {
-      planner.commands.push({ kind: 'move', unitIds: [unit.id], x: pad.x, z: pad.z });
+      planner.commands.push({ kind: 'move', unitIds: [unit.id], ...homeSpot(world, pad) });
       continue;
     }
     if (!type.weapon || unit.order.kind === 'attack' || unit.order.kind === 'move') {
       continue;
     }
-    const range = type.weapon.range;
-    const structureInRange = view.structures
-      .filter((e) => isHostile(world, planner.player, e.owner) && Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 2)
-      .sort((a, b) => a.hp - b.hp || a.id - b.id)[0];
-    const anyEnemyNear = enemies.some((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 4);
+    const weapon = type.weapon;
+    const range = weapon.range;
+    // Only targets this gun can hit: a ground tank never chases an aircraft in flight.
+    const hittable = enemies.filter((e) => weaponCanHit(weapon, unitTargetKind(e)));
+    const structureInRange = weaponCanHit(weapon, 'structure')
+      ? view.structures
+          .filter((e) => isHostile(world, planner.player, e.owner) && Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 2)
+          .sort((a, b) => a.hp - b.hp || a.id - b.id)[0]
+      : undefined;
+    const anyEnemyNear = hittable.some((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 4);
     if (structureInRange && !anyEnemyNear) {
       planner.commands.push({ kind: 'attack', unitIds: [unit.id], targetId: structureInRange.id });
       continue;
     }
-    const inRange = enemies
+    const inRange = hittable
       .filter((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range)
       .sort((a, b) => a.hp - b.hp || a.id - b.id)[0];
     if (inRange && data.focusFire) {

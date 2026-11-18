@@ -27,7 +27,7 @@ class FakeSource implements LifecycleSource {
 }
 
 describe('lifecycle', () => {
-  it('[LIFE-01] hidden pauses, visible resumes, duplicate pauses collapse, back emits pause plus back', () => {
+  it('[LIFE-01] hidden pauses, visible resumes, duplicate pauses collapse, back emits only back', () => {
     const source = new FakeSource();
     const lifecycle = new Lifecycle(source);
     const events: string[] = [];
@@ -47,6 +47,11 @@ describe('lifecycle', () => {
     expect(events).toEqual(['pause', 'resume']);
 
     source.dispatch('backButton');
-    expect(events).toEqual(['pause', 'resume', 'pause', 'back']);
+    expect(events).toEqual(['pause', 'resume', 'back']);
+
+    // Back does not leave the app paused: a later background still pauses.
+    source.hidden = true;
+    source.dispatch('visibilitychange');
+    expect(events).toEqual(['pause', 'resume', 'back', 'pause']);
   });
 });

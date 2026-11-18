@@ -4,6 +4,7 @@ import {
   DEPOSIT_REACH,
   ORE_CRATE_SIZE,
   STATION_REACH,
+  WAYPOINT_REACHED,
 } from './tuning';
 import { approach, computePath, followPath } from './motion';
 import {
@@ -71,7 +72,22 @@ function moveWorkerTo(
     unit.pathGoal = { x, z, endX: end.x, endZ: end.z };
   }
   followPath(world, unit, type, { x, z });
-  return Math.hypot(unit.x - x, unit.z - z) <= reach;
+  if (Math.hypot(unit.x - x, unit.z - z) <= reach) {
+    return true;
+  }
+  // A goal inside a building (a metal station, a pad) can't be driven onto: the path ends on the
+  // nearest open cell and followPath holds the unit once it is within WAYPOINT_REACHED of that
+  // end, which can leave it just past `reach` from the centre. When the planned end itself is in
+  // reach, holding there is arriving; otherwise the worker would wait beside it forever. (A path
+  // to an open goal ends on the goal itself and is left to the distance check above.)
+  const end = unit.path[unit.path.length - 1];
+  return (
+    unit.path.length <= 1 &&
+    !!end &&
+    (end.x !== x || end.z !== z) &&
+    Math.hypot(end.x - x, end.z - z) <= reach &&
+    Math.hypot(end.x - unit.x, end.z - unit.z) <= WAYPOINT_REACHED
+  );
 }
 
 function reportEmpty(world: WorldState, unit: UnitState, depositId: number): void {

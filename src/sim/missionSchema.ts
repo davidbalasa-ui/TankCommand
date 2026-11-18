@@ -16,7 +16,10 @@ export type Condition =
   | { t: 'relationIs'; a: number; b: number; relation: 'allied' | 'neutral' | 'hostile' }
   /** The side has finished `node`, or with no node, has at least `count` (default 1) research nodes done in total. */
   | { t: 'researchDone'; side: number; node?: string; count?: number }
-  | { t: 'unitsAlive'; side?: number; tag?: string; op: '>=' | '<='; count: number }
+  /** Living units of a side (only of `unitType` when given), or of a tag. */
+  | { t: 'unitsAlive'; side?: number; tag?: string; unitType?: string; op: '>=' | '<='; count: number }
+  /** At least `count` (default 1) of the side's units and structures carry `upgrade` (any upgrade when absent). */
+  | { t: 'upgraded'; side: number; upgrade?: 'fireRate' | 'armor' | 'stealth'; count?: number }
   | { t: 'unitEscorted'; tag: string; x: number; z: number; radius: number }
   | { t: 'and'; conds: Condition[] }
   | { t: 'or'; conds: Condition[] }
@@ -61,8 +64,15 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       t: z.literal('unitsAlive'),
       side: side.optional(),
       tag: z.string().optional(),
+      unitType: z.string().min(1).optional(),
       op: z.enum(['>=', '<=']),
       count: z.number().int().nonnegative(),
+    }),
+    z.object({
+      t: z.literal('upgraded'),
+      side,
+      upgrade: z.enum(['fireRate', 'armor', 'stealth']).optional(),
+      count: z.number().int().positive().optional(),
     }),
     z.object({ t: z.literal('unitEscorted'), tag: z.string().min(1), ...area }),
     z.object({ t: z.literal('and'), conds: z.array(conditionSchema).min(1) }),
@@ -175,6 +185,8 @@ export const missionSchema = z.object({
   objectives: z.array(objectiveDef),
   triggers: z.array(triggerSchema),
   timeLimitSec: z.number().positive().optional(),
+  /** Closing text for a campaign's last mission, shown on the results screen when it is won. */
+  epilogue: z.string().min(1).optional(),
   placeholder: z.boolean(),
 });
 

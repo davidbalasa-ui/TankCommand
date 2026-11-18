@@ -1,7 +1,8 @@
-"""Builds the campaign maps and missions from the approved outline.
+"""Builds the campaign and training maps and missions from the approved outline.
 
 Writes src/data/maps.campaign.json, src/data/missions/campaign/*.json and the import list
-src/data/missions/campaign.ts. Edit this file, not the generated JSON.
+src/data/missions/campaign.ts, and the training lessons src/data/missions/training_*.json with
+their import list src/data/missions/training.ts. Edit this file, not the generated JSON.
 
     python3 tools/missions/build.py
 
@@ -32,13 +33,17 @@ ROLE = {
         'tug': 'unit.alien.tug', 'repair': 'unit.alien.repair', 'radar': 'unit.alien.radar',
         'hover': 'unit.alien.glider', 'heavy': 'unit.alien.heavy_tank', 'missile': 'unit.alien.missile_tank',
         'artillery': 'unit.alien.artillery', 'fighter': 'unit.alien.fighter', 'saucer': 'unit.alien.saucer',
+        'dragonfly': 'unit.alien.dragonfly',
         'pad': 'structure.alien.landing_pad', 'station': 'structure.alien.metal_station',
         'turret': 'structure.alien.turret', 'tower_radar': 'structure.alien.radar', 'lab': 'structure.alien.lab',
         'air_base': 'structure.alien.air_base', 'battery': 'structure.alien.missile_battery',
     },
 }
 OTHER = {'human': 'alien', 'alien': 'human'}
-SPEAKER = {'human': 'Command', 'alien': 'Brood-mind'}
+# The voices on the radio: the Terran player's commanding officer, and the Matriarch who leads the
+# broods on Vesper and speaks to the player's young brood-mind. Each is the other campaign's
+# mission-13 target (A13 calls Daska "the Iron Colonel").
+SPEAKER = {'human': 'Col. Daska', 'alien': 'Matriarch'}
 
 # Research each step of the campaign hands the player for free, so new items arrive by mission.
 # The basic gun tower needs no research. Fortifications brings the armour upgrade and Missiles the
@@ -326,6 +331,10 @@ def msg(text, faction):
     return {'t': 'message', 'speaker': SPEAKER[faction], 'text': text}
 
 
+def reveal(x, z, radius=12, sec=90):
+    return {'t': 'revealArea', 'x': x, 'z': z, 'radius': radius, 'forSec': sec}
+
+
 def done(id_):
     return {'t': 'setObjective', 'id': id_, 'status': 'done'}
 
@@ -383,9 +392,32 @@ def at_war(a, b):
     return [{'a': a, 'b': b, 'relation': 'hostile'}, {'a': b, 'b': a, 'relation': 'hostile'}]
 
 
+# What the player could buy (and had researched) by the end of the campaign's previous mission.
+# A campaign's buy list only ever grows: nothing the player has met vanishes in a later mission.
+ROSTER = {}
+
+
+def grow_roster(campaign, sides):
+    seen = ROSTER.setdefault(campaign, {'available': [], 'researchDone': []})
+    for side in sides:
+        if side['controller'] != 'human':
+            continue
+        for key in ('available', 'researchDone'):
+            if key not in side and key == 'available':
+                continue
+            merged = list(seen[key])
+            for item in side.get(key, []):
+                if item not in merged:
+                    merged.append(item)
+            if merged:
+                side[key] = merged
+            seen[key] = merged
+
+
 def mission(faction, order, slug, title, briefing, map_id, sides, units, structures, objectives, triggers,
-            time_limit=None, relations=(), neutral=()):
+            time_limit=None, relations=(), neutral=(), epilogue=None):
     campaign = 'human' if faction == 'human' else 'alien'
+    grow_roster(campaign, sides)
     m = {
         'id': f'mission.{campaign}.{order:02d}_{slug}', 'campaign': campaign, 'order': order, 'title': title,
         'briefing': briefing, 'mapId': map_id, 'sides': sides, 'units': units, 'structures': structures,
@@ -394,6 +426,8 @@ def mission(faction, order, slug, title, briefing, map_id, sides, units, structu
     }
     if time_limit:
         m['timeLimitSec'] = time_limit
+    if epilogue:
+        m['epilogue'] = epilogue
     # Sides without an AI default to neutral; every enemy side here fights the player from the start.
     # `neutral` sides start out of the fight (a trigger may turn them later); `relations` adds more.
     m['relations'] = [r for side in sides
@@ -426,10 +460,10 @@ def act1(f):
     # 1: one objective, a handful of weak enemies, nothing to build. About five minutes.
     mission(f, 1, 'signal_lost' if terran else 'first_seed',
             'Signal Lost' if terran else 'First Seed',
-            ('The Halden outpost stopped answering an hour ago. Take four Lancers to the outpost and '
-             'clear out whatever is there.') if terran else
-            ('A Terran outpost stands where our seed fell. Take four Lumens across the field and silence '
-             'its three guards.'),
+            ('Last night a rift tore open in the sky over Vesper. An hour later our Halden outpost stopped '
+             'answering. Take four Lancers to the outpost and clear out whatever is there.') if terran else
+            ('The rift is open, and the first seeds of the swarm have fallen on Vesper. Wake, young brood-mind. '
+             'A Terran outpost watches our landing field: take four Lumens across and silence its three guards.'),
             'map.c_halden',
             [player_side(f, 0, available=[]), enemy_side(e)],
             [U(1, R['light'], x, z, face) for x, z in spread(lx, lz, 4)]
@@ -437,11 +471,11 @@ def act1(f):
             [],
             [('reach', 'Reach the outpost', 'primary'), ('clear', 'Destroy the three guards', 'primary')],
             [
-                T('intro', at(0), msg('Head north-east to the outpost. Drag to select, tap the ground to move.'
-                                      if terran else 'Cross the field to the outpost. Drag to select, tap to move.', f)),
+                T('intro', at(0), msg('Head north-east to the outpost. Tap All army, then tap the ground to move.'
+                                      if terran else 'The outpost is north-east. Tap All army, then tap the ground to move.', f)),
                 T('reach', area(1, ox, oz, 16), done('reach'),
-                  msg('Enemy scouts at the outpost. Tap one to attack it.' if terran else
-                      'The guards are here. Tap one to attack it.', f)),
+                  msg('Unknown machines at the outpost. Tap one to attack it.' if terran else
+                      'Its guards are weak and alone. Tap one to attack it.', f)),
                 T('clear', {'t': 'allDestroyed', 'side': 2}, done('clear')),
             ],
             time_limit=15 * 60)
@@ -449,20 +483,24 @@ def act1(f):
     # 2: the economy, with a small raid half way through.
     mission(f, 2, 'ore_line' if terran else 'feeding_ground',
             'Ore Line' if terran else 'Feeding Ground',
-            ('The outpost needs ore to call down reinforcements. Put the Prospector to work and bank 400 ore. '
-             'Expect a small raid.') if terran else
-            ('The brood is hungry. Set the Sifter on the ore field and gather 400 ore. Terran scouts may '
-             'come sniffing.'),
+            ('The machines at Halden came through the rift. We are calling them Arcadians, and there will be '
+             'more. Put the Prospector to work and bank 400 ore so we can call down reinforcements.') if terran else
+            ('The swarm is hungry, and Vesper is rich. Set the Sifter on the ore and gather 400. Terran scouts '
+             'will come sniffing.'),
             'map.c_halden',
             [player_side(f, 100, available=avail(f, 'light', 'scout', 'miner', 'tug')), enemy_side(e)],
             [U(1, R['light'], lx + 6, lz - 4, face), U(1, R['light'], lx + 2, lz - 8, face),
              U(1, R['miner'], lx - 6, lz - 2, face), U(1, R['tug'], lx - 4, lz + 4, face)],
             [S(1, R['pad'], lx, lz)],
-            [('ore', 'Bank 400 ore', 'primary'), ('pad', 'Keep your landing pad', 'primary')],
+            [('ore', 'Bank 400 ore', 'primary'),
+             ('pad', 'Keep your landing pad' if terran else 'Keep your Landing Ring', 'primary')],
             [
-                T('intro', at(0), msg('Select the miner, then tap an ore field to start mining. The hauler '
-                                      'carries the crates home by itself.', f)),
-                T('raid', at(150), msg('Raiders coming from the north-east!', f),
+                T('intro', at(0), msg('Select the Prospector, then tap an ore field. The Hauler carries the ore home '
+                                      'by itself.' if terran else
+                                      'Select the Sifter, then tap an ore field. The Ferrier carries the ore home '
+                                      'by itself.', f)),
+                T('raid', at(150), msg('Arcadian raiders coming from the north-east!' if terran else
+                                       'Terran raiders, from the north-east. Feed them to the brood.', f),
                   spawn(2, E['scout'], 2, ox - 10, oz + 10, tag='raid'), attack('raid', lx, lz)),
                 T('ore', {'t': 'resourceReached', 'side': 1, 'ore': 400}, done('ore')),
                 T('padLost', {'t': 'allDestroyed', 'side': 1, 'unitType': R['pad']}, failed('pad'),
@@ -472,12 +510,13 @@ def act1(f):
             time_limit=15 * 60)
 
     # 3: hold out, with the first defence tower.
-    tower = 'Bastion gun' if terran else 'Sentinel'
+    tower = 'Bastion Gun' if terran else 'Sentinel'
     mission(f, 3, 'dig_in' if terran else 'thorns',
             'Dig In' if terran else 'Thorns',
-            (f'Raiders are probing the outpost. Hold it for six minutes. A {tower} kit is now on the Build list: '
+            (f'Arcadian raiders are probing the outpost. Hold it for six minutes. A {tower} is now in Build: '
              'place it where the raids come in.') if terran else
-            (f'Terran patrols want our nest back. Hold it for six minutes. Grow a {tower} where they attack.'),
+            (f'The outpost is ours, and the Terrans want it back. Hold it for six minutes. Grow a {tower} where '
+             'they attack.'),
             'map.c_halden',
             [player_side(f, 450, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret'),
                          research_done=research(f, 'towers')), enemy_side(e)],
@@ -486,11 +525,12 @@ def act1(f):
             [S(1, R['pad'], ox, oz)],
             [('hold', 'Hold the outpost for 6 minutes', 'primary')],
             [
-                T('intro', at(0), msg(f'First raid in one minute. Buy a {tower} and place it facing south-west.', f)),
+                T('intro', at(0), msg(f'First raid in one minute. Buy a {tower} and place it facing south-west.' if terran
+                                      else f'They come in one minute. Grow a {tower} facing south-west.', f)),
                 T('w1', at(60), spawn(2, E['scout'], 2, lx, lz, tag='w1'), attack('w1', ox, oz)),
                 T('w2', at(140), spawn(2, E['scout'], 2, -70, -40, tag='w2'), spawn(2, E['light'], 1, -66, -44, tag='w2'),
                   attack('w2', ox, oz)),
-                T('w3', at(220), msg('A bigger group is coming.', f),
+                T('w3', at(220), msg('A bigger group is coming.' if terran else 'A bigger pack is coming. Hold.', f),
                   spawn(2, E['light'], 4, lx + 6, lz - 6, tag='w3'), attack('w3', ox, oz)),
                 T('w4', at(300), spawn(2, E['light'], 3, 20, 70, tag='w4'), spawn(2, E['scout'], 2, 26, 66, tag='w4'),
                   attack('w4', ox, oz)),
@@ -502,8 +542,9 @@ def act1(f):
     # 4: the first enemy base (Terran) / a fleeing convoy (Arcadian).
     if terran:
         mission(f, 4, 'first_strike', 'First Strike',
-                ('An enemy camp has dug in across the field. Protect the supply hauler, hold off the reinforcement '
-                 'wave and destroy the camp. Optional: build a metal station.'),
+                ('The outpost fell to a night attack while we regrouped at the landing field, and the Arcadians '
+                 'have planted a Landing Ring on it. Take it back: destroy their camp and keep the supply Hauler '
+                 'alive.'),
                 'map.c_halden',
                 [player_side(f, 900, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'station'),
                              research_done=research(f, 'towers')),
@@ -513,11 +554,13 @@ def act1(f):
                  U(1, R['miner'], lx - 2, lz + 6, face),
                  U(2, E['light'], ox - 4, oz + 2, -face), U(2, E['light'], ox - 2, oz + 4, -face)],
                 [S(1, R['pad'], lx, lz), S(2, E['pad'], ox, oz)],
-                [('base', 'Destroy the enemy camp', 'primary'), ('vip', 'Keep the supply hauler alive', 'primary'),
-                 ('station', 'Build a metal station', 'optional')],
+                [('base', 'Destroy the Arcadian camp at the outpost', 'primary'),
+                 ('vip', 'Keep the supply Hauler alive', 'primary'),
+                 ('station', 'Build a Metal Station', 'optional')],
                 [
-                    T('intro', at(0), msg('The camp is north-east. Keep the hauler away from the fighting.', f)),
-                    T('wave', at(180), msg('Enemy reinforcements are landing.', f),
+                    T('intro', at(0), msg('The camp is north-east, on the outpost. Keep the supply Hauler away from the '
+                                          'fighting.', f)),
+                    T('wave', at(180), msg('Arcadian reinforcements are landing at the outpost.', f),
                       spawn(2, E['light'], 3, ox, oz, tag='wave', drop=True), attack('wave', lx, lz)),
                     T('vipLost', {'t': 'unitDestroyed', 'tag': 'vip'}, failed('vip'), {'t': 'lose', 'reason': 'vipLost'}),
                     T('station', {'t': 'structureBuilt', 'side': 1, 'structureType': R['station']}, done('station')),
@@ -528,8 +571,9 @@ def act1(f):
         # Haulers drive from the outpost to the far road; destroy them before they get there.
         convoy_from, convoy_to = (OUTPOST[0], OUTPOST[1]), (-70, -66)
         mission(f, 4, 'prey', 'Prey',
-                ('A Terran supply convoy is running from the outpost. Catch it and destroy its three haulers '
-                 'before they reach the north-west road.'),
+                ('While the brood fed at the landing field, the Terrans crept back into the outpost to save its '
+                 'stores. Now their convoy is running for the north-west road. Catch it and destroy all three '
+                 'Haulers.'),
                 'map.c_halden',
                 [player_side(f, 300, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret'),
                              research_done=research(f, 'towers')), enemy_side(e)],
@@ -540,14 +584,14 @@ def act1(f):
                 + [U(2, E['light'], x, z, 3.0, tag='escort') for x, z in [(convoy_from[0] - 8, convoy_from[1]),
                                                                             (convoy_from[0], convoy_from[1] - 8)]],
                 [S(1, R['pad'], lx, lz)],
-                [('convoy', 'Destroy the three haulers', 'primary'), ('escape', 'Let none of them escape', 'primary')],
+                [('convoy', 'Destroy the three Haulers', 'primary'), ('escape', 'Let none of them escape', 'primary')],
                 [
                     T('intro', at(0), msg('Darters are fast. Send them ahead to cut the convoy off.', f)),
                     # The convoy moves in legs and stops to regroup, so a player has about four minutes.
-                    T('leg1', at(40), msg('The convoy is moving. It stops to regroup on the way.', f),
+                    T('leg1', at(40), msg('The prey is moving west. It stops to regroup on the way.', f),
                       attack('convoy', 20, -60), attack('escort', 20, -60)),
                     T('leg2', at(120), attack('convoy', -15, -45), attack('escort', -15, -45)),
-                    T('leg3', at(200), msg('They are on the move again. Catch them before the road!', f),
+                    T('leg3', at(200), msg('They run again. Catch them before the road!', f),
                       attack('convoy', -45, -65), attack('escort', -45, -65)),
                     T('leg4', at(270), attack('convoy', convoy_to[0], convoy_to[1]), attack('escort', convoy_to[0], convoy_to[1])),
                     T('escaped', {'t': 'unitEscorted', 'tag': 'convoy', 'x': convoy_to[0], 'z': convoy_to[1], 'radius': 10},
@@ -561,10 +605,10 @@ def act1(f):
     post = E['tower_radar']
     mission(f, 5, 'blind_ridge' if terran else 'eyes_of_the_brood',
             'Blind Ridge' if terran else 'Eyes of the Brood',
-            ('Three Arcadian posts are hidden among the hills, each with a guard. A Watchman radar can see them from '
-             'far off. Find and destroy all three.') if terran else
-            ('Three Terran listening posts hide in these hills, each with a guard. A Seer can see them from far off. '
-             'Find and destroy all three.'),
+            ('Three hidden Arcadian posts in these hills are watching our supply roads, and each has a guard. A '
+             'Watchman radar truck can spot them from far off. Find and destroy all three.') if terran else
+            ('Three Terran listening posts hide in these hills, telling the colonies where we feed. A Seer can see '
+             'them from far off. Find and destroy all three.'),
             'map.c_blind_ridge',
             [player_side(f, 600, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar'),
                          research_done=research(f, 'towers', 'sensors')), enemy_side(e)],
@@ -575,7 +619,8 @@ def act1(f):
             [S(1, R['pad'], sx, sz)] + [S(2, post, px, pz) for px, pz in RIDGE_POSTS],
             [('posts', 'Destroy the three hidden posts', 'primary')],
             [
-                T('intro', at(0), msg('Move the radar unit ahead of your tanks. It spots enemies far beyond your guns.', f)),
+                T('intro', at(0), msg('Move the Watchman ahead of your tanks. It spots enemies far beyond your guns.'
+                                      if terran else 'Send the Seer ahead of the Lumens. It sees far beyond their reach.', f)),
                 T('patrol', at(240), spawn(2, E['light'], 2, 0, 0, tag='patrol'), attack('patrol', sx, sz)),
                 T('posts', {'t': 'allDestroyed', 'side': 2, 'unitType': post}, done('posts')),
             ],
@@ -586,15 +631,15 @@ def act1(f):
     vx, vz = RELAY
     if terran:
         mission(f, 6, 'heavy_metal', 'Heavy Metal',
-                ('Two Bulwark heavy tanks must reach the relay station at the end of the road. Ambushes wait in '
-                 'the gaps between the ridges. Get both Bulwarks there.'),
+                ('The relay station at the end of the road links the colonies to orbit. Two Bulwark heavy tanks are '
+                 'going to guard it, but ambushes wait in the gaps between the ridges. Get both Bulwarks there.'),
                 'map.c_relay_road',
                 [player_side(f, 700, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'heavy'),
                              research_done=research(f, 'heavy', 'sensors')), enemy_side(e)],
                 [U(1, R['heavy'], rx + 6, rz - 6, -0.785, tag='convoy'), U(1, R['heavy'], rx + 2, rz - 10, -0.785, tag='convoy')]
                 + [U(1, R['light'], x, z, -0.785) for x, z in spread(rx + 10, rz - 2, 3)]
                 + [U(1, R['miner'], rx - 6, rz + 2), U(1, R['tug'], rx - 2, rz + 6)],
-                [S(1, R['pad'], rx, rz)],
+                [S(1, R['pad'], rx, rz), S(1, R['tower_radar'], vx + 4, vz - 4)],
                 [('relay', 'Bring both Bulwarks to the relay station', 'primary'),
                  ('convoy', 'Keep both Bulwarks alive', 'primary')],
                 [
@@ -616,7 +661,7 @@ def act1(f):
     else:
         guard = [(vx - 18, vz + 2), (vx - 2, vz + 18)]
         mission(f, 6, 'shell_and_spine', 'Shell and Spine',
-                ('The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring '
+                ('The Terrans hold a checkpoint at the end of the road: two Bastion Guns and a Radar Tower. Bring '
                  'your new Aegis tanks up the road and break it.'),
                 'map.c_relay_road',
                 [player_side(f, 700, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'heavy'),
@@ -627,7 +672,7 @@ def act1(f):
                 + [U(2, E['light'], vx - 10, vz + 10), U(2, E['light'], vx - 14, vz + 6), U(2, E['missile'], vx - 6, vz + 14)],
                 [S(1, R['pad'], rx, rz), S(2, E['turret'], *guard[0]), S(2, E['turret'], *guard[1]),
                  S(2, E['tower_radar'], vx, vz)],
-                [('guns', 'Destroy both Bastion guns', 'primary'), ('radar', 'Destroy the radar tower', 'primary')],
+                [('guns', 'Destroy both Bastion Guns', 'primary'), ('radar', 'Destroy the Radar Tower', 'primary')],
                 [
                     T('intro', at(0), msg('Aegis tanks shrug off gunfire. Lead with them; keep the Lumens behind.', f)),
                     T('amb1', area(1, -30, 30, 18), spawn(2, E['light'], 2, -14, 2, tag='amb1'),
@@ -644,12 +689,13 @@ def act1(f):
     ex, ez = VALLEY_ENEMY
     mission(f, 7, 'landfall_broken' if terran else 'root_and_ruin',
             'Landfall Broken' if terran else 'Root and Ruin',
-            ('The Arcadian landing nest sits in Kessra Valley, guarded by ridges with two ways in. Build up, '
-             'then destroy the nest and everything defending it.') if terran else
-            ('The colony lands its supplies in Kessra Valley. Grow the brood, then tear down their landing pad.'),
+            ('Every raid on Halden comes from the Arcadian landing nest in Kessra Valley. Javelin missile tanks are '
+             'now in Build. Break the nest and everything defending it.') if terran else
+            ('The colonies land their supplies in Kessra Valley. Flares are ready to grow. Tear down their Landing '
+             'Pad, and the plains are ours to feed on.'),
             'map.c_kessra_valley',
             [player_side(f, 800, available=avail(f, 'light', 'scout', 'miner', 'tug', 'turret', 'radar', 'tower_radar',
-                                                 'heavy', 'station'),
+                                                 'heavy', 'station', 'missile'),
                          research_done=research(f, 'heavy', 'sensors')),
              enemy_side(e, 'ai', ore=100, metal=0, difficulty='easy')],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 8, hz - 8, 6)]
@@ -657,10 +703,11 @@ def act1(f):
             + [U(2, E['light'], x, z, 2.356) for x, z in spread(ex - 8, ez + 8, 3)]
             + [U(2, E['miner'], ex + 6, ez - 4), U(2, E['tug'], ex + 2, ez - 8)],
             [S(1, R['pad'], hx, hz), S(2, E['pad'], ex, ez), S(2, E['turret'], ex - 22, ez + 4)],
-            [('pad', 'Destroy the enemy landing pad' if terran else 'Destroy the Terran landing pad', 'primary')]
+            [('pad', 'Destroy the Arcadian Landing Ring' if terran else 'Destroy the Terran Landing Pad', 'primary')]
             + ([('all', 'Destroy every enemy unit and building', 'primary')] if terran else []),
             [
-                T('intro', at(0), msg('Mine, build up, then strike. The valley has two ways in.', f)),
+                T('intro', at(0), msg('Mine, build up, then strike. The valley has two ways in.' if terran else
+                                      'Feed first, then swarm. Two paths lead into the valley.', f)),
                 T('pad', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('pad')),
             ] + ([T('all', {'t': 'allDestroyed', 'side': 2}, done('all'))] if terran else []),
             time_limit=40 * 60)
@@ -698,26 +745,28 @@ def act2(f):
     start8 = research(f, *ACT2_BASE)
     lab = say('Research Lab', 'Star Vault')
     mender = say('Mender', 'Weaver')
-    station = say('metal station', 'siphon')
+    station = say('Metal Station', 'Metal Siphon')
     mission(f, 8, say('quiet_fields', 'gene_vault'), say('Quiet Fields', 'The Star Vault'),
-            say('The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the '
-                'spare Hauler to carry the metal home, then research the Mender repair truck.',
-                'The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry '
-                'the metal home, then wake the Star Vault and research the Weaver.'),
+            say('The Kessra nest is ash, but the rift still hangs over Vesper and more of them will come. We dig in '
+                'for a long war. Use the quiet: put a Metal Station on the seam by Tallis colony, then research the '
+                'Mender repair truck.',
+                'The colony pad at Kessra burned, and the swarm spreads across the plains. While the Terrans lick '
+                'their wounds, grow a Metal Siphon on the seam by the nest, then wake the Star Vault and research '
+                'the Weaver.'),
             'map.c_quiet_fields',
             [player_side(f, 900, available=avail(f, *ACT2_UNITS, 'repair'), research_done=start8), enemy_side(e)],
             [U(1, R['light'], x, z, -0.7) for x, z in spread(hx + 10, hz - 10, 4)]
             + [U(1, R['heavy'], hx + 14, hz - 2, -0.7), U(1, R['miner'], hx - 10, hz - 4), U(1, R['tug'], hx + 4, hz + 10),
                U(1, R['tug'], hx + 8, hz + 8, tag='metalHauler')],
             [S(1, R['pad'], hx, hz), S(1, R['lab'], hx - 12, hz + 10)],
-            [('station', f'Build a {station}', 'primary'),
+            [('station', say('Build a Metal Station', 'Grow a Metal Siphon'), 'primary'),
              ('research', f'Research the {mender}', 'primary'), ('raid', 'Drive off the scouting party', 'optional')],
             [
-                T('intro', at(0), msg(say('Metal is for research only. Buy a metal station. It drives to the metal seam by itself.',
-                                          'Metal feeds research only. Grow a siphon. It crawls to the metal seam by itself.'), f)),
+                T('intro', at(0), msg(say('Metal pays for research. Buy a Metal Station; it drives to the metal seam by itself.',
+                                          'Metal feeds the Star Vault. Grow a Metal Siphon; it crawls to the seam by itself.'), f)),
                 T('station', built(1, R['station']), done('station'),
-                  msg(say(f'Station up. Send the spare Hauler to it, then tap the locked {mender} in the drop menu to research it.',
-                          f'Siphon grown. Send the spare Ferrier to it, then tap the locked {mender} in the drop menu to research it.'), f)),
+                  msg(say(f'Station up. Send the spare Hauler to it, then tap the locked {mender} in Build to research it.',
+                          f'Siphon grown. Send the spare Ferrier to it, then tap the locked {mender} in Build to research it.'), f)),
                 T('research', {'t': 'researchDone', 'side': 1, 'node': f'research.{f}.field_repair'}, done('research')),
                 T('scouts', at(240), msg(say('A small scouting party is coming in from the east.',
                                              'Terran scouts are sniffing around.'), f),
@@ -733,27 +782,27 @@ def act2(f):
     hx, hz = REACH_HOME
     gx, gz = REACH_HILL
     cx, cz = REACH_CAMP
-    tower = say('towers', 'thornmounds')
     mission(f, 9, say('long_reach', 'slow_rain'), say('Long Reach', 'Slow Rain'),
             say('The Arcadians have dug guns into the hill at the centre of the valley. They outrange our tanks, but '
                 'not our new Longbow artillery. Shell the hill until every gun is gone.',
-                'The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Lumens, '
-                'but not the Sunfalls. Rain on the hill until every gun is gone.'),
+                'The Terrans have fortified the hill in the middle of the valley. Their guns outrange our Lumens, '
+                'but not our new Sunfalls. Rain on the hill until every gun is gone.'),
             'map.c_long_reach',
-            [player_side(f, 700, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery'),
-                         research_done=research(f, *ACT2_BASE, 'artillery')), enemy_side(e)],
+            [player_side(f, 700, available=avail(f, *ACT2_UNITS, 'artillery'),
+                         research_done=research(f, *ACT2_BASE, 'artillery', 'repair')), enemy_side(e)],
             [U(1, R['artillery'], x, z, -0.785) for x, z in spread(hx + 4, hz - 4, 2)]
             + [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 14, hz - 12, 4)]
             + [U(1, R['heavy'], hx + 18, hz - 4, -0.785), U(1, R['miner'], hx - 8, hz - 2), U(1, R['tug'], hx - 2, hz + 8)]
             + [U(2, E['light'], x, z, 2.356) for x, z in spread(gx + 4, gz + 4, 3)]
             + [U(2, E['missile'], gx + 14, gz - 12, 2.356), U(2, E['light'], cx - 6, cz + 6), U(2, E['light'], cx + 4, cz - 2)],
             [S(1, R['pad'], hx, hz)] + [S(2, E['turret'], x, z) for x, z in REACH_GUNS] + [S(2, E['battery'], gx, gz)],
-            [('guns', f'Destroy the {tower} on the hill', 'primary'), ('battery', 'Destroy the missile battery', 'primary'),
-             ('camp', 'Destroy the camp behind the hill', 'optional')],
+            [('guns', say('Destroy the Sentinels on the hill', 'Destroy the Bastion Guns on the hill'), 'primary'),
+             ('battery', say('Destroy the Corona missile tower', 'Destroy the Harpoon Battery'), 'primary'),
+             ('camp', 'Scout the camp behind the hill', 'optional')],
             [
                 T('intro', at(0), msg(say('Longbows hit from far beyond the guns. Keep tanks in front of them to spot targets.',
                                           'Sunfalls strike from beyond the guns. Keep Lumens ahead of them to spot.'), f)),
-                T('ca1', at(300), msg('Counter-attack coming off the hill!', f),
+                T('ca1', at(300), msg(say('Counter-attack coming off the hill!', 'They pour down off the hill at us!'), f),
                   spawn(2, E['light'], 3, gx - 10, gz + 10, tag='ca1'), attack('ca1', hx, hz)),
                 T('ca2', at(560), spawn(2, E['light'], 2, gx - 10, gz + 10, tag='ca2'),
                   spawn(2, E['heavy'], 1, gx - 14, gz + 6, tag='ca2'), attack('ca2', hx, hz)),
@@ -770,9 +819,9 @@ def act2(f):
     hover = say('Skimmers', 'Gliders')
     mission(f, 10, say('river_run', 'over_the_water'), say('River Run', 'Over the Water'),
             say(f'An Arcadian camp sits on the far side of the delta. Tanks must go the long way round by the southern '
-                f'ford. {hover} float straight across the water. Take the far bank and destroy the camp.',
+                f'ford; our new {hover} float straight across the water. Take the far bank and destroy the camp.',
                 f'A Terran camp sits beyond the river channels. Lumens must crawl round by the southern ford; '
-                f'{hover} skim straight over the water. Reach the far bank and raze the camp.'),
+                f'our new {hover} skim straight over the water. Reach the far bank and raze the camp.'),
             'map.c_delta',
             [player_side(f, 600, available=avail(f, *ACT2_UNITS, 'hover', 'missile'),
                          research_done=research(f, *ACT2_BASE, 'hover', 'artillery')), enemy_side(e)],
@@ -787,8 +836,9 @@ def act2(f):
             [
                 T('intro', at(0), msg(say('Skimmers ride over water. Select them and tap the far bank.',
                                           'Gliders ride over water. Select them and tap the far bank.'), f)),
-                T('bank', area(1, cx - 26, cz, 14), done('bank'), msg('Far bank taken. Now the camp.', f)),
-                T('raid', at(200), msg(say('Raiders crossing toward the colony. The Bastion gun will help.',
+                T('bank', area(1, cx - 26, cz, 14), done('bank'),
+                  msg(say('Far bank taken. Now the camp.', 'The far bank is ours. Now the camp.'), f)),
+                T('raid', at(200), msg(say('Raiders crossing toward the colony. The Bastion Gun will help.',
                                           'Raiders crossing toward the nest. The Sentinel will help.'), f),
                   spawn(2, E['scout'], 3, 50, 10, tag='raid'), attack('raid', hx, hz)),
                 T('raid2', at(420), spawn(2, E['hover'], 2, 50, -20, tag='raid2'), spawn(2, E['light'], 2, 30, 90, tag='raid2'),
@@ -816,15 +866,15 @@ def act2(f):
         tag = f'w{i + 1}'
         acts = [spawn(2, E[role], n, wx, wz, tag=tag) for role, n in group]
         if i == 0:
-            acts.insert(0, msg('First wave inbound.', f))
+            acts.insert(0, msg(say('First wave inbound.', 'The first wave comes.'), f))
         if i == 4:
-            acts.insert(0, msg('Last wave. Everything they have left.', f))
+            acts.insert(0, msg(say('Last wave. Everything they have left.', 'The last wave. Break it and they are spent.'), f))
         wave_triggers.append(T(tag, at(60 + i * 110), *acts, attack(tag, hx, hz)))
     mission(f, 11, say('siege_of_tallis', 'the_long_hunger'), say('Siege of Tallis', 'The Long Hunger'),
-            say(f'Tallis colony is about to be hit by five waves, each bigger than the last. Hold for ten minutes. '
-                f'The {mender} repair vehicle mends damaged units nearby.',
-                f'The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten '
-                f'minutes. The {mender} knits wounded broodlings back together.'),
+            say('Tallis colony is about to be hit by five waves, each bigger than the last. Hold for ten minutes. '
+                'Harpoon Battery missile towers are now in Build, and they outrange tanks.',
+                'The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten '
+                'minutes. Coronas are ready to grow, and they outrange Terran tanks.'),
             'map.c_quiet_fields',
             [player_side(f, 1100, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair')), enemy_side(e)],
@@ -834,7 +884,8 @@ def act2(f):
             [S(1, R['pad'], hx, hz), S(1, R['turret'], hx + 18, hz - 20), S(1, R['station'], -42, 72)],
             [('hold', 'Hold the colony for 10 minutes' if terran else 'Hold the nest for 10 minutes', 'primary')],
             [
-                T('intro', at(0), msg(f'Waves come from the east and south. Keep the {mender} behind your line.', f)),
+                T('intro', at(0), msg(say(f'Waves come from the east and north. Keep the {mender} behind your line.',
+                                          f'They come from the east and north. Keep the {mender} behind the brood.'), f)),
                 *wave_triggers,
                 T('padLost', {'t': 'allDestroyed', 'side': 1, 'unitType': R['pad']}, failed('hold'),
                   {'t': 'lose', 'reason': 'padLost'}),
@@ -847,10 +898,10 @@ def act2(f):
     guards = [U(2, E['light'], x + 6, z + 4, 3.14) for x, z in FIELDS_SITES[:2]] + \
              [U(2, E['light'], x - 6, z - 4, 3.14) for x, z in FIELDS_SITES]
     mission(f, 12, say('salvage_rights', 'metal_veins'), say('Salvage Rights', 'Metal Veins'),
-            say('Three rich metal seams lie east of the colony, and the Arcadians have already siphoned two of them. '
-                'Destroy their siphons and put our own stations on all three seams.',
-                'Three rich metal seams lie east of the nest. The Terrans have stations on two of them. Tear their '
-                'stations down and grow our siphons on all three.'),
+            say('Three rich metal seams lie east of Tallis, and the Arcadians have siphoned two of them to feed '
+                'their research. Destroy their Metal Siphons and put our own Metal Stations on all three seams.',
+                'Three rich metal seams lie east of the nest, and the Terrans mine two of them for their research. '
+                'Tear their Metal Stations down and grow our siphons on all three.'),
             'map.c_quiet_fields',
             [player_side(f, 1000, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair')), enemy_side(e)],
@@ -858,12 +909,17 @@ def act2(f):
             + [U(1, R['heavy'], x, z, -0.7) for x, z in spread(hx + 22, hz - 4, 2)]
             + [U(1, R['miner'], hx - 10, hz - 4), U(1, R['tug'], hx + 4, hz + 10), U(1, R['tug'], hx + 8, hz + 8)]
             + guards,
-            [S(1, R['pad'], hx, hz)] + held,
-            [('sites', f'Put a {station} on all three eastern seams', 'primary'),
-             ('keep', 'Keep your landing pad' if terran else 'Keep your nest', 'primary')],
+            # Both home seams already have a station, so every new one heads for an eastern seam.
+            [S(1, R['pad'], hx, hz), S(1, R['station'], -42, 72), S(1, R['station'], -76, 30)] + held,
+            [('sites', say('Put a Metal Station on all three eastern seams', 'Grow a Metal Siphon on all three eastern seams'),
+              'primary'),
+             ('keep', 'Keep your landing pad' if terran else 'Keep your Landing Ring', 'primary')],
             [
-                T('intro', at(0), msg('The three seams are marked. Clear the enemy off them, then build.', f)),
-                T('r1', at(240), msg('Raiders heading for the seams.', f),
+                T('intro', at(0), msg(say('Our home seams are taken, so new stations head east. Tap a marked seam to send one there.',
+                                          'Our home seams are full, so new siphons crawl east. Tap a marked seam to steer one.'), f)),
+                T('shard', at(120), msg(say('Survey teams report crystal spires growing under the rift. Nobody knows what they are.',
+                                            'Something sings beneath the rift. Crystal grows there, and it is not ours.'), f)),
+                T('r1', at(240), msg(say('Raiders heading for the seams.', 'Terran raiders are making for the seams.'), f),
                   spawn(2, E['light'], 3, 80, -30, tag='r1'), attack('r1', *FIELDS_SITES[0])),
                 T('r2', at(480), spawn(2, E['light'], 2, 20, -85, tag='r2'), spawn(2, E['missile'], 2, 26, -85, tag='r2'),
                   attack('r2', *FIELDS_SITES[2])),
@@ -878,16 +934,17 @@ def act2(f):
 
     # 13: hunt a commander that keeps moving, before it slips away.
     hx, hz = REACH_HOME
-    boss = say('the Matriarch', 'the Iron Colonel')
     route = [(66, -66), (70, 20), (20, 70), (-40, -10), (-70, -70), (40, -70)]
-    legs = [T(f'leg{i}', at(40 + i * 100), attack('boss', x, z), attack('court', x, z))
+    legs = [T(f'leg{i}', at(40 + i * 100), attack('boss', x, z), attack('court', x, z), reveal(x, z))
             for i, (x, z) in enumerate(route[1:], start=1)]
     exit_x, exit_z = 96, -96
     mission(f, 13, say('the_matriarch', 'the_iron_colonel'), say('The Matriarch', 'The Iron Colonel'),
-            say('An Arcadian Matriarch, a huge Aegis that leads their broods, is touring the valley with her guard. '
-                'Hunt her down before she leaves through the south-east pass in ten minutes.',
-                'The Iron Colonel, the Terran commander, is touring the valley in his Bulwark with an escort. '
-                'Hunt him down before he leaves through the south-east pass in ten minutes.'),
+            say('Intercepts name the Arcadian leader on Vesper: the Matriarch. She rides an Aegis heavy tank and is '
+                'touring the valley with her guard. Destroy her before she leaves through the north-east pass in ten '
+                'minutes.',
+                'Colonel Daska, the one his troops call the Iron Colonel, commands the Terrans on Vesper. He is touring '
+                'the valley in a Bulwark with an escort. Destroy him before he leaves through the north-east pass in '
+                'ten minutes.'),
             'map.c_long_reach',
             [player_side(f, 900, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair', 'hover'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover')), enemy_side(e)],
@@ -896,14 +953,16 @@ def act2(f):
             + [U(1, R['missile'], hx + 6, hz - 16, -0.785), U(1, R['radar'], hx + 4, hz - 4, -0.785),
                U(1, R['miner'], hx - 8, hz - 2), U(1, R['tug'], hx - 2, hz + 8)]
             + [U(2, E['heavy'], 66, -66, 2.356, tag='boss')]
-            + [U(2, E['heavy'], 60, -60, 2.356, tag='court'), U(2, E['missile'], 72, -60, 2.356, tag='court'),
+            # The boss is the only heavy tank on the map, so the player can tell it from its guard.
+            + [U(2, E['missile'], 60, -60, 2.356, tag='court'), U(2, E['missile'], 72, -60, 2.356, tag='court'),
                U(2, E['light'], 60, -72, 2.356, tag='court'), U(2, E['light'], 72, -72, 2.356, tag='court')]
             + [U(2, E['light'], x, z) for x, z in [(10, 10), (-30, 30), (40, 40)]],
             [S(1, R['pad'], hx, hz), S(2, E['turret'], 60, -40)],
-            [('boss', f'Destroy {boss}', 'primary')],
+            [('boss', say("Destroy the Matriarch's Aegis", "Destroy the Iron Colonel's Bulwark"), 'primary')],
             [
-                T('intro', at(0), msg(say('Watch the radar. She moves every couple of minutes; cut her off.',
-                                          'Watch the radar. He moves every couple of minutes; cut him off.'), f)),
+                T('intro', at(0), msg(say('She rides the only Aegis in her guard. We will flag each place she heads for.',
+                                          'His is the only Bulwark in the escort. I will show you where he goes next.'), f),
+                  reveal(66, -66)),
                 *legs,
                 T('flee', at(560), msg(say('She is making for the pass!', 'He is making for the pass!'), f),
                   attack('boss', exit_x, exit_z), attack('court', exit_x, exit_z)),
@@ -917,10 +976,10 @@ def act2(f):
     hx, hz = GATE_HOME
     ex, ez = GATE_ENEMY
     mission(f, 14, say('counterpunch', 'breach'), say('Counterpunch', 'Breach'),
-            say('The Arcadians have built a forward base behind the Iron Gate ridges. It is time to hit back. '
-                'Build up, break through and destroy every building in the base.',
-                'The Terrans have walled a forward base behind the Iron Gate ridges. Break through and leave nothing '
-                'standing.'),
+            say('With the Matriarch dead, the broods are fighting without a plan. Hit them before they find one: '
+                'their forward base sits behind the Iron Gate ridges. Destroy every building in it.',
+                'With the Iron Colonel dead, the Terrans are leaderless and afraid. Their forward base hides behind '
+                'the Iron Gate ridges. Break through and leave nothing standing.'),
             'map.c_iron_gate',
             [player_side(f, 1200, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair', 'hover'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover')),
@@ -934,7 +993,8 @@ def act2(f):
              S(2, E['turret'], ex - 6, ez + 26), S(2, E['battery'], ex - 18, ez + 18), S(2, E['tower_radar'], ex + 14, ez + 10)],
             [('base', 'Destroy every enemy building', 'primary')],
             [
-                T('intro', at(0), msg('Three ways in. The guns cover the west gap; artillery can open it.', f)),
+                T('intro', at(0), msg(say('Three ways in. The guns cover the west gap; artillery can open it.',
+                                          'Three paths in. Their guns watch the west one; Sunfalls can open it.'), f)),
                 T('base', {'t': 'and', 'conds': [{'t': 'allDestroyed', 'side': 2, 'unitType': E[k]}
                                                   for k in ('pad', 'turret', 'battery', 'tower_radar', 'station', 'lab')]},
                   done('base')),
@@ -947,6 +1007,12 @@ act2('alien')
 
 
 # ---------------------------------------------------------------- act 3 (both sides)
+
+# The finale's enemy AI (hard, per the outline: the last three missions use hard AI). The Terran
+# finale also starts with more ore: against a hard AI and the Shard, 2000 lost on some seeds.
+def FINALE_AI(e):
+    return enemy_side(e, 'ai', ore=500, metal=200, difficulty='hard')
+
 
 SHARD_CORE = 'structure.alien.shard_core'
 SHARD_SPIRE = 'structure.alien.shard_spire'
@@ -962,30 +1028,32 @@ def act3(f):
         return human_text if terran else alien_text
 
     base_research = research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'air')
-    flyer = say('Falcon', 'Halo')
-    roost = say('air base', 'Aerie')
+    # Arcadians also get the Dragonfly, an interceptor that only hits aircraft.
+    units3 = ACT3_UNITS + (() if terran else ('dragonfly',))
 
     # 15: breather. The first air base and fighters.
     hx, hz = HIGH_HOME
     ex, ez = HIGH_ENEMY
     mission(f, 15, say('wings', 'hive_roost'), say('Wings', 'Aerie'),
-            say(f'Arcadian fliers have been raiding the supply lines. Build an air base, buy {flyer} fighters and '
-                f'clear the four raiders out of the sky. Missile tanks can hit aircraft too.',
-                f'Terran fighters keep stinging the brood. Grow an Aerie, raise {flyer}s and bring down the four '
-                f'raiders. Flares can hit aircraft too.'),
+            say('Survey drones over the rift saw something pulsing at its heart: a crystal we are calling the '
+                'Shard. Before we can get near it, we need the sky. Build an Airfield, buy Falcon fighters and clear '
+                'four Arcadian raiders out of the air.',
+                'At the heart of the rift the Shard has stirred, and its crystals now burn Arcadian and Terran alike. '
+                'Terran fighters keep stinging the brood. Grow an Aerie, raise Halos and bring down the four raiders; '
+                'Dragonflies hunt only fliers.'),
             'map.c_highwater',
-            [player_side(f, 1100, available=avail(f, *ACT3_UNITS), research_done=base_research), enemy_side(e)],
+            [player_side(f, 1100, available=avail(f, *units3), research_done=base_research), enemy_side(e)],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 14, hz - 12, 3)]
             + [U(1, R['missile'], x, z, -0.785) for x, z in spread(hx + 20, hz - 4, 2)]
             + [U(1, R['miner'], hx - 10, hz - 2), U(1, R['tug'], hx - 4, hz + 10), U(1, R['tug'], hx + 2, hz + 10)]
             + [U(2, E['light'], x, z, 2.356) for x, z in spread(ex - 12, ez + 10, 2)],
             [S(1, R['pad'], hx, hz), S(2, E['air_base'], ex, ez)],
-            [('roost', f'Build an {roost}' if terran else f'Grow a {roost}', 'primary'),
+            [('roost', say('Build an Airfield', 'Grow an Aerie'), 'primary'),
              ('sky', 'Destroy the four enemy raiders', 'primary')],
             [
-                T('intro', at(0), msg(f'Buy an {roost} first: aircraft need it to land and rearm.' if terran else
-                                      'Grow an Aerie first: fliers need it to land and feed.', f)),
-                T('raid1', at(90), msg('Raiders inbound!', f),
+                T('intro', at(0), msg(say('Buy an Airfield first: aircraft need it to land and rearm.',
+                                          'Grow an Aerie first: fliers need it to land and feed.'), f)),
+                T('raid1', at(90), msg(say('Raiders inbound!', 'Terran fighters, coming in fast!'), f),
                   spawn(2, E['fighter'], 2, ex - 20, ez, tag='sky', launch=True), attack('sky', hx, hz)),
                 T('raid2', at(300), spawn(2, E['fighter'], 2, ex, ez - 20, tag='sky', launch=True), attack('sky', hx, hz)),
                 T('roost', built(1, R['air_base']), done('roost')),
@@ -998,10 +1066,10 @@ def act3(f):
     targets = [(40, -20), (20, -50), (60, -40), (50, 10)]
     if terran:
         mission(f, 16, 'bombing_run', 'Bombing Run',
-                'Four Arcadian Sentinels guard the eastern plain, covered by two missile batteries. Condor bombers '
-                'can level them from above; Falcons keep the sky clear. Destroy all four Sentinels.',
+                'Four Arcadian Sentinels guard the eastern plain on the road to the rift, covered by two Corona '
+                'missile towers. Condor bombers can level them from above; Falcons keep the sky clear.',
                 'map.c_highwater',
-                [player_side(f, 900, available=avail(f, *ACT3_UNITS, 'bomber'), research_done=base_research),
+                [player_side(f, 900, available=avail(f, *units3, 'bomber'), research_done=base_research),
                  enemy_side(e)],
                 [U(1, R['bomber'], hx + 6, hz - 6), U(1, R['bomber'], hx + 8, hz - 2), U(1, R['fighter'], hx + 4, hz - 10)]
                 + [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
@@ -1010,9 +1078,9 @@ def act3(f):
                 [S(1, R['pad'], hx, hz), S(1, R['air_base'], hx + 10, hz - 18)]
                 + [S(2, E['turret'], x, z) for x, z in targets]
                 + [S(2, E['battery'], 30, -30), S(2, E['battery'], 64, -16)],
-                [('towers', 'Destroy the four Sentinels', 'primary'), ('aa', 'Destroy both missile batteries', 'optional')],
+                [('towers', 'Destroy the four Sentinels', 'primary'), ('aa', 'Destroy both Corona towers', 'optional')],
                 [
-                    T('intro', at(0), msg('Select the Condors and tap a Sentinel to bomb it. Stay away from the batteries.', f)),
+                    T('intro', at(0), msg('Select the Condors and tap a Sentinel to bomb it. Stay clear of the Coronas.', f)),
                     T('patrol', at(200), msg('Enemy fliers scrambled.', f),
                       spawn(2, E['fighter'], 2, ex, ez, tag='patrol', launch=True), attack('patrol', hx, hz)),
                     T('towers', {'t': 'allDestroyed', 'side': 2, 'unitType': E['turret']}, done('towers')),
@@ -1022,10 +1090,10 @@ def act3(f):
                 time_limit=25 * 60)
     else:
         mission(f, 16, 'burning_sky', 'Burning Sky',
-                'Four Terran missile batteries cover the eastern plain, and their Falcons patrol above. Halos rule the '
+                'Four Terran Harpoon Batteries cover the eastern plain, and their Falcons patrol above. Halos rule the '
                 'sky: sweep the Falcons away so the Sunfalls and Gliders can burn all four batteries.',
                 'map.c_highwater',
-                [player_side(f, 900, available=avail(f, *ACT3_UNITS), research_done=base_research), enemy_side(e)],
+                [player_side(f, 900, available=avail(f, *units3), research_done=base_research), enemy_side(e)],
                 [U(1, R['fighter'], hx + 6, hz - 6), U(1, R['fighter'], hx + 8, hz - 2), U(1, R['fighter'], hx + 4, hz - 10)]
                 + [U(1, R['artillery'], x, z, -0.785) for x, z in spread(hx + 12, hz - 20, 2)]
                 + [U(1, R['hover'], x, z, -0.785) for x, z in spread(hx + 18, hz - 12, 3)]
@@ -1033,9 +1101,9 @@ def act3(f):
                 + [U(2, E['light'], x + 6, z + 6, 2.356) for x, z in targets[:2]],
                 [S(1, R['pad'], hx, hz), S(1, R['air_base'], hx + 10, hz - 18), S(2, E['air_base'], ex, ez)]
                 + [S(2, E['battery'], x, z) for x, z in targets],
-                [('towers', 'Destroy the four missile batteries', 'primary')],
+                [('towers', 'Destroy the four Harpoon Batteries', 'primary')],
                 [
-                    T('intro', at(0), msg('Launch the Halos to clear the sky, then send the ground forces in.', f)),
+                    T('intro', at(0), msg('Launch the Halos to clear the sky, then send the ground brood in.', f)),
                     T('patrol', at(60), spawn(2, E['fighter'], 2, ex, ez, tag='patrol', launch=True), attack('patrol', hx, hz)),
                     T('patrol2', at(260), spawn(2, E['fighter'], 2, ex, ez, tag='patrol2', launch=True),
                       attack('patrol2', hx, hz)),
@@ -1047,11 +1115,11 @@ def act3(f):
     # 17: saucers.
     if terran:
         mission(f, 17, 'saucer_season', 'Saucer Season',
-                'The Arcadians have grown saucers: heavy fliers that burn whatever is under them. Waves of them will '
-                'come at the colony. Shoot down six of them, then destroy the two roosts they fly from. Falcons and '
-                'Javelin missile tanks can reach them.',
+                'The Arcadians have grown Discs: heavy saucers that burn whatever is under them. Waves of them will '
+                'come at the colony. Shoot down six, then destroy the two Aeries they fly from. Falcons and Javelins '
+                'can reach them.',
                 'map.c_highwater',
-                [player_side(f, 1200, available=avail(f, *ACT3_UNITS, 'bomber'), research_done=base_research),
+                [player_side(f, 1200, available=avail(f, *units3, 'bomber'), research_done=base_research),
                  enemy_side(e)],
                 [U(1, R['missile'], x, z, -0.785) for x, z in spread(hx + 14, hz - 12, 3)]
                 + [U(1, R['fighter'], hx + 6, hz - 6), U(1, R['fighter'], hx + 8, hz - 2)]
@@ -1059,9 +1127,9 @@ def act3(f):
                 + [U(1, R['miner'], hx - 10, hz - 2), U(1, R['tug'], hx - 4, hz + 10)],
                 [S(1, R['pad'], hx, hz), S(1, R['air_base'], hx + 10, hz - 18), S(2, E['air_base'], ex, ez),
                  S(2, E['air_base'], ex - 14, ez + 6)],
-                [('saucers', 'Shoot down six saucers', 'primary'), ('roosts', 'Destroy both saucer roosts', 'primary')],
+                [('saucers', 'Shoot down six Discs', 'primary'), ('roosts', 'Destroy both Aeries', 'primary')],
                 [
-                    T('intro', at(0), msg('Saucers need to fly right over a target to hit it. Meet them with missiles.', f)),
+                    T('intro', at(0), msg('Discs must fly right over a target to hit it. Meet them with missiles.', f)),
                     *[T(f's{i}', at(60 + i * 90), spawn(2, E['saucer'], 2, ex - 10, ez + 10, tag='saucers', launch=True),
                         attack('saucers', hx, hz)) for i in range(4)],
                     T('saucers', {'t': 'and', 'conds': [at(331), {'t': 'unitsAlive', 'tag': 'saucers', 'op': '<=', 'count': 2}]},
@@ -1073,10 +1141,10 @@ def act3(f):
     else:
         route = [(60, 60), (0, 70), (-60, 20), (-80, -40)]
         mission(f, 17, 'the_disc', 'The Disc',
-                'The brood has grown its first saucers. A Terran tank column is crossing the plain toward the south-west '
-                'pass. Burn it before it gets through.',
+                'The brood has grown its first Discs, heavy saucers that burn whatever lies beneath them. A Terran tank '
+                'column is crossing the plain toward the western pass. Burn it before it gets through.',
                 'map.c_highwater',
-                [player_side(f, 1000, available=avail(f, *ACT3_UNITS, 'saucer'), research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
+                [player_side(f, 1000, available=avail(f, *units3, 'saucer'), research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
                  enemy_side(e)],
                 [U(1, R['saucer'], hx + 6, hz - 6), U(1, R['saucer'], hx + 8, hz - 2), U(1, R['saucer'], hx + 4, hz - 10)]
                 + [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 3)]
@@ -1086,7 +1154,7 @@ def act3(f):
                 [S(1, R['pad'], hx, hz), S(1, R['air_base'], hx + 10, hz - 18), S(1, R['air_base'], hx + 22, hz - 10)],
                 [('column', 'Destroy the tank column', 'primary')],
                 [
-                    T('intro', at(0), msg('Saucers fly over the column and burn it. The Flare missile tank can shoot back: '
+                    T('intro', at(0), msg('Discs fly over the column and burn it. The Javelin missile tank can shoot back: '
                                           'kill it first.', f)),
                     *[T(f'leg{i}', at(30 + i * 110), attack('column', x, z)) for i, (x, z) in enumerate(route)],
                     T('escaped', {'t': 'unitEscorted', 'tag': 'column', 'x': -80, 'z': -40, 'radius': 12},
@@ -1111,10 +1179,10 @@ def act3(f):
         wave_triggers.append(T(f'w{i}', at(sec), *group, attack(f'w{i}', tx, tz)))
     if terran:
         mission(f, 18, 'two_fronts', 'Two Fronts',
-                'Two colonies, Ashby and Corran, are in the path of the swarm. Hold both for twelve minutes. The waves '
-                'switch between them, so you will have to split your forces or move fast.',
+                'The swarm is pushing for two colonies: Ashby in the west and Corran in the south. Hold both for '
+                'twelve minutes. The waves switch between them, so split your forces or move fast.',
                 'map.c_twin_colonies',
-                [player_side(f, 1400, available=avail(f, *ACT3_UNITS, 'bomber'), research_done=base_research),
+                [player_side(f, 1400, available=avail(f, *units3, 'bomber'), research_done=base_research),
                  enemy_side(e)],
                 [U(1, R['light'], x, z, 0.0) for x, z in spread(ax + 14, az, 3)]
                 + [U(1, R['light'], x, z, -1.57) for x, z in spread(bx, bz - 14, 3)]
@@ -1132,10 +1200,10 @@ def act3(f):
     else:
         rx, rz = 30, 40
         mission(f, 18, 'orbital_relay', 'Orbital Relay',
-                'The Terran orbital relay stands in the middle of the plain. Destroy the relay tower and its guns, but '
-                'the colony will keep sending raids at your nest. Hold both ends.',
+                'The Terran orbital relay stands on the plain south-west of our nest; through it the colonies call to '
+                'orbit for help. Destroy the relay tower and its guns while both colonies send raids at the nest.',
                 'map.c_twin_colonies',
-                [player_side(f, 1300, available=avail(f, *ACT3_UNITS, 'saucer'),
+                [player_side(f, 1300, available=avail(f, *units3, 'saucer'),
                              research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
                  enemy_side(e)],
                 [U(1, R['light'], x, z, -0.785) for x, z in spread(ex - 18, ez + 14, 4)]
@@ -1145,10 +1213,10 @@ def act3(f):
                 [S(1, R['pad'], ex, ez), S(1, R['turret'], ex - 14, ez + 14),
                  S(2, E['tower_radar'], rx, rz), S(2, E['turret'], rx - 12, rz - 6), S(2, E['turret'], rx + 6, rz - 12),
                  S(2, E['pad'], ax, az), S(2, E['pad'], bx, bz)],
-                [('relay', 'Destroy the relay tower', 'primary'), ('guns', 'Destroy the relay guns', 'primary'),
-                 ('nest', 'Keep your nest', 'primary')],
+                [('relay', 'Destroy the relay tower', 'primary'), ('guns', "Destroy the relay's Bastion Guns", 'primary'),
+                 ('nest', 'Keep your Landing Ring', 'primary')],
                 [
-                    T('intro', at(0), msg('The relay is north-west of the nest. Raids will come from both colonies.', f)),
+                    T('intro', at(0), msg('The relay is south-west of the nest. Raids will come from both colonies.', f)),
                     *[T(t['id'], t['when'], *[a if a['t'] != 'spawn' else {**a, 'x': ax if i % 2 == 0 else bx,
                                                                          'z': az if i % 2 == 0 else bz}
                                               for a in t['do'] if a['t'] != 'aiOrder'],
@@ -1168,10 +1236,11 @@ def act3(f):
     spires = [S(3, SHARD_SPIRE, x, z) for x, z in FIELD_SPIRES]
     if terran:
         mission(f, 19, 'dead_zone', 'Dead Zone',
-                'The ground near the rift is covered in Shard spires that fire on anything that moves, Arcadian or '
-                'Terran. Get a Watchman radar to the rift\'s edge so we can see what lies beyond. Keep it alive.',
+                'The Shard has grown spires across the ground near the rift, and they fire on anything that moves, '
+                'Arcadian or Terran. Get a Watchman to the rift\'s edge in the north-east so we can see what lies '
+                'beyond. Keep it alive.',
                 'map.c_crystal_fields',
-                [player_side(f, 1200, available=avail(f, *ACT3_UNITS, 'bomber'), research_done=base_research),
+                [player_side(f, 1200, available=avail(f, *units3, 'bomber'), research_done=base_research),
                  enemy_side(e), enemy_side('alien', player=3)],
                 [U(1, R['radar'], hx + 8, hz - 8, -0.785, tag='eye')]
                 + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 18, hz - 10, 3)]
@@ -1190,10 +1259,11 @@ def act3(f):
                 time_limit=25 * 60, relations=at_war(2, 3))
     else:
         mission(f, 19, 'shard_song', 'Shard Song',
-                'The brood has nested among the crystals at the rift. The Shard is waking, and it does not care whose '
-                'side anyone is on. Hold the nest for ten minutes against the Terrans and the spires both.',
+                'The brood has nested among the Shard\'s crystals at the rift. Learn its song and the rift will open '
+                'wide for the whole swarm, but the Shard grows restless and serves no one. Hold the nest for ten '
+                'minutes against the Terrans and the spires both.',
                 'map.c_crystal_fields',
-                [player_side(f, 1200, available=avail(f, *ACT3_UNITS, 'saucer'),
+                [player_side(f, 1200, available=avail(f, *units3, 'saucer'),
                              research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
                  enemy_side(e), enemy_side('alien', player=3)],
                 [U(1, R['heavy'], x, z, 2.356) for x, z in spread(gx - 16, gz + 14, 3)]
@@ -1201,9 +1271,9 @@ def act3(f):
                 + [U(1, R['light'], x, z, 2.356) for x, z in spread(gx - 24, gz + 4, 3)]
                 + [U(1, R['repair'], gx - 4, gz + 10), U(1, R['miner'], gx + 10, gz - 2), U(1, R['tug'], gx + 4, gz - 10)],
                 [S(1, R['pad'], gx, gz), S(1, R['turret'], gx - 18, gz + 2)] + spires,
-                [('hold', 'Hold the nest for 10 minutes', 'primary'), ('spires', 'Shatter the spires near the nest', 'optional')],
+                [('hold', 'Hold the nest for 10 minutes', 'primary'), ('spires', 'Shatter all five spires', 'optional')],
                 [
-                    T('intro', at(0), msg('The crystals are quiet for now. Get ready.', f)),
+                    T('intro', at(0), msg('The spires are quiet for the moment. Get ready.', f)),
                     T('wake', at(120), msg('The Shard is singing. The spires are turning on us!', f),
                       {'t': 'setRelation', 'a': 1, 'b': 3, 'relation': 'hostile'}),
                     *[T(f't{i}', at(90 + i * 110), spawn(2, E['light'], 2 + i, hx + 10, hz - 10, tag=f't{i}'),
@@ -1224,12 +1294,14 @@ def act3(f):
     b_x, b_z = RIFT_ENEMY_B
     sx, sz = RIFT_SHARD
     mission(f, 20, say('brood_war', 'two_banners'), say('Brood War', 'Two Banners'),
-            say('Two Arcadian broods have dug in on either side of the rift. Destroy both of their landing rings.',
-                'The Coalition has hired a mercenary company. Their two bases flank the rift. Destroy both landing pads.'),
+            say('Without the Matriarch two broods hold the rift, each on its own: one to the east, one '
+                'to the north. Destroy both of their Landing Rings.',
+                'With their relay gone, the Coalition has hired a mercenary company to hold the rift against us. The '
+                'Coalition base lies east of it, the mercenaries to the north. Destroy both Landing Pads.'),
             'map.c_rift',
-            [player_side(f, 1600, available=avail(f, *ACT3_UNITS, *(('bomber',) if terran else ('saucer',))),
+            [player_side(f, 1600, available=avail(f, *units3, *(('bomber',) if terran else ('saucer',))),
                          research_done=base_research if terran else research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
-             enemy_side(e, 'ai', ore=300, metal=100, difficulty='normal', team=2),
+             enemy_side(e, 'ai', ore=300, metal=100, difficulty='hard', team=2),
              enemy_side(e, 'ai', ore=200, metal=100, difficulty='easy', player=3, team=2)],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 26, hz - 4, 3)]
@@ -1240,10 +1312,11 @@ def act3(f):
             + [U(3, E['light'], x, z) for x, z in spread(b_x, b_z + 12, 3)] + [U(3, E['miner'], b_x + 4, b_z + 8)],
             [S(1, R['pad'], hx, hz), S(2, E['pad'], a_x, a_z), S(2, E['turret'], a_x - 18, a_z + 4),
              S(3, E['pad'], b_x, b_z), S(3, E['turret'], b_x - 4, b_z + 18)],
-            [('a', say('Destroy the eastern brood\'s nest', 'Destroy the Coalition pad'), 'primary'),
-             ('b', say('Destroy the southern brood\'s nest', 'Destroy the mercenary pad'), 'primary')],
+            [('a', say('Destroy the eastern brood\'s Landing Ring', 'Destroy the eastern Coalition pad'), 'primary'),
+             ('b', say('Destroy the northern brood\'s Landing Ring', 'Destroy the northern mercenary pad'), 'primary')],
             [
-                T('intro', at(0), msg('Two enemies, one at each side of the rift. Take the weaker southern one first.', f)),
+                T('intro', at(0), msg(say('Two broods, one each side of the rift. The northern one is weaker: take it first.',
+                                          'The northern mercenaries are the weaker pack. Break them first.'), f)),
                 T('a', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('a')),
                 T('b', {'t': 'allDestroyed', 'side': 3, 'unitType': E['pad']}, done('b')),
             ],
@@ -1254,10 +1327,11 @@ def act3(f):
     gx, gz = FIELD_EDGE
     if terran:
         mission(f, 21, 'anchor_point', 'Anchor Point',
-                'The spires on the crystal fields anchor the rift to Vesper. Shatter all five while the Arcadians '
-                'throw everything they have at you.',
+                'The Shard\'s spires anchor the rift to Vesper. The Arcadians are trying to bend the Shard to their '
+                'will and hold the rift open for the swarm, though it burns them too. They will throw everything they '
+                'have at you. Shatter all five spires.',
                 'map.c_crystal_fields',
-                [player_side(f, 1600, available=avail(f, *ACT3_UNITS, 'bomber'), research_done=base_research),
+                [player_side(f, 1600, available=avail(f, *units3, 'bomber'), research_done=base_research),
                  enemy_side(e, 'ai', ore=800, metal=150, difficulty='hard'), enemy_side('alien', player=3)],
                 [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
                 + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 26, hz - 4, 3)]
@@ -1276,9 +1350,10 @@ def act3(f):
     else:
         ring = [(-50, 30), (-30, 50), (-60, 60), (-20, 20), (-70, 10), (-10, 70)]
         mission(f, 21, 'citadel_walls', 'Citadel Walls',
-                'The Terran citadel is ringed by gun towers. Break the outer ring: destroy every Bastion gun.',
+                'Only the Coalition citadel still stands between the swarm and Vesper. It is ringed by gun towers: '
+                'break the outer ring and destroy every Bastion Gun.',
                 'map.c_crystal_fields',
-                [player_side(f, 1600, available=avail(f, *ACT3_UNITS, 'saucer'),
+                [player_side(f, 1600, available=avail(f, *units3, 'saucer'),
                              research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
                  enemy_side(e, 'ai', ore=800, metal=150, difficulty='hard')],
                 [U(1, R['light'], x, z, 2.356) for x, z in spread(gx - 16, gz + 14, 4)]
@@ -1288,7 +1363,7 @@ def act3(f):
                    U(1, R['tug'], gx - 8, gz - 8)]
                 + [U(2, E['light'], x, z) for x, z in spread(hx + 14, hz - 14, 4)] + [U(2, E['miner'], hx - 8, hz - 4)],
                 [S(1, R['pad'], gx, gz), S(2, E['pad'], hx, hz)] + [S(2, E['turret'], x, z) for x, z in ring],
-                [('walls', 'Destroy every Bastion gun', 'primary')],
+                [('walls', 'Destroy every Bastion Gun', 'primary')],
                 [
                     T('intro', at(0), msg('Sunfalls outrange the guns. Shell them from a distance.', f)),
                     T('walls', {'t': 'allDestroyed', 'side': 2, 'unitType': E['turret']}, done('walls')),
@@ -1300,15 +1375,15 @@ def act3(f):
     hx, hz = RIFT_HOME
     shard = [S(3, SHARD_CORE, sx, sz)] + [S(3, SHARD_SPIRE, sx + dx, sz + dz) for dx, dz in [(-16, 0), (0, 16), (14, -12)]]
     mission(f, 22, say('close_the_rift', 'vesper_falls'), say('Close the Rift', 'Vesper Falls'),
-            say('This is it. The Shard holds the rift open, and the last Arcadian hive guards it. Destroy the Shard '
-                'and the hive, and Vesper is ours.',
-                'The Coalition\'s last citadel stands beyond the rift. Destroy its command towers and every landing pad, '
-                'and Vesper belongs to the swarm. The Shard will fire on both of us.'),
+            say('The anchor spires are down and the rift is failing. The Shard and its last spires still hold it open, and the last Arcadian '
+                'hive has dug in beside it to feed on its power. Destroy the Shard and the hive, and the rift closes '
+                'for good.',
+                'The citadel\'s walls are down. Destroy its two Radar Towers, which carry its commands, and every '
+                'Landing Pad, and Vesper belongs to the swarm. Keep clear of the Shard: it burns us still.'),
             'map.c_rift',
-            [player_side(f, 2000, available=avail(f, *ACT3_UNITS, *(('bomber',) if terran else ('saucer',))),
+            [player_side(f, 2600 if terran else 2000, available=avail(f, *units3, *(('bomber',) if terran else ('saucer',))),
                          research_done=base_research if terran else research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
-             # An easy AI: the Shard, two pads and their guns already make the finale the hardest fight.
-             enemy_side(e, 'ai', ore=500, metal=200, difficulty='easy'), enemy_side('alien', player=3)],
+             FINALE_AI(e), enemy_side('alien', player=3)],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 26, hz - 4, 4)]
             + [U(1, R['artillery'], x, z, -0.785) for x, z in spread(hx + 10, hz - 24, 3)]
@@ -1319,27 +1394,314 @@ def act3(f):
             [S(1, R['pad'], hx, hz), S(2, E['pad'], a_x, a_z), S(2, E['pad'], b_x, b_z),
              S(2, E['turret'], a_x - 20, a_z + 4), S(2, E['turret'], b_x - 4, b_z + 20), S(2, E['tower_radar'], a_x + 12, a_z - 12),
              S(2, E['tower_radar'], b_x + 14, b_z + 6)] + shard,
-            ([('shard', 'Destroy the Shard', 'primary'), ('hive', 'Destroy the last hive', 'primary')] if terran else
-             [('towers', 'Destroy the command towers', 'primary'), ('pads', 'Destroy every landing pad', 'primary'),
-              ('shard', 'Destroy the Shard', 'optional')]),
+            ([('shard', 'Destroy the Shard', 'primary'), ('hive', "Destroy the hive's two Landing Rings", 'primary')]
+             if terran else
+             [('towers', 'Destroy both Radar Towers', 'primary'), ('pads', 'Destroy every Landing Pad', 'primary')]),
             [
                 T('intro', at(0), msg(say('The Shard fires on anything near it. Break its spires with artillery first.',
-                                          'The Shard fires on anything near it. Go round it, or break it.'), f)),
-                T('shard', {'t': 'allDestroyed', 'side': 3, 'unitType': SHARD_CORE}, done('shard'),
-                  # With the Shard gone the sky clears, and the reserves can land for the last push.
-                  msg(say('The Shard is down and the sky is clear. Reserves are landing at your pad.',
-                          'The Shard is broken. The brood reserves are landing at your nest.'), f),
-                  spawn(1, R['heavy'], 4, hx + 18, hz - 8, drop=True), spawn(1, R['light'], 4, hx + 8, hz - 18, drop=True)),
+                                          'The Shard fires on anything near it. Go round it; the swarm needs it whole.'), f)),
+                # Terran: with the Shard gone, the reserves can land for the last push. Arcadian: the
+                # brood's reserves hatch at the ten-minute mark instead (the swarm leaves the Shard be).
+                (T('shard', {'t': 'allDestroyed', 'side': 3, 'unitType': SHARD_CORE}, done('shard'),
+                   msg('The Shard is down and the way to the hive is open. Reserves are landing at your pad.', f),
+                   spawn(1, R['heavy'], 4, hx + 18, hz - 8, drop=True), spawn(1, R['light'], 4, hx + 8, hz - 18, drop=True))
+                 if terran else
+                 T('reserves', at(600), msg('The brood reserves have hatched. They are landing at your Landing Ring.', f),
+                   spawn(1, R['heavy'], 4, hx + 18, hz - 8, drop=True), spawn(1, R['light'], 4, hx + 8, hz - 18, drop=True))),
                 *([T('hive', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('hive'))] if terran else
                   [T('towers', {'t': 'allDestroyed', 'side': 2, 'unitType': E['tower_radar']}, done('towers')),
                    T('pads', {'t': 'allDestroyed', 'side': 2, 'unitType': E['pad']}, done('pads'))]),
                 T('padLost', {'t': 'allDestroyed', 'side': 1, 'unitType': R['pad']}, {'t': 'lose', 'reason': 'padLost'}),
             ],
-            time_limit=60 * 60, relations=at_war(2, 3))
+            time_limit=60 * 60, relations=at_war(2, 3),
+            epilogue=say('The Shard shattered, and with nothing to hold it open, the rift collapsed. Across Vesper the '
+                         'last Arcadian machines fell still. For the first time since Halden went silent, the sky over '
+                         'the colonies is clear.',
+                         'The citadel\'s last tower fell silent, and the Coalition\'s hold on Vesper broke with it. '
+                         'Above the plains the rift opened wide, and the rest of the swarm began its descent. Vesper '
+                         'is ours.'))
 
 
 act3('human')
 act3('alien')
+
+# ---------------------------------------------------------------- training
+
+# Five short lessons, one idea each, all Terran (the outline: drops, mining, combat, research,
+# air). Every lesson is a chain of steps: the objective line always says what to do next, a
+# step's goal ring only shows once the step before it is done, and Command tops up the ore a
+# step needs, so a player who spent it elsewhere can't get stuck. There is no time limit and
+# nothing in them can destroy the landing pad. The text matches the touch controls (see the
+# Help screen and src/ui/input.ts).
+
+TRAINING = []
+COACH = 'Command'
+H = ROLE['human']
+A = ROLE['alien']
+
+# Drill Yard: a small practice ground. The pad sits in the south-west with ore and a metal site
+# round it; a low ridge with a gap crosses the middle, and the target range is beyond it.
+YARD_PAD = (-40, 32)
+add_map('map.t_drill_yard', 'Drill Yard', 150, [YARD_PAD, (44, -40)], [
+    ('ore', -60, 12, 1500), ('ore', -62, 50, 1500), ('ore', -22, 58, 1200), ('metal', -64, 32, 400),
+], {
+    'seed': 1301, 'roughness': 0.5, 'centreRidge': False, 'symmetric': False,
+    'ridges': [{'x0': -8, 'z0': -74, 'x1': 2, 'z1': -10, 'height': 6, 'width': 6},
+               {'x0': 6, 'z0': 14, 'x1': 14, 'z1': 74, 'height': 6, 'width': 6}],
+    'hills': [{'x': 40, 'z': 40, 'radius': 18, 'height': 3}, {'x': -40, 'z': -40, 'radius': 20, 'height': 4}],
+    'flats': [{'x': YARD_PAD[0], 'z': YARD_PAD[1], 'radius': 15}, {'x': 4, 'z': 2, 'radius': 8}],
+})
+
+# Kestrel Field: open ground for the research and air lessons. Metal by the pad, a target range
+# out to the north-east.
+FIELD_PAD = (-44, 40)
+add_map('map.t_kestrel_field', 'Kestrel Field', 160, [FIELD_PAD, (50, -46)], [
+    ('ore', -64, 22, 1500), ('ore', -26, 62, 1500), ('metal', -66, 58, 600), ('metal', -64, 40, 600),
+], {
+    'seed': 1402, 'roughness': 0.5, 'centreRidge': False, 'symmetric': False,
+    'hills': [{'x': 10, 'z': 20, 'radius': 20, 'height': 3}, {'x': 40, 'z': 50, 'radius': 18, 'height': 4},
+              {'x': -30, 'z': -40, 'radius': 22, 'height': 4}],
+    'flats': [{'x': FIELD_PAD[0], 'z': FIELD_PAD[1], 'radius': 16}, {'x': 34, 'z': -30, 'radius': 12}],
+})
+
+
+def coach(text):
+    return {'t': 'message', 'speaker': COACH, 'text': text}
+
+
+def grant(ore=0, metal=0):
+    g = {'t': 'grant', 'side': 1}
+    if ore:
+        g['ore'] = ore
+    if metal:
+        g['metal'] = metal
+    return g
+
+
+def has(unit, count=1):
+    return {'t': 'unitsAlive', 'side': 1, 'unitType': unit, 'op': '>=', 'count': count}
+
+
+def not_(cond):
+    return {'t': 'not', 'cond': cond}
+
+
+def step_open(steps, i):
+    """True while step i is the current one: the step before is done and this one is not."""
+    conds = [not_({'t': 'objectiveDone', 'id': steps[i][0]})]
+    if i > 0:
+        conds.insert(0, {'t': 'objectiveDone', 'id': steps[i - 1][0]})
+    return conds
+
+
+def topup(ore, have):
+    """A step's safety net: while it is open, the player lacks `have` and has under `ore` ore,
+    Command grants `ore` (so a wrong purchase, or a lost unit, never leaves the lesson stuck)."""
+    return (ore, have)
+
+
+def built(structure):
+    return {'t': 'structureBuilt', 'side': 1, 'structureType': structure}
+
+
+def lesson(order, slug, title, briefing, map_id, player, units, structures, steps, intro, enemy=True,
+           extra=()):
+    """steps: (id, objective text, condition, actions when the step starts[, topups]). The first
+    step's actions run with the intro; a step's condition is only checked once the step before is
+    done. topups: list of topup(ore, have) safety nets, one repeating trigger each."""
+    triggers = [T('intro', at(0), coach(intro), *steps[0][3])]
+    for i, (sid, _text, cond, _start, *rest) in enumerate(steps):
+        when = cond if i == 0 else {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': steps[i - 1][0]}, cond]}
+        do = [done(sid)]
+        if i + 1 < len(steps):
+            nid, ntext, _c, nstart, *_ = steps[i + 1]
+            do += [{'t': 'setObjective', 'id': nid, 'status': 'add', 'text': ntext, 'kind': 'primary'}, *nstart]
+        triggers.append(T(sid, when, *do))
+        for k, (ore, have) in enumerate(rest[0] if rest else []):
+            short = not_({'t': 'resourceReached', 'side': 1, 'ore': ore})
+            triggers.append(T(f'{sid}TopUp{k + 1}', {'t': 'and', 'conds': [*step_open(steps, i), not_(have), short]},
+                              coach('Command has topped up your ore for this step.'), grant(ore), repeat=True))
+    triggers += list(extra)
+    TRAINING.append({
+        'id': f'mission.training.{order}_{slug}', 'campaign': 'training', 'order': order, 'title': title,
+        'briefing': briefing, 'mapId': map_id, 'sides': [player, enemy_side('alien')], 'units': units,
+        'structures': structures,
+        'objectives': [{'id': steps[0][0], 'text': steps[0][1], 'kind': 'primary'}],
+        'triggers': triggers,
+        'relations': at_war(1, 2) if enemy else [],
+        'placeholder': False,
+    })
+
+
+def ring(x, z, r=7):
+    return area(1, x, z, r)
+
+
+# 1. Drops: everything arrives by orbital drop onto the landing pad.
+px, pz = YARD_PAD
+lesson(1, 'drops', 'Drops',
+       'Welcome, Commander. Nothing is built on Vesper: everything you buy is dropped from orbit onto your '
+       'landing pad. Buy a few units, drive one about, and order your first building.',
+       'map.t_drill_yard',
+       player_side('human', 250, available=avail('human', 'light', 'scout', 'turret')),
+       [], [S(1, H['pad'], px, pz)],
+       [
+           ('buy', 'Tap your landing pad to open Build, then tap the Lancer card', has(H['light']), [],
+            [topup(100, has(H['light']))]),
+           ('more', 'Buy two Outriders. They land one at a time; the strip at the top shows the queue',
+            has(H['scout'], 2),
+            [coach('Lancer down! Everything you buy lands on the pad, then drives off it.')],
+            [topup(75, has(H['scout'], 2))]),
+           ('drive', 'Tap one of your units to select it, then tap inside the ring to drive there',
+            ring(-6, 10), [coach('All landed. Close Build with the X to see the whole map again.')]),
+           ('tower', 'Buildings come by drop too. Open Build, tap Structures, buy a Bastion Gun. It sets itself up',
+            built(H['turret']),
+            [coach('Nicely driven. Command tops up your ore whenever a step needs it.')],
+            [topup(150, built(H['turret']))]),
+       ],
+       'Your landing pad is the big square platform. Tap it to see what you can buy.',
+       enemy=False)
+
+# 2. Mining: miners dig ore, haulers carry it home, ore pays for everything.
+lesson(2, 'mining', 'Mining',
+       'Ore pays for everything you buy. A Prospector digs ore and stacks it in crates by the field; a '
+       'Hauler carries the crates home to your landing pad. Get the ore flowing and bank some.',
+       'map.t_drill_yard',
+       player_side('human', 0, available=avail('human', 'light', 'miner', 'tug')),
+       [U(1, H['miner'], px - 10, pz - 2, 0.0), U(1, H['tug'], px - 10, pz + 6, 0.0)],
+       [S(1, H['pad'], px, pz)],
+       [
+           ('dig', 'Tap the Prospector, then tap a pink ore field to start digging',
+            {'t': 'resourceReached', 'side': 1, 'ore': 10}, []),
+           ('crew', 'Buy a second Prospector and a second Hauler. Send the new Prospector to dig too',
+            {'t': 'and', 'conds': [has(H['miner'], 2), has(H['tug'], 2)]},
+            [coach('First load home! Haulers fetch the crates by themselves. Here is 150 ore for more workers.'),
+             grant(150)],
+            [topup(100, has(H['miner'], 2)), topup(50, has(H['tug'], 2))]),
+           ('bank', 'Bank 400 ore. Your ore count is at the top of the screen',
+            {'t': 'resourceReached', 'side': 1, 'ore': 400},
+            [coach('Two crews dig twice as fast. Keep an idle miner busy: tap it, then an ore field.')]),
+           ('spend', 'Ore buys everything. Spend some: buy a Lancer', has(H['light']),
+            [coach('400 ore banked. Tanks, buildings and workers are all paid in ore.')],
+            [topup(100, has(H['light']))]),
+       ],
+       'Your Prospector and Hauler are beside the pad. Ore fields are the pink rocks.',
+       enemy=False)
+
+# 3. Combat: select, move, attack, attack-move, hold, groups.
+targets = [(30, 4), (34, -4)]
+road = [(30, -24), (36, -20)]
+end_ring = (46, -40)
+lesson(3, 'combat', 'Combat',
+       'Four Lancers are yours to command. Learn to pick them, move them and fight with them. The '
+       'Arcadian Darters on the range are light scouts, no match for four Lancers.',
+       'map.t_drill_yard',
+       player_side('human', 0, available=[]),
+       [U(1, H['light'], x, z, 0.0, tag='squad') for x, z in spread(px + 12, pz - 4, 4, 5)]
+       + [U(2, A['scout'], x, z, 3.1, tag='targets') for x, z in targets]
+       + [U(2, A['scout'], x, z, 2.3, tag='road') for x, z in road],
+       [S(1, H['pad'], px, pz)],
+       [
+           ('move', 'Tap a Lancer to select it, then tap inside the ring to move it', ring(-14, 18, 6), []),
+           ('all', 'Double-tap a Lancer to pick every Lancer on screen, or tap All army. Move them to the ring',
+            ring(4, 2, 8), [coach('Well done. Drag one finger on the map to look around.')]),
+           ('attack', 'Two Darters on the range. With your Lancers selected, tap a Darter to attack it',
+            {'t': 'unitDestroyed', 'tag': 'targets'}, [coach('Through the gap is the target range.')]),
+           ('advance', 'Tap Attack, then tap inside the far ring. Your Lancers fight anything on the way',
+            ring(*end_ring, 8), [coach('Targets down. A plain move drives past enemies; an Attack move fights them.')]),
+           ('hold', 'Select your Lancers and tap Hold: they stay put and fire at anything in range. Beat the raid',
+            {'t': 'unitDestroyed', 'tag': 'raid'},
+            [coach('Well fought. Arcadian raiders are coming through the gap behind you!'),
+             spawn(2, A['scout'], 3, -46, -56, tag='raid'), attack('raid', end_ring[0], end_ring[1])]),
+           ('group', 'Tap All army, then hold tile 1 to save them as a group. Tap 1, then tap the ring',
+            ring(-14, 6, 8), [coach('Raid beaten. Groups let you pick a squad again with one tap.')]),
+       ],
+       'Units are selected by tapping them. Move by tapping the ground.',
+       extra=[
+           # Never run out of tanks: reinforcements land whenever only one is left, every time,
+           # until the lesson is over.
+           T('reinforce', {'t': 'and', 'conds': [{'t': 'unitsAlive', 'side': 1, 'op': '<=', 'count': 1},
+                                                 not_({'t': 'objectiveDone', 'id': 'group'})]},
+             coach('Reinforcements are landing at your pad.'), spawn(1, H['light'], 3, px + 10, pz - 6, drop=True),
+             repeat=True),
+       ])
+
+# 4. Research: metal from a metal station pays for research and upgrades.
+fx, fz = FIELD_PAD
+lesson(4, 'research', 'Research',
+       'New weapons need research, and research is paid in metal as well as ore. Set up a Metal Station, '
+       'let a Hauler bring the metal home, then research a new tank and upgrade an old one.',
+       'map.t_kestrel_field',
+       player_side('human', 250, available=avail('human', 'missile', 'station', 'tug')),
+       [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7),
+        U(1, H['tug'], fx - 2, fz - 12, 0.0)],
+       [S(1, H['pad'], fx, fz)],
+       [
+           ('station', 'Open Build, tap Structures and buy a Metal Station. It drives to a blue metal site',
+            built(H['station']), [], [topup(200, built(H['station']))]),
+           ('metal', 'Bank 50 metal. Your Hauler fetches it from the station by itself',
+            {'t': 'resourceReached', 'side': 1, 'metal': 50},
+            [coach('Station up. Haulers carry metal home just like ore.')],
+            # No Hauler left (dismantled or salvaged): one for the station.
+            [topup(50, has(H['tug']))]),
+           ('research', 'Open Build and tap the locked Javelin card to research Missiles',
+            {'t': 'researchDone', 'side': 1, 'node': 'research.human.missiles'},
+            [coach('Research costs metal and some ore.')],
+            [topup(100, {'t': 'researchDone', 'side': 1, 'node': 'research.human.missiles'})]),
+           ('upgrade', 'Missiles also unlock Fire rate. Select a Lancer, tap Upgrade, then tap Fire rate',
+            {'t': 'upgraded', 'side': 1, 'upgrade': 'fireRate'},
+            [coach('Missiles researched! Upgrades cost a little ore and metal.')],
+            [topup(60, {'t': 'upgraded', 'side': 1, 'upgrade': 'fireRate'})]),
+           ('javelin', 'Buy a Javelin. Units cost only ore; metal is for research and upgrades',
+            has(H['missile']), [coach('That Lancer fires faster for the rest of the match.')],
+            [topup(200, has(H['missile']))]),
+       ],
+       'Metal sites are the blue rocks by your pad. Tap your landing pad to open Build.',
+       enemy=False)
+
+# 5. Air: an airfield, fighters, and the few weapons that can hit aircraft.
+range_ring = (34, -30)
+lesson(5, 'air', 'Air',
+       'Aircraft fly over hills and water, but they need an Airfield to land, refuel and rearm. Only '
+       'some weapons can hit them: missiles and fighters. Build an air wing and put it to work.',
+       'map.t_kestrel_field',
+       player_side('human', 300, available=avail('human', 'missile', 'air_base', 'fighter'),
+                   research_done=research('human', 'air', 'artillery')),
+       [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7)]
+       + [U(2, A['scout'], x, z, 2.3, tag='darters') for x, z in [(range_ring[0] + 3, range_ring[1] - 2),
+                                                                 (range_ring[0] - 3, range_ring[1] + 3)]],
+       [S(1, H['pad'], fx, fz)],
+       [
+           ('airfield', 'Open Build, tap Structures and buy an Airfield. Aircraft land, refuel and rearm there',
+            built(H['air_base']), [], [topup(300, built(H['air_base']))]),
+           ('antiair', 'Lancers cannot hit aircraft. Buy a Javelin: its missiles can. Shoot down the Dragonflies',
+            {'t': 'and', 'conds': [has(H['missile']), {'t': 'unitDestroyed', 'tag': 'drones'}]},
+            [coach('Arcadian Dragonflies overhead! They only hunt aircraft, but our Lancers cannot touch them.'),
+             spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz)],
+            # A Javelin lost before the Dragonflies are down is replaced the same way.
+            [topup(200, has(H['missile']))]),
+           ('falcon', 'Buy a Falcon. It parks on the Airfield until you launch it', has(H['fighter']),
+            [coach('Only missiles, missile towers and fighters can hit aircraft.')],
+            [topup(300, has(H['fighter']))]),
+           ('fly', 'Tap the Falcon on the Airfield, tap Launch, then tap inside the ring',
+            area(1, range_ring[0], range_ring[1], 10, unitType=H['fighter']), [],
+            # A Falcon that ran out of fuel and crashed can be bought again.
+            [topup(300, has(H['fighter']))]),
+           ('strike', 'Falcons hit ground units too. Destroy both Darters. Empty Falcons fly home; launch them again',
+            {'t': 'unitDestroyed', 'tag': 'darters'},
+            [coach('Falcons carry little fuel and ammunition. They return to the Airfield by themselves.')]),
+       ],
+       'Aviation research is done for you. Tap your landing pad to open Build.',
+       extra=[
+           # Dragonflies run out of fuel and crash after a minute: while the step is open and no
+           # Javelin has come to shoot them, send another pair, so there is always one to shoot.
+           T('moreDrones', {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': 'airfield'},
+                                                  not_({'t': 'objectiveDone', 'id': 'antiair'}),
+                                                  {'t': 'unitsAlive', 'tag': 'drones', 'op': '<=', 'count': 0},
+                                                  not_(has(H['missile']))]},
+             spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz), repeat=True),
+       ])
+
 
 # ---------------------------------------------------------------- site spacing
 
@@ -1367,7 +1729,7 @@ def space_sites():
     for m in MAPS:
         # The pads the missions actually place (map starts are only camera spots in the campaign).
         pads = []
-        users = [ms for ms in MISSIONS if ms['mapId'] == m['id']]
+        users = [ms for ms in MISSIONS + TRAINING if ms['mapId'] == m['id']]
         for ms in users:
             for st in ms['structures']:
                 if st['structureType'].endswith('landing_pad') and (st['x'], st['z']) not in pads:
@@ -1443,7 +1805,24 @@ def write():
     lines.append(f"export const CAMPAIGN_MISSIONS: readonly unknown[] = [{', '.join(names)}];")
     with open(os.path.join(ROOT, 'src/data/missions/campaign.ts'), 'w') as f:
         f.write('\n'.join(lines) + '\n')
-    print(f'{len(MAPS)} maps, {len(MISSIONS)} missions')
+    # Training lessons: src/data/missions/training_<n>_<slug>.json and the import list training.ts.
+    for name in os.listdir(os.path.join(ROOT, 'src/data/missions')):
+        if name.startswith('training_') and name.endswith('.json'):
+            os.remove(os.path.join(ROOT, 'src/data/missions', name))
+    lines = ['// Generated by tools/missions/build.py. Do not edit by hand.']
+    names = []
+    for i, m in enumerate(TRAINING):
+        file = 'training_' + m['id'].split('.')[-1] + '.json'
+        with open(os.path.join(ROOT, 'src/data/missions', file), 'w') as f:
+            json.dump(m, f, indent=2)
+            f.write('\n')
+        lines.append(f"import t{i} from './{file}';")
+        names.append(f't{i}')
+    lines.append('')
+    lines.append(f"export const TRAINING_MISSIONS: readonly unknown[] = [{', '.join(names)}];")
+    with open(os.path.join(ROOT, 'src/data/missions/training.ts'), 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f'{len(MAPS)} maps, {len(MISSIONS)} missions, {len(TRAINING)} training missions')
 
 
 write()

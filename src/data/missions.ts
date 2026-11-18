@@ -1,13 +1,12 @@
 import { addAi } from '../ai/driver';
-import { parseMission, type MissionRow } from '../sim/missionSchema';
+import { parseMission, type Condition, type MissionRow } from '../sim/missionSchema';
 import { SIM_TICK_HZ } from '../sim/constants';
 import { createWorld } from '../sim/world';
 import { tagUnit, type MissionState } from '../sim/triggers';
 import { convertResearchIds, sideResearch } from '../sim/research';
 import type { SimData } from './simData';
 import type { WorldState } from '../sim/types';
-import training1 from './missions/training_1_drops.json';
-import training2 from './missions/training_2_mining.json';
+import { TRAINING_MISSIONS } from './missions/training';
 import { CAMPAIGN_MISSIONS } from './missions/campaign';
 
 export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
@@ -22,7 +21,7 @@ export function loadMissionTable(json: readonly unknown[]): MissionRow[] {
   return rows.sort((a, b) => a.campaign.localeCompare(b.campaign) || a.order - b.order);
 }
 
-export const MISSIONS: MissionRow[] = loadMissionTable([training1, training2, ...CAMPAIGN_MISSIONS]);
+export const MISSIONS: MissionRow[] = loadMissionTable([...TRAINING_MISSIONS, ...CAMPAIGN_MISSIONS]);
 
 export function missionsOf(campaign: MissionRow['campaign']): MissionRow[] {
   return MISSIONS.filter((mission) => mission.campaign === campaign);
@@ -30,6 +29,62 @@ export function missionsOf(campaign: MissionRow['campaign']): MissionRow[] {
 
 export function nextMission(mission: MissionRow): MissionRow | null {
   return missionsOf(mission.campaign).find((item) => item.order === mission.order + 1) ?? null;
+}
+
+/** Throws on a unit or structure type named in a trigger, a spawn or a buy list that the loaded
+ *  data does not have: a typo there would otherwise leave a condition that can never come true. */
+export function checkMissionReferences(data: SimData, mission: MissionRow): void {
+  const unit = (id: string | undefined, where: string): void => {
+    if (id !== undefined && !data.unitTypes.has(id)) {
+      throw new Error(`Mission ${mission.id}: unknown unit ${id} in ${where}`);
+    }
+  };
+  const structure = (id: string, where: string): void => {
+    if (!data.structureTypes.has(id)) {
+      throw new Error(`Mission ${mission.id}: unknown structure ${id} in ${where}`);
+    }
+  };
+  const walk = (cond: Condition, where: string): void => {
+    switch (cond.t) {
+      case 'areaEntered':
+      case 'unitsAlive':
+        unit(cond.unitType, where);
+        break;
+      case 'allDestroyed':
+        // Counts the side's units and structures, so either kind of type is fine.
+        if (cond.unitType !== undefined && !data.structureTypes.has(cond.unitType)) {
+          unit(cond.unitType, where);
+        }
+        break;
+      case 'structureBuilt':
+        structure(cond.structureType, where);
+        break;
+      case 'and':
+      case 'or':
+        cond.conds.forEach((c) => walk(c, where));
+        break;
+      case 'not':
+        walk(cond.cond, where);
+        break;
+      default:
+        break;
+    }
+  };
+  for (const trigger of mission.triggers) {
+    walk(trigger.when, `trigger ${trigger.id}`);
+    for (const action of trigger.do) {
+      if (action.t === 'spawn') {
+        unit(action.unitType, `trigger ${trigger.id}`);
+      }
+    }
+  }
+  for (const side of mission.sides) {
+    for (const id of side.available ?? []) {
+      if (!data.unitTypes.has(id) && !data.structureTypes.has(id)) {
+        throw new Error(`Mission ${mission.id}: unknown item ${id} in side ${side.player}'s buy list`);
+      }
+    }
+  }
 }
 
 export function buildMissionWorld(
@@ -52,6 +107,7 @@ export function buildMissionWorld(
       throw new Error(`Mission ${mission.id}: unknown structure ${structure.structureType}`);
     }
   }
+  checkMissionReferences(data, mission);
   const human = mission.sides.find((side) => side.controller === 'human');
   if (!human) {
     throw new Error(`Mission ${mission.id}: no human side`);

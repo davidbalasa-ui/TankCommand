@@ -112,7 +112,9 @@ export class AlertCenter {
   private readonly lineText: HTMLSpanElement;
   private readonly flash: HTMLDivElement;
   private readonly locate: ((x: number, z: number) => { x: number; y: number } | null) | null;
-  private current: { alert: AlertSnapshot; key: string; count: number; at: number } | null = null;
+  // `subjects` holds the distinct units a merged "under attack" line is about, so it counts units
+  // hit rather than hits.
+  private current: { alert: AlertSnapshot; key: string; count: number; at: number; subjects: Set<number> } | null = null;
   private textTimer: number | null = null;
   private flashTimer: number | null = null;
   private initialized = false;
@@ -188,7 +190,7 @@ export class AlertCenter {
         }
         const previous = this.previous.get(unit.id);
         if (previous && unit.hp < previous.hp) {
-          this.raiseAlert('underAttack', unit.x, unit.z);
+          this.raiseAlert('underAttack', unit.x, unit.z, undefined, unit.id);
         }
       }
       for (const [id, previous] of this.previous) {
@@ -285,7 +287,8 @@ export class AlertCenter {
     }
   }
 
-  raiseAlert(kind: AlertKind, x: number, z: number, message?: string): AlertSnapshot | null {
+  /** `subject` is the unit the alert is about, when there is one (merged lines count those). */
+  raiseAlert(kind: AlertKind, x: number, z: number, message?: string, subject?: number): AlertSnapshot | null {
     if (!this.enabled) {
       return null;
     }
@@ -297,6 +300,9 @@ export class AlertCenter {
       if (this.current && this.current.key === key) {
         this.current.count += 1;
         this.current.at = at;
+        if (subject !== undefined) {
+          this.current.subjects.add(subject);
+        }
         this.renderLine();
       }
       return null;
@@ -316,7 +322,7 @@ export class AlertCenter {
     while (this.history.length > 50) {
       this.history.shift();
     }
-    this.show(alert);
+    this.show(alert, subject);
     this.onAlert?.(alert);
     return alert;
   }
@@ -345,14 +351,17 @@ export class AlertCenter {
     }
   }
 
-  private show(alert: AlertSnapshot): void {
+  private show(alert: AlertSnapshot, subject?: number): void {
     const key = alert.message;
     if (this.current && this.current.key === key && alert.at - this.current.at < ALERT_MERGE_MS) {
       this.current.count += 1;
       this.current.alert = alert;
       this.current.at = alert.at;
     } else {
-      this.current = { alert, key, count: 1, at: alert.at };
+      this.current = { alert, key, count: 1, at: alert.at, subjects: new Set() };
+    }
+    if (subject !== undefined) {
+      this.current.subjects.add(subject);
     }
     this.renderLine();
     this.edgeFlash(alert);
@@ -363,11 +372,14 @@ export class AlertCenter {
     if (!current) {
       return;
     }
-    const text = current.count > 1 ? pluralMessage(current.key, current.count) : current.key;
+    // A line about units counts the distinct units (one tank hit five times is one unit under
+    // attack); other lines count how often it happened.
+    const count = current.subjects.size > 0 ? current.subjects.size : current.count;
+    const text = count > 1 ? pluralMessage(current.key, count) : current.key;
     this.lineText.textContent = text;
     this.line.dataset.alertId = String(current.alert.id);
     this.line.dataset.alertKind = current.alert.kind;
-    this.line.dataset.count = String(current.count);
+    this.line.dataset.count = String(count);
     this.line.setAttribute('aria-label', `${text}. Tap to look.`);
     this.line.hidden = false;
     this.line.classList.remove('faded');

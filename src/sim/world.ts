@@ -24,11 +24,13 @@ import {
   MAX_REPLANS,
   MOVE_EPS,
   MUZZLE_HEIGHT,
+  PROJECTILE_RANGE_OVERSHOOT,
   PROJECTILE_TTL,
   STOP_DISTANCE,
   STUCK_TICKS,
   TARGET_HEIGHT,
   TURRET_ALIGN_TOLERANCE_DEG,
+  TURRET_RETURN_DELAY_SEC,
   UNIT_RADIUS,
   WRECK_TTL_SEC,
 } from './tuning';
@@ -46,6 +48,7 @@ import {
   applyBuyCommand,
   applyCancelCommand,
   applyPlaceKitCommand,
+  setOutcome,
   updateDropQueues,
 } from './drops';
 import { updateMatchResult } from './match';
@@ -68,7 +71,7 @@ import {
   updateResearch,
 } from './research';
 import { applyUpgradeCommand, unitArmor, structureArmor } from './upgrades';
-import { burstSize, tickReload, afterShot, damageAfterArmor, isLastShotOfBurst } from './weaponCycle';
+import { burstSize, tickReload, afterShot, damageAfterArmor, isArcingWeapon, isLastShotOfBurst } from './weaponCycle';
 import { resolveRepairCommand, updateRepair } from './repair';
 import {
   applyDeployCommand,
@@ -122,6 +125,7 @@ import type {
 
 const DT = 1 / SIM_TICK_HZ;
 const DEG_TO_RAD = Math.PI / 180;
+const TURRET_RETURN_TICKS = Math.round(TURRET_RETURN_DELAY_SEC * SIM_TICK_HZ);
 
 export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
@@ -520,14 +524,37 @@ function applyAttackCommand(
   world: WorldState,
   command: Extract<Command, { kind: 'attack' }>,
 ): void {
+  const targetUnit = world.units.find((other) => other.id === command.targetId && other.hp > 0);
+  const targetStructure = targetUnit
+    ? undefined
+    : world.structures.find((structure) => structure.id === command.targetId && structure.hp > 0);
+  const targetKind = targetUnit ? unitTargetKind(targetUnit) : targetStructure ? 'structure' : null;
+  let refused = 0;
+  let taken = 0;
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    // Units that can't hurt the target (unarmed workers, ground guns against an aircraft in
+    // flight) don't take the order: they keep their job or order instead of chasing it uselessly.
+    const weapon = world.unitTypes.get(unit.typeId)?.weapon;
+    if (targetKind !== null && (!weapon || weapon.damage <= 0 || !weaponCanHit(weapon, targetKind))) {
+      refused += 1;
+      continue;
+    }
+    taken += 1;
     unit.stance = 'free';
+    // The same order again (a second tap to confirm) changes nothing: the unit keeps driving.
+    if (unit.order.kind === 'attack' && unit.order.targetId === command.targetId) {
+      continue;
+    }
+    // A new target re-plans the route but keeps the unit's speed, as a move order does, so a
+    // tank already rolling doesn't lurch to a stop.
     unit.order = { kind: 'attack', targetId: command.targetId };
     unit.path = [];
-    unit.speed = 0;
     unit.replans = 0;
     unit.stuckTicks = 0;
     unit.attackRepathTick = 0;
+  }
+  if (taken === 0 && refused > 0) {
+    setOutcome(world, command.tick, 'attack', false, 'cannotHit');
   }
 }
 
@@ -668,8 +695,9 @@ function selectTarget(
   return best;
 }
 
-// An ordered target can be one the weapon can't reach (an interceptor told to attack a tank, a
-// bomber told to attack an aircraft in flight): the unit follows the order but never fires.
+// An ordered target can stop being one the weapon can reach (an aircraft hit on the ground takes
+// off): the unit follows the order but never fires. Orders it could never carry out are refused
+// in applyAttackCommand.
 function canHitTarget(world: WorldState, weapon: WeaponStats, target: TargetRef): boolean {
   if (target.kind === 'structure') {
     return weaponCanHit(weapon, 'structure');
@@ -727,7 +755,14 @@ function fireProjectile(
     vy: (targetY - startY) / travelTime,
     vz: Math.sin(angle) * weapon.projectileSpeed,
     damage: weapon.damage,
-    ttl: PROJECTILE_TTL,
+    // A miss doesn't fly on for the full TTL: an indirect shell bursts on the aimed point, a
+    // direct shot a little past its weapon's range (one tick added so it gets all the way there).
+    ttl: Math.min(
+      PROJECTILE_TTL,
+      (isArcingWeapon(weapon.kind) ? distance : Math.max(distance, weapon.range) * PROJECTILE_RANGE_OVERSHOOT) /
+        weapon.projectileSpeed +
+        DT,
+    ),
     splashRadius: weapon.splashRadius,
   };
   if (targetStructureId !== undefined) {
@@ -1149,6 +1184,19 @@ function updateUnits(world: WorldState, rng: Rng): void {
         bearing,
         type.turretTurnDegPerSec * DEG_TO_RAD * DT,
       );
+      unit.turretIdleTicks = 0;
+    } else if (type.turretTurnDegPerSec > 0) {
+      // After a few quiet seconds the turret swings back to the front, so a tank doesn't drive
+      // around with its gun pointing sideways long after a fight.
+      const idle = Math.min(TURRET_RETURN_TICKS, (unit.turretIdleTicks ?? 0) + 1);
+      unit.turretIdleTicks = idle;
+      if (idle >= TURRET_RETURN_TICKS) {
+        unit.turretHeading = rotateTowards(
+          unit.turretHeading,
+          unit.heading,
+          type.turretTurnDegPerSec * DEG_TO_RAD * DT,
+        );
+      }
     }
 
     updateOrderPath(world, unit, type, target);
@@ -1412,6 +1460,7 @@ export function hashWorld(world: WorldState): string {
         ...(unit.burstLeft !== undefined ? { burstLeft: unit.burstLeft } : {}),
         stuckTicks: unit.stuckTicks,
         yieldTicks: unit.yieldTicks ?? 0,
+        ...(unit.turretIdleTicks ? { turretIdleTicks: unit.turretIdleTicks } : {}),
         speed: unit.speed,
         replans: unit.replans,
         attackRepathTick: unit.attackRepathTick,

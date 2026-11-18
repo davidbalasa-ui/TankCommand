@@ -71,8 +71,19 @@ test('[GAME-01] pause freezes the sim, refuses orders, and Android back opens an
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     document.dispatchEvent(new Event('visibilitychange'));
   });
+  // Returning to the match shows the pause card first; Resume carries on.
+  await waitScreen(page, 'pause');
+  await tap(page, 'pause.resume');
+  await waitScreen(page, 'inGame');
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.isSimPaused() ?? true)).toBe(false);
 
+  // Android Back opens pause; Resume after Back must not leave the match frozen.
+  await page.evaluate(() => window.__TC_TEST__?.pressAndroidBack());
+  await waitScreen(page, 'pause');
+  await tap(page, 'pause.resume');
+  await waitScreen(page, 'inGame');
+  const afterBack = (await snapshot(page)).tick;
+  await expect.poll(async () => (await snapshot(page)).tick).toBeGreaterThan(afterBack);
   await page.evaluate(() => window.__TC_TEST__?.pressAndroidBack());
   await waitScreen(page, 'pause');
   await page.evaluate(() => window.__TC_TEST__?.pressAndroidBack());

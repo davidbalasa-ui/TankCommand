@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 1,
   "title": "First Seed",
-  "briefing": "A Terran outpost stands where our seed fell. Take four Lumens across the field and silence its three guards.",
+  "briefing": "The rift is open, and the first seeds of the swarm have fallen on Vesper. Wake, young brood-mind. A Terran outpost watches our landing field: take four Lumens across and silence its three guards.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -96,8 +96,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Cross the field to the outpost. Drag to select, tap to move."
+          "speaker": "Matriarch",
+          "text": "The outpost is north-east. Tap All army, then tap the ground to move."
         }
       ]
     },
@@ -118,8 +118,8 @@
         },
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The guards are here. Tap one to attack it."
+          "speaker": "Matriarch",
+          "text": "Its guards are weak and alone. Tap one to attack it."
         }
       ]
     },

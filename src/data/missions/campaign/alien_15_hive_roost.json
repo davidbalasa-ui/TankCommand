@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 15,
   "title": "Aerie",
-  "briefing": "Terran fighters keep stinging the brood. Grow an Aerie, raise Halos and bring down the four raiders. Flares can hit aircraft too.",
+  "briefing": "At the heart of the rift the Shard has stirred, and its crystals now burn Arcadian and Terran alike. Terran fighters keep stinging the brood. Grow an Aerie, raise Halos and bring down the four raiders; Dragonflies hunt only fliers.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly"
@@ -139,7 +139,7 @@
   "objectives": [
     {
       "id": "roost",
-      "text": "Grow a Aerie",
+      "text": "Grow an Aerie",
       "kind": "primary"
     },
     {
@@ -158,7 +158,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Grow an Aerie first: fliers need it to land and feed."
         }
       ]
@@ -172,8 +172,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Raiders inbound!"
+          "speaker": "Matriarch",
+          "text": "Terran fighters, coming in fast!"
         },
         {
           "t": "spawn",

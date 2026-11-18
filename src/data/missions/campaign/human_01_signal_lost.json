@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 1,
   "title": "Signal Lost",
-  "briefing": "The Halden outpost stopped answering an hour ago. Take four Lancers to the outpost and clear out whatever is there.",
+  "briefing": "Last night a rift tore open in the sky over Vesper. An hour later our Halden outpost stopped answering. Take four Lancers to the outpost and clear out whatever is there.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -96,8 +96,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Head north-east to the outpost. Drag to select, tap the ground to move."
+          "speaker": "Col. Daska",
+          "text": "Head north-east to the outpost. Tap All army, then tap the ground to move."
         }
       ]
     },
@@ -118,8 +118,8 @@
         },
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Enemy scouts at the outpost. Tap one to attack it."
+          "speaker": "Col. Daska",
+          "text": "Unknown machines at the outpost. Tap one to attack it."
         }
       ]
     },

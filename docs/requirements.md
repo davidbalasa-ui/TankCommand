@@ -51,12 +51,15 @@
 | PERF-01 | Sustained slow frames step quality down in order, fast frames step it back up, and quality never changes more than once per second. |
 | MAP-01 | Same seed produces identical heights and different seeds differ. |
 | MAP-02 | Start areas are flat and connected by an A* path. |
+| MAP-03 | On every skirmish map, for any seed, ground units can drive between every pair of start positions (two- and four-side layouts). There are at least six skirmish maps, two of them for four sides. |
+| MAP-04 | On every designed skirmish map, a normal-vs-normal AI match ends with a winner inside 30 game minutes (two seeds each). |
 | MOVE-01 | A single tank ordered to a reachable point arrives within 0.5 units in time. |
 | MOVE-02 | A tank ordered behind the ridge routes around it and never enters a blocked cell. |
 | MOVE-03 | Orders outside the map are clamped and units never leave the map. |
 | MOVE-04 | Twelve tanks ordered to one point settle without overlaps or active orders. |
 | MOVE-05 | A destination inside a blocked area stops at the nearest reachable cell. |
 | MOVE-06 | Commands for units the issuer does not own change nothing. |
+| MOVE-07 | Units sent one by one to the same point settle round it instead of circling it forever. |
 | CMB-01 | Turrets turn at their turn rate independently of the hull. |
 | CMB-02 | A tank fires only when aligned and reloaded, with the configured reload interval. |
 | CMB-03 | Damage uses armor with a minimum of one (and armor never stops more than 75% of a hit), HP clamps and wrecks expire after ten seconds. |
@@ -66,6 +69,8 @@
 | CMB-07 | A skirmish ends with a result, a wipe yields a winner and simultaneous last kills draw. |
 | CMB-08 | Each weapon fires in its own rhythm: a burst of shots at a set spacing, then a reload; aircraft spend one ammo per burst; the fire-rate upgrade shortens only the reload. |
 | CMB-09 | Every armed unit and turret in the game data has a distinct firing pattern fitted to its role (scouts rapid and light, heavy tanks one big shot, artillery three-shell salvos). |
+| CMB-10 | A shot that misses never flies on far out of range: an indirect shell bursts on the aimed point, a direct shot ends at 1.2x its weapon range (or the aimed distance when longer). |
+| CMB-11 | A turret with no target for a few seconds turns back to face along the hull. |
 | DET-01 | Scripted battles are bit-identical across runs and save/load. |
 | CAM-01 | Camera target, distance and pitch clamp and interpolate. |
 | CAM-02 | The camera never goes below terrain plus three units. |
@@ -93,6 +98,8 @@
 | ORD-01 | Hold: unit fires at enemies in range and never moves, even when attacked. |
 | ORD-02 | Attack-move: unit moves to the point but engages enemies met on the way, then continues. |
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
+| ORD-04 | Units that cannot hit an attack target (unarmed workers, ground-only guns against aircraft in flight) ignore the order and keep their job; if none can, the order is refused with a reason. |
+| ORD-05 | Repeating an attack order on the same target changes nothing (the unit keeps its speed and route); a new target re-plans without stopping the unit. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
 | GAME-01 | Pause stops the sim tick and refuses orders; backgrounding and the back button auto-pause. |
@@ -106,6 +113,7 @@
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |
 | ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
+| ALRT-03 | A merged "under attack" line counts the distinct units hit, not the number of hits. |
 | BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
@@ -113,16 +121,19 @@
 | ECO-04 | Income stops entirely when every miner and tug is dead. |
 | ECO-05 | Resources never go negative under any command sequence (property test with random commands). |
 | ECO-06 | Miner salvage refunds exactly the data-sheet percentage. |
+| ECO-07 | A hauler serving a metal station keeps looping station, pad, station: a station centre it cannot drive onto still counts as reached once it holds at the end of a path planned into reach. |
 | DROP-01 | Buying deducts the full cost at order time; unaffordable, unknown, over-cap and no-pad orders are refused with a reason. |
 | DROP-02 | Cancelling a queued item refunds the full cost; delivered items can't be cancelled. |
 | DROP-03 | Units are delivered beside the chosen pad after the delivery time; with no pad they wait. |
 | DROP-04 | Structure kits are placed only on valid ground; metal stations only on metal deposits. |
 | MATCH-01 | Destroying every enemy pad and fighting unit triggers victory; losing your own triggers defeat. |
 | MATCH-02 | Results screen shows outcome, time, units built/lost and resources gathered. |
+| MATCH-03 | In skirmish, once the map's ore is mined out, a side that keeps a pad but has no fighting units, nothing on the way and no money (counting refunds) for any fighter is eliminated; missions keep the pad rule. |
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | HINT-01 | Hint bubbles grow to fit their text on a phone screen instead of cutting it off, and every mission objective, mission message and help hint stays within the word limits set in src/ui/textLimits.ts. |
 | PART-01 | Model parts with anim extras (spin or swing about their own axis) move only while their condition holds (always, mining, working, moving), use busySpeed while working, and a spinning TurretPivot is never aimed. |
 | PART-02 | Firing parts play on each shot the unit fires: recoil parts (telescoping barrels) slide back and return, launch parts (missiles) fly out, vanish and reload, swing and slide snaps (lids, pod nods) kick and settle, and the model's scene fire kick rocks the hull away from the gun. A shot plays the parts whose delay falls on its place in the art's firing cycle. Low quality skips the snaps but keeps barrels and missiles. |
+| PART-03 | Artillery shells (Longbow, Mortar Beast) leave from the barrel tip (the base of the muzzle-flash mesh) and fly a ballistic arc onto the burst point, never backwards, even at point-blank range. |
 | PAN-01 | A flick of the map keeps the camera gliding after the finger lifts and slows it smoothly to a stop; a finger that rests before lifting, or a new touch, stops it. Two fingers moving together pan the map. |
 | TITLE-01 | The title screen shows a live skirmish behind the menu: raids keep arriving at a Terran pad and its defenders, the fight never ends and nothing in it is saved or scored. |
 | DET-02 | Economy and drops keep determinism and survive save/load mid-delivery with an identical hash. |
@@ -150,6 +161,10 @@
 | AI-10 | With aviation researched, the AI builds an air base, buys aircraft and launches them at enemy targets; interceptors go after enemy aircraft near its base. |
 | AI-11 | Hard beats normal in most fixed-seed matches, playing either side. |
 | AI-12 | A defender that locked onto a raider breaks off once it is far from home, instead of chasing it into the enemy base. |
+| AI-13 | Once every ore field is mined out the AI buys no more workers or stations, spends its last ore on any fighter it can afford (no reserve), and then attacks with whatever army it has left instead of idling at home. |
+| AI-14 | The AI only orders a unit to attack targets its weapon can hit (no ground guns after aircraft in flight). |
+| AI-15 | Units the AI sends home (a returning scout, a retreating group, a recalled defender, units in a kit's way) park past the pad's rally point, never on the landing pad. |
+| AI-16 | Fresh units the AI sends to attack join the group already out fighting instead of replacing it, and a scout already fighting is not called home. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |
@@ -159,15 +174,20 @@
 | AIR-04 | Fighters can shoot air; bombers never target air. |
 | AIR-05 | Aircraft ammo is spent one per attack run (one per shot for single-shot weapons, one per burst otherwise) and an empty aircraft stops firing. |
 | AIR-06 | Interceptors (air-only weapons, e.g. the Arcadian Dragonfly) never fire at ground units or structures; the computer buys them only against enemy aircraft and never sends them on ground strikes. |
-| MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
+| MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. Every unit and structure type named in a trigger condition, a spawn or a buy list must exist in the loaded data (buildMissionWorld throws on a typo). |
 | MSN-02 | Every condition and action type has a unit test that fires it. |
-| MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). |
+| MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). Training lessons are the exception: they cannot be lost (TRN-02). |
 | MSN-04 | No placeholder mission can reach a state with no way to win or lose. |
+| TRN-01 | Five training lessons in order (drops, mining, combat, research, air), each on a training map with no time limit, are won by the scripted beginner in a few minutes. |
+| TRN-02 | A training lesson cannot be lost: a player who does nothing for ten minutes is never defeated. |
+| TRN-03 | A lesson shows only the current step's goal ring; later steps' rings appear once the step before is done. |
+| TRN-04 | The training chain holds exactly the five lessons. |
+| TRN-05 | A lesson cannot soft-lock: a player who spends all ore on the wrong things at the start of each step still wins, because Command tops up the ore a step needs while the step is open and its item is unaffordable (a lost Javelin or Falcon is replaced the same way). Dragonflies that crash for lack of fuel before a Javelin arrives are sent again. |
 | MSN-05 | Completing a mission unlocks the next; progress persists across reload; reached missions can be replayed. |
 | MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
 | MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
-| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). |
+| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). A map seats one side per start: two-player maps offer 1 AI; four-player maps offer 1 or 2 AI and are labelled "Up to 3 sides" (3 AI would mean 4 × 64 = 256 units, past the 192-unit stress test, C-08). Side 3 takes start 3, equally far from sides 1 and 2; start 4 stays empty. |
 | SKR-02 | Every side starts with the same layout of tanks, miner and tug round its pad, turned to face the middle of the map. |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |

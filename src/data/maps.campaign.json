@@ -1676,5 +1676,195 @@
     },
     "placeholder": false,
     "campaignOnly": true
+  },
+  {
+    "id": "map.t_drill_yard",
+    "name": "Drill Yard",
+    "size": 150,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -40,
+        "z": 32
+      },
+      {
+        "player": 2,
+        "x": 44,
+        "z": -40
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -60,
+        "z": 12,
+        "amount": 1500
+      },
+      {
+        "kind": "ore",
+        "x": -62,
+        "z": 50,
+        "amount": 1500
+      },
+      {
+        "kind": "ore",
+        "x": -22,
+        "z": 58,
+        "amount": 1200
+      },
+      {
+        "kind": "metal",
+        "x": -64,
+        "z": 32,
+        "amount": 400
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 1301,
+        "roughness": 0.5,
+        "centreRidge": false,
+        "symmetric": false,
+        "ridges": [
+          {
+            "x0": -8,
+            "z0": -74,
+            "x1": 2,
+            "z1": -10,
+            "height": 6,
+            "width": 6
+          },
+          {
+            "x0": 6,
+            "z0": 14,
+            "x1": 14,
+            "z1": 74,
+            "height": 6,
+            "width": 6
+          }
+        ],
+        "hills": [
+          {
+            "x": 40,
+            "z": 40,
+            "radius": 18,
+            "height": 3
+          },
+          {
+            "x": -40,
+            "z": -40,
+            "radius": 20,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -40,
+            "z": 32,
+            "radius": 15
+          },
+          {
+            "x": 4,
+            "z": 2,
+            "radius": 8
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
+  },
+  {
+    "id": "map.t_kestrel_field",
+    "name": "Kestrel Field",
+    "size": 160,
+    "cellSize": 2,
+    "starts": [
+      {
+        "player": 1,
+        "x": -44,
+        "z": 40
+      },
+      {
+        "player": 2,
+        "x": 50,
+        "z": -46
+      }
+    ],
+    "deposits": [
+      {
+        "kind": "ore",
+        "x": -64,
+        "z": 22,
+        "amount": 1500
+      },
+      {
+        "kind": "ore",
+        "x": -26,
+        "z": 62,
+        "amount": 1500
+      },
+      {
+        "kind": "metal",
+        "x": -66,
+        "z": 58,
+        "amount": 600
+      },
+      {
+        "kind": "metal",
+        "x": -64,
+        "z": 40,
+        "amount": 600
+      }
+    ],
+    "features": {
+      "waterLevel": null,
+      "lakes": [],
+      "rivers": [],
+      "terrain": {
+        "seed": 1402,
+        "roughness": 0.5,
+        "centreRidge": false,
+        "symmetric": false,
+        "hills": [
+          {
+            "x": 10,
+            "z": 20,
+            "radius": 20,
+            "height": 3
+          },
+          {
+            "x": 40,
+            "z": 50,
+            "radius": 18,
+            "height": 4
+          },
+          {
+            "x": -30,
+            "z": -40,
+            "radius": 22,
+            "height": 4
+          }
+        ],
+        "flats": [
+          {
+            "x": -44,
+            "z": 40,
+            "radius": 16
+          },
+          {
+            "x": 34,
+            "z": -30,
+            "radius": 12
+          }
+        ]
+      }
+    },
+    "placeholder": false,
+    "campaignOnly": true
   }
 ]

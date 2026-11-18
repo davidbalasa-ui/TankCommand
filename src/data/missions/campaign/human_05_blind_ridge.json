@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 5,
   "title": "Blind Ridge",
-  "briefing": "Three Arcadian posts are hidden among the hills, each with a guard. A Watchman radar can see them from far off. Find and destroy all three.",
+  "briefing": "Three hidden Arcadian posts in these hills are watching our supply roads, and each has a guard. A Watchman radar truck can spot them from far off. Find and destroy all three.",
   "mapId": "map.c_blind_ridge",
   "sides": [
     {
@@ -18,6 +18,7 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar"
       ],
@@ -164,8 +165,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Move the radar unit ahead of your tanks. It spots enemies far beyond your guns."
+          "speaker": "Col. Daska",
+          "text": "Move the Watchman ahead of your tanks. It spots enemies far beyond your guns."
         }
       ]
     },

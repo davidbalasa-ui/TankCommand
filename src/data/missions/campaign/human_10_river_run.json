@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 10,
   "title": "River Run",
-  "briefing": "An Arcadian camp sits on the far side of the delta. Tanks must go the long way round by the southern ford. Skimmers float straight across the water. Take the far bank and destroy the camp.",
+  "briefing": "An Arcadian camp sits on the far side of the delta. Tanks must go the long way round by the southern ford; our new Skimmers float straight across the water. Take the far bank and destroy the camp.",
   "mapId": "map.c_delta",
   "sides": [
     {
@@ -18,20 +18,23 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
-        "unit.human.hover_tank",
-        "unit.human.missile_tank"
+        "unit.human.missile_tank",
+        "unit.human.repair",
+        "unit.human.artillery",
+        "unit.human.hover_tank"
       ],
       "researchDone": [
         "research.human.fortifications",
         "research.human.missiles",
         "research.human.sensors",
         "research.human.heavy_armor",
-        "research.human.hover_drive",
-        "research.human.heavy_ordnance"
+        "research.human.heavy_ordnance",
+        "research.human.field_repair",
+        "research.human.hover_drive"
       ]
     },
     {
@@ -196,7 +199,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Skimmers ride over water. Select them and tap the far bank."
         }
       ]
@@ -218,7 +221,7 @@
         },
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Far bank taken. Now the camp."
         }
       ]
@@ -232,8 +235,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Raiders crossing toward the colony. The Bastion gun will help."
+          "speaker": "Col. Daska",
+          "text": "Raiders crossing toward the colony. The Bastion Gun will help."
         },
         {
           "t": "spawn",

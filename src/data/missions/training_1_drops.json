@@ -2,16 +2,21 @@
   "id": "mission.training.1_drops",
   "campaign": "training",
   "order": 1,
-  "title": "Drops and Movement",
-  "briefing": "Commander, welcome to the field. Orders arrive by drop pod. Tap your landing pad to open Build, buy a Light Tank, then drive any tank to the marked area.",
-  "mapId": "map.wp02_skirmish",
+  "title": "Drops",
+  "briefing": "Welcome, Commander. Nothing is built on Vesper: everything you buy is dropped from orbit onto your landing pad. Buy a few units, drive one about, and order your first building.",
+  "mapId": "map.t_drill_yard",
   "sides": [
     {
       "player": 1,
       "faction": "human",
       "controller": "human",
-      "ore": 500,
-      "metal": 100
+      "ore": 250,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.scout",
+        "structure.human.turret"
+      ]
     },
     {
       "player": 2,
@@ -21,32 +26,19 @@
       "metal": 0
     }
   ],
-  "units": [
-    {
-      "side": 1,
-      "unitType": "unit.human.light_tank",
-      "x": -46,
-      "z": -48,
-      "heading": 0.785
-    }
-  ],
+  "units": [],
   "structures": [
     {
       "side": 1,
       "structureType": "structure.human.landing_pad",
-      "x": -50,
-      "z": -50
+      "x": -40,
+      "z": 32
     }
   ],
   "objectives": [
     {
       "id": "buy",
-      "text": "Buy a Light Tank",
-      "kind": "primary"
-    },
-    {
-      "id": "move",
-      "text": "Move a tank to the marked area",
+      "text": "Tap your landing pad to open Build, then tap the Lancer card",
       "kind": "primary"
     }
   ],
@@ -61,17 +53,18 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Buy a Light Tank, then send a tank to the marked area."
+          "text": "Your landing pad is the big square platform. Tap it to see what you can buy."
         }
       ]
     },
     {
-      "id": "bought",
+      "id": "buy",
       "when": {
         "t": "unitsAlive",
         "side": 1,
+        "unitType": "unit.human.light_tank",
         "op": ">=",
-        "count": 2
+        "count": 1
       },
       "do": [
         {
@@ -80,30 +73,264 @@
           "status": "done"
         },
         {
+          "t": "setObjective",
+          "id": "more",
+          "status": "add",
+          "text": "Buy two Outriders. They land one at a time; the strip at the top shows the queue",
+          "kind": "primary"
+        },
+        {
           "t": "message",
           "speaker": "Command",
-          "text": "Good drop. Now move out."
+          "text": "Lancer down! Everything you buy lands on the pad, then drives off it."
         }
       ]
     },
     {
-      "id": "arrived",
+      "id": "buyTopUp1",
       "when": {
-        "t": "areaEntered",
-        "side": 1,
-        "x": -25,
-        "z": -25,
-        "radius": 7
+        "t": "and",
+        "conds": [
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "buy"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.light_tank",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ],
+      "repeat": true
+    },
+    {
+      "id": "more",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "buy"
+          },
+          {
+            "t": "unitsAlive",
+            "side": 1,
+            "unitType": "unit.human.scout",
+            "op": ">=",
+            "count": 2
+          }
+        ]
       },
       "do": [
         {
           "t": "setObjective",
-          "id": "move",
+          "id": "more",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "drive",
+          "status": "add",
+          "text": "Tap one of your units to select it, then tap inside the ring to drive there",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "All landed. Close Build with the X to see the whole map again."
+        }
+      ]
+    },
+    {
+      "id": "moreTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "buy"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "more"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.scout",
+              "op": ">=",
+              "count": 2
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 75
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 75
+        }
+      ],
+      "repeat": true
+    },
+    {
+      "id": "drive",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "more"
+          },
+          {
+            "t": "areaEntered",
+            "side": 1,
+            "x": -6,
+            "z": 10,
+            "radius": 7
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "drive",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "tower",
+          "status": "add",
+          "text": "Buildings come by drop too. Open Build, tap Structures, buy a Bastion Gun. It sets itself up",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Nicely driven. Command tops up your ore whenever a step needs it."
+        }
+      ]
+    },
+    {
+      "id": "tower",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "drive"
+          },
+          {
+            "t": "structureBuilt",
+            "side": 1,
+            "structureType": "structure.human.turret"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "tower",
           "status": "done"
         }
       ]
+    },
+    {
+      "id": "towerTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "drive"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "tower"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "structureBuilt",
+              "side": 1,
+              "structureType": "structure.human.turret"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 150
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 150
+        }
+      ],
+      "repeat": true
     }
   ],
-  "timeLimitSec": 900,
-  "placeholder": true
+  "relations": [],
+  "placeholder": false
 }

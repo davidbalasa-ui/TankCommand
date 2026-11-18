@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 3,
   "title": "Thorns",
-  "briefing": "Terran patrols want our nest back. Hold it for six minutes. Grow a Sentinel where they attack.",
+  "briefing": "The outpost is ours, and the Terrans want it back. Hold it for six minutes. Grow a Sentinel where they attack.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -93,8 +93,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "First raid in one minute. Buy a Sentinel and place it facing south-west."
+          "speaker": "Matriarch",
+          "text": "They come in one minute. Grow a Sentinel facing south-west."
         }
       ]
     },
@@ -166,8 +166,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "A bigger group is coming."
+          "speaker": "Matriarch",
+          "text": "A bigger pack is coming. Hold."
         },
         {
           "t": "spawn",

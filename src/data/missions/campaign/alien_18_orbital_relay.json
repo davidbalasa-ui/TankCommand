@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 18,
   "title": "Orbital Relay",
-  "briefing": "The Terran orbital relay stands in the middle of the plain. Destroy the relay tower and its guns, but the colony will keep sending raids at your nest. Hold both ends.",
+  "briefing": "The Terran orbital relay stands on the plain south-west of our nest; through it the colonies call to orbit for help. Destroy the relay tower and its guns while both colonies send raids at the nest.",
   "mapId": "map.c_twin_colonies",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -196,12 +196,12 @@
     },
     {
       "id": "guns",
-      "text": "Destroy the relay guns",
+      "text": "Destroy the relay's Bastion Guns",
       "kind": "primary"
     },
     {
       "id": "nest",
-      "text": "Keep your nest",
+      "text": "Keep your Landing Ring",
       "kind": "primary"
     }
   ],
@@ -215,8 +215,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The relay is north-west of the nest. Raids will come from both colonies."
+          "speaker": "Matriarch",
+          "text": "The relay is south-west of the nest. Raids will come from both colonies."
         }
       ]
     },

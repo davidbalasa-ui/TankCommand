@@ -40,6 +40,7 @@ const featuresSchema = z.object({
       roughness: z.number().nonnegative().optional(),
       centreRidge: z.boolean().optional(),
       symmetric: z.boolean().optional(),
+      fourWay: z.boolean().optional(),
       ridges: z
         .array(
           z.object({

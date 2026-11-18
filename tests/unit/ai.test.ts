@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { data, aiMatch, runMatch, hashWorld, stepWithAi } from './aiHelpers';
 import { thinkAi } from '../../src/ai/ai';
 import { addAi } from '../../src/ai/driver';
+import { DEFEND_RADIUS } from '../../src/ai/aiData';
 import { validateCommand } from '../../src/sim/commands';
 import { relation } from '../../src/sim/diplomacy';
 import { createSkirmishWorld } from '../../src/data/simData';
@@ -95,7 +96,8 @@ describe('enemy AI', () => {
     const files = readdirSync('src/ai').filter((f) => f.endsWith('.ts'));
     const allowed = [
       '../sim/types', '../sim/commands', '../sim/vision', '../sim/diplomacy', '../sim/spawn',
-      '../sim/rng', '../sim/economy', '../sim/research', '../sim/world', '../sim/air', '../sim/unpack', './ai', './aiData', './driver',
+      '../sim/rng', '../sim/economy', '../sim/research', '../sim/world', '../sim/air', '../sim/unpack', '../sim/pad',
+      '../sim/map', '../sim/tuning', './ai', './aiData', './driver',
     ];
     for (const file of files) {
       const text = readFileSync(`src/ai/${file}`, 'utf8');
@@ -154,13 +156,17 @@ describe('enemy AI', () => {
     expect(world.result?.winner).toBe(2);
   }, 120_000);
 
-  it('[AI-11] hard beats normal in most fixed-seed matches, playing either side', () => {
+  it('[AI-11] hard beats normal in most fixed-seed matches, playing either side', async () => {
     let hardWins = 0;
     for (let seed = 300; seed < 303; seed += 1) {
       for (const hardFirst of [true, false]) {
         let world = aiMatch(seed, hardFirst ? 'hard' : 'normal', hardFirst ? 'normal' : 'hard');
         while (world.result === null && world.tick < 45 * 60 * 20) {
           world = stepWithAi(world);
+          // Yield now and then: one long synchronous run starves the worker's reporter channel on slow CI.
+          if (world.tick % 2000 === 0) {
+            await new Promise<void>((resolve) => setImmediate(resolve));
+          }
         }
         if (world.result?.winner === (hardFirst ? 1 : 2)) {
           hardWins += 1;
@@ -194,11 +200,12 @@ describe('enemy AI', () => {
       state = result.state;
       for (const command of result.commands) {
         if ('unitIds' in command && command.unitIds.includes(chaser.id)) {
-          sent.push(command.kind === 'move' ? `move ${Math.round(command.x)},${Math.round(command.z)}` : command.kind);
+          // Home is the spot in front of the pad (past its rally point), not the pad itself.
+          sent.push(command.kind === 'move' && Math.hypot(command.x - pad.x, command.z - pad.z) < DEFEND_RADIUS ? 'move home' : command.kind);
         }
       }
     }
-    expect(sent).toContain(`move ${Math.round(pad.x)},${Math.round(pad.z)}`);
+    expect(sent).toContain('move home');
   });
 
   it('[AI-05] a side with no pads and no fighting units is eliminated', () => {

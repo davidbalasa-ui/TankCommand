@@ -50,7 +50,9 @@ export const AI_DATA: Record<AiDifficulty, AiDifficultyData> = {
   },
   hard: {
     strategicEveryTicks: 30,
-    attackThresholdValue: 800,
+    // Hard waits for a bigger first wave than Normal (and Normal's earlier, smaller attack breaks
+    // on it), then rolls on: with 800 it traded evenly and Normal won as often as Hard.
+    attackThresholdValue: 1000,
     reserveOre: 60,
     // A third miner costs the early army more than it earns back before the first fights: with
     // three, Hard lost every soak match to Normal.
@@ -84,3 +86,6 @@ export const RETREAT_HP_FRACTION = 0.3;
 export const DEFEND_RADIUS = 35;
 export const KIT_RING_RADIUS = 16;
 export const UNIT_ORDER_PERIOD = 10; // a unit gets at most one tactical order per 10 tactical steps
+
+/** How far past its pad's rally point (toward the map centre) the AI parks units it sends home, m. */
+export const HOME_PAST_RALLY = 8;

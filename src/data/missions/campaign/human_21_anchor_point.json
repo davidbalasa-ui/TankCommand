@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 21,
   "title": "Anchor Point",
-  "briefing": "The spires on the crystal fields anchor the rift to Vesper. Shatter all five while the Arcadians throw everything they have at you.",
+  "briefing": "The Shard's spires anchor the rift to Vesper. The Arcadians are trying to bend the Shard to their will and hold the rift open for the swarm, though it burns them too. They will throw everything they have at you. Shatter all five spires.",
   "mapId": "map.c_crystal_fields",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -253,7 +253,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Artillery outranges the spires. Keep tanks back until they are down."
         }
       ]

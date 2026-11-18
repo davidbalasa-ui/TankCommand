@@ -62,6 +62,8 @@ import {
   installGlobalErrorCapture,
   type WatchdogReport,
 } from './platform/watchdog';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import { pushLog } from './platform/logBuffer';
 import {
@@ -1408,7 +1410,6 @@ export class App {
   }
 
   pressAndroidBack(): void {
-    this.pauseLifecycle();
     this.handleAndroidBack();
   }
 
@@ -1532,9 +1533,12 @@ export class App {
 
   private newSkirmish(): WorldState {
     const config = this.skirmishConfig;
+    // One side per start: a two-player map takes one AI (the setup screen offers no more).
+    const mapRow = this.mapRows.find((row) => row.id === this.mapIdValue) ?? this.mapRows[0];
+    const seats = Math.max(1, (mapRow?.starts.length ?? 3) - 1);
     const specs = [
       { player: 1, faction: config.faction, controller: 'human' as const },
-      ...config.opponents.map((opponent, index) => ({
+      ...config.opponents.slice(0, seats).map((opponent, index) => ({
         player: index + 2,
         faction: opponent.faction,
         controller: 'ai' as const,
@@ -1631,20 +1635,41 @@ export class App {
   private resultView(): ResultView {
     const mission = this.world.mission;
     if (!mission) {
-      return { mission: false, won: false, title: null, reason: null, hasNext: false };
+      return {
+        mission: false,
+        won: false,
+        title: null,
+        reason: null,
+        hasNext: false,
+        campaignComplete: false,
+        epilogue: null,
+      };
     }
     const row = MISSIONS.find((item) => item.id === mission.def.id);
     const won = this.world.result?.winner === mission.humanSide;
+    const hasNext = row ? nextMission(row) !== null : false;
+    const alien = row?.sides.find((side) => side.player === mission.humanSide)?.faction === 'alien';
+    const campaignComplete = won && !hasNext && row !== undefined && row.campaign !== 'training';
     const reasons: Record<string, string> = {
       timeout: 'Time ran out.',
       defeated: 'Your base was lost.',
+      padLost: alien ? 'Your Landing Ring was destroyed.' : 'Your landing pad was destroyed.',
+      colonyLost: 'A colony fell.',
+      bossEscaped: 'Your target escaped through the pass.',
+      columnEscaped: 'The tank column got through the pass.',
+      convoyEscaped: 'The convoy escaped.',
+      convoyLost: 'A Bulwark was lost.',
+      radarLost: 'The Watchman radar was destroyed.',
+      vipLost: 'The supply hauler was destroyed.',
     };
     return {
       mission: true,
       won,
       title: row?.title ?? null,
-      reason: mission.failReason ? (reasons[mission.failReason] ?? mission.failReason) : null,
-      hasNext: row ? nextMission(row) !== null : false,
+      reason: mission.failReason ? (reasons[mission.failReason] ?? 'The mission failed.') : null,
+      hasNext,
+      campaignComplete,
+      epilogue: campaignComplete ? (row?.epilogue ?? null) : null,
     };
   }
 
@@ -1904,22 +1929,23 @@ export class App {
   }
 
   private resumeLifecycle(): void {
+    const before = this.lifecyclePauseScreen;
     this.lifecyclePaused = false;
     this.lifecyclePauseScreen = null;
+    // Coming back to a running match opens the pause card first, so the battle doesn't restart
+    // under the player's thumb before they have looked at the screen.
+    if (before === 'inGame' && this.matchActive && !this.world.result && this.router.current() === 'inGame') {
+      this.go('pause');
+    }
     this.applyPauseState();
   }
 
+  /** Android Back: in a match it opens the pause card (Back again resumes); on the title screen it leaves the app. */
   private handleAndroidBack(): void {
-    const before = this.lifecyclePauseScreen;
-    this.lifecyclePauseScreen = null;
-    if (before === 'inGame') {
-      this.go('pause');
-      return;
-    }
-    if (before === 'pause') {
-      this.lifecyclePaused = false;
-      this.applyPauseState();
-      this.router.back();
+    if (this.router.current() === 'title') {
+      if (Capacitor.isNativePlatform()) {
+        void CapacitorApp.exitApp();
+      }
       return;
     }
     this.router.back();

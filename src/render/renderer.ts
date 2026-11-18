@@ -16,6 +16,8 @@ import { damageState } from '../sim/structures';
 import { crateOre } from '../sim/economy';
 import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
 import { SIM_TICK_HZ } from '../sim/constants';
+import { isArcingWeapon } from '../sim/weaponCycle';
+import { planShellArc, shellArcPoint, type ShellArc } from './shellArc';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
@@ -429,7 +431,8 @@ const GUN_PART = /^(Barrel|Flash|Msl)/;
 // The art pipeline's solid muzzle-flash meshes (under Flash* nodes) are made for a viewer that
 // shows them only for a frame after each shot; the game draws its own muzzle effects, so the meshes
 // are dropped from unit models (and their low-detail files, so both keep the same mesh order).
-// Each one leaves an empty Muzzle* node at its centre (FlashL leaves MuzzleL), where the barrel tip is.
+// Each one leaves an empty Muzzle* node (FlashL leaves MuzzleL) at the flash's base, where the
+// barrel tip is.
 function dropFlashMeshes(root: THREE.Object3D): void {
   const drop: Array<{ mesh: THREE.Object3D; geometry: THREE.BufferGeometry; flash: string }> = [];
   root.traverse((object) => {
@@ -452,13 +455,35 @@ function dropFlashMeshes(root: THREE.Object3D): void {
         mesh.updateMatrix();
         const anchor = new THREE.Object3D();
         anchor.name = flash.replace(/^Flash/, 'Muzzle');
-        anchor.position.copy(box.getCenter(new THREE.Vector3()).applyMatrix4(mesh.matrix));
+        anchor.position.copy(flashBaseCentre(box, mesh, root).applyMatrix4(mesh.matrix));
         parent.add(anchor);
       }
     }
     mesh.removeFromParent();
     geometry.dispose();
   }
+}
+
+/**
+ * The barrel-tip end of a muzzle-flash mesh, in the mesh's own space: the centre of the box face
+ * at the end of its long axis that lies nearer the model's centre (the flash points out of the
+ * barrel). A long flash (the Longbow's is three model units) would otherwise put the muzzle well
+ * in front of the gun.
+ */
+function flashBaseCentre(box: THREE.Box3, mesh: THREE.Object3D, root: THREE.Object3D): THREE.Vector3 {
+  const centre = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const axis = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
+  const near = centre.clone();
+  const far = centre.clone();
+  near[axis] = box.min[axis];
+  far[axis] = box.max[axis];
+  // Compare the two ends in the model's frame: the one closer to the model's origin is the base.
+  root.updateMatrixWorld(true);
+  const toRoot = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(mesh.matrixWorld);
+  const a = near.clone().applyMatrix4(toRoot);
+  const b = far.clone().applyMatrix4(toRoot);
+  return a.lengthSq() <= b.lengthSq() ? near : far;
 }
 
 function isGunPart(object: THREE.Object3D, root: THREE.Object3D): boolean {
@@ -651,6 +676,10 @@ export class RenderView {
       shooterId: number | undefined;
       aim: number;
       alien: boolean;
+      /** Indirect shells: the ballistic arc drawn from the muzzle to the burst point. */
+      arc?: ShellArc;
+      /** Where the sim's shot was last seen (an arcing shell that hits early bursts there). */
+      simAt?: THREE.Vector3;
       /** Shard lance: where it started, and the seed and time of its last kink re-roll. */
       from?: THREE.Vector3;
       seed?: number;
@@ -738,8 +767,18 @@ export class RenderView {
     this.renderer.setPixelRatio(this.basePixelRatio);
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 4000);
     this.rtsCamera = new RtsCamera(world.map.size);
+    // Start over your own units; with none (a pad-only start), over your landing pad, else the
+    // middle of your buildings.
     const ownUnits = world.units.filter((unit) => unit.owner === 1);
-    if (ownUnits.length > 0) {
+    const ownStructures = world.structures.filter((structure) => structure.owner === 1);
+    const ownPad = ownStructures.find((structure) => world.structureTypes.get(structure.typeId)?.kind === 'pad');
+    if (ownUnits.length === 0 && ownPad) {
+      this.rtsCamera.setTarget(ownPad.x, ownPad.z);
+    } else if (ownUnits.length === 0 && ownStructures.length > 0) {
+      const centerX = ownStructures.reduce((sum, item) => sum + item.x, 0) / ownStructures.length;
+      const centerZ = ownStructures.reduce((sum, item) => sum + item.z, 0) / ownStructures.length;
+      this.rtsCamera.setTarget(centerX, centerZ);
+    } else if (ownUnits.length > 0) {
       const centerX = ownUnits.reduce((sum, unit) => sum + unit.x, 0) / ownUnits.length;
       const centerZ = ownUnits.reduce((sum, unit) => sum + unit.z, 0) / ownUnits.length;
       this.rtsCamera.setTarget(centerX, centerZ);
@@ -3318,7 +3357,9 @@ export class RenderView {
     const ids = new Set(this.world.projectiles.map((projectile) => projectile.id));
     for (const [id, visual] of this.projectileVisuals) {
       if (!ids.has(id)) {
-        const at = visual.object.position;
+        // A shell on its arc that met something before its end point bursts where the sim's shot
+        // hit, not up in the air where its arc happened to be.
+        const at = visual.arc && visual.simAt ? visual.simAt : visual.object.position;
         const ground = heightAt(this.world.map, at.x, at.z);
         this.effects.impact(visual.kind, at.x, at.y, at.z, ground, visual.splash, visual.alien);
         if (visual.kind === 'shard' && visual.from) {
@@ -3361,6 +3402,13 @@ export class RenderView {
           aim: projectile.aimDistance ?? 0,
           alien: !human,
         };
+        if (isArcingWeapon(projectile.kind) && !airborne && (projectile.aimDistance ?? 0) > 0.01) {
+          // Indirect fire: lob the shell from the muzzle onto the point the sim's shot bursts at.
+          const aim = projectile.aimDistance ?? 0;
+          const ground = Math.hypot(projectile.vx, projectile.vz);
+          const endY = projectile.y + (ground > 1e-6 ? projectile.vy * (aim / ground) : 0);
+          visual.arc = planShellArc(projectile, muzzle, projectile.vx, projectile.vz, aim, endY);
+        }
         this.projectileVisuals.set(projectile.id, visual);
         this.effects.muzzle(projectile.x, projectile.y + offsetY, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz, muzzle);
         if (shooter && !airborne) {
@@ -3370,14 +3418,21 @@ export class RenderView {
       }
       const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
       const progress = visual.aim > 0.01 ? Math.min(1, travelled / visual.aim) : 1;
-      // Bombs fall (slow at first, then faster); energy shots fly straight from the gun.
+      // Bombs fall (slow at first, then faster); energy shots fly straight from the gun; shells
+      // follow their arc.
       const left = visual.kind === 'bombs' ? 1 - progress * progress : 1 - progress;
       const previous = visual.object.position.clone();
-      visual.object.position.set(
-        projectile.x + visual.offsetX * left,
-        projectile.y + visual.offsetY * left,
-        projectile.z + visual.offsetZ * left,
-      );
+      if (visual.arc) {
+        const point = shellArcPoint(visual.arc, progress);
+        visual.object.position.set(point.x, point.y, point.z);
+        (visual.simAt ??= new THREE.Vector3()).set(projectile.x, projectile.y, projectile.z);
+      } else {
+        visual.object.position.set(
+          projectile.x + visual.offsetX * left,
+          projectile.y + visual.offsetY * left,
+          projectile.z + visual.offsetZ * left,
+        );
+      }
       const direction = new THREE.Vector3().subVectors(visual.object.position, previous);
       if (direction.lengthSq() < 1e-6 || previous.lengthSq() === 0) {
         direction.set(projectile.vx, projectile.vy, projectile.vz);
