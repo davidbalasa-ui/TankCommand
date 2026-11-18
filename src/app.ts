@@ -1,4 +1,5 @@
 import rawManifest from '../public/assets/manifest.json';
+import { introFilmDue, playIntroFilm } from './ui/introFilm';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
 import { createSkirmishWorld, loadSimData, type SimData } from './data/simData';
@@ -435,7 +436,14 @@ export class App {
   }
 
   start(): void {
-    this.router.start('title');
+    if (introFilmDue()) {
+      // First launch: the opening film, then the title (the title's own opening plays after it).
+      void playIntroFilm().then(() => {
+        this.router.start('title');
+      });
+    } else {
+      this.router.start('title');
+    }
     this.lifecycle = bindLifecycleToBrowserAndCapacitor();
     this.lifecycle.on('pause', () => {
       this.pauseLifecycle();
