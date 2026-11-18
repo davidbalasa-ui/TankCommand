@@ -5,6 +5,9 @@ import { hasFreeAirSlot, isAirborne, unitTargetKind, weaponCanHit } from '../sim
 import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
 import { placementValidity } from '../sim/spawn';
+import { padLayout } from '../sim/pad';
+import { clampToMap } from '../sim/map';
+import { UNIT_RADIUS } from '../sim/tuning';
 import { perceivedUnits } from '../sim/vision';
 import { isPackedOnTheWay } from '../sim/unpack';
 import type {
@@ -17,7 +20,7 @@ import type {
   UnitState,
   WorldState,
 } from '../sim/types';
-import { AI_DATA, AI_RESEARCH_ORDER, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
+import { AI_DATA, AI_RESEARCH_ORDER, HOME_PAST_RALLY, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
 
 type Untimed = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
 
@@ -131,6 +134,18 @@ class Planner {
   }
 }
 
+// Where units sent home wait: out past the pad's rally point, toward the map centre, so they stand
+// guard in front of the base and leave the pad and its first arrival spots free for deliveries.
+function homeSpot(world: WorldState, pad: StructureState): { x: number; z: number } {
+  const layout = padLayout(world, pad);
+  return clampToMap(
+    world.map,
+    layout.rallyX + Math.round(Math.cos(layout.facing)) * HOME_PAST_RALLY,
+    layout.rallyZ + Math.round(Math.sin(layout.facing)) * HOME_PAST_RALLY,
+    UNIT_RADIUS,
+  );
+}
+
 function isMiner(type: SimUnitType | undefined): boolean {
   return type?.workerKind === 'oreMiner';
 }
@@ -206,7 +221,7 @@ function placeKits(planner: Planner): void {
             .filter((u) => u.order.kind === 'idle' && Math.hypot(u.x - deposit.x, u.z - deposit.z) < 8)
             .map((u) => u.id);
           if (blockers.length > 0) {
-            planner.commands.push({ kind: 'move', unitIds: blockers, x: pad.x, z: pad.z });
+            planner.commands.push({ kind: 'move', unitIds: blockers, ...homeSpot(world, pad) });
           }
         }
       }
@@ -518,7 +533,7 @@ function strategic(planner: Planner): void {
   if (activeScout) {
     if (known.length > 0) {
       state.scoutId = null;
-      planner.commands.push({ kind: 'move', unitIds: [activeScout.id], x: pad.x, z: pad.z });
+      planner.commands.push({ kind: 'move', unitIds: [activeScout.id], ...homeSpot(world, pad) });
     } else if (activeScout.order.kind === 'idle') {
       const points = waypoints(world, pad);
       const point = points[state.waypoint % points.length];
@@ -583,7 +598,7 @@ function strategic(planner: Planner): void {
       state.groupIds = [];
       state.groupStartValue = 0;
     } else if (!broke && value < state.groupStartValue * (1 - data.retreatLossFraction)) {
-      planner.commands.push({ kind: 'move', unitIds: alive.map((u) => u.id), x: pad.x, z: pad.z });
+      planner.commands.push({ kind: 'move', unitIds: alive.map((u) => u.id), ...homeSpot(world, pad) });
       state.groupIds = [];
     }
   }
@@ -668,7 +683,7 @@ function tactical(planner: Planner): void {
       !state.groupIds.includes(unit.id) &&
       Math.hypot(unit.x - pad.x, unit.z - pad.z) > DEFEND_RADIUS * 2
     ) {
-      planner.commands.push({ kind: 'move', unitIds: [unit.id], x: pad.x, z: pad.z });
+      planner.commands.push({ kind: 'move', unitIds: [unit.id], ...homeSpot(world, pad) });
       continue;
     }
     if (!type.weapon || unit.order.kind === 'attack' || unit.order.kind === 'move') {

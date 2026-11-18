@@ -84,3 +84,6 @@ export const RETREAT_HP_FRACTION = 0.3;
 export const DEFEND_RADIUS = 35;
 export const KIT_RING_RADIUS = 16;
 export const UNIT_ORDER_PERIOD = 10; // a unit gets at most one tactical order per 10 tactical steps
+
+/** How far past its pad's rally point (toward the map centre) the AI parks units it sends home, m. */
+export const HOME_PAST_RALLY = 8;
