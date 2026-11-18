@@ -81,6 +81,8 @@ export function mountUnlock(root: HTMLElement, ctx: ScreenContext): () => void {
   });
 
   let priceText: string | null = null;
+  /** Play answered without a price (offline, or the product is not set up yet). */
+  let priceMissing = false;
   const refresh = (): void => {
     const unlocked = purchases?.isUnlocked() ?? false;
     const store = purchases?.canPurchase() ?? false;
@@ -89,7 +91,11 @@ export function mountUnlock(root: HTMLElement, ctx: ScreenContext): () => void {
     } else if (!store) {
       price.textContent = 'Available in the Android app from Google Play.';
     } else {
-      price.textContent = priceText ? `Price: ${priceText}` : 'Price: loading from Google Play…';
+      price.textContent = priceText
+        ? `Price: ${priceText}`
+        : priceMissing
+          ? 'Price unavailable: Google Play could not be reached.'
+          : 'Price: loading from Google Play…';
     }
     buy.textContent = priceText && store && !unlocked ? `Buy full game · ${priceText}` : 'Buy full game';
     buy.disabled = busy || unlocked || !store;
@@ -109,11 +115,7 @@ export function mountUnlock(root: HTMLElement, ctx: ScreenContext): () => void {
         return;
       }
       priceText = value;
-      if (!value && !purchases.isUnlocked()) {
-        price.textContent = 'Price unavailable: Google Play could not be reached.';
-        buy.textContent = 'Buy full game';
-        return;
-      }
+      priceMissing = value === null;
       refresh();
     });
   }

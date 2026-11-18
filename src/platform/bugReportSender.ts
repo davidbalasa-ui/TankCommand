@@ -19,6 +19,8 @@ export const REPORT_LIMITS = {
   logLine: 500,
   /** A bigger save is left out of the sent report (it stays in the local file). */
   save: 400_000,
+  /** The whole request body in bytes, under the endpoint's 512 KiB limit with room to spare. */
+  body: 480_000,
 } as const;
 
 export interface BugReportPayload {
@@ -58,6 +60,15 @@ function clip(value: string, max: number): string {
 
 /** Trims every field to the endpoint's limits. */
 export function fitPayload(payload: BugReportPayload): BugReportPayload {
+  const fitted = fitFields(payload);
+  // A save is escaped again inside the JSON body; if the body still runs over, send it without.
+  if (fitted.save !== null && new TextEncoder().encode(JSON.stringify(fitted)).length > REPORT_LIMITS.body) {
+    return { ...fitted, save: null };
+  }
+  return fitted;
+}
+
+function fitFields(payload: BugReportPayload): BugReportPayload {
   return {
     message: clip(payload.message, REPORT_LIMITS.message),
     version: payload.version,

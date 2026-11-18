@@ -6,6 +6,7 @@ import { AudioEngine, type AudioStatusView, type SoundEvent } from '../audio/aud
 import { APP_VERSION } from '../platform/appInfo';
 import {
   SEND_FAILURE_TEXT,
+  fitPayload,
   sendBugReport,
   type BugReportPayload,
   type SendResult,
@@ -511,7 +512,14 @@ export class GameServices implements GameApi {
     const sent = await this.sendReport(payload);
     if (sent.ok) {
       pushLog('info', 'Bug report sent');
-      const result: BugReportResult = { status: 'sent', message: 'Report sent. Thank you!' };
+      // fitPayload drops a save too big to send; say so, since the player ticked it.
+      const saveLeftOut = payload.save !== null && fitPayload(payload).save === null;
+      const result: BugReportResult = {
+        status: 'sent',
+        message: saveLeftOut
+          ? 'Report sent without the save file (too large to send). Thank you!'
+          : 'Report sent. Thank you!',
+      };
       this.lastSendResult = result;
       return result;
     }

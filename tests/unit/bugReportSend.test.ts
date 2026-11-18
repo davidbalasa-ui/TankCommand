@@ -11,7 +11,7 @@ import {
 } from '../../src/platform/bugReportSender';
 import { MemoryKvStore } from '../../src/platform/kv';
 import { SettingsStore } from '../../src/platform/settings';
-import { validateReport } from '../../api/bug-report';
+import { MAX_BODY_BYTES, validateReport } from '../../api/bug-report';
 import { createWorld } from '../../src/sim/world';
 
 function payload(overrides: Partial<BugReportPayload> = {}): BugReportPayload {
@@ -101,6 +101,14 @@ describe('[BUG-02] sending a bug report', () => {
     expect(fitted.logs.at(-1)?.startsWith('449 ')).toBe(true);
     expect(fitted.save).toBeNull();
     expect(validateReport(fitted).ok).toBe(true);
+  });
+
+  it('[BUG-02] a save that would push the body over the endpoint limit is left out', () => {
+    const quoted = '"'.repeat(REPORT_LIMITS.save - 10);
+    const fitted = fitPayload(payload({ logs: Array.from({ length: 200 }, () => 'x'.repeat(500)), save: quoted }));
+    expect(fitted.save).toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(fitted)).length).toBeLessThan(MAX_BODY_BYTES);
+    expect(fitPayload(payload({ save: '{"small":true}' })).save).toBe('{"small":true}');
   });
 });
 
