@@ -447,16 +447,23 @@ function strategic(planner: Planner): void {
   placeKits(planner);
   assignWorkers(planner);
 
+  // Skirmish endgame: every ore field is mined out and nothing is still being hauled in, so no
+  // more workers or stations are worth buying. (Missions script their own sides.)
+  const minedOut =
+    world.mission === null &&
+    !world.deposits.some((d) => d.kind === 'ore' && (d.amount > 1 || crateOre(d, planner.player) > 1)) &&
+    !units.some((u) => (u.job?.load ?? 0) > 0);
+
   const stationTypeEarly = planner.myStructureTypes().find((t) => t.kind === 'metalStation');
   const taken = foreignStationDeposits(planner);
   const freeMetal = world.deposits.some((d) => freeMetalDeposit(planner, d.id, taken));
   const stationCount = structures.filter((s) => planner.structureKind(s) === 'metalStation').length;
-  if (stationTypeEarly && stationCount < data.maxStations && freeMetal && !world.pendingKits.some((k) => k.owner === planner.player)) {
+  if (stationTypeEarly && !minedOut && stationCount < data.maxStations && freeMetal && !world.pendingKits.some((k) => k.owner === planner.player)) {
     planner.metalReserve = stationTypeEarly.cost.metal;
   }
   const minerType = types.find((t) => isMiner(t));
   const miners = units.filter((u) => isMiner(planner.unitType(u))).length + (minerType ? planner.queued(minerType.id) : 0);
-  if (minerType && miners < data.minersWanted) {
+  if (minerType && miners < data.minersWanted && !minedOut) {
     planner.buyUnit(minerType, 0);
   }
 
@@ -477,6 +484,7 @@ function strategic(planner: Planner): void {
     ) || units.some((u) => isPackedOnTheWay(u));
   if (
     stationType &&
+    !minedOut &&
     stationCount < data.maxStations &&
     !hasKit &&
     planner.queued(stationType.id) === 0 &&
@@ -490,7 +498,7 @@ function strategic(planner: Planner): void {
   const minerCount = units.filter((u) => isMiner(planner.unitType(u))).length;
   const tugCount = units.filter((u) => isTug(planner.unitType(u))).length;
   const tugsWanted = Math.min(5, Math.max(1, minerCount) + (hasStation || hasKit ? 1 : 0));
-  if (tugType && tugCount < tugsWanted && planner.queued(tugType.id) === 0) {
+  if (tugType && tugCount < tugsWanted && planner.queued(tugType.id) === 0 && !minedOut) {
     planner.buyUnit(tugType, 0);
   }
 
@@ -508,15 +516,12 @@ function strategic(planner: Planner): void {
   const cheapest = types
     .filter((t) => isFighter(t, true))
     .sort((a, b) => valueOf(a) - valueOf(b) || a.id.localeCompare(b.id))[0];
-  // Skirmish endgame: every ore field is mined out, nothing is still being hauled in and the
-  // cheapest fighter is out of reach. No bigger army is ever coming, so whatever is left attacks
-  // instead of idling at home for the rest of the match. (Missions script their own sides.)
-  const broke =
-    world.mission === null &&
-    !world.deposits.some((d) => d.kind === 'ore' && (d.amount > 1 || crateOre(d, planner.player) > 1)) &&
-    !units.some((u) => (u.job?.load ?? 0) > 0) &&
-    (!cheapest || !planner.canAfford(cheapest.oreCost, cheapest.metalCost, 0, false));
-  const desperate = broke || (!metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false);
+  // Endgame (minedOut): the last ore is spent on whatever fighter it buys (scouts too, no reserve
+  // kept back); once even the cheapest is out of reach no bigger army is ever coming, so whatever
+  // is left attacks instead of idling at home for the rest of the match.
+  const broke = minedOut && (!cheapest || !planner.canAfford(cheapest.oreCost, cheapest.metalCost, 0, false));
+  const armyReserve = minedOut ? 0 : data.reserveOre;
+  const desperate = minedOut || (!metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false);
   const fighters = units.filter((u) => isFighter(planner.unitType(u), desperate));
   const armyValue = fighters.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   const known = knownEnemyStructures(world, planner.player);
@@ -582,7 +587,7 @@ function strategic(planner: Planner): void {
       .map((t) => ({ t, count: units.filter((u) => u.typeId === t.id).length + planner.queued(t.id) }))
       .sort((x, y) => x.count - y.count || x.t.id.localeCompare(y.t.id));
     for (const entry of order) {
-      if (planner.buyUnit(entry.t, data.reserveOre)) {
+      if (planner.buyUnit(entry.t, armyReserve)) {
         break;
       }
     }

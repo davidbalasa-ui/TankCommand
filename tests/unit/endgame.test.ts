@@ -111,4 +111,21 @@ describe('skirmish endgame', () => {
     }
     expect(early).toHaveLength(0);
   });
+
+  it('[AI-13b] with the ore mined out the AI spends its last money on a fighter, reserve or not, and none on workers', () => {
+    const world = minedOut('ai');
+    // 110 ore buys a light tank only if Hard's usual 60-ore reserve is not held back.
+    world.resources.find((entry) => entry.player === 1)!.ore = 110;
+    let state = world.aiStates.find((entry) => entry.player === 1)!;
+    const buys = [];
+    for (let tick = 0; tick < 200; tick += 1) {
+      const result = thinkAi({ ...world, tick }, state);
+      state = result.state;
+      buys.push(...result.commands.filter((command) => command.kind === 'buy'));
+    }
+    const bought = buys.map((command) => (command.kind === 'buy' ? world.unitTypes.get(command.itemId) : undefined));
+    expect(bought.some((type) => type !== undefined && type.weapon !== null && type.role !== 'worker')).toBe(true);
+    // Nothing is spent on workers with no ore left to mine.
+    expect(bought.some((type) => type?.workerKind)).toBe(false);
+  });
 });
