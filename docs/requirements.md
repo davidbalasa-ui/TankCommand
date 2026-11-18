@@ -113,6 +113,7 @@
 | SET-01 | Every setting persists across reload and takes effect immediately. |
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |
+| HAP-01 | In the Android app, selection, orders and alerts give a light vibration through the official `@capacitor/haptics` plugin; the Haptics setting turns it off; the web build never vibrates, and a missing or failing plugin is ignored. |
 | ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
 | ALRT-03 | A merged "under attack" line counts the distinct units hit, not the number of hits. |
 | BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |

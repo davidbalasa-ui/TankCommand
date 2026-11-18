@@ -56,6 +56,8 @@ export interface GameServicesOptions {
   kv?: KvStore;
   settings?: SettingsStore;
   audio?: AudioEngine;
+  /** Built from the stored Haptics setting when left out (tests pass one with a fake plugin). */
+  haptics?: HapticsService;
   mount?: HTMLElement;
   now?: () => number;
 }
@@ -134,7 +136,7 @@ export class GameServices implements GameApi {
     this.manager = new SaveManager(this.kv, { gameVersion: APP_VERSION });
     this.settingsStore = options.settings ?? new SettingsStore();
     this.audioEngine = options.audio ?? new AudioEngine();
-    this.haptics = new HapticsService(this.settingsStore.getValue('haptics'));
+    this.haptics = options.haptics ?? new HapticsService(this.settingsStore.getValue('haptics'));
     this.alertsCenter = new AlertCenter({
       host: options.mount ?? document.body,
       onJump: (x, z) => {
