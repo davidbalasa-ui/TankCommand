@@ -767,10 +767,14 @@ export class RenderView {
     this.renderer.setPixelRatio(this.basePixelRatio);
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 4000);
     this.rtsCamera = new RtsCamera(world.map.size);
-    // Start over your own units, or your buildings when you start with none (a pad-only start).
+    // Start over your own units; with none (a pad-only start), over your landing pad, else the
+    // middle of your buildings.
     const ownUnits = world.units.filter((unit) => unit.owner === 1);
     const ownStructures = world.structures.filter((structure) => structure.owner === 1);
-    if (ownUnits.length === 0 && ownStructures.length > 0) {
+    const ownPad = ownStructures.find((structure) => world.structureTypes.get(structure.typeId)?.kind === 'pad');
+    if (ownUnits.length === 0 && ownPad) {
+      this.rtsCamera.setTarget(ownPad.x, ownPad.z);
+    } else if (ownUnits.length === 0 && ownStructures.length > 0) {
       const centerX = ownStructures.reduce((sum, item) => sum + item.x, 0) / ownStructures.length;
       const centerZ = ownStructures.reduce((sum, item) => sum + item.z, 0) / ownStructures.length;
       this.rtsCamera.setTarget(centerX, centerZ);

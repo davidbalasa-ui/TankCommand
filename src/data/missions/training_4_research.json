@@ -13,7 +13,6 @@
       "ore": 250,
       "metal": 0,
       "available": [
-        "unit.human.light_tank",
         "unit.human.missile_tank",
         "structure.human.metal_station",
         "unit.human.tug"
@@ -108,6 +107,50 @@
       ]
     },
     {
+      "id": "stationTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "station"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "structureBuilt",
+              "side": 1,
+              "structureType": "structure.human.metal_station"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 200
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 200
+        }
+      ],
+      "repeat": true
+    },
+    {
       "id": "metal",
       "when": {
         "t": "and",
@@ -139,14 +182,59 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Metal pays for research. Here is 100 ore for the rest of the cost."
+          "text": "Research costs metal and some ore."
+        }
+      ]
+    },
+    {
+      "id": "metalTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "station"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "metal"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.tug",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 50
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
         },
         {
           "t": "grant",
           "side": 1,
-          "ore": 100
+          "ore": 50
         }
-      ]
+      ],
+      "repeat": true
     },
     {
       "id": "research",
@@ -180,14 +268,57 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Missiles researched! Upgrades cost a little ore and metal. Here is 100 ore."
+          "text": "Missiles researched! Upgrades cost a little ore and metal."
+        }
+      ]
+    },
+    {
+      "id": "researchTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "metal"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "research"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "researchDone",
+              "side": 1,
+              "node": "research.human.missiles"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
         },
         {
           "t": "grant",
           "side": 1,
           "ore": 100
         }
-      ]
+      ],
+      "repeat": true
     },
     {
       "id": "upgrade",
@@ -222,13 +353,56 @@
           "t": "message",
           "speaker": "Command",
           "text": "That Lancer fires faster for the rest of the match."
+        }
+      ]
+    },
+    {
+      "id": "upgradeTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "research"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "upgrade"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "upgraded",
+              "side": 1,
+              "upgrade": "fireRate"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 60
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
         },
         {
           "t": "grant",
           "side": 1,
-          "ore": 200
+          "ore": 60
         }
-      ]
+      ],
+      "repeat": true
     },
     {
       "id": "javelin",
@@ -255,6 +429,56 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "id": "javelinTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "upgrade"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "javelin"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.missile_tank",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 200
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 200
+        }
+      ],
+      "repeat": true
     }
   ],
   "relations": [],

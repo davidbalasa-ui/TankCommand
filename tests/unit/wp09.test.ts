@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { data } from './aiHelpers';
-import { MISSIONS, buildMissionWorld, loadMissionTable, nextMission } from '../../src/data/missions';
-import { parseMission, type Action, type Condition, type Trigger } from '../../src/sim/missionSchema';
+import { MISSIONS, buildMissionWorld, checkMissionReferences, loadMissionTable, nextMission } from '../../src/data/missions';
+import { parseMission, type Action, type Condition, type MissionRow, type Trigger } from '../../src/sim/missionSchema';
 import { evalCondition, runAction, updateMission, tagUnit, type MissionState } from '../../src/sim/triggers';
 import { stepWithAi } from '../../src/ai/driver';
 import { decodeSave, encodeSave } from '../../src/platform/saves';
@@ -85,6 +85,34 @@ describe('mission data', () => {
     expect(() => parseMission(noTitle)).toThrow(/title/);
     const dup = JSON.parse(JSON.stringify(MISSIONS[0]));
     expect(() => loadMissionTable([dup, dup])).toThrow(/Duplicate/);
+  });
+
+  it('[MSN-01] every unit and structure type a trigger, spawn or buy list names exists (campaigns and training)', () => {
+    expect(MISSIONS.filter((m) => m.campaign === 'training')).toHaveLength(5);
+    expect(MISSIONS.filter((m) => m.campaign !== 'training').length).toBeGreaterThanOrEqual(44);
+    for (const row of MISSIONS) {
+      expect(() => checkMissionReferences(data, row), row.id).not.toThrow();
+    }
+    const withCond = (when: Condition): MissionRow => {
+      const row = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+      row.triggers.push({ id: 'typo', when: { t: 'and', conds: [{ t: 'time', tick: 1 }, { t: 'not', cond: when }] }, do: [{ t: 'win' }] });
+      return row;
+    };
+    const typos: [MissionRow, RegExp][] = [
+      [withCond({ t: 'unitsAlive', side: 1, unitType: 'unit.human.lite_tank', op: '>=', count: 1 }), /unit\.human\.lite_tank/],
+      [withCond({ t: 'structureBuilt', side: 1, structureType: 'structure.human.turet' }), /structure\.human\.turet/],
+      [withCond({ t: 'areaEntered', side: 1, x: 0, z: 0, radius: 5, unitType: 'unit.nope' }), /unit\.nope/],
+      [withCond({ t: 'allDestroyed', side: 2, unitType: 'unit.nope2' }), /unit\.nope2/],
+    ];
+    const spawn = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+    spawn.triggers.push({ id: 's', when: { t: 'time', tick: 1 }, do: [{ t: 'spawn', side: 2, unitType: 'unit.nope3', count: 1, x: 0, z: 0 }] });
+    typos.push([spawn, /unit\.nope3/]);
+    const buy = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+    buy.sides[0]!.available = ['unit.nope4'];
+    typos.push([buy, /unit\.nope4/]);
+    for (const [row, message] of typos) {
+      expect(() => buildMissionWorld(data, row, 1)).toThrow(message);
+    }
   });
 });
 

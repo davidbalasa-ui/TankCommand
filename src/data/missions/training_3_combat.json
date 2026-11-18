@@ -137,7 +137,7 @@
           "t": "setObjective",
           "id": "all",
           "status": "add",
-          "text": "Double-tap a Lancer to pick all four, or tap All army at the bottom. Move them to the ring",
+          "text": "Double-tap a Lancer to pick every Lancer on screen, or tap All army. Move them to the ring",
           "kind": "primary"
         },
         {
@@ -338,10 +338,22 @@
     {
       "id": "reinforce",
       "when": {
-        "t": "unitsAlive",
-        "side": 1,
-        "op": "<=",
-        "count": 1
+        "t": "and",
+        "conds": [
+          {
+            "t": "unitsAlive",
+            "side": 1,
+            "op": "<=",
+            "count": 1
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "group"
+            }
+          }
+        ]
       },
       "do": [
         {

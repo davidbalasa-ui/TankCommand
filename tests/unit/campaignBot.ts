@@ -24,11 +24,13 @@ const MAX_TOWERS = 3;
 
 type Cmd = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
 
-function conditionsOf(cond: Condition, out: Condition[] = []): Condition[] {
+/** Every condition in a tree. With goals, leaves out what sits under a 'not': that is a state
+ *  to stay out of (a top-up's "can't afford it yet"), never something to work towards. */
+function conditionsOf(cond: Condition, out: Condition[] = [], goals = false): Condition[] {
   out.push(cond);
   if (cond.t === 'and' || cond.t === 'or') {
-    cond.conds.forEach((c) => conditionsOf(c, out));
-  } else if (cond.t === 'not') {
+    cond.conds.forEach((c) => conditionsOf(c, out, goals));
+  } else if (cond.t === 'not' && !goals) {
     conditionsOf(cond.cond, out);
   }
   return out;
@@ -109,7 +111,7 @@ export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   const stats = w.resources.find((r) => r.player === me);
   const faction = w.unitTypes.get(own[0]?.typeId ?? '')?.faction ?? (pad ? w.structureTypes.get(pad.typeId)?.faction : undefined);
   const busy = w.dropQueue.some((o) => o.owner === me);
-  const open = triggers.flatMap((t) => conditionsOf(t.when));
+  const open = triggers.flatMap((t) => conditionsOf(t.when, [], true));
   // Saving up is the objective: spend nothing.
   const saving = open.some((c) => c.t === 'resourceReached' && c.side === me);
   const usable = (id: string): boolean => missionAllows(w, me, id) && isItemUnlocked(w, me, id);

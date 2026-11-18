@@ -471,8 +471,8 @@ def act1(f):
             [],
             [('reach', 'Reach the outpost', 'primary'), ('clear', 'Destroy the three guards', 'primary')],
             [
-                T('intro', at(0), msg('Head north-east to the outpost. Drag to select, tap the ground to move.'
-                                      if terran else 'The outpost is north-east. Drag to select, tap the ground to move.', f)),
+                T('intro', at(0), msg('Head north-east to the outpost. Tap All army, then tap the ground to move.'
+                                      if terran else 'The outpost is north-east. Tap All army, then tap the ground to move.', f)),
                 T('reach', area(1, ox, oz, 16), done('reach'),
                   msg('Unknown machines at the outpost. Tap one to attack it.' if terran else
                       'Its guards are weak and alone. Tap one to attack it.', f)),
@@ -1482,18 +1482,45 @@ def has(unit, count=1):
     return {'t': 'unitsAlive', 'side': 1, 'unitType': unit, 'op': '>=', 'count': count}
 
 
+def not_(cond):
+    return {'t': 'not', 'cond': cond}
+
+
+def step_open(steps, i):
+    """True while step i is the current one: the step before is done and this one is not."""
+    conds = [not_({'t': 'objectiveDone', 'id': steps[i][0]})]
+    if i > 0:
+        conds.insert(0, {'t': 'objectiveDone', 'id': steps[i - 1][0]})
+    return conds
+
+
+def topup(ore, have):
+    """A step's safety net: while it is open, the player lacks `have` and has under `ore` ore,
+    Command grants `ore` (so a wrong purchase, or a lost unit, never leaves the lesson stuck)."""
+    return (ore, have)
+
+
+def built(structure):
+    return {'t': 'structureBuilt', 'side': 1, 'structureType': structure}
+
+
 def lesson(order, slug, title, briefing, map_id, player, units, structures, steps, intro, enemy=True,
            extra=()):
-    """steps: (id, objective text, condition, actions when the step starts). The first step's
-    actions run with the intro; a step's condition is only checked once the step before is done."""
+    """steps: (id, objective text, condition, actions when the step starts[, topups]). The first
+    step's actions run with the intro; a step's condition is only checked once the step before is
+    done. topups: list of topup(ore, have) safety nets, one repeating trigger each."""
     triggers = [T('intro', at(0), coach(intro), *steps[0][3])]
-    for i, (sid, _text, cond, _start) in enumerate(steps):
+    for i, (sid, _text, cond, _start, *rest) in enumerate(steps):
         when = cond if i == 0 else {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': steps[i - 1][0]}, cond]}
         do = [done(sid)]
         if i + 1 < len(steps):
-            nid, ntext, _c, nstart = steps[i + 1]
+            nid, ntext, _c, nstart, *_ = steps[i + 1]
             do += [{'t': 'setObjective', 'id': nid, 'status': 'add', 'text': ntext, 'kind': 'primary'}, *nstart]
         triggers.append(T(sid, when, *do))
+        for k, (ore, have) in enumerate(rest[0] if rest else []):
+            short = not_({'t': 'resourceReached', 'side': 1, 'ore': ore})
+            triggers.append(T(f'{sid}TopUp{k + 1}', {'t': 'and', 'conds': [*step_open(steps, i), not_(have), short]},
+                              coach('Command has topped up your ore for this step.'), grant(ore), repeat=True))
     triggers += list(extra)
     TRAINING.append({
         'id': f'mission.training.{order}_{slug}', 'campaign': 'training', 'order': order, 'title': title,
@@ -1519,15 +1546,18 @@ lesson(1, 'drops', 'Drops',
        player_side('human', 250, available=avail('human', 'light', 'scout', 'turret')),
        [], [S(1, H['pad'], px, pz)],
        [
-           ('buy', 'Tap your landing pad to open Build, then tap the Lancer card', has(H['light']), []),
+           ('buy', 'Tap your landing pad to open Build, then tap the Lancer card', has(H['light']), [],
+            [topup(100, has(H['light']))]),
            ('more', 'Buy two Outriders. They land one at a time; the strip at the top shows the queue',
             has(H['scout'], 2),
-            [coach('Lancer down! Everything you buy lands on the pad, then drives off it.'), grant(150)]),
+            [coach('Lancer down! Everything you buy lands on the pad, then drives off it.')],
+            [topup(75, has(H['scout'], 2))]),
            ('drive', 'Tap one of your units to select it, then tap inside the ring to drive there',
             ring(-6, 10), [coach('All landed. Close Build with the X to see the whole map again.')]),
            ('tower', 'Buildings come by drop too. Open Build, tap Structures, buy a Bastion Gun. It sets itself up',
-            {'t': 'structureBuilt', 'side': 1, 'structureType': H['turret']},
-            [coach('Nicely driven. Command has sent 150 ore for a gun tower.'), grant(150)]),
+            built(H['turret']),
+            [coach('Nicely driven. Command tops up your ore whenever a step needs it.')],
+            [topup(150, built(H['turret']))]),
        ],
        'Your landing pad is the big square platform. Tap it to see what you can buy.',
        enemy=False)
@@ -1546,12 +1576,14 @@ lesson(2, 'mining', 'Mining',
            ('crew', 'Buy a second Prospector and a second Hauler. Send the new Prospector to dig too',
             {'t': 'and', 'conds': [has(H['miner'], 2), has(H['tug'], 2)]},
             [coach('First load home! Haulers fetch the crates by themselves. Here is 150 ore for more workers.'),
-             grant(150)]),
-           ('bank', 'Bank 400 ore. Your ore count is at the top left',
+             grant(150)],
+            [topup(100, has(H['miner'], 2)), topup(50, has(H['tug'], 2))]),
+           ('bank', 'Bank 400 ore. Your ore count is at the top of the screen',
             {'t': 'resourceReached', 'side': 1, 'ore': 400},
             [coach('Two crews dig twice as fast. Keep an idle miner busy: tap it, then an ore field.')]),
            ('spend', 'Ore buys everything. Spend some: buy a Lancer', has(H['light']),
-            [coach('400 ore banked. Tanks, buildings and workers are all paid in ore.')]),
+            [coach('400 ore banked. Tanks, buildings and workers are all paid in ore.')],
+            [topup(100, has(H['light']))]),
        ],
        'Your Prospector and Hauler are beside the pad. Ore fields are the pink rocks.',
        enemy=False)
@@ -1571,7 +1603,7 @@ lesson(3, 'combat', 'Combat',
        [S(1, H['pad'], px, pz)],
        [
            ('move', 'Tap a Lancer to select it, then tap inside the ring to move it', ring(-14, 18, 6), []),
-           ('all', 'Double-tap a Lancer to pick all four, or tap All army at the bottom. Move them to the ring',
+           ('all', 'Double-tap a Lancer to pick every Lancer on screen, or tap All army. Move them to the ring',
             ring(4, 2, 8), [coach('Well done. Drag one finger on the map to look around.')]),
            ('attack', 'Two Darters on the range. With your Lancers selected, tap a Darter to attack it',
             {'t': 'unitDestroyed', 'tag': 'targets'}, [coach('Through the gap is the target range.')]),
@@ -1586,8 +1618,10 @@ lesson(3, 'combat', 'Combat',
        ],
        'Units are selected by tapping them. Move by tapping the ground.',
        extra=[
-           # Never run out of tanks: reinforcements land whenever only one is left.
-           T('reinforce', {'t': 'unitsAlive', 'side': 1, 'op': '<=', 'count': 1},
+           # Never run out of tanks: reinforcements land whenever only one is left, every time,
+           # until the lesson is over.
+           T('reinforce', {'t': 'and', 'conds': [{'t': 'unitsAlive', 'side': 1, 'op': '<=', 'count': 1},
+                                                 not_({'t': 'objectiveDone', 'id': 'group'})]},
              coach('Reinforcements are landing at your pad.'), spawn(1, H['light'], 3, px + 10, pz - 6, drop=True),
              repeat=True),
        ])
@@ -1598,24 +1632,29 @@ lesson(4, 'research', 'Research',
        'New weapons need research, and research is paid in metal as well as ore. Set up a Metal Station, '
        'let a Hauler bring the metal home, then research a new tank and upgrade an old one.',
        'map.t_kestrel_field',
-       player_side('human', 250, available=avail('human', 'light', 'missile', 'station', 'tug')),
+       player_side('human', 250, available=avail('human', 'missile', 'station', 'tug')),
        [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7),
         U(1, H['tug'], fx - 2, fz - 12, 0.0)],
        [S(1, H['pad'], fx, fz)],
        [
            ('station', 'Open Build, tap Structures and buy a Metal Station. It drives to a blue metal site',
-            {'t': 'structureBuilt', 'side': 1, 'structureType': H['station']}, []),
+            built(H['station']), [], [topup(200, built(H['station']))]),
            ('metal', 'Bank 50 metal. Your Hauler fetches it from the station by itself',
             {'t': 'resourceReached', 'side': 1, 'metal': 50},
-            [coach('Station up. Haulers carry metal home just like ore.')]),
+            [coach('Station up. Haulers carry metal home just like ore.')],
+            # No Hauler left (dismantled or salvaged): one for the station.
+            [topup(50, has(H['tug']))]),
            ('research', 'Open Build and tap the locked Javelin card to research Missiles',
             {'t': 'researchDone', 'side': 1, 'node': 'research.human.missiles'},
-            [coach('Metal pays for research. Here is 100 ore for the rest of the cost.'), grant(100)]),
+            [coach('Research costs metal and some ore.')],
+            [topup(100, {'t': 'researchDone', 'side': 1, 'node': 'research.human.missiles'})]),
            ('upgrade', 'Missiles also unlock Fire rate. Select a Lancer, tap Upgrade, then tap Fire rate',
             {'t': 'upgraded', 'side': 1, 'upgrade': 'fireRate'},
-            [coach('Missiles researched! Upgrades cost a little ore and metal. Here is 100 ore.'), grant(100)]),
+            [coach('Missiles researched! Upgrades cost a little ore and metal.')],
+            [topup(60, {'t': 'upgraded', 'side': 1, 'upgrade': 'fireRate'})]),
            ('javelin', 'Buy a Javelin. Units cost only ore; metal is for research and upgrades',
-            has(H['missile']), [coach('That Lancer fires faster for the rest of the match.'), grant(200)]),
+            has(H['missile']), [coach('That Lancer fires faster for the rest of the match.')],
+            [topup(200, has(H['missile']))]),
        ],
        'Metal sites are the blue rocks by your pad. Tap your landing pad to open Build.',
        enemy=False)
@@ -1626,7 +1665,7 @@ lesson(5, 'air', 'Air',
        'Aircraft fly over hills and water, but they need an Airfield to land, refuel and rearm. Only '
        'some weapons can hit them: missiles and fighters. Build an air wing and put it to work.',
        'map.t_kestrel_field',
-       player_side('human', 300, available=avail('human', 'light', 'missile', 'air_base', 'fighter'),
+       player_side('human', 300, available=avail('human', 'missile', 'air_base', 'fighter'),
                    research_done=research('human', 'air', 'artillery')),
        [U(1, H['light'], fx + 12, fz - 6, -0.7), U(1, H['light'], fx + 14, fz + 2, -0.7)]
        + [U(2, A['scout'], x, z, 2.3, tag='darters') for x, z in [(range_ring[0] + 3, range_ring[1] - 2),
@@ -1634,26 +1673,32 @@ lesson(5, 'air', 'Air',
        [S(1, H['pad'], fx, fz)],
        [
            ('airfield', 'Open Build, tap Structures and buy an Airfield. Aircraft land, refuel and rearm there',
-            {'t': 'structureBuilt', 'side': 1, 'structureType': H['air_base']}, []),
+            built(H['air_base']), [], [topup(300, built(H['air_base']))]),
            ('antiair', 'Lancers cannot hit aircraft. Buy a Javelin: its missiles can. Shoot down the Dragonflies',
             {'t': 'and', 'conds': [has(H['missile']), {'t': 'unitDestroyed', 'tag': 'drones'}]},
             [coach('Arcadian Dragonflies overhead! They only hunt aircraft, but our Lancers cannot touch them.'),
-             grant(200), spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz)]),
+             spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz)],
+            # A Javelin lost before the Dragonflies are down is replaced the same way.
+            [topup(200, has(H['missile']))]),
            ('falcon', 'Buy a Falcon. It parks on the Airfield until you launch it', has(H['fighter']),
-            [coach('Only missiles, missile towers and fighters can hit aircraft.'), grant(300)]),
+            [coach('Only missiles, missile towers and fighters can hit aircraft.')],
+            [topup(300, has(H['fighter']))]),
            ('fly', 'Tap the Falcon on the Airfield, tap Launch, then tap inside the ring',
-            area(1, range_ring[0], range_ring[1], 10, unitType=H['fighter']), []),
+            area(1, range_ring[0], range_ring[1], 10, unitType=H['fighter']), [],
+            # A Falcon that ran out of fuel and crashed can be bought again.
+            [topup(300, has(H['fighter']))]),
            ('strike', 'Falcons hit ground units too. Destroy both Darters. Empty Falcons fly home; launch them again',
             {'t': 'unitDestroyed', 'tag': 'darters'},
             [coach('Falcons carry little fuel and ammunition. They return to the Airfield by themselves.')]),
        ],
        'Aviation research is done for you. Tap your landing pad to open Build.',
        extra=[
-           # Dragonflies run out of fuel and crash after a minute: send more until a Javelin is here.
+           # Dragonflies run out of fuel and crash after a minute: while the step is open and no
+           # Javelin has come to shoot them, send another pair, so there is always one to shoot.
            T('moreDrones', {'t': 'and', 'conds': [{'t': 'objectiveDone', 'id': 'airfield'},
-                                                  {'t': 'not', 'cond': {'t': 'objectiveDone', 'id': 'antiair'}},
+                                                  not_({'t': 'objectiveDone', 'id': 'antiair'}),
                                                   {'t': 'unitsAlive', 'tag': 'drones', 'op': '<=', 'count': 0},
-                                                  {'t': 'not', 'cond': has(H['missile'])}]},
+                                                  not_(has(H['missile']))]},
              spawn(2, A['dragonfly'], 2, 60, -60, tag='drones', launch=True), attack('drones', fx, fz), repeat=True),
        ])
 

@@ -59,6 +59,17 @@ test('[MSN-05] locked missions are greyed, the next one unlocks on a win and pro
       timeout: 30_000,
     })
     .toBe(true);
+  // Once the drive step is done, Command tops the ore up to the Bastion Gun's price.
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const snap = window.__TC_TEST__?.snapshot() as unknown as { resources: Array<{ player: number; ore: number }> };
+          return snap.resources.find((r) => r.player === 1)?.ore ?? 0;
+        }),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThanOrEqual(150);
   await buy('structure.human.turret');
   await page.waitForFunction(() => window.__TC_TEST__?.screen() === 'results', undefined, { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: 'Mission complete' })).toBeVisible();
@@ -157,7 +168,7 @@ test('[SKR-01] every skirmish setup option takes effect in the started match', a
   await page.getByRole('button', { name: 'Skirmish', exact: true }).click();
   // Two AIs need a four-player map; the last map in the list is one.
   await page.getByRole('button', { name: 'Previous map', exact: true }).click();
-  await expect(page.locator('.map-name')).toContainText('4 players');
+  await expect(page.locator('.map-name')).toContainText('Up to 3 sides');
   await page.getByRole('radio', { name: 'Opponents: 2 AI' }).click();
   await expect(page.getByRole('radio', { name: 'Opponents: 2 AI' })).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('radio', { name: 'Your side: Arcadians' }).click();

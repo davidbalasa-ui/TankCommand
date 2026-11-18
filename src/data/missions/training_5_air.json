@@ -13,7 +13,6 @@
       "ore": 300,
       "metal": 0,
       "available": [
-        "unit.human.light_tank",
         "unit.human.missile_tank",
         "structure.human.air_base",
         "unit.human.fighter"
@@ -121,11 +120,6 @@
           "text": "Arcadian Dragonflies overhead! They only hunt aircraft, but our Lancers cannot touch them."
         },
         {
-          "t": "grant",
-          "side": 1,
-          "ore": 200
-        },
-        {
           "t": "spawn",
           "side": 2,
           "unitType": "unit.alien.dragonfly",
@@ -143,6 +137,50 @@
           "z": 40
         }
       ]
+    },
+    {
+      "id": "airfieldTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "airfield"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "structureBuilt",
+              "side": 1,
+              "structureType": "structure.human.air_base"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 300
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 300
+        }
+      ],
+      "repeat": true
     },
     {
       "id": "antiair",
@@ -188,13 +226,58 @@
           "t": "message",
           "speaker": "Command",
           "text": "Only missiles, missile towers and fighters can hit aircraft."
+        }
+      ]
+    },
+    {
+      "id": "antiairTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "airfield"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "antiair"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.missile_tank",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 200
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
         },
         {
           "t": "grant",
           "side": 1,
-          "ore": 300
+          "ore": 200
         }
-      ]
+      ],
+      "repeat": true
     },
     {
       "id": "falcon",
@@ -228,6 +311,56 @@
           "kind": "primary"
         }
       ]
+    },
+    {
+      "id": "falconTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "antiair"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "falcon"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.fighter",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 300
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 300
+        }
+      ],
+      "repeat": true
     },
     {
       "id": "fly",
@@ -267,6 +400,56 @@
           "text": "Falcons carry little fuel and ammunition. They return to the Airfield by themselves."
         }
       ]
+    },
+    {
+      "id": "flyTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "falcon"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "fly"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.fighter",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 300
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 300
+        }
+      ],
+      "repeat": true
     },
     {
       "id": "strike",

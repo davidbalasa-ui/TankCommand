@@ -174,7 +174,7 @@
 | AIR-04 | Fighters can shoot air; bombers never target air. |
 | AIR-05 | Aircraft ammo is spent one per attack run (one per shot for single-shot weapons, one per burst otherwise) and an empty aircraft stops firing. |
 | AIR-06 | Interceptors (air-only weapons, e.g. the Arcadian Dragonfly) never fire at ground units or structures; the computer buys them only against enemy aircraft and never sends them on ground strikes. |
-| MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
+| MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. Every unit and structure type named in a trigger condition, a spawn or a buy list must exist in the loaded data (buildMissionWorld throws on a typo). |
 | MSN-02 | Every condition and action type has a unit test that fires it. |
 | MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). Training lessons are the exception: they cannot be lost (TRN-02). |
 | MSN-04 | No placeholder mission can reach a state with no way to win or lose. |
@@ -182,11 +182,12 @@
 | TRN-02 | A training lesson cannot be lost: a player who does nothing for ten minutes is never defeated. |
 | TRN-03 | A lesson shows only the current step's goal ring; later steps' rings appear once the step before is done. |
 | TRN-04 | The training chain holds exactly the five lessons. |
+| TRN-05 | A lesson cannot soft-lock: a player who spends all ore on the wrong things at the start of each step still wins, because Command tops up the ore a step needs while the step is open and its item is unaffordable (a lost Javelin or Falcon is replaced the same way). Dragonflies that crash for lack of fuel before a Javelin arrives are sent again. |
 | MSN-05 | Completing a mission unlocks the next; progress persists across reload; reached missions can be replayed. |
 | MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
 | MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
-| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). A map seats one side per start: two-player maps offer 1 AI, four-player maps 1 or 2 AI. |
+| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). A map seats one side per start: two-player maps offer 1 AI; four-player maps offer 1 or 2 AI and are labelled "Up to 3 sides" (3 AI would mean 4 × 64 = 256 units, past the 192-unit stress test, C-08). Side 3 takes start 3, equally far from sides 1 and 2; start 4 stays empty. |
 | SKR-02 | Every side starts with the same layout of tanks, miner and tug round its pad, turned to face the middle of the map. |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |

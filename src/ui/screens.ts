@@ -481,7 +481,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         if (map?.preview) {
           const ore = map.preview.deposits.filter((d) => d.kind !== 'metal').length;
           const metal = map.preview.deposits.length - ore;
-          info.textContent = `${map.preview.starts.length} players · ${ore} ore · ${metal} metal`;
+          // A match seats you and at most MAX_AI_OPPONENTS AI (the stress-tested unit cap), so a
+          // four-start map holds up to three sides; the spare start is drawn faded.
+          const sides = Math.min(map.preview.starts.length, MAX_AI_OPPONENTS + 1);
+          const seats = sides > 2 ? `Up to ${sides} sides` : `${sides} sides`;
+          info.textContent = `${seats} · ${ore} ore · ${metal} metal`;
         }
         mapName.replaceChildren(title, info);
         preview.querySelectorAll('.spawn').forEach((node) => {
@@ -991,7 +995,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           'Research also opens upgrades: select vehicles, tap Upgrade, and buy one for each vehicle.',
         ]],
         ['air', 'Air and sight', [
-          'Aircraft need a free slot at an air base (Airfield or Aerie). Tap one, tap Launch, then tap where to fly.',
+          'Aircraft need a free slot at an air base (Airfield or Aerie). Tap an aircraft, then Launch, then tap where to fly.',
           'Many ground weapons cannot hit aircraft: bring anti-air units or towers.',
           'Dark ground is unexplored; you only see what your units, buildings and radar can see.',
         ]],

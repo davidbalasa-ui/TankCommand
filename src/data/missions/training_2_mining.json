@@ -144,7 +144,7 @@
           "t": "setObjective",
           "id": "bank",
           "status": "add",
-          "text": "Bank 400 ore. Your ore count is at the top left",
+          "text": "Bank 400 ore. Your ore count is at the top of the screen",
           "kind": "primary"
         },
         {
@@ -153,6 +153,106 @@
           "text": "Two crews dig twice as fast. Keep an idle miner busy: tap it, then an ore field."
         }
       ]
+    },
+    {
+      "id": "crewTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "dig"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "crew"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.ore_miner",
+              "op": ">=",
+              "count": 2
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ],
+      "repeat": true
+    },
+    {
+      "id": "crewTopUp2",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "dig"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "crew"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.tug",
+              "op": ">=",
+              "count": 2
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 50
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 50
+        }
+      ],
+      "repeat": true
     },
     {
       "id": "bank",
@@ -215,6 +315,56 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "id": "spendTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "bank"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "spend"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.light_tank",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ],
+      "repeat": true
     }
   ],
   "relations": [],
