@@ -41,7 +41,7 @@ const MAX_AI_OPPONENTS = 2;
 const DIFFICULTY_LABELS: Record<CampaignDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 // Matches DIFFICULTY_TUNING in src/data/missions.ts.
 const DIFFICULTY_NOTES: Record<CampaignDifficulty, string> = {
-  easy: 'Enemy commanders play one level easier and start with 25% less ore and metal. You start with 25% more ore.',
+  easy: 'You start with 25% more ore, and enemy commanders of normal skill play one level easier.',
   normal: 'Every mission as designed. Training is the same on every difficulty.',
   hard: 'Enemy commanders play one level harder and start with 25% more ore and metal. You start with 20% less ore.',
 };
@@ -998,7 +998,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           // The old match's autosaves go first, so Continue never offers the abandoned run.
           again.disabled = true;
           void (async () => {
-            await ctx.api?.discardMatch();
+            // Storage trouble must not leave the player stuck on the pause menu.
+            await ctx.api?.discardMatch().catch(() => undefined);
             ctx.go('loading');
           })();
         });
@@ -1030,7 +1031,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           // Nor does Continue offer a match quit without saving (its earlier autosaves go too).
           quitNow.disabled = true;
           void (async () => {
-            await ctx.api?.discardMatch();
+            // Storage trouble must not leave the player stuck on the pause menu.
+            await ctx.api?.discardMatch().catch(() => undefined);
             ctx.go('title');
           })();
         });

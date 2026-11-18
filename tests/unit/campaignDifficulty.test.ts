@@ -47,7 +47,7 @@ describe('[MSN-05] campaign difficulty', () => {
     }
   });
 
-  it('[MSN-05] Easy and Hard move the AI a level and scale the starting stock', () => {
+  it('[MSN-05] Easy and Hard move the AI a level and scale the starting stock (Hard: also the AI)', () => {
     const row = mission('mission.human.14_counterpunch');
     const ai = row.sides.find((side) => side.controller === 'ai');
     const human = row.sides.find((side) => side.controller === 'human');
@@ -60,20 +60,21 @@ describe('[MSN-05] campaign difficulty', () => {
     expect(hard.mission?.def.difficulty).toBe('hard');
     expect(sideOre(easy, human?.player ?? 1).ore).toBe(Math.round((human?.ore ?? 0) * 1.25));
     expect(sideOre(hard, human?.player ?? 1).ore).toBe(Math.round((human?.ore ?? 0) * 0.8));
-    expect(sideOre(easy, ai?.player ?? 2).metal).toBe(Math.round((ai?.metal ?? 0) * 0.75));
+    // Easy leaves the AI's stock as written (a poorer AI turtles, which made Easy harder).
+    expect(sideOre(easy, ai?.player ?? 2).metal).toBe(ai?.metal ?? 0);
     expect(sideOre(hard, ai?.player ?? 2).metal).toBe(Math.round((ai?.metal ?? 0) * 1.25));
 
     // Levels stop at the ends of the scale.
     const broodWar = mission('mission.human.20_brood_war');
     expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'hard' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'normal']);
-    expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'easy' }).aiStates.map((s) => s.difficulty)).toEqual(['normal', 'easy']);
+    // Easy leaves a Hard side as it is (the Normal level hits harder early than Hard).
+    expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'easy' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'easy']);
   });
 });
 
-// A sample across both campaigns, early and late, scripted enemies and AI ones. (All 44 were
-// checked once: the bot wins 42 on Easy. It loses the two two-base missions (20), which it only
-// just wins on Normal with a plan tuned to the written enemy; it loses one of them even with the
-// AI levels unchanged, so the loss is the bot's fragility there, not Easy being harder.)
+// A sample across both campaigns, early and late, scripted enemies and AI ones. (Every mission
+// with an AI enemy is played on Easy, Normal and Hard over several world seeds by the
+// missionSeeds soak, DIFFICULTIES=easy,normal,hard.)
 const EASY_SAMPLE: Array<[string, BotPlan]> = [
   ['mission.human.04_first_strike', {}],
   ['mission.human.14_counterpunch', {}],

@@ -157,6 +157,9 @@ export function computePath(
   return path;
 }
 
+// A path point this close to a leg end is that leg end, m.
+const LEG_END_ON = 0.5;
+
 /** The leg ends still ahead of a unit on a queued move (none for any other order). */
 export function queuedLegs(unit: UnitState): Point[] {
   const queued = (unit.order.kind === 'move' || unit.order.kind === 'attackMove') && unit.order.queue;
@@ -187,21 +190,26 @@ export function routeThroughLegs(world: WorldState, unit: UnitState, goalX: numb
   return path;
 }
 
-// Index of the path point that ends the current leg: the one nearest the leg end (the first of
-// equals). Past it lies the next leg, which the unit must not cut across to.
+// Index of the path point that ends the current leg: the first one on the leg end, else the one
+// nearest it (a leg end on blocked ground is planned to the nearest open spot). Past it lies the
+// next leg, which the unit must not cut across to. Taking the first point on it keeps a later leg
+// that runs back through the same spot from being mistaken for this one.
 function legEndIndex(path: readonly Point[], leg: Point | undefined): number {
   if (!leg) {
     return path.length - 1;
   }
   let best = path.length - 1;
   let bestDistance = Infinity;
-  path.forEach((point, index) => {
+  for (const [index, point] of path.entries()) {
     const d = Math.hypot(point.x - leg.x, point.z - leg.z);
+    if (d <= LEG_END_ON) {
+      return index;
+    }
     if (d < bestDistance) {
       bestDistance = d;
       best = index;
     }
-  });
+  }
   return best;
 }
 

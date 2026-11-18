@@ -101,18 +101,27 @@ export const MISSION_MAP_SEED = 1;
 const LEVELS: readonly AiDifficulty[] = ['easy', 'normal', 'hard'];
 
 /**
- * Campaign difficulty. Normal is each mission exactly as written. Easy and Hard move every AI
- * side's level one step (within easy..hard) and scale the starting ore and metal of the enemy
- * AI sides; most missions' enemies are scripted rather than AI, so the player's own starting
- * ore is scaled the other way too, which is the lever every mission has.
+ * Campaign difficulty. Normal is each mission exactly as written. Hard moves every AI side's
+ * level one step up (within easy..hard) and gives it more starting ore and metal; Easy moves a
+ * Normal side down to Easy. Most missions' enemies are scripted rather than AI, so the player's
+ * own starting ore is scaled the other way too, which is the lever every mission has.
+ *
+ * What Easy leaves alone, from the seed soak (scripted beginner, 5-10 seeds per mission):
+ * - the AI's starting stock: a poorer AI kept its army home rather than spending it in the
+ *   field, and the player's push met it at its base (Two Banners 2/5 on Easy, 5/5 on Normal);
+ * - a Hard side: the Normal level spends on its army where Hard spends on towers and air, so it
+ *   hits harder early (Vesper Falls 6/10 with Hard moved to Normal, 9/10 on Normal and Easy).
  */
 export const DIFFICULTY_TUNING: Record<AiDifficulty, { aiStep: number; aiStock: number; playerOre: number }> = {
-  easy: { aiStep: -1, aiStock: 0.75, playerOre: 1.25 },
+  easy: { aiStep: -1, aiStock: 1, playerOre: 1.25 },
   normal: { aiStep: 0, aiStock: 1, playerOre: 1 },
   hard: { aiStep: 1, aiStock: 1.25, playerOre: 0.8 },
 };
 
 function shiftLevel(level: AiDifficulty, step: number): AiDifficulty {
+  if (step < 0 && level === 'hard') {
+    return level;
+  }
   const index = Math.min(LEVELS.length - 1, Math.max(0, LEVELS.indexOf(level) + step));
   return LEVELS[index] ?? level;
 }
