@@ -35,11 +35,15 @@ test('[SAVE-06] a manual save loads from the title screen, and deleting a slot a
   await tap(page, 'saveSlots.save2');
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.lastSaveOutcome()?.status ?? '')).toBe('ok');
   await expect(page.locator('[data-slot="manual-2"] .save-title')).toHaveText('Skirmish');
+  // An autosave of this match, then Quit without saving: Continue must not offer it.
+  await page.evaluate(() => window.__TC_TEST__?.requestAutosave());
   await tap(page, 'saveSlots.back');
   await waitScreen(page, 'pause');
   await tap(page, 'pause.quit');
   await tap(page, 'pause.confirmQuit');
   await waitScreen(page, 'title');
+  expect(await page.evaluate(async () => (await window.__TC_TEST__?.latestAutosaveSlot()) ?? null)).toBeNull();
+  await expect(page.locator('[data-control-id="title.resume"]')).toBeHidden();
 
   // A fresh launch: the title screen opens the saved games.
   await page.reload();
@@ -142,4 +146,17 @@ test('[MSN-05] campaign difficulty is chosen, kept and shown; objectives open fr
   await waitScreen(page, 'pause');
   // Still paused under the pause card after looking at the objectives.
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.isSimPaused() ?? false)).toBe(true);
+
+  // A mission's pause menu has all eight entries in two columns of four rows, on screen at 915x412.
+  const items = page.locator('.pause-card button.pause-item');
+  await expect(items).toHaveCount(8);
+  const boxes = await items.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect));
+  const rows = new Set(boxes.map((box) => Math.round(box.top)));
+  expect(rows.size).toBe(4);
+  for (const box of boxes) {
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.bottom).toBeLessThanOrEqual(412);
+    expect(box.height).toBeGreaterThanOrEqual(40);
+  }
+  await page.screenshot({ path: 'test-results/shots/saves-5-mission-pause.png' });
 });

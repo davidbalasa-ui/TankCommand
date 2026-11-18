@@ -13,11 +13,21 @@ export interface SaveMeta {
   savedAtIso: string;
   /** Which match the save belongs to, so the saves of a finished match can be cleared. */
   matchId?: string;
+  /** How a skirmish was set up (the app's own record), so Restart can rebuild it after a load. */
+  skirmish?: unknown;
 }
 
 /** Extra facts stored beside the world in a save's envelope (outside the checksummed payload). */
 export interface SaveExtras {
   matchId?: string;
+  skirmish?: unknown;
+}
+
+function extrasOf(meta: SaveExtras): SaveExtras {
+  return {
+    ...(meta.matchId ? { matchId: meta.matchId } : {}),
+    ...(meta.skirmish !== undefined ? { skirmish: meta.skirmish } : {}),
+  };
 }
 
 export type DecodeFailureReason = 'corrupt' | 'checksum' | 'incompatible' | 'not-a-save';
@@ -59,7 +69,7 @@ export function encodeSave(world: WorldState, meta: SaveMeta): string {
     schema: CURRENT_SAVE_SCHEMA,
     gameVersion: meta.gameVersion,
     savedAtIso: meta.savedAtIso,
-    ...(meta.matchId ? { matchId: meta.matchId } : {}),
+    ...extrasOf(meta),
     checksum,
     payload,
   });
@@ -117,7 +127,7 @@ export function decodeSave(text: string): DecodeSaveResult {
     return {
       ok: true,
       world,
-      meta: { gameVersion, savedAtIso, ...(matchId ? { matchId } : {}) },
+      meta: { gameVersion, savedAtIso, ...extrasOf({ matchId, skirmish: isRecord(parsed.skirmish) ? parsed.skirmish : undefined }) },
     };
   } catch {
     return { ok: false, reason: 'corrupt' };
@@ -159,7 +169,7 @@ export class SaveManager {
     const text = encodeSave(world, {
       gameVersion: this.gameVersion,
       savedAtIso: this.now().toISOString(),
-      ...(extras.matchId ? { matchId: extras.matchId } : {}),
+      ...extrasOf(extras),
     });
     const key = this.key(slot);
     const size = byteLength(text);
@@ -214,13 +224,15 @@ export class SaveManager {
     }
   }
 
-  async autosave(world: WorldState, extras: SaveExtras = {}): Promise<void> {
+  /** Writes the next slot of the autosave rotation and returns which one it was. */
+  async autosave(world: WorldState, extras: SaveExtras = {}): Promise<string> {
     await this.ensureLoaded();
     const slot = `auto-${this.autoCursor % 3}`;
     await this.save(slot, world, extras);
     this.lastAutoSlot = slot;
     this.autoCursor = (this.autoCursor + 1) % 3;
     await this.kv.set(AUTO_CURSOR_KEY, String(this.autoCursor));
+    return slot;
   }
 
   async latestAutosaveSlot(): Promise<string | null> {
@@ -269,7 +281,7 @@ export class SaveManager {
         ? { status: 'incompatible' }
         : { status: 'invalid' };
     }
-    await this.save(slot, decoded.world, decoded.meta.matchId ? { matchId: decoded.meta.matchId } : {});
+    await this.save(slot, decoded.world, extrasOf(decoded.meta));
     return {
       status: 'ok',
       save: { world: decoded.world, meta: decoded.meta },

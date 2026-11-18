@@ -989,16 +989,24 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         return text;
       };
 
-      add('restart', world?.mission ? 'Restart mission' : 'Restart match', 'restart', () => {
+      // A skirmish saved before setups were kept with saves can't be rebuilt: no Restart then.
+      const restart = (): void => {
         if (confirmPanel) {
           return;
         }
         const again = button('pause', 'confirmRestart', 'Restart', () => {
-          ctx.go('loading');
+          // The old match's autosaves go first, so Continue never offers the abandoned run.
+          void (async () => {
+            await ctx.api?.discardMatch();
+            ctx.go('loading');
+          })();
         });
         again.classList.add('danger');
         confirm(`${world?.mission ? 'Restart this mission' : 'Restart this match'} from the beginning? Progress since the start is lost.`, [again], 'cancelRestart');
-      });
+      };
+      if (ctx.canRestart?.() ?? true) {
+        add('restart', world?.mission ? 'Restart mission' : 'Restart match', 'restart', restart);
+      }
 
       const quit = add('quit', 'Quit to title', 'x', () => {
         if (confirmPanel) {
@@ -1018,7 +1026,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         });
         saveQuit.classList.add('primary');
         const quitNow = button('pause', 'confirmQuit', 'Quit without saving', () => {
-          ctx.go('title');
+          // Nor does Continue offer a match quit without saving (its earlier autosaves go too).
+          void (async () => {
+            await ctx.api?.discardMatch();
+            ctx.go('title');
+          })();
         });
         quitNow.classList.add('danger');
         const question = confirm('Quit this match? Save & quit lets you continue it from the title screen.', [saveQuit, quitNow], 'cancelQuit');
@@ -1203,13 +1215,15 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             }
           }, true);
         }
-        action('retry', 'Retry', () => {
-          ctx.go('loading');
-        }, !(view.won && view.hasNext));
+        if (ctx.canRestart?.() ?? true) {
+          action('retry', 'Retry', () => {
+            ctx.go('loading');
+          }, !(view.won && view.hasNext));
+        }
         action('missions', 'Mission list', () => {
           ctx.go('missionSelect');
         });
-      } else {
+      } else if (ctx.canRestart?.() ?? true) {
         action('playAgain', 'Play again', () => {
           ctx.go('loading');
         }, true);

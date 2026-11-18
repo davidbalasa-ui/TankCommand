@@ -35,7 +35,10 @@ import { GameSpeed } from './speed';
 
 export interface GameServicesHost {
   getWorld(): WorldState;
-  loadWorld(world: WorldState, startMatch: boolean): void;
+  /** `skirmish` is the setup record a skirmish save carries (see matchSetup). */
+  loadWorld(world: WorldState, startMatch: boolean, skirmish?: unknown): void;
+  /** The running skirmish's setup record, kept with its saves so Restart works after a load. */
+  matchSetup?(): unknown;
   currentScreen(): string;
   inMatch(): boolean;
   setCameraTarget(x: number, z: number): void;
@@ -120,6 +123,10 @@ export class GameServices implements GameApi {
   private forceStorageFull = false;
   /** The running match: every save of it carries this id, so its autosaves go when it ends. */
   private matchId: string | null = null;
+  /** The autosave slot the running match was loaded from (old saves carry no match id). */
+  private loadedAutoSlot: string | null = null;
+  /** Autosave writes still in flight; clearing a match's autosaves waits for them. */
+  private readonly autoWrites = new Set<Promise<unknown>>();
 
   constructor(host: GameServicesHost, options: GameServicesOptions = {}) {
     this.host = host;
@@ -187,7 +194,9 @@ export class GameServices implements GameApi {
 
   async quitSave(): Promise<SaveActionResult> {
     const result = await this.writeSave(
-      () => this.manager.autosave(this.host.getWorld(), this.extras()),
+      async () => {
+        await this.trackAutosave(this.manager.autosave(this.host.getWorld(), this.extras()));
+      },
       'Saved. Continue on the title screen picks it up.',
     );
     if (result.status === 'ok') {
@@ -210,7 +219,8 @@ export class GameServices implements GameApi {
     const result = this.fromLoadResult(loaded);
     if (result.status === 'ok' && loaded.status === 'ok') {
       this.matchId = loaded.save.meta.matchId ?? newMatchId();
-      this.host.loadWorld(loaded.save.world, !this.host.inMatch());
+      this.loadedAutoSlot = slot.startsWith('auto-') ? slot : null;
+      this.host.loadWorld(loaded.save.world, !this.host.inMatch(), loaded.save.meta.skirmish);
       result.savedAtIso = loaded.save.meta.savedAtIso;
     }
     this.lastLoadResult = result;
@@ -272,18 +282,39 @@ export class GameServices implements GameApi {
   /** A new match is starting: its saves get a fresh match id. */
   beginMatch(): void {
     this.matchId = newMatchId();
+    this.loadedAutoSlot = null;
   }
 
   /** The running match ended: its autosaves can't be played on, so Continue stops offering them. */
   async finishMatch(): Promise<void> {
+    await this.discardMatch();
+  }
+
+  /**
+   * Drops the running match's autosaves (it ended, was restarted or was quit without saving), so
+   * Continue never offers it: every autosave carrying its id, the autosave it was loaded from
+   * (a save from before match ids has none), and any autosave holding a finished result.
+   */
+  async discardMatch(): Promise<void> {
     const finished = this.matchId;
+    const loadedSlot = this.loadedAutoSlot;
     this.matchId = null;
+    this.loadedAutoSlot = null;
+    // An autosave still being written would otherwise land after the clean-up.
+    while (this.autoWrites.size > 0) {
+      await Promise.allSettled([...this.autoWrites]);
+    }
     const slots = (await this.manager.listSlots()).filter((slot) => slot.startsWith('auto-'));
     for (const slot of slots) {
       const loaded = await this.manager.load(slot);
+      if (loaded.status !== 'ok') {
+        continue;
+      }
+      const id = loaded.save.meta.matchId;
       const ended =
-        loaded.status === 'ok' &&
-        (loaded.save.world.result !== null || (finished !== null && loaded.save.meta.matchId === finished));
+        loaded.save.world.result !== null ||
+        (finished !== null && id === finished) ||
+        (slot === loadedSlot && (id === undefined || id === finished));
       if (ended) {
         await this.manager.remove(slot);
       }
@@ -325,9 +356,11 @@ export class GameServices implements GameApi {
       return result;
     }
     const matchId = decoded.meta.matchId ?? newMatchId();
+    const extras = { matchId, ...(decoded.meta.skirmish !== undefined ? { skirmish: decoded.meta.skirmish } : {}) };
     // An import goes into the first empty manual slot. With none free it becomes the latest
     // autosave rather than overwriting one of the player's own saves.
     let slot: string | null = null;
+    let autoSlot: string | null = null;
     for (let index = 1; index <= MANUAL_SLOTS && slot === null; index += 1) {
       if ((await this.manager.load(`manual-${index}`)).status === 'missing') {
         slot = `manual-${index}`;
@@ -335,9 +368,9 @@ export class GameServices implements GameApi {
     }
     try {
       if (slot) {
-        await this.manager.save(slot, decoded.world, { matchId });
+        await this.manager.save(slot, decoded.world, extras);
       } else {
-        await this.manager.autosave(decoded.world, { matchId });
+        autoSlot = await this.trackAutosave(this.manager.autosave(decoded.world, extras));
       }
     } catch (error) {
       const result: ImportSaveResult =
@@ -348,8 +381,12 @@ export class GameServices implements GameApi {
       return result;
     }
     this.matchId = matchId;
-    this.host.loadWorld(decoded.world, !this.host.inMatch());
-    const where = slot ? ` into slot ${slot.slice('manual-'.length)}` : '';
+    this.loadedAutoSlot = autoSlot;
+    this.host.loadWorld(decoded.world, !this.host.inMatch(), decoded.meta.skirmish);
+    // Say where it went: a manual slot, or (all five full) the autosaves that Continue reads.
+    const where = slot
+      ? ` into slot ${slot.slice('manual-'.length)}`
+      : ' as the latest autosave (all save slots are full); Continue on the title screen picks it up';
     const result: ImportSaveResult = { status: 'ok', message: `Save imported${where}.` };
     this.lastImportResult = result;
     return result;
@@ -513,9 +550,22 @@ export class GameServices implements GameApi {
     this.alertsCenter.dispose();
   }
 
+  private trackAutosave<T>(write: Promise<T>): Promise<T> {
+    this.autoWrites.add(write);
+    const settle = (): void => {
+      this.autoWrites.delete(write);
+    };
+    write.then(settle, settle);
+    return write;
+  }
+
   private async autosaveNow(): Promise<void> {
+    // No match id: the match is being discarded or has ended, and nothing of it should be kept.
+    if (this.matchId === null) {
+      return;
+    }
     try {
-      await this.manager.autosave(this.host.getWorld(), this.extras());
+      await this.trackAutosave(this.manager.autosave(this.host.getWorld(), this.extras()));
       this.lastAutoAt = Date.now();
     } catch (error) {
       if (error instanceof StorageFullError) {
@@ -525,7 +575,11 @@ export class GameServices implements GameApi {
   }
 
   private extras(): SaveExtras {
-    return this.matchId ? { matchId: this.matchId } : {};
+    const skirmish = this.host.matchSetup?.();
+    return {
+      ...(this.matchId ? { matchId: this.matchId } : {}),
+      ...(skirmish !== undefined ? { skirmish } : {}),
+    };
   }
 
   private describe(world: WorldState): string {

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { GameServices, type GameServicesHost } from '../../src/game/services';
 import { MemoryKvStore } from '../../src/platform/kv';
 import { SettingsStore } from '../../src/platform/settings';
+import { encodeSave } from '../../src/platform/saves';
 import { createWorld, hashWorld } from '../../src/sim/world';
 import type { WorldState } from '../../src/sim/types';
 
@@ -11,19 +12,26 @@ interface Harness {
   kv: MemoryKvStore;
   setWorld(world: WorldState): void;
   loaded: WorldState[];
+  /** The skirmish setup record handed over with each load. */
+  setups: unknown[];
+  setSetup(setup: unknown): void;
 }
 
 const open: GameServices[] = [];
 
 function harness(kv = new MemoryKvStore()): Harness {
   let world = createWorld(1);
+  let setup: unknown = undefined;
   const loaded: WorldState[] = [];
+  const setups: unknown[] = [];
   const host: GameServicesHost = {
     getWorld: () => world,
-    loadWorld: (next) => {
+    loadWorld: (next, _start, skirmish) => {
       world = next;
       loaded.push(next);
+      setups.push(skirmish);
     },
+    matchSetup: () => setup,
     currentScreen: () => 'inGame',
     inMatch: () => true,
     setCameraTarget: () => undefined,
@@ -42,6 +50,10 @@ function harness(kv = new MemoryKvStore()): Harness {
       world = next;
     },
     loaded,
+    setups,
+    setSetup: (next) => {
+      setup = next;
+    },
   };
 }
 
@@ -86,6 +98,51 @@ describe('[SAVE-09] continue, quit-save and save slots', () => {
     expect(await h.services.latestAutosave()).toBeNull();
   });
 
+  it('[SAVE-09] a loaded autosave from before match ids is cleared when its match ends', async () => {
+    const h = harness();
+    await h.services.writeRawSave('auto-0', encodeSave(createWorld(31), { gameVersion: 't', savedAtIso: '2026-01-01T00:00:00Z' }));
+    expect((await h.services.resumeLastGame()).status).toBe('ok');
+    await h.services.finishMatch();
+    expect(await h.services.latestAutosave()).toBeNull();
+  });
+
+  it('[SAVE-09] an autosave still being written when the match ends is cleared too', async () => {
+    const h = harness();
+    h.services.beginMatch();
+    h.setWorld(createWorld(32));
+    const writing = h.services.requestAutosave();
+    await h.services.finishMatch();
+    await writing;
+    expect(await h.services.latestAutosave()).toBeNull();
+  });
+
+  it('[SAVE-09] quit without saving and restart drop the match from Continue, older saves stay', async () => {
+    const h = harness();
+    h.services.beginMatch();
+    h.setWorld(createWorld(41));
+    await h.services.quitSave();
+    // A second match autosaves, then is abandoned (Quit without saving, or Restart).
+    h.services.beginMatch();
+    h.setWorld(createWorld(42));
+    await h.services.requestAutosave();
+    await h.services.discardMatch();
+    expect((await h.services.latestAutosave())?.title).toBe('match 41');
+    // Nothing more of the abandoned match is written while it is being dropped.
+    await h.services.requestAutosave();
+    expect((await h.services.latestAutosave())?.title).toBe('match 41');
+  });
+
+  it('[SAVE-11] a skirmish save carries its setup, handed back on load', async () => {
+    const h = harness();
+    h.services.beginMatch();
+    const setup = { config: { faction: 'alien', opponents: [{ faction: 'human', difficulty: 'hard' }], resources: 'low', force: 'padOnly', mapId: 'm', fog: false }, mapId: 'm', fog: false, ai: true };
+    h.setSetup(setup);
+    h.setWorld(createWorld(51));
+    await h.services.saveToSlot('manual-1');
+    expect((await h.services.loadFromSlot('manual-1')).status).toBe('ok');
+    expect(h.setups.at(-1)).toEqual(setup);
+  });
+
   it('[SAVE-09] an autosave holding a finished result is never offered', async () => {
     const h = harness();
     h.services.beginMatch();
@@ -117,7 +174,10 @@ describe('[SAVE-09] continue, quit-save and save slots', () => {
     const before = await Promise.all([1, 2, 3, 4, 5].map((index) => h.kv.get(`save:manual-${index}`)));
     h.setWorld(createWorld(999));
     const text = await h.services.exportSave();
-    expect((await h.services.importSave(text)).status).toBe('ok');
+    const imported = await h.services.importSave(text);
+    expect(imported.status).toBe('ok');
+    // It says where the save went when no manual slot was free.
+    expect(imported.message).toMatch(/autosave.*Continue/);
     const after = await Promise.all([1, 2, 3, 4, 5].map((index) => h.kv.get(`save:manual-${index}`)));
     expect(after).toEqual(before);
     expect((await h.services.latestAutosave())?.title).toBe('match 999');

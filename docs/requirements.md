@@ -109,6 +109,7 @@
 | SAVE-08 | Load returns typed results; corrupt and incompatible saves show a clear message and never crash. |
 | SAVE-09 | Resume-last-game offered on start when an autosave exists; quit asks to save. |
 | SAVE-10 | Web export/import round-trips a save; storage-full shows a message. |
+| SAVE-11 | Restart and Retry rebuild the match being played, also after loading its save: a mission keeps the save's difficulty, a skirmish the setup its save carries (an old skirmish save without one offers no Restart). Restart and Quit without saving drop the match's autosaves, so Continue never offers it. |
 | SET-01 | Every setting persists across reload and takes effect immediately. |
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |

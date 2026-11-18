@@ -281,6 +281,8 @@ export interface ScreenContext {
   getMissionMessages?: () => MissionMessageView[];
   getResultView?: () => ResultView;
   chooseNextMission?: () => boolean;
+  /** Restart / Retry / Play again can rebuild the match (false for an old skirmish save). */
+  canRestart?: () => boolean;
   getSkirmishConfig?: () => SkirmishConfig;
   setSkirmishConfig?: (config: SkirmishConfig) => void;
   getSkirmishMaps?: () => Array<{ id: string; name: string; preview?: BriefingView['map'] }>;

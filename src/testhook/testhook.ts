@@ -92,6 +92,8 @@ export interface TestHook {
   audioStatus(): AudioStatusView;
   listSaveSlots(): Promise<SaveSlotSummary[]>;
   requestAutosave(): Promise<void>;
+  /** The slot Continue would resume, or null. */
+  latestAutosaveSlot(): Promise<string | null>;
   lastSaveOutcome(): SaveActionResult | null;
   lastLoadOutcome(): LoadSlotResult | null;
   lastImportOutcome(): ImportSaveResult | null;
@@ -174,6 +176,7 @@ export function installTestHook(app: App): void {
     audioStatus: () => app.audioStatus(),
     listSaveSlots: () => app.listSaveSlots(),
     requestAutosave: () => app.requestAutosave(),
+    latestAutosaveSlot: () => app.latestAutosaveSlot(),
     lastSaveOutcome: () => app.lastSaveOutcome(),
     lastLoadOutcome: () => app.lastLoadOutcome(),
     lastImportOutcome: () => app.lastImportOutcome(),

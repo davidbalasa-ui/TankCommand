@@ -281,6 +281,7 @@ export interface TestHook {
   audioStatus(): AudioStatus;
   listSaveSlots(): Promise<SaveSlotSummaryView[]>;
   requestAutosave(): Promise<void>;
+  latestAutosaveSlot(): Promise<string | null>;
   lastSaveOutcome(): SaveOutcomeView | null;
   lastLoadOutcome(): SaveOutcomeView | null;
   lastImportOutcome(): SaveOutcomeView | null;

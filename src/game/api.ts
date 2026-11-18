@@ -65,6 +65,8 @@ export interface GameApi {
   deleteSlot(slot: string): Promise<SaveActionResult>;
   /** Saves the running match for Continue on the title screen (never into a manual slot). */
   quitSave(): Promise<SaveActionResult>;
+  /** Drops the running match's autosaves (restart, quit without saving), so Continue skips it. */
+  discardMatch(): Promise<void>;
   /** The newest autosave of a match that has not ended, or null. */
   latestAutosave(): Promise<AutosaveSummary | null>;
   resumeLastGame(): Promise<LoadSlotResult>;

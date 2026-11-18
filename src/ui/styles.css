@@ -4131,7 +4131,8 @@ html.quality-low .title-embers {
   color: var(--orange);
 }
 
-/* The pause list holds up to eight entries: two columns keep them on a 412 px-tall phone. */
+/* The pause list holds up to eight entries: two columns (four rows) keep them on a 412 px-tall
+   phone. Quit takes a cell like the rest, so seven entries still fit in four rows. */
 .pause-card .pause-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4143,6 +4144,3 @@ html.quality-low .title-embers {
   font-size: 14px;
 }
 
-.pause-card button.pause-quit {
-  grid-column: 1 / -1;
-}
