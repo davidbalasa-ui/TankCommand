@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 7,
   "title": "Root and Ruin",
-  "briefing": "The colony lands its supplies in Kessra Valley. Grow the brood, then tear down their landing pad.",
+  "briefing": "The colonies land their supplies in Kessra Valley. Flares are ready to grow. Tear down their Landing Pad, and the plains are ours to feed on.",
   "mapId": "map.c_kessra_valley",
   "sides": [
     {
@@ -21,13 +21,14 @@
         "unit.alien.radar",
         "structure.alien.radar",
         "unit.alien.heavy_tank",
-        "structure.alien.metal_station"
+        "structure.alien.metal_station",
+        "unit.alien.missile_tank"
       ],
       "researchDone": [
         "research.alien.fortifications",
-        "research.alien.heavy_armor",
         "research.alien.missiles",
-        "research.alien.sensors"
+        "research.alien.sensors",
+        "research.alien.heavy_armor"
       ]
     },
     {
@@ -169,7 +170,7 @@
   "objectives": [
     {
       "id": "pad",
-      "text": "Destroy the Terran landing pad",
+      "text": "Destroy the Terran Landing Pad",
       "kind": "primary"
     }
   ],
@@ -183,8 +184,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Mine, build up, then strike. The valley has two ways in."
+          "speaker": "Matriarch",
+          "text": "Feed first, then swarm. Two paths lead into the valley."
         }
       ]
     },

@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 14,
   "title": "Breach",
-  "briefing": "The Terrans have walled a forward base behind the Iron Gate ridges. Break through and leave nothing standing.",
+  "briefing": "With the Iron Colonel dead, the Terrans are leaderless and afraid. Their forward base hides behind the Iron Gate ridges. Break through and leave nothing standing.",
   "mapId": "map.c_iron_gate",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
-        "unit.alien.glider"
+        "unit.alien.artillery",
+        "unit.alien.glider",
+        "structure.alien.missile_battery"
       ],
       "researchDone": [
         "research.alien.fortifications",
@@ -216,8 +216,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Three ways in. The guns cover the west gap; artillery can open it."
+          "speaker": "Matriarch",
+          "text": "Three paths in. Their guns watch the west one; Sunfalls can open it."
         }
       ]
     },

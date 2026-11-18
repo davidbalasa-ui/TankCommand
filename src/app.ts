@@ -1624,19 +1624,30 @@ export class App {
   private resultView(): ResultView {
     const mission = this.world.mission;
     if (!mission) {
-      return { mission: false, won: false, title: null, reason: null, hasNext: false };
+      return {
+        mission: false,
+        won: false,
+        title: null,
+        reason: null,
+        hasNext: false,
+        campaignComplete: false,
+        epilogue: null,
+      };
     }
     const row = MISSIONS.find((item) => item.id === mission.def.id);
     const won = this.world.result?.winner === mission.humanSide;
+    const hasNext = row ? nextMission(row) !== null : false;
+    const alien = row?.sides.find((side) => side.player === mission.humanSide)?.faction === 'alien';
+    const campaignComplete = won && !hasNext && row !== undefined && row.campaign !== 'training';
     const reasons: Record<string, string> = {
       timeout: 'Time ran out.',
       defeated: 'Your base was lost.',
-      padLost: 'Your landing pad was destroyed.',
+      padLost: alien ? 'Your Landing Ring was destroyed.' : 'Your landing pad was destroyed.',
       colonyLost: 'A colony fell.',
       bossEscaped: 'Your target escaped through the pass.',
       columnEscaped: 'The tank column got through the pass.',
       convoyEscaped: 'The convoy escaped.',
-      convoyLost: 'Too many Bulwarks were lost.',
+      convoyLost: 'A Bulwark was lost.',
       radarLost: 'The Watchman radar was destroyed.',
       vipLost: 'The supply hauler was destroyed.',
     };
@@ -1645,7 +1656,9 @@ export class App {
       won,
       title: row?.title ?? null,
       reason: mission.failReason ? (reasons[mission.failReason] ?? 'The mission failed.') : null,
-      hasNext: row ? nextMission(row) !== null : false,
+      hasNext,
+      campaignComplete,
+      epilogue: campaignComplete ? (row?.epilogue ?? null) : null,
     };
   }
 

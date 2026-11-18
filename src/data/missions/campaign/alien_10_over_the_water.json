@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 10,
   "title": "Over the Water",
-  "briefing": "A Terran camp sits beyond the river channels. Lumens must crawl round by the southern ford; Gliders skim straight over the water. Reach the far bank and raze the camp.",
+  "briefing": "A Terran camp sits beyond the river channels. Lumens must crawl round by the southern ford; our new Gliders skim straight over the water. Reach the far bank and raze the camp.",
   "mapId": "map.c_delta",
   "sides": [
     {
@@ -22,16 +22,19 @@
         "structure.alien.radar",
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
-        "unit.alien.glider",
-        "unit.alien.missile_tank"
+        "unit.alien.missile_tank",
+        "unit.alien.repair",
+        "unit.alien.artillery",
+        "unit.alien.glider"
       ],
       "researchDone": [
         "research.alien.fortifications",
         "research.alien.missiles",
         "research.alien.sensors",
         "research.alien.heavy_armor",
-        "research.alien.hover_drive",
-        "research.alien.heavy_ordnance"
+        "research.alien.heavy_ordnance",
+        "research.alien.field_repair",
+        "research.alien.hover_drive"
       ]
     },
     {
@@ -196,7 +199,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Gliders ride over water. Select them and tap the far bank."
         }
       ]
@@ -218,8 +221,8 @@
         },
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Far bank taken. Now the camp."
+          "speaker": "Matriarch",
+          "text": "The far bank is ours. Now the camp."
         }
       ]
     },
@@ -232,7 +235,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Raiders crossing toward the nest. The Sentinel will help."
         },
         {

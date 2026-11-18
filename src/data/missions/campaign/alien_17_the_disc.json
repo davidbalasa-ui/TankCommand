@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 17,
   "title": "The Disc",
-  "briefing": "The brood has grown its first saucers. A Terran tank column is crossing the plain toward the south-west pass. Burn it before it gets through.",
+  "briefing": "The brood has grown its first Discs, heavy saucers that burn whatever lies beneath them. A Terran tank column is crossing the plain toward the western pass. Burn it before it gets through.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -194,8 +194,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Saucers fly over the column and burn it. The Flare missile tank can shoot back: kill it first."
+          "speaker": "Matriarch",
+          "text": "Discs fly over the column and burn it. The Javelin missile tank can shoot back: kill it first."
         }
       ]
     },

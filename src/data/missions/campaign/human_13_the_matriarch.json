@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 13,
   "title": "The Matriarch",
-  "briefing": "An Arcadian Matriarch, a huge Aegis that leads their broods, is touring the valley with her guard. Hunt her down before she leaves through the south-east pass in ten minutes.",
+  "briefing": "Intercepts name the Arcadian leader on Vesper: the Matriarch. She rides an Aegis heavy tank and is touring the valley with her guard. Destroy her before she leaves through the north-east pass in ten minutes.",
   "mapId": "map.c_long_reach",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
-        "unit.human.hover_tank"
+        "unit.human.artillery",
+        "unit.human.hover_tank",
+        "structure.human.missile_battery"
       ],
       "researchDone": [
         "research.human.fortifications",
@@ -127,7 +127,7 @@
     },
     {
       "side": 2,
-      "unitType": "unit.alien.heavy_tank",
+      "unitType": "unit.alien.missile_tank",
       "x": 60,
       "z": -60,
       "heading": 2.356,
@@ -196,7 +196,7 @@
   "objectives": [
     {
       "id": "boss",
-      "text": "Destroy the Matriarch",
+      "text": "Destroy the Matriarch's Aegis",
       "kind": "primary"
     }
   ],
@@ -210,8 +210,15 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Watch the radar. She moves every couple of minutes; cut her off."
+          "speaker": "Col. Daska",
+          "text": "She rides the only Aegis in her guard. We will flag each place she heads for."
+        },
+        {
+          "t": "revealArea",
+          "x": 66,
+          "z": -66,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -235,6 +242,13 @@
           "mode": "attack",
           "x": 70,
           "z": 20
+        },
+        {
+          "t": "revealArea",
+          "x": 70,
+          "z": 20,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -258,6 +272,13 @@
           "mode": "attack",
           "x": 20,
           "z": 70
+        },
+        {
+          "t": "revealArea",
+          "x": 20,
+          "z": 70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -281,6 +302,13 @@
           "mode": "attack",
           "x": -40,
           "z": -10
+        },
+        {
+          "t": "revealArea",
+          "x": -40,
+          "z": -10,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -304,6 +332,13 @@
           "mode": "attack",
           "x": -70,
           "z": -70
+        },
+        {
+          "t": "revealArea",
+          "x": -70,
+          "z": -70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -327,6 +362,13 @@
           "mode": "attack",
           "x": 40,
           "z": -70
+        },
+        {
+          "t": "revealArea",
+          "x": 40,
+          "z": -70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -339,7 +381,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "She is making for the pass!"
         },
         {

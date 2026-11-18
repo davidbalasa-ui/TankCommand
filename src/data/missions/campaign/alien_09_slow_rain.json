@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 9,
   "title": "Slow Rain",
-  "briefing": "The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Lumens, but not the Sunfalls. Rain on the hill until every gun is gone.",
+  "briefing": "The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Lumens, but not our new Sunfalls. Rain on the hill until every gun is gone.",
   "mapId": "map.c_long_reach",
   "sides": [
     {
@@ -23,15 +23,16 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery"
+        "unit.alien.repair",
+        "unit.alien.artillery"
       ],
       "researchDone": [
         "research.alien.fortifications",
         "research.alien.missiles",
         "research.alien.sensors",
         "research.alien.heavy_armor",
-        "research.alien.heavy_ordnance"
+        "research.alien.heavy_ordnance",
+        "research.alien.field_repair"
       ]
     },
     {
@@ -190,17 +191,17 @@
   "objectives": [
     {
       "id": "guns",
-      "text": "Destroy the thornmounds on the hill",
+      "text": "Destroy the Bastion Guns on the hill",
       "kind": "primary"
     },
     {
       "id": "battery",
-      "text": "Destroy the missile battery",
+      "text": "Destroy the Harpoon Battery",
       "kind": "primary"
     },
     {
       "id": "camp",
-      "text": "Destroy the camp behind the hill",
+      "text": "Scout the camp behind the hill",
       "kind": "optional"
     }
   ],
@@ -214,7 +215,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Sunfalls strike from beyond the guns. Keep Lumens ahead of them to spot."
         }
       ]
@@ -228,8 +229,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Counter-attack coming off the hill!"
+          "speaker": "Matriarch",
+          "text": "They pour down off the hill at us!"
         },
         {
           "t": "spawn",

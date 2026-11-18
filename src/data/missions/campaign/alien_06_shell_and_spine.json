@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 6,
   "title": "Shell and Spine",
-  "briefing": "The Terrans hold a checkpoint at the end of the road: two Bastion guns and a radar tower. Bring your new Aegis tanks up the road and break it.",
+  "briefing": "The Terrans hold a checkpoint at the end of the road: two Bastion Guns and a Radar Tower. Bring your new Aegis tanks up the road and break it.",
   "mapId": "map.c_relay_road",
   "sides": [
     {
@@ -19,13 +19,14 @@
         "unit.alien.tug",
         "structure.alien.turret",
         "unit.alien.radar",
+        "structure.alien.radar",
         "unit.alien.heavy_tank"
       ],
       "researchDone": [
         "research.alien.fortifications",
-        "research.alien.heavy_armor",
         "research.alien.missiles",
-        "research.alien.sensors"
+        "research.alien.sensors",
+        "research.alien.heavy_armor"
       ]
     },
     {
@@ -137,12 +138,12 @@
   "objectives": [
     {
       "id": "guns",
-      "text": "Destroy both Bastion guns",
+      "text": "Destroy both Bastion Guns",
       "kind": "primary"
     },
     {
       "id": "radar",
-      "text": "Destroy the radar tower",
+      "text": "Destroy the Radar Tower",
       "kind": "primary"
     }
   ],
@@ -156,7 +157,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Aegis tanks shrug off gunfire. Lead with them; keep the Lumens behind."
         }
       ]

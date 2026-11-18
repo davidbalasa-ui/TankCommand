@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 8,
   "title": "Quiet Fields",
-  "briefing": "The front has gone quiet. Use the time: put a metal station on the seam by the colony, send the spare Hauler to carry the metal home, then research the Mender repair truck.",
+  "briefing": "The Kessra nest is ash, but the rift still hangs over Vesper and more of them will come. We dig in for a long war. Use the quiet: put a Metal Station on the seam by Tallis colony, then research the Mender repair truck.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -18,10 +18,11 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
+        "unit.human.missile_tank",
         "unit.human.repair"
       ],
       "researchDone": [
@@ -115,7 +116,7 @@
   "objectives": [
     {
       "id": "station",
-      "text": "Build a metal station",
+      "text": "Build a Metal Station",
       "kind": "primary"
     },
     {
@@ -139,8 +140,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Metal is for research only. Buy a metal station. It drives to the metal seam by itself."
+          "speaker": "Col. Daska",
+          "text": "Metal pays for research. Buy a Metal Station; it drives to the metal seam by itself."
         }
       ]
     },
@@ -160,8 +161,8 @@
         },
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Station up. Send the spare Hauler to it, then tap the locked Mender in the drop menu to research it."
+          "speaker": "Col. Daska",
+          "text": "Station up. Send the spare Hauler to it, then tap the locked Mender in Build to research it."
         }
       ]
     },
@@ -189,7 +190,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "A small scouting party is coming in from the east."
         },
         {

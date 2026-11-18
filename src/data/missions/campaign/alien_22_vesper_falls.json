@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 22,
   "title": "Vesper Falls",
-  "briefing": "The Coalition's last citadel stands beyond the rift. Destroy its command towers and every landing pad, and Vesper belongs to the swarm. The Shard will fire on both of us.",
+  "briefing": "The citadel's walls are down. Destroy its two Radar Towers, which carry its commands, and every Landing Pad, and Vesper belongs to the swarm. Keep clear of the Shard: it burns us still.",
   "mapId": "map.c_rift",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -49,7 +49,7 @@
       "controller": "ai",
       "ore": 500,
       "metal": 200,
-      "difficulty": "easy"
+      "difficulty": "hard"
     },
     {
       "player": 3,
@@ -286,18 +286,13 @@
   "objectives": [
     {
       "id": "towers",
-      "text": "Destroy the command towers",
+      "text": "Destroy both Radar Towers",
       "kind": "primary"
     },
     {
       "id": "pads",
-      "text": "Destroy every landing pad",
+      "text": "Destroy every Landing Pad",
       "kind": "primary"
-    },
-    {
-      "id": "shard",
-      "text": "Destroy the Shard",
-      "kind": "optional"
     }
   ],
   "triggers": [
@@ -310,28 +305,22 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The Shard fires on anything near it. Go round it, or break it."
+          "speaker": "Matriarch",
+          "text": "The Shard fires on anything near it. Go round it; the swarm needs it whole."
         }
       ]
     },
     {
-      "id": "shard",
+      "id": "reserves",
       "when": {
-        "t": "allDestroyed",
-        "side": 3,
-        "unitType": "structure.alien.shard_core"
+        "t": "time",
+        "tick": 12000
       },
       "do": [
         {
-          "t": "setObjective",
-          "id": "shard",
-          "status": "done"
-        },
-        {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The Shard is broken. The brood reserves are landing at your nest."
+          "speaker": "Matriarch",
+          "text": "The brood reserves have hatched. They are landing at your Landing Ring."
         },
         {
           "t": "spawn",
@@ -400,6 +389,7 @@
   ],
   "placeholder": false,
   "timeLimitSec": 3600,
+  "epilogue": "The citadel's last tower fell silent, and the Coalition's hold on Vesper broke with it. Above the plains the rift opened wide, and the rest of the swarm began its descent. Vesper is ours.",
   "relations": [
     {
       "a": 1,

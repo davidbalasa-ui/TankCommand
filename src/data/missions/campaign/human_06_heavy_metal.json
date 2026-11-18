@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 6,
   "title": "Heavy Metal",
-  "briefing": "Two Bulwark heavy tanks must reach the relay station at the end of the road. Ambushes wait in the gaps between the ridges. Get both Bulwarks there.",
+  "briefing": "The relay station at the end of the road links the colonies to orbit. Two Bulwark heavy tanks are going to guard it, but ambushes wait in the gaps between the ridges. Get both Bulwarks there.",
   "mapId": "map.c_relay_road",
   "sides": [
     {
@@ -18,14 +18,16 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
+        "structure.human.radar",
         "unit.human.heavy_tank"
       ],
       "researchDone": [
         "research.human.fortifications",
-        "research.human.heavy_armor",
         "research.human.missiles",
-        "research.human.sensors"
+        "research.human.sensors",
+        "research.human.heavy_armor"
       ]
     },
     {
@@ -95,6 +97,12 @@
       "structureType": "structure.human.landing_pad",
       "x": -76,
       "z": 72
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.radar",
+      "x": 76,
+      "z": -76
     }
   ],
   "objectives": [
@@ -119,7 +127,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Send the Lancers ahead to spring the ambushes before the Bulwarks arrive."
         }
       ]
@@ -136,7 +144,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Ambush in the first gap!"
         },
         {
@@ -178,7 +186,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "More of them at the second gap."
         },
         {

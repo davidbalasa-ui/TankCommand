@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 17,
   "title": "Saucer Season",
-  "briefing": "The Arcadians have grown saucers: heavy fliers that burn whatever is under them. Waves of them will come at the colony. Shoot down six of them, then destroy the two roosts they fly from. Falcons and Javelin missile tanks can reach them.",
+  "briefing": "The Arcadians have grown Discs: heavy saucers that burn whatever is under them. Waves of them will come at the colony. Shoot down six, then destroy the two Aeries they fly from. Falcons and Javelins can reach them.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -144,12 +144,12 @@
   "objectives": [
     {
       "id": "saucers",
-      "text": "Shoot down six saucers",
+      "text": "Shoot down six Discs",
       "kind": "primary"
     },
     {
       "id": "roosts",
-      "text": "Destroy both saucer roosts",
+      "text": "Destroy both Aeries",
       "kind": "primary"
     }
   ],
@@ -163,8 +163,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Saucers need to fly right over a target to hit it. Meet them with missiles."
+          "speaker": "Col. Daska",
+          "text": "Discs must fly right over a target to hit it. Meet them with missiles."
         }
       ]
     },

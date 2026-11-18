@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 11,
   "title": "The Long Hunger",
-  "briefing": "The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten minutes. The Weaver knits wounded broodlings back together.",
+  "briefing": "The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten minutes. Coronas are ready to grow, and they outreach Terran tanks.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -23,9 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
+        "unit.alien.repair",
         "unit.alien.artillery",
-        "structure.alien.missile_battery",
-        "unit.alien.repair"
+        "unit.alien.glider",
+        "structure.alien.missile_battery"
       ],
       "researchDone": [
         "research.alien.fortifications",
@@ -33,7 +34,8 @@
         "research.alien.sensors",
         "research.alien.heavy_armor",
         "research.alien.heavy_ordnance",
-        "research.alien.field_repair"
+        "research.alien.field_repair",
+        "research.alien.hover_drive"
       ]
     },
     {
@@ -139,8 +141,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Waves come from the east and south. Keep the Weaver behind your line."
+          "speaker": "Matriarch",
+          "text": "They come from the east and north. Keep the Weaver behind the brood."
         }
       ]
     },
@@ -153,8 +155,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "First wave inbound."
+          "speaker": "Matriarch",
+          "text": "The first wave comes."
         },
         {
           "t": "spawn",
@@ -294,8 +296,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Last wave. Everything they have left."
+          "speaker": "Matriarch",
+          "text": "The last wave. Break it and they are spent."
         },
         {
           "t": "spawn",

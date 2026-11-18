@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 16,
   "title": "Bombing Run",
-  "briefing": "Four Arcadian Sentinels guard the eastern plain, covered by two missile batteries. Condor bombers can level them from above; Falcons keep the sky clear. Destroy all four Sentinels.",
+  "briefing": "Four Arcadian Sentinels guard the eastern plain on the road to the rift, covered by two Corona missile towers. Condor bombers can level them from above; Falcons keep the sky clear.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -187,7 +187,7 @@
     },
     {
       "id": "aa",
-      "text": "Destroy both missile batteries",
+      "text": "Destroy both Corona towers",
       "kind": "optional"
     }
   ],
@@ -201,8 +201,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Select the Condors and tap a Sentinel to bomb it. Stay away from the batteries."
+          "speaker": "Col. Daska",
+          "text": "Select the Condors and tap a Sentinel to bomb it. Stay clear of the Coronas."
         }
       ]
     },
@@ -215,7 +215,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Enemy fliers scrambled."
         },
         {

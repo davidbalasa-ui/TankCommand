@@ -175,6 +175,8 @@ export const missionSchema = z.object({
   objectives: z.array(objectiveDef),
   triggers: z.array(triggerSchema),
   timeLimitSec: z.number().positive().optional(),
+  /** Closing text for a campaign's last mission, shown on the results screen when it is won. */
+  epilogue: z.string().min(1).optional(),
   placeholder: z.boolean(),
 });
 

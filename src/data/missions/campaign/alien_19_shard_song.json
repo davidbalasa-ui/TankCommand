@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 19,
   "title": "Shard Song",
-  "briefing": "The brood has nested among the crystals at the rift. The Shard is waking, and it does not care whose side anyone is on. Hold the nest for ten minutes against the Terrans and the spires both.",
+  "briefing": "The brood has nested among the Shard's crystals at the rift. Learn its song and the rift will open wide for the whole swarm, but the Shard is waking and it serves no one. Hold the nest for ten minutes against the Terrans and the spires both.",
   "mapId": "map.c_crystal_fields",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -189,7 +189,7 @@
     },
     {
       "id": "spires",
-      "text": "Shatter the spires near the nest",
+      "text": "Shatter all five spires",
       "kind": "optional"
     }
   ],
@@ -203,7 +203,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "The crystals are quiet for now. Get ready."
         }
       ]
@@ -217,7 +217,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "The Shard is singing. The spires are turning on us!"
         },
         {

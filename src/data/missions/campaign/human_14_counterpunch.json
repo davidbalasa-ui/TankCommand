@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 14,
   "title": "Counterpunch",
-  "briefing": "The Arcadians have built a forward base behind the Iron Gate ridges. It is time to hit back. Build up, break through and destroy every building in the base.",
+  "briefing": "With the Matriarch dead, the broods are fighting without a plan. Hit them before they find one: their forward base sits behind the Iron Gate ridges. Destroy every building in it.",
   "mapId": "map.c_iron_gate",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
-        "unit.human.hover_tank"
+        "unit.human.artillery",
+        "unit.human.hover_tank",
+        "structure.human.missile_battery"
       ],
       "researchDone": [
         "research.human.fortifications",
@@ -216,7 +216,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Three ways in. The guns cover the west gap; artillery can open it."
         }
       ]

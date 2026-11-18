@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 20,
   "title": "Two Banners",
-  "briefing": "The Coalition has hired a mercenary company. Their two bases flank the rift. Destroy both landing pads.",
+  "briefing": "With their relay gone, the Coalition has hired a mercenary company to hold the rift against us. The Coalition base lies east of it, the mercenaries to the north. Destroy both Landing Pads.",
   "mapId": "map.c_rift",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -49,7 +49,7 @@
       "controller": "ai",
       "ore": 300,
       "metal": 100,
-      "difficulty": "normal",
+      "difficulty": "hard",
       "team": 2
     },
     {
@@ -246,12 +246,12 @@
   "objectives": [
     {
       "id": "a",
-      "text": "Destroy the Coalition pad",
+      "text": "Destroy the eastern Coalition pad",
       "kind": "primary"
     },
     {
       "id": "b",
-      "text": "Destroy the mercenary pad",
+      "text": "Destroy the northern mercenary pad",
       "kind": "primary"
     }
   ],
@@ -265,8 +265,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Two enemies, one at each side of the rift. Take the weaker southern one first."
+          "speaker": "Matriarch",
+          "text": "The northern mercenaries are the weaker pack. Break them first."
         }
       ]
     },

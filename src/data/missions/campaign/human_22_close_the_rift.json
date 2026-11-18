@@ -3,14 +3,14 @@
   "campaign": "human",
   "order": 22,
   "title": "Close the Rift",
-  "briefing": "This is it. The Shard holds the rift open, and the last Arcadian hive guards it. Destroy the Shard and the hive, and Vesper is ours.",
+  "briefing": "The anchors are down and the rift is failing. The Shard still holds it open, and the last Arcadian hive has dug in beside it to feed on its power. Destroy the Shard and the hive, and the rift closes for good.",
   "mapId": "map.c_rift",
   "sides": [
     {
       "player": 1,
       "faction": "human",
       "controller": "human",
-      "ore": 2000,
+      "ore": 2600,
       "metal": 0,
       "available": [
         "unit.human.light_tank",
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -48,7 +48,7 @@
       "controller": "ai",
       "ore": 500,
       "metal": 200,
-      "difficulty": "easy"
+      "difficulty": "hard"
     },
     {
       "player": 3,
@@ -290,7 +290,7 @@
     },
     {
       "id": "hive",
-      "text": "Destroy the last hive",
+      "text": "Destroy the hive's two Landing Rings",
       "kind": "primary"
     }
   ],
@@ -304,7 +304,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "The Shard fires on anything near it. Break its spires with artillery first."
         }
       ]
@@ -324,8 +324,8 @@
         },
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "The Shard is down and the sky is clear. Reserves are landing at your pad."
+          "speaker": "Col. Daska",
+          "text": "The Shard is down and the way to the hive is open. Reserves are landing at your pad."
         },
         {
           "t": "spawn",
@@ -379,6 +379,7 @@
   ],
   "placeholder": false,
   "timeLimitSec": 3600,
+  "epilogue": "The Shard shattered, and with nothing to hold it open, the rift collapsed. Across Vesper the last Arcadian machines fell still. For the first time since Halden went silent, the sky over the colonies is clear.",
   "relations": [
     {
       "a": 1,

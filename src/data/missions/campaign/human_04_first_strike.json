@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 4,
   "title": "First Strike",
-  "briefing": "An enemy camp has dug in across the field. Protect the supply hauler, hold off the reinforcement wave and destroy the camp. Optional: build a metal station.",
+  "briefing": "The outpost fell to a night attack while we regrouped at the landing field, and the Arcadians have planted a Landing Ring on it. Take it back: destroy their camp and keep the supply Hauler alive.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -102,17 +102,17 @@
   "objectives": [
     {
       "id": "base",
-      "text": "Destroy the enemy camp",
+      "text": "Destroy the Arcadian camp at the outpost",
       "kind": "primary"
     },
     {
       "id": "vip",
-      "text": "Keep the supply hauler alive",
+      "text": "Keep the supply Hauler alive",
       "kind": "primary"
     },
     {
       "id": "station",
-      "text": "Build a metal station",
+      "text": "Build a Metal Station",
       "kind": "optional"
     }
   ],
@@ -126,8 +126,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "The camp is north-east. Keep the hauler away from the fighting."
+          "speaker": "Col. Daska",
+          "text": "The camp is north-east, on the outpost. Keep the supply Hauler away from the fighting."
         }
       ]
     },
@@ -140,8 +140,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Enemy reinforcements are landing."
+          "speaker": "Col. Daska",
+          "text": "Arcadian reinforcements are landing at the outpost."
         },
         {
           "t": "spawn",

@@ -1028,9 +1028,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const heading = root.querySelector('h1');
       if (heading) {
         heading.textContent = view?.mission
-          ? view.won
-            ? 'Mission complete'
-            : 'Mission failed'
+          ? view.campaignComplete
+            ? 'Campaign complete'
+            : view.won
+              ? 'Mission complete'
+              : 'Mission failed'
           : winner === 1
             ? 'Victory'
             : winner === null
@@ -1042,6 +1044,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         note.className = 'results-mission';
         note.textContent = view.won ? (view.title ?? '') : (view.reason ?? 'Try again.');
         root.append(note);
+        if (view.campaignComplete && view.epilogue) {
+          const epilogue = document.createElement('p');
+          epilogue.className = 'results-epilogue';
+          epilogue.textContent = view.epilogue;
+          root.append(epilogue);
+        }
       }
       if (world) {
         const stats = world.resources.find((item) => item.player === 1);
@@ -1076,7 +1084,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         }
         actions.append(node);
       };
-      if (view?.mission) {
+      if (view?.mission && view.campaignComplete) {
+        // The story is over: no retry, just back to the campaigns.
+        action('missions', 'Mission list', () => {
+          ctx.go('missionSelect');
+        }, true);
+      } else if (view?.mission) {
         if (view.won && view.hasNext) {
           action('next', 'Next mission', () => {
             if (ctx.chooseNextMission?.()) {
