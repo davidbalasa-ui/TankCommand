@@ -106,6 +106,16 @@ describe('[SAVE-09] continue, quit-save and save slots', () => {
     expect(await h.services.latestAutosave()).toBeNull();
   });
 
+  it('[SAVE-09] an old autosave resumed, saved & quit and resumed again is cleared when the match ends', async () => {
+    const h = harness();
+    await h.services.writeRawSave('auto-0', encodeSave(createWorld(33), { gameVersion: 't', savedAtIso: '2026-01-01T00:00:00Z' }));
+    expect((await h.services.resumeLastGame()).status).toBe('ok');
+    await h.services.quitSave();
+    expect((await h.services.resumeLastGame()).status).toBe('ok');
+    await h.services.finishMatch();
+    expect(await h.services.latestAutosave()).toBeNull();
+  });
+
   it('[SAVE-09] an autosave still being written when the match ends is cleared too', async () => {
     const h = harness();
     h.services.beginMatch();

@@ -996,6 +996,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         }
         const again = button('pause', 'confirmRestart', 'Restart', () => {
           // The old match's autosaves go first, so Continue never offers the abandoned run.
+          again.disabled = true;
           void (async () => {
             await ctx.api?.discardMatch();
             ctx.go('loading');
@@ -1027,6 +1028,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         saveQuit.classList.add('primary');
         const quitNow = button('pause', 'confirmQuit', 'Quit without saving', () => {
           // Nor does Continue offer a match quit without saving (its earlier autosaves go too).
+          quitNow.disabled = true;
           void (async () => {
             await ctx.api?.discardMatch();
             ctx.go('title');

@@ -1,3 +1,4 @@
+import { AI_DATA } from '../ai/aiData';
 import { addAi } from '../ai/driver';
 import { parseMission, type Condition, type MissionRow } from '../sim/missionSchema';
 import { SIM_TICK_HZ } from '../sim/constants';
@@ -116,6 +117,17 @@ function shiftLevel(level: AiDifficulty, step: number): AiDifficulty {
   return LEVELS[index] ?? level;
 }
 
+/**
+ * A mission's aiAttackScale is written against the side's own level. When the campaign
+ * difficulty shifts that level, the range is rescaled so the attack threshold it gives stays the
+ * same in absolute terms: an opening rush the mission is built round (Counterpunch, Breach) then
+ * happens on every difficulty, though Easy and Hard have other thresholds.
+ */
+export function attackScaleFor(range: readonly [number, number], written: AiDifficulty, level: AiDifficulty): [number, number] {
+  const ratio = AI_DATA[written].attackThresholdValue / AI_DATA[level].attackThresholdValue;
+  return [range[0] * ratio, range[1] * ratio];
+}
+
 export function buildMissionWorld(
   data: SimData,
   mission: MissionRow,
@@ -228,7 +240,9 @@ export function buildMissionWorld(
       }
     }
     if (side.controller === 'ai') {
-      addAi(world, side.player, shiftLevel(side.difficulty ?? 'normal', tuning.aiStep), side.aiAttackScale ? { attackScaleRange: side.aiAttackScale } : {});
+      const written = side.difficulty ?? 'normal';
+      const level = shiftLevel(written, tuning.aiStep);
+      addAi(world, side.player, level, side.aiAttackScale ? { attackScaleRange: attackScaleFor(side.aiAttackScale, written, level) } : {});
     }
   }
   return world;

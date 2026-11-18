@@ -220,6 +220,15 @@ export class GameServices implements GameApi {
     if (result.status === 'ok' && loaded.status === 'ok') {
       this.matchId = loaded.save.meta.matchId ?? newMatchId();
       this.loadedAutoSlot = slot.startsWith('auto-') ? slot : null;
+      if (this.loadedAutoSlot && !loaded.save.meta.matchId) {
+        // An autosave from before match ids: stamp it with this match's id, so it goes with the
+        // match's other autosaves even after a Save & quit and another Continue.
+        try {
+          await this.manager.save(slot, loaded.save.world, { matchId: this.matchId, ...(loaded.save.meta.skirmish !== undefined ? { skirmish: loaded.save.meta.skirmish } : {}) });
+        } catch {
+          // Storage trouble: the loaded slot is still cleared by loadedAutoSlot when this run ends.
+        }
+      }
       this.host.loadWorld(loaded.save.world, !this.host.inMatch(), loaded.save.meta.skirmish);
       result.savedAtIso = loaded.save.meta.savedAtIso;
     }
