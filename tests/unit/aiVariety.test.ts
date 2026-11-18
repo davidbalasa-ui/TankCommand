@@ -121,14 +121,18 @@ describe('mission seeds and AI variety', () => {
     const difficulty = base.aiStates[0]?.difficulty ?? 'normal';
     const decisions = new Set<string>();
     for (let seed = 1; seed <= 8; seed += 1) {
-      const fresh = createAiState(player, difficulty, seed);
+      const range = base.aiStates[0]?.attackScaleRange;
+      const fresh = createAiState(player, difficulty, seed, range ? { attackScaleRange: range } : {});
       const state = { ...(base.aiStates[0] ?? fresh), traitSeed: fresh.traitSeed, attackScale: fresh.attackScale, rngState: fresh.rngState };
       const orders: Command[] = [];
       let world: WorldState = { ...base, aiStates: [state] };
       for (let i = 0; i < 20 * SEC; i += 1) {
         world = stepRecording(world, orders);
       }
-      decisions.add(JSON.stringify(orders.filter((c) => c.kind === 'attackMove')));
+      const attacks = orders.filter((c) => c.kind === 'attackMove');
+      // Every seed still makes the opening rush; only its route (and target) may change.
+      expect(attacks.length, `seed ${seed}`).toBeGreaterThan(0);
+      decisions.add(JSON.stringify(attacks));
     }
     expect(decisions.size).toBeGreaterThan(1);
   }, 300_000);
