@@ -109,6 +109,7 @@
 | SAVE-08 | Load returns typed results; corrupt and incompatible saves show a clear message and never crash. |
 | SAVE-09 | Resume-last-game offered on start when an autosave exists; quit asks to save. |
 | SAVE-10 | Web export/import round-trips a save; storage-full shows a message. |
+| SAVE-11 | Restart and Retry rebuild the match being played, also after loading its save: a mission keeps the save's difficulty, a skirmish the setup its save carries (an old skirmish save without one offers no Restart). Restart and Quit without saving drop the match's autosaves, so Continue never offers it. |
 | SET-01 | Every setting persists across reload and takes effect immediately. |
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |
@@ -165,7 +166,9 @@
 | AI-14 | The AI only orders a unit to attack targets its weapon can hit (no ground guns after aircraft in flight). |
 | AI-15 | Units the AI sends home (a returning scout, a retreating group, a recalled defender, units in a kit's way) park past the pad's rally point, never on the landing pad. |
 | AI-16 | Fresh units the AI sends to attack join the group already out fighting instead of replacing it, and a scout already fighting is not called home. |
+| AI-17 | The AI plays differently from one world seed to the next (attack timing and size, approach route round either side on open ground, unit mix, which of several comparable targets it hits, scout route) using only its own seeded random stream; every range is centred on the plain behaviour so each difficulty is as strong on average. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
+| DET-08 | Every mission attempt (start, retry, next) gets a new world seed, kept in the world and its saves; the map and the mission's scripted units, triggers, waves and reinforcements are the same for every seed, and the same seed gives the same hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |
 | AIR-01 | Aircraft can only be bought with a free air base slot and are delivered parked at a base. |

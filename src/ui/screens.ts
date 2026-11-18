@@ -7,6 +7,7 @@ import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './wid
 import { playIntroFilm } from './introFilm';
 import { APP_VERSION } from '../platform/appInfo';
 import type {
+  CampaignDifficulty,
   CampaignId,
   RendererHandle,
   ScreenContext,
@@ -37,6 +38,14 @@ async function lockLandscape(): Promise<void> {
 export const FACTION_NAMES = { human: 'Terran Coalition', alien: 'Arcadians' } as const;
 
 const MAX_AI_OPPONENTS = 2;
+
+const DIFFICULTY_LABELS: Record<CampaignDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+// Matches DIFFICULTY_TUNING in src/data/missions.ts.
+const DIFFICULTY_NOTES: Record<CampaignDifficulty, string> = {
+  easy: 'You start with 25% more ore, and enemy commanders of normal skill play one level easier.',
+  normal: 'Every mission as designed. Training is the same on every difficulty.',
+  hard: 'Enemy commanders play one level harder and start with 25% more ore and metal. You start with 20% less ore.',
+};
 
 type Build = (root: HTMLElement, ctx: ScreenContext) => void | (() => void);
 
@@ -199,7 +208,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           .latestAutosave()
           .then((latest) => {
             if (latest) {
-              const parts = [latest.mode === 'mission' ? 'Campaign' : 'Skirmish'];
+              const parts = [latest.title ?? (latest.mode === 'mission' ? 'Campaign' : 'Skirmish')];
               if (latest.playSeconds !== undefined) {
                 parts.push(`${formatClock(latest.playSeconds)} played`);
               }
@@ -229,6 +238,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const small = document.createElement('div');
       small.className = 'title-small-row';
       small.append(
+        iconButton('title', 'load', 'Load game', 'save', () => {
+          ctx.go('saveSlots');
+        }, 'Load'),
         iconButton('title', 'settings', 'Settings', 'gear', () => {
           ctx.go('settings');
         }),
@@ -305,6 +317,26 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         cards.append(card);
       }
       root.append(cards);
+      // Difficulty applies to every campaign mission and is kept with the campaign progress.
+      const levels = (['easy', 'normal', 'hard'] as const).map((value) => ({ value, label: DIFFICULTY_LABELS[value] }));
+      const levelHolder = document.createElement('div');
+      levelHolder.className = 'campaign-difficulty';
+      const renderLevel = (): void => {
+        const level = ctx.getDifficulty?.() ?? 'normal';
+        // Any edge either side gets is stated openly here.
+        const note = document.createElement('p');
+        note.className = 'difficulty-note';
+        note.textContent = DIFFICULTY_NOTES[level];
+        levelHolder.replaceChildren(
+          segmentRow('campaignSelect', 'difficulty', 'Difficulty', levels, level, (value) => {
+            ctx.setDifficulty?.(value);
+            renderLevel();
+          }),
+          note,
+        );
+      };
+      renderLevel();
+      root.append(levelHolder);
       addButton(root, 'campaignSelect', 'back', 'Back', () => {
         ctx.router.back();
       });
@@ -334,7 +366,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         name.textContent = item.title;
         const state = document.createElement('span');
         state.className = 'mission-state';
-        state.textContent = item.status === 'done' ? 'Complete' : item.status === 'locked' ? 'Locked' : 'Ready';
+        state.textContent =
+          item.status === 'done'
+            ? `Complete${item.bestDifficulty ? ` · ${DIFFICULTY_LABELS[item.bestDifficulty]}` : ''}`
+            : item.status === 'locked'
+              ? 'Locked'
+              : 'Ready';
         entry.replaceChildren(order, name, state, icon(item.status === 'locked' ? 'lock' : 'right', 'chev'));
         rows.append(entry);
       }
@@ -373,6 +410,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
           objectives.append(item);
         }
         text.append(paragraph, label, objectives);
+        if (view.difficulty) {
+          const level = document.createElement('p');
+          level.className = 'briefing-difficulty';
+          level.dataset.difficulty = view.difficulty;
+          level.textContent = `Difficulty: ${DIFFICULTY_LABELS[view.difficulty]}`;
+          text.append(level);
+        }
         body.append(preview, text);
       }
       root.append(body);
@@ -907,6 +951,14 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         grid.append(node);
         return node;
       };
+      if (world?.mission) {
+        add('objectives', 'Objectives', 'flag', () => {
+          ctx.go('objectives');
+        });
+      }
+      add('help', 'Help', 'help', () => {
+        ctx.go('help');
+      });
       add('save', 'Save game', 'save', () => {
         ctx.go('saveSlots');
       });
@@ -920,42 +972,80 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.go('bugReport');
       });
 
+      // Restart and Quit swap the menu for a question with large buttons (no browser dialogs).
       let confirmPanel: HTMLDivElement | null = null;
+      const closeConfirm = (): void => {
+        confirmPanel?.remove();
+        confirmPanel = null;
+        card.classList.remove('confirming');
+      };
+      const confirm = (question: string, buttons: HTMLButtonElement[], cancelName: string): HTMLParagraphElement => {
+        const text = document.createElement('p');
+        text.textContent = question;
+        const actions = document.createElement('div');
+        actions.className = 'pause-confirm-actions';
+        actions.append(...buttons, button('pause', cancelName, 'Cancel', closeConfirm));
+        confirmPanel = document.createElement('div');
+        confirmPanel.className = 'pause-confirm';
+        confirmPanel.append(text, actions);
+        card.classList.add('confirming');
+        card.append(confirmPanel);
+        return text;
+      };
+
+      // A skirmish saved before setups were kept with saves can't be rebuilt: no Restart then.
+      const restart = (): void => {
+        if (confirmPanel) {
+          return;
+        }
+        const again = button('pause', 'confirmRestart', 'Restart', () => {
+          // The old match's autosaves go first, so Continue never offers the abandoned run.
+          again.disabled = true;
+          void (async () => {
+            // Storage trouble must not leave the player stuck on the pause menu.
+            await ctx.api?.discardMatch().catch(() => undefined);
+            ctx.go('loading');
+          })();
+        });
+        again.classList.add('danger');
+        confirm(`${world?.mission ? 'Restart this mission' : 'Restart this match'} from the beginning? Progress since the start is lost.`, [again], 'cancelRestart');
+      };
+      if (ctx.canRestart?.() ?? true) {
+        add('restart', world?.mission ? 'Restart mission' : 'Restart match', 'restart', restart);
+      }
+
       const quit = add('quit', 'Quit to title', 'x', () => {
         if (confirmPanel) {
           return;
         }
-        confirmPanel = document.createElement('div');
-        confirmPanel.className = 'pause-confirm';
-        const text = document.createElement('p');
-        text.textContent = 'Quit this match? Save before leaving?';
-        const actions = document.createElement('div');
-        actions.className = 'pause-confirm-actions';
+        // Save & quit keeps the match for Continue on the title screen; it never touches the
+        // player's own save slots.
         const saveQuit = button('pause', 'confirmSaveQuit', 'Save & quit', () => {
           void (async () => {
-            await ctx.api?.saveToSlot('manual-1');
+            const result = await ctx.api?.quitSave();
+            if (result && result.status !== 'ok') {
+              question.textContent = result.message;
+              return;
+            }
             ctx.go('title');
           })();
         });
         saveQuit.classList.add('primary');
         const quitNow = button('pause', 'confirmQuit', 'Quit without saving', () => {
-          ctx.go('title');
+          // Nor does Continue offer a match quit without saving (its earlier autosaves go too).
+          quitNow.disabled = true;
+          void (async () => {
+            // Storage trouble must not leave the player stuck on the pause menu.
+            await ctx.api?.discardMatch().catch(() => undefined);
+            ctx.go('title');
+          })();
         });
         quitNow.classList.add('danger');
-        const cancel = button('pause', 'cancelQuit', 'Cancel', () => {
-          confirmPanel?.remove();
-          confirmPanel = null;
-          card.classList.remove('confirming');
-        });
-        actions.append(saveQuit, quitNow, cancel);
-        confirmPanel.append(text, actions);
-        card.classList.add('confirming');
-        card.append(confirmPanel);
+        const question = confirm('Quit this match? Save & quit lets you continue it from the title screen.', [saveQuit, quitNow], 'cancelQuit');
       });
       quit.classList.add('pause-quit');
       return () => {
-        confirmPanel?.remove();
-        confirmPanel = null;
+        closeConfirm();
         ctx.pauseSim(false);
       };
     }),
@@ -1027,6 +1117,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
     }),
 
     objectives: makeScreen('objectives', 'Objectives', (root, ctx) => {
+      // Opened from the pause menu the match is already paused, and stays paused on return.
+      const overPause = ctx.router.current() === 'pause';
       ctx.pauseSim(true);
       const list = document.createElement('ul');
       list.className = 'objective-list';
@@ -1042,7 +1134,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ctx.router.back();
       });
       return () => {
-        ctx.pauseSim(false);
+        if (!overPause) {
+          ctx.pauseSim(false);
+        }
       };
     }),
 
@@ -1069,6 +1163,13 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         note.className = 'results-mission';
         note.textContent = view.won ? (view.title ?? '') : (view.reason ?? 'Try again.');
         root.append(note);
+        if (view.difficulty) {
+          const level = document.createElement('p');
+          level.className = 'results-difficulty';
+          level.dataset.difficulty = view.difficulty;
+          level.textContent = `Difficulty: ${DIFFICULTY_LABELS[view.difficulty]}`;
+          root.append(level);
+        }
         if (view.campaignComplete && view.epilogue) {
           const epilogue = document.createElement('p');
           epilogue.className = 'results-epilogue';
@@ -1122,13 +1223,15 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             }
           }, true);
         }
-        action('retry', 'Retry', () => {
-          ctx.go('loading');
-        }, !(view.won && view.hasNext));
+        if (ctx.canRestart?.() ?? true) {
+          action('retry', 'Retry', () => {
+            ctx.go('loading');
+          }, !(view.won && view.hasNext));
+        }
         action('missions', 'Mission list', () => {
           ctx.go('missionSelect');
         });
-      } else {
+      } else if (ctx.canRestart?.() ?? true) {
         action('playAgain', 'Play again', () => {
           ctx.go('loading');
         }, true);

@@ -38,6 +38,8 @@ export interface MissionState {
     timeLimitTicks: number | null;
     /** Per side (player number as a string): the only items it may buy in this mission. */
     available?: Record<string, string[]>;
+    /** Campaign difficulty the mission was started on; absent means Normal. */
+    difficulty?: 'easy' | 'hard';
   };
   humanSide: PlayerId;
   fired: string[];

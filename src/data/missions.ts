@@ -1,3 +1,4 @@
+import { AI_DATA } from '../ai/aiData';
 import { addAi } from '../ai/driver';
 import { parseMission, type Condition, type MissionRow } from '../sim/missionSchema';
 import { SIM_TICK_HZ } from '../sim/constants';
@@ -5,7 +6,7 @@ import { createWorld } from '../sim/world';
 import { tagUnit, type MissionState } from '../sim/triggers';
 import { convertResearchIds, sideResearch } from '../sim/research';
 import type { SimData } from './simData';
-import type { WorldState } from '../sim/types';
+import type { AiDifficulty, WorldState } from '../sim/types';
 import { TRAINING_MISSIONS } from './missions/training';
 import { CAMPAIGN_MISSIONS } from './missions/campaign';
 
@@ -87,12 +88,72 @@ export function checkMissionReferences(data: SimData, mission: MissionRow): void
   }
 }
 
+/**
+ * Every attempt at a mission plays on the same ground (terrain noise and props come from this
+ * seed, as the briefing preview does); the world seed only drives combat dice and the AI's choices.
+ */
+export const MISSION_MAP_SEED = 1;
+
+/**
+ * Build a mission's world. `seed` varies per attempt: scripted beats (units, triggers, waves) are
+ * fixed by the mission data, while combat and the computer opponents' choices follow the seed.
+ */
+const LEVELS: readonly AiDifficulty[] = ['easy', 'normal', 'hard'];
+
+/**
+ * Campaign difficulty. Normal is each mission exactly as written. Hard moves every AI side's
+ * level one step up (within easy..hard) and gives it more starting ore and metal; Easy moves a
+ * Normal side down to Easy. Most missions' enemies are scripted rather than AI, so the player's
+ * own starting ore is scaled the other way too, which is the lever every mission has.
+ *
+ * What Easy leaves alone, from the seed soak (scripted beginner, 5-10 seeds per mission):
+ * - the AI's starting stock: a poorer AI kept its army home rather than spending it in the
+ *   field, and the player's push met it at its base (Two Banners 2/5 on Easy, 5/5 on Normal);
+ * - a Hard side: the Normal level spends on its army where Hard spends on towers and air, so it
+ *   hits harder early (Vesper Falls 6/10 with Hard moved to Normal, 9/10 on Normal and Easy).
+ */
+export const DIFFICULTY_TUNING: Record<AiDifficulty, { aiStep: number; aiStock: number; playerOre: number }> = {
+  easy: { aiStep: -1, aiStock: 1, playerOre: 1.25 },
+  normal: { aiStep: 0, aiStock: 1, playerOre: 1 },
+  hard: { aiStep: 1, aiStock: 1.25, playerOre: 0.8 },
+};
+
+function shiftLevel(level: AiDifficulty, step: number): AiDifficulty {
+  if (step < 0 && level === 'hard') {
+    return level;
+  }
+  const index = Math.min(LEVELS.length - 1, Math.max(0, LEVELS.indexOf(level) + step));
+  return LEVELS[index] ?? level;
+}
+
+/**
+ * A mission's aiAttackScale is written against the side's own level. When the campaign
+ * difficulty shifts that level, the range is rescaled so the attack threshold it gives stays the
+ * same in absolute terms: an opening rush the mission is built round (Counterpunch, Breach) then
+ * happens on every difficulty, though Easy and Hard have other thresholds.
+ */
+export function attackScaleFor(range: readonly [number, number], written: AiDifficulty, level: AiDifficulty): [number, number] {
+  const ratio = AI_DATA[written].attackThresholdValue / AI_DATA[level].attackThresholdValue;
+  return [range[0] * ratio, range[1] * ratio];
+}
+
 export function buildMissionWorld(
   data: SimData,
   mission: MissionRow,
   seed: number,
-  options: { fog?: boolean } = {},
+  options: { fog?: boolean; difficulty?: AiDifficulty } = {},
 ): WorldState {
+  const difficulty = options.difficulty ?? 'normal';
+  const tuning = DIFFICULTY_TUNING[difficulty];
+  const startStock = (side: MissionRow['sides'][number]): { ore: number; metal: number } => {
+    if (side.controller === 'human') {
+      return { ore: Math.round(side.ore * tuning.playerOre), metal: side.metal };
+    }
+    if (side.controller === 'ai') {
+      return { ore: Math.round(side.ore * tuning.aiStock), metal: Math.round(side.metal * tuning.aiStock) };
+    }
+    return { ore: side.ore, metal: side.metal };
+  };
   const mapRow = data.mapRows.find((row) => row.id === mission.mapId);
   if (!mapRow) {
     throw new Error(`Mission ${mission.id}: unknown map ${mission.mapId}`);
@@ -117,6 +178,8 @@ export function buildMissionWorld(
       id: mission.id,
       triggers: mission.triggers,
       timeLimitTicks: mission.timeLimitSec ? Math.round(mission.timeLimitSec * SIM_TICK_HZ) : null,
+      // Normal leaves the field out, so a Normal mission is byte-for-byte the mission as written.
+      ...(difficulty !== 'normal' ? { difficulty } : {}),
       ...(mission.sides.some((side) => side.available)
         ? {
             available: Object.fromEntries(
@@ -135,6 +198,7 @@ export function buildMissionWorld(
     failReason: null,
   };
   const world = createWorld(seed, {
+    mapSeed: MISSION_MAP_SEED,
     unitTypes: data.unitTypes,
     structureTypes: data.structureTypes,
     researchTree: data.researchTree,
@@ -153,7 +217,7 @@ export function buildMissionWorld(
     })),
     deposits: mapRow.deposits.map((deposit) => ({ ...deposit })),
     factions: mission.sides.map((side) => ({ player: side.player, faction: side.faction })),
-    startResources: mission.sides.map((side) => ({ player: side.player, ore: side.ore, metal: side.metal })),
+    startResources: mission.sides.map((side) => ({ player: side.player, ...startStock(side) })),
     size: mapRow.size,
     cellSize: mapRow.cellSize,
     fog: options.fog ?? false,
@@ -185,7 +249,9 @@ export function buildMissionWorld(
       }
     }
     if (side.controller === 'ai') {
-      addAi(world, side.player, side.difficulty ?? 'normal');
+      const written = side.difficulty ?? 'normal';
+      const level = shiftLevel(written, tuning.aiStep);
+      addAi(world, side.player, level, side.aiAttackScale ? { attackScaleRange: attackScaleFor(side.aiAttackScale, written, level) } : {});
     }
   }
   return world;

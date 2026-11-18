@@ -108,17 +108,23 @@ export interface WorkerActions {
 
 export type CampaignId = 'training' | 'human' | 'alien';
 
+export type CampaignDifficulty = 'easy' | 'normal' | 'hard';
+
 export interface MissionListItem {
   id: string;
   title: string;
   order: number;
   status: 'locked' | 'open' | 'done';
+  /** The hardest difficulty the mission has been won on. */
+  bestDifficulty?: CampaignDifficulty;
 }
 
 export interface BriefingView {
   title: string;
   text: string;
   objectives: Array<{ text: string; kind: 'primary' | 'optional' }>;
+  /** The campaign difficulty the mission will be played on. */
+  difficulty?: CampaignDifficulty;
   map: {
     size: number;
     cellSize: number;
@@ -166,6 +172,8 @@ export interface ResultView {
   campaignComplete: boolean;
   /** The campaign's closing text, when campaignComplete. */
   epilogue: string | null;
+  /** The difficulty a mission was played on. */
+  difficulty?: CampaignDifficulty;
 }
 
 export interface HudSnapshot {
@@ -261,6 +269,11 @@ export interface ScreenContext {
   salvageSelected?: () => void;
   chooseCampaign?: (campaign: CampaignId) => void;
   getCampaign?: () => CampaignId | null;
+  /** Campaign difficulty, saved with the campaign progress. */
+  getDifficulty?: () => CampaignDifficulty;
+  setDifficulty?: (difficulty: CampaignDifficulty) => void;
+  /** A match is running (Save and Delete are offered on the save slots only then). */
+  inMatch?: () => boolean;
   getMissionList?: () => MissionListItem[];
   chooseMission?: (id: string) => boolean;
   getBriefing?: () => BriefingView | null;
@@ -268,6 +281,8 @@ export interface ScreenContext {
   getMissionMessages?: () => MissionMessageView[];
   getResultView?: () => ResultView;
   chooseNextMission?: () => boolean;
+  /** Restart / Retry / Play again can rebuild the match (false for an old skirmish save). */
+  canRestart?: () => boolean;
   getSkirmishConfig?: () => SkirmishConfig;
   setSkirmishConfig?: (config: SkirmishConfig) => void;
   getSkirmishMaps?: () => Array<{ id: string; name: string; preview?: BriefingView['map'] }>;
@@ -297,21 +312,21 @@ const OVERLAY_IDS = new Set<ScreenId>([
 ]);
 
 const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
-  title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help'],
+  title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help', 'saveSlots'],
   campaignSelect: ['title', 'missionSelect'],
   missionSelect: ['campaignSelect', 'briefing'],
   briefing: ['missionSelect', 'loading'],
   skirmishSetup: ['title', 'loading'],
   loading: ['inGame', 'title'],
   inGame: ['pause', 'objectives', 'help', 'bugReport', 'saveSlots', 'recovery', 'results', 'title'],
-  pause: ['settings', 'bugReport', 'saveSlots', 'title', 'inGame'],
+  pause: ['settings', 'bugReport', 'saveSlots', 'help', 'objectives', 'loading', 'title', 'inGame'],
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
   results: ['title', 'missionSelect', 'briefing', 'loading'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
-  saveSlots: ['pause', 'inGame'],
+  saveSlots: ['pause', 'inGame', 'title'],
   recovery: ['inGame', 'title'],
 };
 
@@ -327,7 +342,8 @@ const PARENT: Partial<Record<ScreenId, ScreenId>> = {
   results: 'title',
   credits: 'title',
   bugReport: 'inGame',
-  saveSlots: 'pause',
+  // Over a match Save / Load is an overlay and Back pops it; from the title it is a screen of its own.
+  saveSlots: 'title',
   recovery: 'inGame',
   pause: 'inGame',
 };

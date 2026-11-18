@@ -157,6 +157,62 @@ export function computePath(
   return path;
 }
 
+// A path point this close to a leg end is that leg end, m.
+const LEG_END_ON = 0.5;
+
+/** The leg ends still ahead of a unit on a queued move (none for any other order). */
+export function queuedLegs(unit: UnitState): Point[] {
+  const queued = (unit.order.kind === 'move' || unit.order.kind === 'attackMove') && unit.order.queue;
+  return queued ? (unit.legs ?? []) : [];
+}
+
+/**
+ * A path from the unit through each queued leg end still ahead, in order, to the goal: a replan
+ * resumes the leg the unit is on instead of cutting straight to the final goal.
+ */
+export function routeThroughLegs(world: WorldState, unit: UnitState, goalX: number, goalZ: number): Point[] | null {
+  const legs = queuedLegs(unit);
+  const first = legs[0];
+  if (!first) {
+    return computePath(world, unit, goalX, goalZ);
+  }
+  const start = computePath(world, unit, first.x, first.z);
+  if (!start) {
+    return null;
+  }
+  const map = unitMap(world, unit);
+  const path = [...start];
+  let from: Point = first;
+  for (const next of [...legs.slice(1), { x: goalX, z: goalZ }]) {
+    path.push(...(findPath(map, from.x, from.z, next.x, next.z) ?? [{ x: next.x, z: next.z }]));
+    from = next;
+  }
+  return path;
+}
+
+// Index of the path point that ends the current leg: the first one on the leg end, else the one
+// nearest it (a leg end on blocked ground is planned to the nearest open spot). Past it lies the
+// next leg, which the unit must not cut across to. Taking the first point on it keeps a later leg
+// that runs back through the same spot from being mistaken for this one.
+function legEndIndex(path: readonly Point[], leg: Point | undefined): number {
+  if (!leg) {
+    return path.length - 1;
+  }
+  let best = path.length - 1;
+  let bestDistance = Infinity;
+  for (const [index, point] of path.entries()) {
+    const d = Math.hypot(point.x - leg.x, point.z - leg.z);
+    if (d <= LEG_END_ON) {
+      return index;
+    }
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = index;
+    }
+  }
+  return best;
+}
+
 export function followPath(
   world: WorldState,
   unit: UnitState,
@@ -184,19 +240,33 @@ export function followPath(
     unit.speed = 0;
     return;
   }
+  // With queued leg ends still ahead the unit is not there yet, even when the route loops back
+  // past its final goal.
   if (
-    besideBlockedGoal ||
-    goalDistance <= STOP_DISTANCE ||
-    ((unit.order.kind === 'move' || unit.order.kind === 'attackMove') && goalTaken(world, unit, goal.x, goal.z, goalDistance))
+    queuedLegs(unit).length === 0 &&
+    (besideBlockedGoal ||
+      goalDistance <= STOP_DISTANCE ||
+      ((unit.order.kind === 'move' || unit.order.kind === 'attackMove') && goalTaken(world, unit, goal.x, goal.z, goalDistance)))
   ) {
     unit.path = [];
     unit.speed = 0;
     if (unit.order.kind === 'move' || unit.order.kind === 'attackMove') {
       unit.order = { kind: 'idle' };
+      unit.legs = [];
     }
     return;
   }
 
+  // A leg end counts as passed once the unit is at it, or at the path point standing in for it
+  // (a leg end on blocked ground is planned to the nearest open spot).
+  const legs = queuedLegs(unit);
+  const passLeg = (): void => {
+    legs.shift();
+    unit.legs = [...legs];
+  };
+  while (legs[0] && Math.hypot(legs[0].x - unit.x, legs[0].z - unit.z) <= WAYPOINT_REACHED) {
+    passLeg();
+  }
   while (unit.path.length > 1) {
     const first = unit.path[0];
     if (!first) {
@@ -205,8 +275,13 @@ export function followPath(
     if (Math.hypot(first.x - unit.x, first.z - unit.z) > WAYPOINT_REACHED) {
       break;
     }
+    if (legs[0] && legEndIndex(unit.path, legs[0]) === 0) {
+      passLeg();
+    }
     unit.path.shift();
   }
+  // Never look past the end of the current leg.
+  const lastInLeg = legEndIndex(unit.path, legs[0]);
 
   // Aim for the furthest waypoint in clear line of sight, preferring one whose straight line does
   // not run through a parked friend. Waypoints before it are behind us now and are dropped, so a
@@ -215,7 +290,7 @@ export function followPath(
   // Units on the attack take the direct line and leave contact to local steering.
   const avoidParked = unit.job === null && unit.order.kind === 'move' && goalDistance > PARKED_IGNORE_NEAR_GOAL;
   let visible = -1;
-  for (let index = unit.path.length - 1; index >= 0; index -= 1) {
+  for (let index = lastInLeg; index >= 0; index -= 1) {
     const point = unit.path[index];
     if (!point || !groundLineClear(map, unit.x, unit.z, point.x, point.z)) {
       continue;
@@ -228,7 +303,7 @@ export function followPath(
   if (visible < 0 && unit.path.length > 0) {
     // No waypoint is in sight any more (the unit was pushed or slid off its line): plan again
     // from here rather than driving into whatever is in the way.
-    const path = computePath(world, unit, goal.x, goal.z);
+    const path = routeThroughLegs(world, unit, goal.x, goal.z);
     if (path) {
       unit.path = path;
       const end = path[path.length - 1]!;
@@ -239,9 +314,9 @@ export function followPath(
       visible = groundLineClear(map, unit.x, unit.z, first.x, first.z) ? 0 : -1;
     }
   }
-  // A queued order's path holds the player's waypoints, so it is kept whole.
-  const queued = (unit.order.kind === 'move' || unit.order.kind === 'attackMove') && unit.order.queue;
-  if (visible > 0 && !queued) {
+  // Points before the aim are behind us; leg ends are never among them (the search stops at the
+  // current leg's end), so queued waypoints survive.
+  if (visible > 0) {
     unit.path.splice(0, visible);
     visible = 0;
   }

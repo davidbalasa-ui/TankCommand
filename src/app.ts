@@ -3,7 +3,7 @@ import { introFilmDue, playIntroFilm } from './ui/introFilm';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
 import { createSkirmishWorld, loadSimData, type SimData } from './data/simData';
-import { MISSIONS, buildMissionWorld, missionsOf, nextMission } from './data/missions';
+import { MISSIONS, MISSION_MAP_SEED, buildMissionWorld, missionsOf, nextMission } from './data/missions';
 import { createKvStore, type KvStore } from './platform/kv';
 import {
   emptyProgress,
@@ -11,9 +11,12 @@ import {
   missionStatus,
   recordWin,
   saveProgress,
+  setCampaignDifficulty,
+  type CampaignDifficulty,
   type CampaignProgress,
 } from './platform/progress';
 import type { MapRow } from './data/mapSchema';
+import type { MissionRow } from './sim/missionSchema';
 import type { StructureRow } from './data/structureSchema';
 import type { UnitRow } from './data/unitSchema';
 import { createScreens } from './ui/screens';
@@ -187,6 +190,45 @@ const TITLE_MOOD = {
   reflectionIntensity: 0.4,
 } as const;
 
+/** A skirmish's setup as kept with its saves (see GameServicesHost.matchSetup). */
+interface SkirmishSetupRecord {
+  config: SkirmishConfig;
+  mapId: string | undefined;
+  fog: boolean;
+  ai: boolean;
+}
+
+function parseSkirmishSetup(value: unknown): SkirmishSetupRecord | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+  const record = value as Partial<SkirmishSetupRecord>;
+  const config = record.config;
+  const faction = (f: unknown): f is 'human' | 'alien' => f === 'human' || f === 'alien';
+  const level = (d: unknown): d is AiDifficulty => d === 'easy' || d === 'normal' || d === 'hard';
+  if (
+    typeof config !== 'object' ||
+    config === null ||
+    !faction(config.faction) ||
+    !Array.isArray(config.opponents) ||
+    config.opponents.length === 0 ||
+    !config.opponents.every((o) => typeof o === 'object' && o !== null && faction(o.faction) && level(o.difficulty)) ||
+    !['low', 'normal', 'high'].includes(config.resources) ||
+    !['padOnly', 'padForce'].includes(config.force) ||
+    typeof record.fog !== 'boolean' ||
+    typeof record.ai !== 'boolean' ||
+    (record.mapId !== undefined && typeof record.mapId !== 'string')
+  ) {
+    return null;
+  }
+  return {
+    config: { ...config, opponents: config.opponents.map((o) => ({ faction: o.faction, difficulty: o.difficulty })) },
+    mapId: record.mapId,
+    fog: record.fog,
+    ai: record.ai,
+  };
+}
+
 export class App {
   public readonly router: ScreenRouter;
   private readonly registry: AssetRegistry;
@@ -218,6 +260,14 @@ export class App {
   private selectedIds: number[] = [];
   private simSpeedMultiplier = 1;
   private nextSeed = 1;
+  private missionAttempts = 0;
+  /**
+   * The next start is a new pick (a mission chosen from the list or Next, or Start on the
+   * skirmish setup), not a restart of the match being played: restarts keep its settings.
+   */
+  private freshStart = true;
+  /** How the running skirmish was set up; null for a loaded old save that does not say. */
+  private matchSetup: SkirmishSetupRecord | null = null;
   private queueModeValue = false;
   private selectModeValue = false;
   private attackMoveArmedValue = false;
@@ -378,11 +428,18 @@ export class App {
         this.campaignValue = campaign;
       },
       getCampaign: () => this.campaignValue,
+      getDifficulty: () => this.progress.difficulty,
+      setDifficulty: (difficulty) => {
+        this.progress = setCampaignDifficulty(this.progress, difficulty);
+        void saveProgress(this.kv, this.progress).catch(() => undefined);
+      },
+      inMatch: () => this.matchActive,
       getMissionList: () => this.missionList(),
       chooseMission: (id) => this.chooseMission(id),
       getBriefing: () => this.briefing(),
       getObjectives: () => this.objectives(),
       getResultView: () => this.resultView(),
+      canRestart: () => this.mode.kind === 'mission' || this.matchSetup !== null,
       chooseNextMission: () => this.chooseNextMission(),
       getSkirmishConfig: () => this.skirmishConfig,
       setSkirmishConfig: (config) => {
@@ -402,6 +459,7 @@ export class App {
           },
         })),
       beginSkirmish: () => {
+        this.freshStart = true;
         this.mode = { kind: 'skirmish' };
         this.fogValue = this.skirmishConfig.fog;
         this.mapIdValue = this.skirmishConfig.mapId || this.mapIdValue;
@@ -416,9 +474,10 @@ export class App {
 
     this.services = new GameServices({
       getWorld: () => this.world,
-      loadWorld: (world, startMatch) => {
-        this.loadWorld(world, startMatch);
+      loadWorld: (world, startMatch, skirmish) => {
+        this.loadWorld(world, startMatch, skirmish);
       },
+      matchSetup: () => (this.world.mission ? undefined : (this.matchSetup ?? undefined)),
       currentScreen: () => this.router.current(),
       inMatch: () => this.matchActive,
       setCameraTarget: (x, z) => {
@@ -432,6 +491,10 @@ export class App {
       freezeReport: () => this.lastFreeze,
       applySettings: (settings) => {
         this.applySettings(settings);
+      },
+      describeWorld: (world) => {
+        const id = world.mission?.def.id;
+        return id ? (MISSIONS.find((item) => item.id === id)?.title ?? 'Campaign') : 'Skirmish';
       },
     });
     this.leftHandedValue = this.services.settings().leftHanded;
@@ -471,6 +534,9 @@ export class App {
     }
     if (id === 'title' || id === 'results') {
       this.matchActive = false;
+    }
+    if (id === 'results') {
+      void this.services?.finishMatch();
     }
     this.router.go(id);
     this.services?.setMatchActive(this.matchActive && id !== 'results');
@@ -1344,6 +1410,8 @@ export class App {
 
   setFogOn(value: boolean): void {
     this.fogValue = value;
+    // The skirmish setup screen starts from this value (it overrides fogValue on Start).
+    this.skirmishConfig = { ...this.skirmishConfig, fog: value };
     try {
       window.localStorage.setItem('setting.fog', value ? 'on' : 'revealed');
     } catch {
@@ -1415,6 +1483,10 @@ export class App {
 
   requestAutosave(): Promise<void> {
     return this.services?.requestAutosave() ?? Promise.resolve();
+  }
+
+  async latestAutosaveSlot(): Promise<string | null> {
+    return (await this.services?.latestAutosave())?.slot ?? null;
   }
 
   listSaveSlots(): Promise<SaveSlotSummary[]> {
@@ -1532,9 +1604,16 @@ export class App {
   }
 
   private newSkirmish(): WorldState {
-    const config = this.skirmishConfig;
+    // A restart replays the running match's setup (also after loading its save); a new start
+    // takes the setup screen's.
+    const setup =
+      !this.freshStart && this.matchSetup
+        ? this.matchSetup
+        : { config: this.skirmishConfig, mapId: this.mapIdValue, fog: this.fogValue, ai: this.aiValue };
+    this.matchSetup = { config: { ...setup.config, opponents: setup.config.opponents.map((o) => ({ ...o })) }, mapId: setup.mapId, fog: setup.fog, ai: setup.ai };
+    const config = setup.config;
     // One side per start: a two-player map takes one AI (the setup screen offers no more).
-    const mapRow = this.mapRows.find((row) => row.id === this.mapIdValue) ?? this.mapRows[0];
+    const mapRow = this.mapRows.find((row) => row.id === setup.mapId) ?? this.mapRows[0];
     const seats = Math.max(1, (mapRow?.starts.length ?? 3) - 1);
     const specs = [
       { player: 1, faction: config.faction, controller: 'human' as const },
@@ -1546,12 +1625,12 @@ export class App {
       })),
     ];
     const world = createSkirmishWorld(this.simData, this.nextSeed, specs, {
-      fog: this.fogValue,
-      mapId: this.mapIdValue,
+      fog: setup.fog,
+      mapId: setup.mapId,
       resources: config.resources,
       force: config.force,
     });
-    if (!this.aiValue) {
+    if (!setup.ai) {
       world.aiStates = [];
     }
     this.nextSeed += 1;
@@ -1565,13 +1644,32 @@ export class App {
     if (!row) {
       return this.newSkirmish();
     }
-    const world = buildMissionWorld(this.simData, row, 1, { fog: this.fogValue });
+    // A restart or retry of the mission being played keeps its difficulty (a loaded save's may
+    // differ from the campaign's current one); a fresh pick uses the campaign's.
+    const current = this.world.mission?.def.id === id && !this.freshStart ? this.world.mission : null;
+    const difficulty = current ? (current.def.difficulty ?? 'normal') : this.difficultyFor(row);
+    // The fog toggle is a skirmish option: campaign missions are always played under fog.
+    const world = buildMissionWorld(this.simData, row, this.missionSeed(), { fog: true, difficulty });
     if (!this.aiValue) {
       world.aiStates = [];
     }
     this.dropPadId = null;
     this.placementState = null;
     return world;
+  }
+
+  // A fresh world seed for every mission attempt (start, retry, next), so the computer opponents and
+  // the dice play out differently each time. The app may use the clock; the sim only sees the seed,
+  // which the world (and so every save) keeps.
+  private missionSeed(): number {
+    this.missionAttempts += 1;
+    const mixed = Math.imul((Date.now() % 0x7fffffff) ^ Math.imul(this.missionAttempts, 0x9e3779b1), 0x85ebca6b) >>> 0;
+    return (mixed % 0x7ffffffe) + 1;
+  }
+
+  /** Training is the same for everyone; the story campaigns follow the chosen difficulty. */
+  private difficultyFor(row: MissionRow): CampaignDifficulty {
+    return row.campaign === 'training' ? 'normal' : this.progress.difficulty;
   }
 
   private missionList(): MissionListItem[] {
@@ -1584,6 +1682,8 @@ export class App {
       title: mission.title,
       order: mission.order,
       status: missionStatus(this.progress, missions, mission.id),
+      // Training is the same on every difficulty, so it shows none.
+      bestDifficulty: mission.campaign === 'training' ? undefined : this.progress.completed[mission.id]?.bestDifficulty,
     }));
   }
 
@@ -1598,6 +1698,7 @@ export class App {
     }
     this.selectedMissionId = id;
     this.mode = { kind: 'mission', id };
+    this.freshStart = true;
     return true;
   }
 
@@ -1617,10 +1718,12 @@ export class App {
       title: mission.title,
       text: mission.briefing,
       objectives: mission.objectives.map((o) => ({ text: o.text, kind: o.kind })),
+      difficulty: mission.campaign === 'training' ? undefined : this.difficultyFor(mission),
       map: {
         size: map.size,
         cellSize: map.cellSize,
-        seed: 1,
+        // The ground every attempt at this mission is played on.
+        seed: MISSION_MAP_SEED,
         starts: map.starts,
         deposits: map.deposits,
         features: map.features ?? null,
@@ -1670,6 +1773,7 @@ export class App {
       hasNext,
       campaignComplete,
       epilogue: campaignComplete ? (row?.epilogue ?? null) : null,
+      difficulty: row?.campaign === 'training' ? undefined : (mission.def.difficulty ?? 'normal'),
     };
   }
 
@@ -1680,7 +1784,7 @@ export class App {
     }
     this.resultRecorded = true;
     if (this.world.result.winner === mission.humanSide) {
-      this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ);
+      this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ, mission.def.difficulty ?? 'normal');
       void saveProgress(this.kv, this.progress).catch(() => undefined);
     }
   }
@@ -1688,6 +1792,7 @@ export class App {
   private startSkirmish(): void {
     this.resultRecorded = false;
     this.world = this.mode.kind === 'mission' ? this.newMission(this.mode.id) : this.newSkirmish();
+    this.freshStart = false;
     this.pendingCommands = [];
     this.selectedIds = [];
     this.fixed.reset();
@@ -1696,12 +1801,17 @@ export class App {
     this.matchActive = true;
     this.services?.resetAlerts(this.world);
     this.services?.setMatchActive(true);
+    this.services?.beginMatch();
   }
 
-  private loadWorld(world: WorldState, startMatch: boolean): void {
+  private loadWorld(world: WorldState, startMatch: boolean, skirmish?: unknown): void {
     this.world = world;
     // A save remembers whether it was a mission, so Retry, Next and progress work after loading.
     this.mode = world.mission ? { kind: 'mission', id: world.mission.def.id } : { kind: 'skirmish' };
+    // Restart replays the loaded match: a mission keeps its own difficulty, a skirmish the setup
+    // its save carries (a skirmish saved before setups were kept can't be restarted).
+    this.freshStart = false;
+    this.matchSetup = world.mission ? null : parseSkirmishSetup(skirmish);
     if (world.mission) {
       this.selectedMissionId = world.mission.def.id;
       this.campaignValue = MISSIONS.find((item) => item.id === world.mission?.def.id)?.campaign ?? this.campaignValue;

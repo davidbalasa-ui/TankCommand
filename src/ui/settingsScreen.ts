@@ -16,15 +16,26 @@ function downloadText(fileName: string, text: string): void {
   }, 0);
 }
 
+/** A phone or tablet without a mouse: edge scrolling and key bindings mean nothing there. */
+function touchOnly(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Settings is laid out for a 915x412 landscape phone: five sliders in a left
  * column and the toggles in a two-column grid on the right, with the action row
  * (export/import/rebind/back) underneath. As a single column the screen is over
  * 900 px tall, and because `touch-action: none` is set on <html> for TCH-04 the
- * player cannot scroll a touch screen to reach a control below the fold.
+ * player cannot scroll a touch screen to reach a control below the fold. On a
+ * touch-only device the desktop items (edge scroll, key rebinding) are left out.
  */
 export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void {
   const api = ctx.api;
+  const desktop = !touchOnly();
   const form = document.createElement('div');
   form.className = 'settings-form';
   const status = document.createElement('p');
@@ -79,7 +90,9 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
   addRange('masterVolume', 'Master volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`);
   addRange('musicVolume', 'Music volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`);
   addRange('effectsVolume', 'Effects volume', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`);
-  addRange('edgeScrollSpeed', 'Edge-scroll speed', 0.2, 3, 0.1, (v) => `${v.toFixed(1)}×`);
+  if (desktop) {
+    addRange('edgeScrollSpeed', 'Edge-scroll speed', 0.2, 3, 0.1, (v) => `${v.toFixed(1)}×`);
+  }
   addRange('cameraSensitivity', 'Sensitivity', 0.2, 3, 0.1, (v) => `${v.toFixed(1)}×`);
 
   const quality = button('settings', 'graphicsQuality', 'Graphics: auto', () => {
@@ -115,7 +128,8 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     api?.setSetting('leftHanded', !current().leftHanded);
     refreshLabels();
   });
-  const fog = button('settings', 'fog', 'Fog of war: on', () => {
+  // Fog is a skirmish option: campaign missions are always played under fog.
+  const fog = button('settings', 'fog', 'Skirmish fog: on', () => {
     ctx.setFogOn?.(!(ctx.isFogOn?.() ?? true));
     refreshLabels();
   });
@@ -123,7 +137,7 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     api?.setSetting('showFps', !current().showFps);
     refreshLabels();
   });
-  toggles.append(quality, health, edgeScroll, textSize, colourBlind, haptics, leftHanded, fog, fps);
+  toggles.append(quality, health, ...(desktop ? [edgeScroll] : []), textSize, colourBlind, haptics, leftHanded, fog, fps);
 
   let listeningFor: 'move' | null = null;
   const rebind = button('settings', 'rebind', 'Rebind keys', () => {
@@ -182,7 +196,7 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     ctx.router.back();
   });
 
-  actions.append(rebind, exportButton, importButton, back, fileInput);
+  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, back, fileInput);
 
   function refreshLabels(): void {
     const values = current();
@@ -194,7 +208,7 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     colourBlind.textContent = `Colour-blind: ${values.colourBlind ? 'on' : 'off'}`;
     haptics.textContent = `Haptics: ${values.haptics ? 'on' : 'off'}`;
     leftHanded.textContent = `Layout: ${values.leftHanded ? 'left' : 'right'}`;
-    fog.textContent = `Fog of war: ${ctx.isFogOn?.() === false ? 'revealed' : 'on'}`;
+    fog.textContent = `Skirmish fog: ${ctx.isFogOn?.() === false ? 'off' : 'on'}`;
     const move = values.keyBindings['move'];
     rebind.textContent = move ? `Rebind keys (${move})` : 'Rebind keys';
   }

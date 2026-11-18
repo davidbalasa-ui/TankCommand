@@ -10,7 +10,7 @@ import {
   isBlockedAt,
   lineOfSightClear,
 } from './map';
-import { computePath, followPath, unitMap } from './motion';
+import { computePath, followPath, queuedLegs, routeThroughLegs, unitMap } from './motion';
 import { separateUnits } from './avoidance';
 import { obstacleMap, pushOutOfObstacles } from './obstacles';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
@@ -143,6 +143,11 @@ export interface CreateWorldOptions {
   startResources?: StartResources[];
   size?: number;
   cellSize?: number;
+  /**
+   * Seed for the map's terrain noise and prop scatter. Defaults to the world seed. Missions pin it
+   * so every attempt plays on the same ground while the world seed (combat, AI) changes.
+   */
+  mapSeed?: number;
 }
 
 interface TargetRef {
@@ -236,6 +241,7 @@ function cloneWorld(world: WorldState): WorldState {
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      ...(unit.legs ? { legs: unit.legs.map((point) => ({ ...point })) } : {}),
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
@@ -295,7 +301,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
   const unitTypes = options.unitTypes ?? new Map<string, SimUnitType>();
   const structureTypes = options.structureTypes ?? new Map<string, SimStructureType>();
   const mapFeatures = options.mapFeatures ?? NO_FEATURES;
-  const map = generateMap(seed, options.size, options.cellSize, mapFeatures);
+  const map = generateMap(options.mapSeed ?? seed, options.size, options.cellSize, mapFeatures);
   const rng = new Rng(seed);
   const deposits: DepositState[] = (options.deposits ?? []).map((def, index) => ({
     id: index + 1,
@@ -426,6 +432,8 @@ function planMove(
         : undefined;
     const anchor = tail ?? pending;
     if (anchor) {
+      // Where the order so far ends becomes a leg end the unit must drive through before this one.
+      const legs = pending ? [...queuedLegs(unit), { x: anchor.x, z: anchor.z }] : [];
       const appended = findPath(unitMap(world, unit), anchor.x, anchor.z, goalX, goalZ) ?? [
         { x: goalX, z: goalZ },
       ];
@@ -433,6 +441,7 @@ function planMove(
       const final = combined[combined.length - 1];
       if (final) {
         unit.path = combined;
+        unit.legs = legs;
         unit.order =
           kind === 'move'
             ? { kind: 'move', x: final.x, z: final.z, queue: true }
@@ -444,6 +453,7 @@ function planMove(
     }
   }
 
+  unit.legs = [];
   const path = computePath(world, unit, goalX, goalZ);
   if (!path) {
     unit.path = [];
@@ -969,14 +979,14 @@ function updateOrderPath(
   }
 
   if (unit.order.kind === 'move') {
-    if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
+    if (queuedLegs(unit).length === 0 && Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
       unit.order = { kind: 'idle' };
       unit.path = [];
       unit.speed = 0;
       return;
     }
     if (unit.path.length === 0) {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       if (!path) {
         unit.order = { kind: 'idle' };
         unit.speed = 0;
@@ -1004,7 +1014,7 @@ function updateOrderPath(
       return;
     }
 
-    if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
+    if (queuedLegs(unit).length === 0 && Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
       unit.order = { kind: 'idle' };
       unit.path = [];
       unit.speed = 0;
@@ -1012,7 +1022,7 @@ function updateOrderPath(
     }
 
     if (unit.path.length === 0) {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       if (!path) {
         unit.order = { kind: 'idle' };
         unit.speed = 0;
@@ -1110,7 +1120,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'move') {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1120,7 +1130,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'attackMove') {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1456,6 +1466,7 @@ export function hashWorld(world: WorldState): string {
         order: unit.order,
         stance: unit.stance,
         path: unit.path,
+        ...(unit.legs && unit.legs.length > 0 ? { legs: unit.legs } : {}),
         reloadLeft: unit.reloadLeft,
         ...(unit.burstLeft !== undefined ? { burstLeft: unit.burstLeft } : {}),
         stuckTicks: unit.stuckTicks,
@@ -1506,7 +1517,7 @@ export function worldToPayload(world: WorldState): unknown {
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
     mission: world.mission ? cloneMission(world.mission) : null,
-    mapSpec: { size: world.map.size, cellSize: world.map.cellSize, features: world.mapFeatures },
+    mapSpec: { size: world.map.size, cellSize: world.map.cellSize, seed: world.map.seed, features: world.mapFeatures },
     fogEnabled: world.fogEnabled,
     vision: world.vision.map(cloneVision),
     aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
@@ -1514,6 +1525,7 @@ export function worldToPayload(world: WorldState): unknown {
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      ...(unit.legs ? { legs: unit.legs.map((point) => ({ ...point })) } : {}),
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
@@ -1574,8 +1586,9 @@ export function payloadToWorld(input: unknown): WorldState | null {
   const spec = isRecord(input.mapSpec) ? input.mapSpec : null;
   const mapFeatures: MapFeatures =
     spec && isRecord(spec.features) ? (spec.features as unknown as MapFeatures) : NO_FEATURES;
+  // Saves from before the map had its own seed generated it from the world seed.
   const map = generateMap(
-    seed,
+    spec && typeof spec.seed === 'number' && Number.isFinite(spec.seed) ? spec.seed : seed,
     spec && typeof spec.size === 'number' ? spec.size : undefined,
     spec && typeof spec.cellSize === 'number' ? spec.cellSize : undefined,
     mapFeatures,

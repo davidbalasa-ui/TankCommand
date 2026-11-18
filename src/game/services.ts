@@ -11,7 +11,9 @@ import {
   decodeSave,
   encodeSave,
   SaveManager,
+  type LoadedSave,
   type LoadSaveResult,
+  type SaveExtras,
 } from '../platform/saves';
 import { SettingsStore, type SettingsState } from '../platform/settings';
 import type { WatchdogReport } from '../platform/watchdog';
@@ -33,7 +35,10 @@ import { GameSpeed } from './speed';
 
 export interface GameServicesHost {
   getWorld(): WorldState;
-  loadWorld(world: WorldState, startMatch: boolean): void;
+  /** `skirmish` is the setup record a skirmish save carries (see matchSetup). */
+  loadWorld(world: WorldState, startMatch: boolean, skirmish?: unknown): void;
+  /** The running skirmish's setup record, kept with its saves so Restart works after a load. */
+  matchSetup?(): unknown;
   currentScreen(): string;
   inMatch(): boolean;
   setCameraTarget(x: number, z: number): void;
@@ -43,6 +48,8 @@ export interface GameServicesHost {
   getSimSpeed(): number;
   freezeReport(): WatchdogReport | null;
   applySettings(settings: SettingsState): void;
+  /** A short name for what a saved world is playing (a mission's title, or "Skirmish"). */
+  describeWorld?(world: WorldState): string;
 }
 
 export interface GameServicesOptions {
@@ -51,6 +58,13 @@ export interface GameServicesOptions {
   audio?: AudioEngine;
   mount?: HTMLElement;
   now?: () => number;
+}
+
+const MANUAL_SLOTS = 5;
+const STORAGE_FULL = 'Storage is full; delete a save or free space.';
+
+function newMatchId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function errorMessage(error: unknown): string {
@@ -107,6 +121,12 @@ export class GameServices implements GameApi {
   private lastImportResult: ImportSaveResult | null = null;
   private lastReport: { fileName: string; content: string } | null = null;
   private forceStorageFull = false;
+  /** The running match: every save of it carries this id, so its autosaves go when it ends. */
+  private matchId: string | null = null;
+  /** The autosave slot the running match was loaded from (old saves carry no match id). */
+  private loadedAutoSlot: string | null = null;
+  /** Autosave writes still in flight; clearing a match's autosaves waits for them. */
+  private readonly autoWrites = new Set<Promise<unknown>>();
 
   constructor(host: GameServicesHost, options: GameServicesOptions = {}) {
     this.host = host;
@@ -168,26 +188,29 @@ export class GameServices implements GameApi {
   }
 
   async saveToSlot(slot: string): Promise<SaveActionResult> {
-    if (this.forceStorageFull) {
-      const result: SaveActionResult = {
-        status: 'full',
-        message: 'Storage is full; delete a save or free space.',
-      };
-      this.lastSaveResult = result;
-      return result;
+    const label = /^manual-\d+$/.test(slot) ? `slot ${slot.slice('manual-'.length)}` : slot;
+    return this.writeSave(() => this.manager.save(slot, this.host.getWorld(), this.extras()), `Saved to ${label}.`);
+  }
+
+  async quitSave(): Promise<SaveActionResult> {
+    const result = await this.writeSave(
+      async () => {
+        await this.trackAutosave(this.manager.autosave(this.host.getWorld(), this.extras()));
+      },
+      'Saved. Continue on the title screen picks it up.',
+    );
+    if (result.status === 'ok') {
+      this.lastAutoAt = Date.now();
     }
+    return result;
+  }
+
+  async deleteSlot(slot: string): Promise<SaveActionResult> {
     try {
-      await this.manager.save(slot, this.host.getWorld());
-      const result: SaveActionResult = { status: 'ok', message: `Saved ${slot}.` };
-      this.lastSaveResult = result;
-      return result;
+      await this.manager.remove(slot);
+      return { status: 'ok', message: 'Save deleted.' };
     } catch (error) {
-      const result: SaveActionResult =
-        error instanceof StorageFullError
-          ? { status: 'full', message: 'Storage is full; delete a save or free space.' }
-          : { status: 'error', message: `Save failed: ${errorMessage(error)}` };
-      this.lastSaveResult = result;
-      return result;
+      return { status: 'error', message: `Delete failed: ${errorMessage(error)}` };
     }
   }
 
@@ -195,7 +218,18 @@ export class GameServices implements GameApi {
     const loaded = await this.manager.load(slot);
     const result = this.fromLoadResult(loaded);
     if (result.status === 'ok' && loaded.status === 'ok') {
-      this.host.loadWorld(loaded.save.world, !this.host.inMatch());
+      this.matchId = loaded.save.meta.matchId ?? newMatchId();
+      this.loadedAutoSlot = slot.startsWith('auto-') ? slot : null;
+      if (this.loadedAutoSlot && !loaded.save.meta.matchId) {
+        // An autosave from before match ids: stamp it with this match's id, so it goes with the
+        // match's other autosaves even after a Save & quit and another Continue.
+        try {
+          await this.manager.save(slot, loaded.save.world, { matchId: this.matchId, ...(loaded.save.meta.skirmish !== undefined ? { skirmish: loaded.save.meta.skirmish } : {}) });
+        } catch {
+          // Storage trouble: the loaded slot is still cleared by loadedAutoSlot when this run ends.
+        }
+      }
+      this.host.loadWorld(loaded.save.world, !this.host.inMatch(), loaded.save.meta.skirmish);
       result.savedAtIso = loaded.save.meta.savedAtIso;
     }
     this.lastLoadResult = result;
@@ -204,34 +238,96 @@ export class GameServices implements GameApi {
 
   async listSaveSlots(): Promise<SaveSlotSummary[]> {
     const summaries: SaveSlotSummary[] = [];
-    for (let index = 1; index <= 5; index += 1) {
+    for (let index = 1; index <= MANUAL_SLOTS; index += 1) {
       const slot = `manual-${index}`;
       const loaded = await this.manager.load(slot);
-      summaries.push({
-        slot,
-        savedAtIso: loaded.status === 'ok' ? loaded.save.meta.savedAtIso : null,
-        status: loaded.status,
-      });
+      if (loaded.status === 'ok') {
+        const world = loaded.save.world;
+        summaries.push({
+          slot,
+          savedAtIso: loaded.save.meta.savedAtIso,
+          status: 'ok',
+          title: this.describe(world),
+          playSeconds: Math.floor(world.tick / SIM_TICK_HZ),
+        });
+      } else {
+        summaries.push({ slot, savedAtIso: null, status: loaded.status });
+      }
     }
     return summaries;
   }
 
   async latestAutosave(): Promise<AutosaveSummary | null> {
-    const slot = await this.manager.latestAutosaveSlot();
-    if (!slot) {
+    // The newest autosave wins, but only of a match that can still be played on.
+    const preferred = await this.manager.latestAutosaveSlot();
+    const slots = (await this.manager.listSlots()).filter((slot) => slot.startsWith('auto-'));
+    let best: { slot: string; save: LoadedSave } | null = null;
+    for (const slot of slots) {
+      const loaded = await this.manager.load(slot);
+      if (loaded.status !== 'ok' || loaded.save.world.result !== null) {
+        continue;
+      }
+      if (slot === preferred) {
+        best = { slot, save: loaded.save };
+        break;
+      }
+      if (!best || loaded.save.meta.savedAtIso > best.save.meta.savedAtIso) {
+        best = { slot, save: loaded.save };
+      }
+    }
+    if (!best) {
       return null;
     }
-    const loaded = await this.manager.load(slot);
-    if (loaded.status !== 'ok') {
-      return null;
-    }
-    const world = loaded.save.world;
+    const world = best.save.world;
     return {
-      slot,
-      savedAtIso: loaded.save.meta.savedAtIso,
+      slot: best.slot,
+      savedAtIso: best.save.meta.savedAtIso,
       mode: world.mission ? 'mission' : 'skirmish',
       playSeconds: Math.floor(world.tick / SIM_TICK_HZ),
+      title: this.describe(world),
     };
+  }
+
+  /** A new match is starting: its saves get a fresh match id. */
+  beginMatch(): void {
+    this.matchId = newMatchId();
+    this.loadedAutoSlot = null;
+  }
+
+  /** The running match ended: its autosaves can't be played on, so Continue stops offering them. */
+  async finishMatch(): Promise<void> {
+    await this.discardMatch();
+  }
+
+  /**
+   * Drops the running match's autosaves (it ended, was restarted or was quit without saving), so
+   * Continue never offers it: every autosave carrying its id, the autosave it was loaded from
+   * (a save from before match ids has none), and any autosave holding a finished result.
+   */
+  async discardMatch(): Promise<void> {
+    const finished = this.matchId;
+    const loadedSlot = this.loadedAutoSlot;
+    this.matchId = null;
+    this.loadedAutoSlot = null;
+    // An autosave still being written would otherwise land after the clean-up.
+    while (this.autoWrites.size > 0) {
+      await Promise.allSettled([...this.autoWrites]);
+    }
+    const slots = (await this.manager.listSlots()).filter((slot) => slot.startsWith('auto-'));
+    for (const slot of slots) {
+      const loaded = await this.manager.load(slot);
+      if (loaded.status !== 'ok') {
+        continue;
+      }
+      const id = loaded.save.meta.matchId;
+      const ended =
+        loaded.save.world.result !== null ||
+        (finished !== null && id === finished) ||
+        (slot === loadedSlot && (id === undefined || id === finished));
+      if (ended) {
+        await this.manager.remove(slot);
+      }
+    }
   }
 
   async resumeLastGame(): Promise<LoadSlotResult> {
@@ -264,25 +360,43 @@ export class GameServices implements GameApi {
       return result;
     }
     if (this.forceStorageFull) {
-      const result: ImportSaveResult = {
-        status: 'full',
-        message: 'Storage is full; delete a save or free space.',
-      };
+      const result: ImportSaveResult = { status: 'full', message: STORAGE_FULL };
       this.lastImportResult = result;
       return result;
     }
+    const matchId = decoded.meta.matchId ?? newMatchId();
+    const extras = { matchId, ...(decoded.meta.skirmish !== undefined ? { skirmish: decoded.meta.skirmish } : {}) };
+    // An import goes into the first empty manual slot. With none free it becomes the latest
+    // autosave rather than overwriting one of the player's own saves.
+    let slot: string | null = null;
+    let autoSlot: string | null = null;
+    for (let index = 1; index <= MANUAL_SLOTS && slot === null; index += 1) {
+      if ((await this.manager.load(`manual-${index}`)).status === 'missing') {
+        slot = `manual-${index}`;
+      }
+    }
     try {
-      await this.manager.save('manual-1', decoded.world);
+      if (slot) {
+        await this.manager.save(slot, decoded.world, extras);
+      } else {
+        autoSlot = await this.trackAutosave(this.manager.autosave(decoded.world, extras));
+      }
     } catch (error) {
       const result: ImportSaveResult =
         error instanceof StorageFullError
-          ? { status: 'full', message: 'Storage is full; delete a save or free space.' }
+          ? { status: 'full', message: STORAGE_FULL }
           : { status: 'error', message: `Import failed: ${errorMessage(error)}` };
       this.lastImportResult = result;
       return result;
     }
-    this.host.loadWorld(decoded.world, !this.host.inMatch());
-    const result: ImportSaveResult = { status: 'ok', message: 'Save imported.' };
+    this.matchId = matchId;
+    this.loadedAutoSlot = autoSlot;
+    this.host.loadWorld(decoded.world, !this.host.inMatch(), decoded.meta.skirmish);
+    // Say where it went: a manual slot, or (all five full) the autosaves that Continue reads.
+    const where = slot
+      ? ` into slot ${slot.slice('manual-'.length)}`
+      : ' as the latest autosave (all save slots are full); Continue on the title screen picks it up';
+    const result: ImportSaveResult = { status: 'ok', message: `Save imported${where}.` };
     this.lastImportResult = result;
     return result;
   }
@@ -445,18 +559,59 @@ export class GameServices implements GameApi {
     this.alertsCenter.dispose();
   }
 
+  private trackAutosave<T>(write: Promise<T>): Promise<T> {
+    this.autoWrites.add(write);
+    const settle = (): void => {
+      this.autoWrites.delete(write);
+    };
+    write.then(settle, settle);
+    return write;
+  }
+
   private async autosaveNow(): Promise<void> {
+    // No match id: the match is being discarded or has ended, and nothing of it should be kept.
+    if (this.matchId === null) {
+      return;
+    }
     try {
-      await this.manager.autosave(this.host.getWorld());
+      await this.trackAutosave(this.manager.autosave(this.host.getWorld(), this.extras()));
       this.lastAutoAt = Date.now();
     } catch (error) {
       if (error instanceof StorageFullError) {
-        this.lastSaveResult = {
-          status: 'full',
-          message: 'Storage is full; delete a save or free space.',
-        };
+        this.lastSaveResult = { status: 'full', message: STORAGE_FULL };
       }
     }
+  }
+
+  private extras(): SaveExtras {
+    const skirmish = this.host.matchSetup?.();
+    return {
+      ...(this.matchId ? { matchId: this.matchId } : {}),
+      ...(skirmish !== undefined ? { skirmish } : {}),
+    };
+  }
+
+  private describe(world: WorldState): string {
+    return this.host.describeWorld?.(world) ?? (world.mission ? 'Campaign' : 'Skirmish');
+  }
+
+  private async writeSave(write: () => Promise<void>, okMessage: string): Promise<SaveActionResult> {
+    let result: SaveActionResult;
+    if (this.forceStorageFull) {
+      result = { status: 'full', message: STORAGE_FULL };
+    } else {
+      try {
+        await write();
+        result = { status: 'ok', message: okMessage };
+      } catch (error) {
+        result =
+          error instanceof StorageFullError
+            ? { status: 'full', message: STORAGE_FULL }
+            : { status: 'error', message: `Save failed: ${errorMessage(error)}` };
+      }
+    }
+    this.lastSaveResult = result;
+    return result;
   }
 
   private applySettings(state: SettingsState): void {

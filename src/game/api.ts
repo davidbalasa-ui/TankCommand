@@ -7,6 +7,10 @@ export interface SaveSlotSummary {
   slot: string;
   savedAtIso: string | null;
   status: 'ok' | 'missing' | 'corrupt' | 'incompatible';
+  /** What was being played: the mission's name, or "Skirmish". */
+  title?: string;
+  /** In-game time played, in seconds. */
+  playSeconds?: number;
 }
 
 export interface SaveActionResult {
@@ -27,6 +31,8 @@ export interface AutosaveSummary {
   mode?: 'mission' | 'skirmish';
   /** In-game time played, in seconds. */
   playSeconds?: number;
+  /** What was being played: the mission's name, or "Skirmish". */
+  title?: string;
 }
 
 export interface ImportSaveResult {
@@ -56,6 +62,12 @@ export interface GameApi {
   saveToSlot(slot: string): Promise<SaveActionResult>;
   loadFromSlot(slot: string): Promise<LoadSlotResult>;
   listSaveSlots(): Promise<SaveSlotSummary[]>;
+  deleteSlot(slot: string): Promise<SaveActionResult>;
+  /** Saves the running match for Continue on the title screen (never into a manual slot). */
+  quitSave(): Promise<SaveActionResult>;
+  /** Drops the running match's autosaves (restart, quit without saving), so Continue skips it. */
+  discardMatch(): Promise<void>;
+  /** The newest autosave of a match that has not ended, or null. */
   latestAutosave(): Promise<AutosaveSummary | null>;
   resumeLastGame(): Promise<LoadSlotResult>;
   exportSave(): Promise<string>;

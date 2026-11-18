@@ -281,6 +281,7 @@ export interface TestHook {
   audioStatus(): AudioStatus;
   listSaveSlots(): Promise<SaveSlotSummaryView[]>;
   requestAutosave(): Promise<void>;
+  latestAutosaveSlot(): Promise<string | null>;
   lastSaveOutcome(): SaveOutcomeView | null;
   lastLoadOutcome(): SaveOutcomeView | null;
   lastImportOutcome(): SaveOutcomeView | null;
@@ -623,47 +624,68 @@ export async function toggleLeftHandedViaSettings(page: Page): Promise<void> {
  */
 export async function openBuildMenu(page: Page): Promise<void> {
   const queuedBefore = await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0);
-  const point = await page.evaluate(() => {
-    const hook = window.__TC_TEST__;
-    if (!hook) {
-      return null;
-    }
-    const pad = hook.structures().find((item) => item.owner === 1 && item.kind === 'pad' && item.hp > 0);
-    if (!pad) {
-      return null;
-    }
-    const before = hook.camera();
-    hook.setCamera({ targetX: pad.x, targetZ: pad.z, distance: 40, yaw: 0 });
-    const units = hook.units();
-    const offsets = [0, 1.5, -1.5, 3, -3];
-    for (const dx of offsets) {
-      for (const dz of offsets) {
-        const wx = pad.x + dx;
-        const wz = pad.z + dz;
-        if (units.some((unit) => Math.hypot(unit.x - wx, unit.z - wz) < 4)) {
-          continue;
-        }
-        const screen = hook.worldToScreen(wx, wz);
-        if (!screen) {
-          continue;
-        }
-        const hit = document.elementFromPoint(screen.x, screen.y);
-        if (hit instanceof HTMLCanvasElement && hit.classList.contains('game-canvas')) {
-          return { x: screen.x, y: screen.y, before };
+  // Fresh units drive off the pad after a drop. On a slow machine one can roll under the finger
+  // between picking the spot and the tap, and the tap then selects it (as it should). When that
+  // happens, clear the selection and pick a new spot.
+  let cameraBefore: ReturnType<NonNullable<Window['__TC_TEST__']>['camera']> | undefined;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const point = await page.evaluate(() => {
+      const hook = window.__TC_TEST__;
+      if (!hook) {
+        return null;
+      }
+      const pad = hook.structures().find((item) => item.owner === 1 && item.kind === 'pad' && item.hp > 0);
+      if (!pad) {
+        return null;
+      }
+      const before = hook.camera();
+      hook.setCamera({ targetX: pad.x, targetZ: pad.z, distance: 40, yaw: 0 });
+      const units = hook.units();
+      const offsets = [0, 1.5, -1.5, 3, -3];
+      for (const dx of offsets) {
+        for (const dz of offsets) {
+          const wx = pad.x + dx;
+          const wz = pad.z + dz;
+          if (units.some((unit) => Math.hypot(unit.x - wx, unit.z - wz) < 4)) {
+            continue;
+          }
+          const screen = hook.worldToScreen(wx, wz);
+          if (!screen) {
+            continue;
+          }
+          const hit = document.elementFromPoint(screen.x, screen.y);
+          if (hit instanceof HTMLCanvasElement && hit.classList.contains('game-canvas')) {
+            return { x: screen.x, y: screen.y, before };
+          }
         }
       }
+      return null;
+    });
+    expect(point).not.toBeNull();
+    if (!point) {
+      return;
     }
-    return null;
-  });
-  expect(point).not.toBeNull();
-  if (!point) {
-    return;
-  }
-  const touch = await page.evaluate(() => navigator.maxTouchPoints > 0);
-  if (touch) {
-    await page.touchscreen.tap(point.x, point.y);
-  } else {
-    await page.mouse.click(point.x, point.y);
+    const touch = await page.evaluate(() => navigator.maxTouchPoints > 0);
+    if (touch) {
+      await page.touchscreen.tap(point.x, point.y);
+    } else {
+      await page.mouse.click(point.x, point.y);
+    }
+    if (attempt === 0) {
+      cameraBefore = point.before;
+    }
+    // Wait until the tap either opened the menu or selected a unit that rolled under the finger.
+    const deselect = page.locator('[data-control-id="inGame.deselect"]');
+    await expect
+      .poll(async () =>
+        (await page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false)) || (await deselect.isVisible()),
+      )
+      .toBe(true);
+    if (await page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false)) {
+      break;
+    }
+    await deselect.click();
+    await expect(deselect).toBeHidden();
   }
   await expect
     .poll(async () => page.evaluate(() => window.__TC_TEST__?.hud()?.buildMenuOpen ?? false))
@@ -675,7 +697,7 @@ export async function openBuildMenu(page: Page): Promise<void> {
     .toBeGreaterThanOrEqual(frame + 2);
   // An earlier order may land meanwhile, so the queue can shrink, but it must not grow.
   expect(await page.evaluate(() => window.__TC_TEST__?.hud()?.queue.length ?? 0)).toBeLessThanOrEqual(queuedBefore);
-  await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera), point.before);
+  await page.evaluate((camera) => window.__TC_TEST__?.setCamera(camera!), cameraBefore);
 }
 
 /** Centres the camera on a unit and taps it. */

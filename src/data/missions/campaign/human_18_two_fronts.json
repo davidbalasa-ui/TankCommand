@@ -160,6 +160,18 @@
       "structureType": "structure.human.turret",
       "x": -2,
       "z": 70
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": -76,
+      "z": -28
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.turret",
+      "x": 8,
+      "z": 80
     }
   ],
   "objectives": [
