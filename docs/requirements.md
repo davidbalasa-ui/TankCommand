@@ -110,6 +110,7 @@
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |
 | ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
+| ALRT-03 | A merged "under attack" line counts the distinct units hit, not the number of hits. |
 | BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |

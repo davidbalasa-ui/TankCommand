@@ -161,4 +161,33 @@ describe('alerts', () => {
     line.click();
     expect(jumps.at(-1)).toEqual({ x: 9, z: 9 });
   });
+
+  it('[ALRT-03] a merged "under attack" line counts the units hit, not the hits', () => {
+    let now = 0;
+    center = new AlertCenter({ host: document.body, now: () => now, rateLimitMs: 1000, ttlMs: 100000, onJump: () => {} });
+    center.setEnabled(true);
+    let world: WorldState = makeWorld(1, [
+      { owner: 1, typeId: 'unit.test.tank', x: -50, z: -50 },
+      { owner: 1, typeId: 'unit.test.tank', x: -46, z: -50 },
+      { owner: 2, typeId: 'unit.test.tank', x: -40, z: -50 },
+    ]);
+    center.update(world);
+    const hit = (index: number): void => {
+      world = { ...world, units: world.units.map((unit, i) => (i === index ? { ...unit, hp: unit.hp - 5 } : unit)) };
+      center?.update(world);
+    };
+    const line = document.querySelector<HTMLButtonElement>('.alert-toast')!;
+    // One unit hit five times, some inside the rate limit: still one unit under attack.
+    for (let i = 0; i < 5; i += 1) {
+      now += 600;
+      hit(0);
+    }
+    expect(line.textContent).toContain('Unit under attack');
+    expect(line.textContent).not.toMatch(/\d+ units under attack/);
+    // A second unit hit: two units.
+    now += 600;
+    hit(1);
+    expect(line.textContent).toContain('2 units under attack');
+    expect(line.dataset.count).toBe('2');
+  });
 });
