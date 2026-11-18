@@ -87,6 +87,12 @@ export interface QualityControllerOptions {
   minChangeIntervalMs?: number;
   /** Length of the rolling-average window (default 1000 ms). */
   windowMs?: number;
+  /**
+   * A frame longer than this (default 2000 ms) is ignored when it stands alone (a tab switch, a
+   * one-off stall), but counts, as this long, when the frame before it was that long too: a
+   * device that needs over this per frame at the current settings must still step down.
+   */
+  maxSampleMs?: number;
 }
 
 const DEFAULTS = {
@@ -96,6 +102,7 @@ const DEFAULTS = {
   fastHoldMs: 3000,
   minChangeIntervalMs: 1000,
   windowMs: 1000,
+  maxSampleMs: 2000,
 } as const;
 
 export class QualityController {
@@ -105,6 +112,9 @@ export class QualityController {
   private readonly fastHoldMs: number;
   private readonly minChangeIntervalMs: number;
   private readonly windowMs: number;
+  private readonly maxSampleMs: number;
+  /** The last frame fed in was over maxSampleMs. */
+  private lastWasLong = false;
 
   private readonly samples: number[] = [];
   private windowTotal = 0;
@@ -121,6 +131,7 @@ export class QualityController {
     this.fastHoldMs = options.fastHoldMs ?? DEFAULTS.fastHoldMs;
     this.minChangeIntervalMs = options.minChangeIntervalMs ?? DEFAULTS.minChangeIntervalMs;
     this.windowMs = options.windowMs ?? DEFAULTS.windowMs;
+    this.maxSampleMs = options.maxSampleMs ?? DEFAULTS.maxSampleMs;
   }
 
   /** Current quality level; 0 is full quality, `QUALITY_LADDER.length - 1` the floor. */
@@ -141,15 +152,27 @@ export class QualityController {
     this.fastAccum = 0;
     this.lastChangeAt = Number.NEGATIVE_INFINITY;
     this.currentLevel = 0;
+    this.lastWasLong = false;
   }
 
   /**
    * Feeds one frame time. Returns true when the level changed, so the caller can
    * apply the new settings once rather than polling every frame.
    */
-  sample(frameMs: number): boolean {
-    if (!Number.isFinite(frameMs) || frameMs <= 0) {
+  sample(rawFrameMs: number): boolean {
+    if (!Number.isFinite(rawFrameMs) || rawFrameMs <= 0) {
       return false;
+    }
+    let frameMs = rawFrameMs;
+    if (frameMs > this.maxSampleMs) {
+      const sustained = this.lastWasLong;
+      this.lastWasLong = true;
+      if (!sustained) {
+        return false;
+      }
+      frameMs = this.maxSampleMs;
+    } else {
+      this.lastWasLong = false;
     }
 
     this.elapsedTotal += frameMs;

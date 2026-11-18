@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { heightAt, isWaterAt, slopeAt, type MapDef } from "../sim/map";
 import { MAX_SLOPE } from "../sim/tuning";
 import type { DepositState, WorldState } from "../sim/types";
+import { groundNoiseAt } from "./groundDetail";
 import { distanceOutside, groundHeightAt } from "./outerLand";
 
 export const PROP_IDS = [
@@ -27,6 +28,17 @@ export const DEPOSIT_MODEL_IDS = {
   ore: "prop.deposit.ore",
   metal: "prop.deposit.metal",
 } as const;
+const LOD_SUFFIX = ".lod";
+/** Low-detail versions: drawn away from the camera and on the lower quality levels. */
+export const DEPOSIT_LOD_IDS = {
+  ore: `${DEPOSIT_MODEL_IDS.ore}${LOD_SUFFIX}`,
+  metal: `${DEPOSIT_MODEL_IDS.metal}${LOD_SUFFIX}`,
+} as const;
+export const LANDSCAPE_LOD_IDS: readonly string[] = [
+  ...PROP_IDS.map((id) => `${id}${LOD_SUFFIX}`),
+  DEPOSIT_LOD_IDS.ore,
+  DEPOSIT_LOD_IDS.metal,
+];
 
 type PropId = (typeof PROP_IDS)[number];
 
@@ -48,6 +60,8 @@ interface Placement {
   x: number;
   z: number;
   matrix: THREE.Matrix4;
+  /** Per-instance colour multiplier, so repeated props are not identical copies. */
+  tint: THREE.Color;
   /** Past the map edge: drawn without shadows (they would fall outside the shadow map anyway). */
   outside?: boolean;
 }
@@ -73,6 +87,7 @@ export function addFogHook(
   material: THREE.Material,
   fog: FogUniforms,
   instanced: boolean,
+  foliage = false,
 ): void {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uFog = fog.uFog;
@@ -98,8 +113,64 @@ export function addFogHook(
         "#include <emissivemap_fragment>",
         "#include <emissivemap_fragment>\ntotalEmissiveRadiance *= fogLevel;",
       );
+    if (foliage) {
+      // Grass and leaves are lit mostly as if they faced the sky, the usual foliage trick: thin
+      // blades seen edge-on or from behind otherwise go almost black against the lit ground.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <normal_fragment_maps>",
+        "#include <normal_fragment_maps>\nnormal = normalize(mix(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), 0.65));",
+      );
+    }
   };
-  material.customProgramCacheKey = () => (instanced ? "tcFogInst" : "tcFog");
+  material.customProgramCacheKey = () =>
+    (instanced ? "tcFogInst" : "tcFog") + (foliage ? "Fol" : "");
+}
+
+const ROCKS: ReadonlySet<PropId> = new Set<PropId>([
+  "prop.nature.boulder",
+  "prop.nature.rock_cluster",
+  "prop.nature.slab",
+  "prop.nature.cliff",
+]);
+const PLANTS: ReadonlySet<PropId> = new Set<PropId>([
+  "prop.nature.grass",
+  "prop.nature.shrub",
+]);
+/** Plant colour multiplier on lush and on dry ground. */
+const PLANT_LUSH = new THREE.Color(1.1, 1.12, 0.95);
+const PLANT_DRY = new THREE.Color(1.38, 1.24, 0.86);
+
+/**
+ * A colour multiplier for one prop: rocks vary in lightness and lean warm or cool, plants take the
+ * dryness of the ground under them (from the same noise the terrain shader uses), everything varies
+ * a little in brightness.
+ */
+function propTint(prop: PropId, x: number, z: number, seed: number): THREE.Color {
+  const ix = Math.floor(x * 8);
+  const iz = Math.floor(z * 8);
+  const light = hash(ix, iz, seed, 21);
+  const hue = hash(ix, iz, seed, 22) * 2 - 1;
+  if (ROCKS.has(prop)) {
+    const b = 0.8 + light * 0.34;
+    return new THREE.Color(b * (1 + 0.06 * hue), b, b * (1 - 0.08 * hue));
+  }
+  if (PLANTS.has(prop)) {
+    const dry = groundNoiseAt(seed, x, z).dry;
+    // Shrubs are broad and catch more light than grass blades: a smaller lift.
+    const b = (0.86 + light * 0.28) * (prop === "prop.nature.shrub" ? 0.78 : 1);
+    return PLANT_LUSH.clone()
+      .lerp(PLANT_DRY, Math.min(1, Math.max(0, dry * 1.2 - 0.1 + hue * 0.15)))
+      .multiplyScalar(b);
+  }
+  const b = 0.88 + light * 0.24;
+  return new THREE.Color(b, b, b);
+}
+
+/** Rocks also vary in height, so two boulders of one size are not the same shape. */
+function propStretch(prop: PropId, x: number, z: number, seed: number): number {
+  return ROCKS.has(prop)
+    ? 0.84 + hash(Math.floor(x * 8), Math.floor(z * 8), seed, 23) * 0.32
+    : 1;
 }
 
 /** Rough radius of a solid prop at scale 1, in metres. */
@@ -141,9 +212,15 @@ export function scatterProps(map: MapDef): Placement[] {
     sink: number,
   ): void => {
     q.setFromAxisAngle(up, yaw);
-    s.set(scale, scale, scale);
+    s.set(scale, scale * propStretch(prop, x, z, map.seed), scale);
     p.set(x, heightAt(map, x, z) - sink * scale, z);
-    out.push({ prop, x, z, matrix: new THREE.Matrix4().compose(p, q, s) });
+    out.push({
+      prop,
+      x,
+      z,
+      matrix: new THREE.Matrix4().compose(p, q, s),
+      tint: propTint(prop, x, z, map.seed),
+    });
   };
   for (let cz = 0; cz < map.rows; cz += 1) {
     for (let cx = 0; cx < map.cols; cx += 1) {
@@ -216,6 +293,13 @@ export function scatterProps(map: MapDef): Placement[] {
 const OUTSIDE_REACH = 80;
 const OUTSIDE_CELL = 4.5;
 const OUTSIDE_SUFFIX = ":out";
+const FAR_SUFFIX = ":far";
+/** Props and sites within this distance of the camera target draw their full models (metres). */
+const NEAR_RADIUS = 34;
+/** Zoomed out further than this (camera to target, metres), every prop draws low-detail. */
+const FULL_DETAIL_VIEW = 56;
+/** The near/far split is redone after the camera target moves this far (metres). */
+const RELAYOUT_STEP = 8;
 /** Shrubs and grass only this far past the edge (metres); beyond it, rocks and dead trees. */
 const OUTSIDE_PLANT_REACH = 22;
 
@@ -292,13 +376,14 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
         scale = 1 + size * 0.9;
       }
       q.setFromAxisAngle(up, yaw);
-      s.set(scale, scale, scale);
+      s.set(scale, scale * propStretch(prop, x, z, map.seed), scale);
       p.set(x, groundHeightAt(map, x, z) - sink * scale, z);
       out.push({
         prop,
         x,
         z,
         matrix: new THREE.Matrix4().compose(p, q, s),
+        tint: propTint(prop, x, z, map.seed),
         outside: true,
       });
     }
@@ -308,16 +393,29 @@ function scatterOutside(map: MapDef, out: Placement[]): void {
 export class Landscape {
   private readonly group = new THREE.Group();
   private readonly templates = new Map<PropId, PropTemplate>();
-  /** Instanced props, keyed by prop id, with ':out' for the shadowless set past the map edge. */
+  private readonly lodTemplates = new Map<PropId, PropTemplate>();
+  /**
+   * Instanced props, keyed by prop id: the plain key holds the full models near the camera,
+   * ':far' the low-detail ones further off, ':out' the shadowless low-detail set past the map edge.
+   */
   private readonly meshes = new Map<string, THREE.InstancedMesh>();
   private placements: Placement[] = [];
+  /** Placements left after clearing round deposits and structures. */
+  private shown: Placement[] = [];
   private structureKey = "";
   private readonly depositTemplates = new Map<string, THREE.Object3D>();
-  private readonly depositViews = new Map<
-    number,
-    { root: THREE.Object3D; gems: THREE.Object3D[]; fallback: boolean }
-  >();
+  private readonly depositLodTemplates = new Map<string, THREE.Object3D>();
+  private readonly depositViews = new Map<number, DepositView>();
   private shadows = true;
+  /** Full models near the camera (high quality); false draws every prop low-detail. */
+  private fullDetail = true;
+  private focusX = 0;
+  private focusZ = 0;
+  /** Camera zoomed out past FULL_DETAIL_VIEW. */
+  private zoomedOut = false;
+  /** Focus the near/far split was last laid out for (NaN: never). */
+  private laidX = Number.NaN;
+  private laidZ = Number.NaN;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -329,24 +427,31 @@ export class Landscape {
     this.placements = scatterProps(map);
   }
 
+  /** Registers any landscape model by its asset id (props, sites and their low-detail versions). */
+  addModel(id: string, model: THREE.Object3D): void {
+    if (id === DEPOSIT_MODEL_IDS.ore || id === DEPOSIT_MODEL_IDS.metal) {
+      this.addDepositModel(id === DEPOSIT_MODEL_IDS.ore ? "ore" : "metal", model);
+    } else if (id === DEPOSIT_LOD_IDS.ore || id === DEPOSIT_LOD_IDS.metal) {
+      this.depositLodTemplates.set(id === DEPOSIT_LOD_IDS.ore ? "ore" : "metal", model);
+      this.dropDepositViews(() => true);
+    } else if (id.endsWith(LOD_SUFFIX)) {
+      this.addPropLod(id.slice(0, -LOD_SUFFIX.length), model);
+    } else {
+      this.addPropModel(id, model);
+    }
+  }
+
   /** Registers a loaded prop model (one mesh, one material). */
   addPropModel(id: string, model: THREE.Object3D): void {
     if (!(PROP_IDS as readonly string[]).includes(id)) {
       return;
     }
-    model.updateMatrixWorld(true);
-    let found: THREE.Mesh | null = null;
-    model.traverse((object) => {
-      if (!found && object instanceof THREE.Mesh) {
-        found = object;
-      }
-    });
-    const mesh = found as THREE.Mesh | null;
+    const mesh = firstMesh(model);
     if (!mesh || Array.isArray(mesh.material)) {
       return;
     }
     const material = mesh.material.clone();
-    addFogHook(material, this.fog, true);
+    addFogHook(material, this.fog, true, PLANTS.has(id as PropId));
     this.templates.set(id as PropId, {
       geometry: mesh.geometry,
       material,
@@ -355,17 +460,28 @@ export class Landscape {
     this.structureKey = "#"; // force a rebuild
   }
 
+  /** Registers a prop's low-detail geometry; it is drawn with the full model's material. */
+  private addPropLod(id: string, model: THREE.Object3D): void {
+    if (!(PROP_IDS as readonly string[]).includes(id)) {
+      return;
+    }
+    const mesh = firstMesh(model);
+    if (!mesh) {
+      return;
+    }
+    this.lodTemplates.set(id as PropId, {
+      geometry: mesh.geometry,
+      material: mesh.material as THREE.Material,
+      local: mesh.matrixWorld.clone(),
+    });
+    this.structureKey = "#";
+  }
+
   /** Registers a loaded ore or metal site model. */
   addDepositModel(kind: "ore" | "metal", model: THREE.Object3D): void {
     this.depositTemplates.set(kind, model);
-    // Swap any placeholder discs already drawn for the real model.
-    for (const [id, view] of this.depositViews) {
-      if (view.fallback) {
-        this.group.remove(view.root);
-        disposeFallback(view.root);
-        this.depositViews.delete(id);
-      }
-    }
+    // Swap any placeholder discs (or the other version of this site) for the new model.
+    this.dropDepositViews((view) => view.fallback || view.kind === kind);
   }
 
   setShadows(on: boolean): void {
@@ -382,6 +498,18 @@ export class Landscape {
     }
   }
 
+  /**
+   * True on the higher quality levels: props near the camera use their full models. False draws
+   * every prop and site from its low-detail model.
+   */
+  setFullDetail(on: boolean): void {
+    if (on === this.fullDetail) {
+      return;
+    }
+    this.fullDetail = on;
+    this.layoutProps();
+  }
+
   /** Number of props drawn (for tests and the stats overlay). */
   propCount(): number {
     let count = 0;
@@ -391,18 +519,55 @@ export class Landscape {
     return count;
   }
 
-  sync(world: WorldState): void {
+  /** Props drawn from full and from low-detail models (for tests). */
+  detailCounts(): { full: number; low: number } {
+    let full = 0;
+    let low = 0;
+    for (const [key, mesh] of this.meshes) {
+      if (key.endsWith(FAR_SUFFIX) || key.endsWith(OUTSIDE_SUFFIX)) {
+        low += mesh.count;
+      } else {
+        full += mesh.count;
+      }
+    }
+    return { full, low };
+  }
+
+  /**
+   * `focusX`, `focusZ`: the camera's ground target, `viewDistance` its distance from the camera,
+   * for the near/far model split.
+   */
+  sync(
+    world: WorldState,
+    focusX = this.focusX,
+    focusZ = this.focusZ,
+    viewDistance = 0,
+  ): void {
+    this.focusX = focusX;
+    this.focusZ = focusZ;
+    const zoomedOut = viewDistance > FULL_DETAIL_VIEW;
+    const zoomChanged = zoomedOut !== this.zoomedOut;
+    this.zoomedOut = zoomedOut;
     this.syncDeposits(world);
     const key =
       world.structures.map((s) => s.id).join(",") +
       `|${world.deposits.filter((d) => d.amount > 0).length}`;
     if (key !== this.structureKey && this.templates.size > 0) {
       this.structureKey = key;
-      this.rebuildProps(world);
+      this.filterProps(world);
+      this.layoutProps();
+    } else if (
+      this.fullDetail &&
+      (zoomChanged ||
+        Number.isNaN(this.laidX) ||
+        (focusX - this.laidX) ** 2 + (focusZ - this.laidZ) ** 2 >
+          RELAYOUT_STEP * RELAYOUT_STEP)
+    ) {
+      this.layoutProps();
     }
   }
 
-  private rebuildProps(world: WorldState): void {
+  private filterProps(world: WorldState): void {
     const clear: Array<{ x: number; z: number; r: number }> = [];
     for (const deposit of world.deposits) {
       clear.push({ x: deposit.x, z: deposit.z, r: DEPOSIT_CLEAR });
@@ -418,45 +583,67 @@ export class Landscape {
         r: Math.max(STRUCTURE_CLEAR, cells * this.map.cellSize * 0.75 + 1.5),
       });
     }
-    const byProp = new Map<string, THREE.Matrix4[]>();
-    for (const placement of this.placements) {
+    this.shown = this.placements.filter(
+      (placement) =>
+        !clear.some(
+          (c) =>
+            (placement.x - c.x) ** 2 + (placement.z - c.z) ** 2 < c.r * c.r,
+        ),
+    );
+  }
+
+  /** True when a prop or site at (x, z) draws its full model. */
+  private isNear(x: number, z: number): boolean {
+    return (
+      this.fullDetail &&
+      !this.zoomedOut &&
+      (x - this.focusX) ** 2 + (z - this.focusZ) ** 2 < NEAR_RADIUS * NEAR_RADIUS
+    );
+  }
+
+  /** Sorts the shown props into near (full model), far and outside (low-detail) batches. */
+  private layoutProps(): void {
+    this.laidX = this.focusX;
+    this.laidZ = this.focusZ;
+    const byKey = new Map<string, Placement[]>();
+    for (const placement of this.shown) {
       if (!this.templates.has(placement.prop)) {
         continue;
       }
-      if (
-        clear.some(
-          (c) =>
-            (placement.x - c.x) ** 2 + (placement.z - c.z) ** 2 < c.r * c.r,
-        )
-      ) {
-        continue;
-      }
+      const lod = this.lodTemplates.has(placement.prop);
       const key = placement.outside
         ? placement.prop + OUTSIDE_SUFFIX
-        : placement.prop;
-      const list = byProp.get(key) ?? [];
-      list.push(placement.matrix);
-      byProp.set(key, list);
+        : lod && !this.isNear(placement.x, placement.z)
+          ? placement.prop + FAR_SUFFIX
+          : placement.prop;
+      const list = byKey.get(key) ?? [];
+      list.push(placement);
+      byKey.set(key, list);
     }
     const matrix = new THREE.Matrix4();
     for (const [prop, template] of this.templates) {
-      for (const outside of [false, true]) {
-        const key = outside ? prop + OUTSIDE_SUFFIX : prop;
-        const list = byProp.get(key) ?? [];
+      const lod = this.lodTemplates.get(prop) ?? template;
+      for (const suffix of ["", FAR_SUFFIX, OUTSIDE_SUFFIX]) {
+        const key = prop + suffix;
+        const list = byKey.get(key) ?? [];
+        const look = suffix === "" ? template : lod;
+        const outside = suffix === OUTSIDE_SUFFIX;
         let mesh = this.meshes.get(key);
         if (!mesh && list.length === 0) {
           continue;
         }
-        if (!mesh || mesh.instanceMatrix.count < list.length) {
+        if (
+          !mesh ||
+          mesh.instanceMatrix.count < list.length ||
+          mesh.geometry !== look.geometry
+        ) {
           if (mesh) {
             this.group.remove(mesh);
             mesh.dispose();
           }
-          mesh = new THREE.InstancedMesh(
-            template.geometry,
-            template.material,
-            Math.max(1, list.length),
-          );
+          // Room to spare, so moving the camera rarely needs a new buffer.
+          const capacity = Math.max(1, Math.ceil(list.length * 1.25));
+          mesh = new THREE.InstancedMesh(look.geometry, template.material, capacity);
           mesh.name = `Prop:${key}`;
           mesh.frustumCulled = false;
           mesh.receiveShadow = !outside;
@@ -466,12 +653,16 @@ export class Landscape {
         }
         const target = mesh;
         list.forEach((placed, index) => {
-          matrix.multiplyMatrices(placed, template.local);
+          matrix.multiplyMatrices(placed.matrix, look.local);
           target.setMatrixAt(index, matrix);
+          target.setColorAt(index, placed.tint);
         });
         target.count = list.length;
         target.visible = list.length > 0;
         target.instanceMatrix.needsUpdate = true;
+        if (target.instanceColor) {
+          target.instanceColor.needsUpdate = true;
+        }
       }
     }
   }
@@ -484,8 +675,16 @@ export class Landscape {
       }
       alive.add(deposit.id);
       let view = this.depositViews.get(deposit.id);
+      const lod =
+        this.depositLodTemplates.has(deposit.kind) &&
+        !this.isNear(deposit.x, deposit.z);
+      if (view && !view.fallback && view.lod !== lod) {
+        this.group.remove(view.root);
+        this.depositViews.delete(deposit.id);
+        view = undefined;
+      }
       if (!view) {
-        view = this.makeDeposit(deposit);
+        view = this.makeDeposit(deposit, lod);
         this.depositViews.set(deposit.id, view);
         this.group.add(view.root);
       }
@@ -498,8 +697,14 @@ export class Landscape {
         part.scale.setScalar(gem);
       }
     }
+    this.dropDepositViews((_view, id) => !alive.has(id));
+  }
+
+  private dropDepositViews(
+    test: (view: DepositView, id: number) => boolean,
+  ): void {
     for (const [id, view] of this.depositViews) {
-      if (!alive.has(id)) {
+      if (test(view, id)) {
         this.group.remove(view.root);
         if (view.fallback) {
           disposeFallback(view.root);
@@ -509,11 +714,7 @@ export class Landscape {
     }
   }
 
-  private makeDeposit(deposit: DepositState): {
-    root: THREE.Object3D;
-    gems: THREE.Object3D[];
-    fallback: boolean;
-  } {
+  private makeDeposit(deposit: DepositState, lod: boolean): DepositView {
     const template = this.depositTemplates.get(deposit.kind);
     const y = heightAt(this.map, deposit.x, deposit.z);
     if (!template) {
@@ -526,9 +727,21 @@ export class Landscape {
       );
       mesh.position.set(deposit.x, y + 0.2, deposit.z);
       mesh.receiveShadow = true;
-      return { root: mesh, gems: [], fallback: true };
+      return { root: mesh, gems: [], fallback: true, lod: false, kind: deposit.kind };
     }
-    const root = template.clone(true);
+    const lodTemplate = lod ? this.depositLodTemplates.get(deposit.kind) : undefined;
+    // The low-detail site wears the full model's materials, matched by name.
+    const materials = new Map<string, THREE.Material>();
+    if (lodTemplate) {
+      template.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          for (const material of [object.material].flat() as THREE.Material[]) {
+            materials.set(material.name, material);
+          }
+        }
+      });
+    }
+    const root = (lodTemplate ?? template).clone(true);
     root.name = `Deposit:${deposit.id}`;
     root.position.set(deposit.x, y, deposit.z);
     root.rotation.y = deposit.id * 2.39996;
@@ -542,6 +755,11 @@ export class Landscape {
           THREE.BufferGeometry,
           THREE.Material | THREE.Material[]
         >;
+        if (lodTemplate) {
+          mesh.material = Array.isArray(mesh.material)
+            ? mesh.material.map((m) => materials.get(m.name) ?? m)
+            : (materials.get(mesh.material.name) ?? mesh.material);
+        }
         const material = Array.isArray(mesh.material)
           ? mesh.material[0]
           : mesh.material;
@@ -550,7 +768,7 @@ export class Landscape {
         }
       }
     });
-    return { root, gems, fallback: false };
+    return { root, gems, fallback: false, lod: Boolean(lodTemplate), kind: deposit.kind };
   }
 
   dispose(): void {
@@ -567,6 +785,26 @@ export class Landscape {
     }
     this.scene.remove(this.group);
   }
+}
+
+interface DepositView {
+  root: THREE.Object3D;
+  gems: THREE.Object3D[];
+  fallback: boolean;
+  /** Drawn from the low-detail model. */
+  lod: boolean;
+  kind: string;
+}
+
+function firstMesh(model: THREE.Object3D): THREE.Mesh | null {
+  model.updateMatrixWorld(true);
+  let found: THREE.Mesh | null = null;
+  model.traverse((object) => {
+    if (!found && object instanceof THREE.Mesh) {
+      found = object;
+    }
+  });
+  return found;
 }
 
 function disposeFallback(root: THREE.Object3D): void {

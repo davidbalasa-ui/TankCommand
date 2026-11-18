@@ -1,16 +1,14 @@
-"""Pack built Arcadian unit models for the game: fewer meshes, so fewer draw calls per unit type.
+"""Pack built Arcadian unit models for the game.
 
     python gamepack.py <models dir> [name ...]      (run after motion.apply, before lod.py)
 
-The art models keep every moving part separate for the viewer (recoil, muzzle flashes, missile
-launches, two-slot lightning). The game plays none of the firing motion yet and draws each mesh of
-a unit type as one instanced call, so here:
-- muzzle flashes (anim 'flash') are removed: the game draws its own;
-- the second slot of each lightning pair (LiftB, ThrustB) is removed; the first (LiftA, ThrustA)
-  joins the hull as a still bolt (a flickering part would cost two more draw calls per unit type);
-- every other mesh joins the mesh of its nearest moving anchor: the hull, an aimed turret
-  (TurretPivot) or a spinning part (spin/swing pivots), one mesh per anchor.
-Node names the game looks up (TurretPivot, spin pivots) are kept.
+The game plays recoil, missile launches and spins, and draws its own muzzle blasts from the
+Flash* nodes, but it does not play 'flicker' lightning, so it would show both slots of every
+lightning pair at once. Here:
+- the second slot of each lightning pair (LiftB, ThrustB) is removed;
+- every static mesh that hangs off the model root (LiftA, ThrustA, Ore, root-level parts with no
+  motion of their own) joins the Hull, one mesh fewer per part.
+Everything that moves (turret, barrels, pods, flashes, spinning parts) is left as built.
 """
 import json
 import os
@@ -40,34 +38,21 @@ def pack(path):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=path)
     objs = list(bpy.context.scene.objects)
-    doomed = [o for o in objs if o.name in ('LiftB', 'ThrustB') or any(anim(p).get('type') == 'flash' for p in chain(o))]
-    for o in doomed:
+    for o in [o for o in objs if o.name in ('LiftB', 'ThrustB')]:
         bpy.data.objects.remove(o, do_unlink=True)
     objs = list(bpy.context.scene.objects)
-    roots = [o for o in objs if o.parent is None]
-    anchors = set(o.name for o in objs if o.name == 'TurretPivot' or anim(o).get('type') in ('spin', 'swing'))
-    groups = {}
-    for o in objs:
-        if o.type != 'MESH':
-            continue
-        anchor = next((p for p in chain(o.parent) if p.name in anchors), None)
-        groups.setdefault(anchor.name if anchor else '', []).append(o)
-    for key, meshes in groups.items():
-        if len(meshes) < 2:
-            continue
-        # Keep the anchor's own direct child mesh (Hull, Turret, Eye ...) as the target.
-        meshes.sort(key=lambda m: (0 if m.name == 'Hull' else 1, len(list(chain(m))), m.name))
-        target = meshes[0]
+    hull = bpy.context.scene.objects.get('Hull')
+    # Static: a mesh whose whole parent chain (up to the root empty) carries no motion and no turret.
+    static = [o for o in objs if o.type == 'MESH' and o is not hull
+              and all(anim(p).get('type') in (None, 'flicker') and p.name != 'TurretPivot' for p in chain(o) if p.parent is not None)]
+    if hull is not None and static:
         bpy.ops.object.select_all(action='DESELECT')
-        for m in meshes:
+        for m in static + [hull]:
             m.select_set(True)
-        bpy.context.view_layer.objects.active = target
+        bpy.context.view_layer.objects.active = hull
         bpy.ops.object.join()
-    # Pivots left with nothing under them (recoil and launch pivots) go too.
-    for o in list(bpy.context.scene.objects):
-        if o.type == 'EMPTY' and not o.children and o.name not in anchors and o.parent is not None:
-            bpy.data.objects.remove(o, do_unlink=True)
-    del roots
+        if 'anim' in hull:
+            del hull['anim']
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', export_yup=True, export_apply=True,
                               export_image_format='JPEG', export_jpeg_quality=88, export_animations=False,
                               export_extras=True)

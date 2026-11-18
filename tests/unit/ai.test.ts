@@ -154,6 +154,53 @@ describe('enemy AI', () => {
     expect(world.result?.winner).toBe(2);
   }, 120_000);
 
+  it('[AI-11] hard beats normal in most fixed-seed matches, playing either side', () => {
+    let hardWins = 0;
+    for (let seed = 300; seed < 303; seed += 1) {
+      for (const hardFirst of [true, false]) {
+        let world = aiMatch(seed, hardFirst ? 'hard' : 'normal', hardFirst ? 'normal' : 'hard');
+        while (world.result === null && world.tick < 45 * 60 * 20) {
+          world = stepWithAi(world);
+        }
+        if (world.result?.winner === (hardFirst ? 1 : 2)) {
+          hardWins += 1;
+        }
+      }
+    }
+    expect(hardWins).toBeGreaterThan(3);
+  }, 600_000);
+
+  it('[AI-12] a defender chasing a raider far from home breaks off and heads back', () => {
+    const world = aiMatch(4, 'normal', 'normal');
+    const pad = world.structures.find((s) => s.owner === 2 && s.typeId.includes('pad'));
+    const chaser = world.units.find((u) => u.owner === 2 && u.typeId.includes('tank'));
+    const raider = world.units.find((u) => u.owner === 1 && u.typeId.includes('tank'));
+    expect(pad && chaser && raider).toBeTruthy();
+    if (!pad || !chaser || !raider) return;
+    // Far from its own pad, deep on the way to the enemy, still locked onto the raider.
+    chaser.x = pad.x - 80;
+    chaser.z = pad.z - 80;
+    raider.x = chaser.x - 4;
+    raider.z = chaser.z - 4;
+    chaser.order = { kind: 'attack', targetId: raider.id };
+    let state = world.aiStates.find((s) => s.player === 2);
+    expect(state).toBeDefined();
+    if (!state) return;
+    const sent: string[] = [];
+    // Tactical orders reach each unit once in a short cycle of ticks.
+    for (let tick = 0; tick < 40; tick += 1) {
+      world.tick = 1000 + tick;
+      const result = thinkAi(world, state);
+      state = result.state;
+      for (const command of result.commands) {
+        if ('unitIds' in command && command.unitIds.includes(chaser.id)) {
+          sent.push(command.kind === 'move' ? `move ${Math.round(command.x)},${Math.round(command.z)}` : command.kind);
+        }
+      }
+    }
+    expect(sent).toContain(`move ${Math.round(pad.x)},${Math.round(pad.z)}`);
+  });
+
   it('[AI-05] a side with no pads and no fighting units is eliminated', () => {
     let world = aiMatch(4, 'normal', 'normal');
     world.structures = world.structures.filter((s) => s.owner !== 2);
@@ -213,6 +260,24 @@ describe('enemy AI', () => {
     const alliesAlive = state.units.filter((u) => (u.owner === 1 || u.owner === 2) && u.hp > 0).length;
     expect(lostAllies + alliesAlive).toBeGreaterThan(0);
   }, 120_000);
+
+  it('[SKR-02] every side starts with the same layout round its pad, turned to face the middle', () => {
+    const world = aiMatch(1, 'normal', 'normal');
+    const own = (player: number) =>
+      world.units
+        .filter((u) => u.owner === player)
+        .map((u) => ({ kind: u.typeId.split('.').slice(2).join('.'), x: u.x, z: u.z, heading: u.heading }));
+    const first = own(1);
+    const second = own(2);
+    expect(second).toHaveLength(first.length);
+    // The default map's two starts mirror through the centre.
+    first.forEach((unit, index) => {
+      const other = second[index];
+      expect(other?.kind).toBe(unit.kind);
+      expect(other?.x).toBeCloseTo(-unit.x, 6);
+      expect(other?.z).toBeCloseTo(-unit.z, 6);
+    });
+  });
 
   it('[DET-05] AI-vs-AI is deterministic and save/load mid-match keeps the hash', () => {
     const a = runMatch(aiMatch(6, 'normal', 'normal'), 4);

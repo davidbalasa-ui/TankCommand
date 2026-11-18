@@ -1,6 +1,18 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { collectPartMotions, pivotIsSpinner, readPartMotion, stripFlashParts, treadTilesPerMetre, updatePartMotions } from '../../src/render/partMotion';
+import {
+  collectPartMotions,
+  createUnitFiring,
+  fireKickEnvelope,
+  fireUnit,
+  pivotIsSpinner,
+  readFireKick,
+  readPartMotion,
+  treadTilesPerMetre,
+  updatePartMotions,
+  type PartMotion,
+  type UnitFiring,
+} from '../../src/render/partMotion';
 import { UnitInstances, markInstanced } from '../../src/render/unitInstances';
 
 const idle = { mining: false, working: false, moving: false };
@@ -25,6 +37,14 @@ describe('moving model parts', () => {
     expect(readPartMotion({ type: 'wobble', axis: [1, 0, 0], speed: 1 })).toBeNull();
     expect(readPartMotion({ type: 'swing', axis: [1, 0, 0], speed: 1 })).toBeNull();
     expect(readPartMotion(null)).toBeNull();
+  });
+
+  it('[PART-01] an idle-only turret sweep is ignored, so the turret stays aimed rather than becoming a spinner', () => {
+    expect(readPartMotion({ type: 'swing', axis: [0, 1, 0], amp: 0.25, speed: 0.16, when: 'idle' })).toBeNull();
+    const sweep = model({ type: 'swing', axis: [0, 1, 0], amp: 0.25, speed: 0.16, when: 'idle' }, 'TurretPivot');
+    const parts = collectPartMotions(sweep.root);
+    expect(parts).toHaveLength(0);
+    expect(pivotIsSpinner(parts)).toBe(false);
   });
 
   it('[PART-01] a mining drum spins up only while mining, about its own axis on top of its rest pose', () => {
@@ -147,46 +167,148 @@ describe('moving model parts', () => {
     expect(tread.userData.uvScroll as number).toBeCloseTo(-0.2, 6);
   });
 
-  it('[PART-01] flickering bolts: at most one slot shows per tick, and moving-only bolts go dark at rest', () => {
-    const root = new THREE.Object3D();
-    for (const slot of [0, 1]) {
-      const node = new THREE.Object3D();
-      node.name = `Thrust${slot}`;
-      node.userData.anim = { type: 'flicker', slot, slots: 2, rate: 24, duty: 1, idle: 0, when: 'moving' };
-      root.add(node);
+  describe('firing parts', () => {
+    // A Lancer-like rig: two telescoping lances fired in turn (the art's cycle: 2 shots 1.8 s apart).
+    function rig(anims: Record<string, unknown>, fire?: unknown): { root: THREE.Object3D; parts: PartMotion[]; firing: UnitFiring } {
+      const scene = new THREE.Object3D();
+      if (fire) {
+        scene.userData.fire = fire;
+      }
+      const turret = new THREE.Object3D();
+      turret.name = 'TurretPivot';
+      scene.add(turret);
+      for (const [name, anim] of Object.entries(anims)) {
+        const node = new THREE.Object3D();
+        node.name = name;
+        node.position.set(1.8, 0.4, 0);
+        node.userData.anim = anim;
+        turret.add(node);
+      }
+      const root = new THREE.Group();
+      root.add(scene);
+      const clone = root.clone();
+      const parts = collectPartMotions(clone);
+      return { root: clone, parts, firing: createUnitFiring(clone, parts) };
     }
-    const parts = collectPartMotions(root.clone());
-    expect(parts).toHaveLength(2);
-    expect(parts.every((part) => part.spec.type === 'flicker')).toBe(true);
-    const shown = (): number => parts.filter((part) => part.node.scale.x > 0).length;
-    const seen = new Set<string>();
-    for (let i = 0; i < 60; i += 1) {
-      updatePartMotions(parts, { ...idle, moving: true }, 1 / 30);
-      expect(shown()).toBe(1);
-      seen.add(parts.find((part) => part.node.scale.x > 0)?.node.name ?? '');
-    }
-    expect(seen.size).toBe(2);
-    for (let i = 0; i < 30; i += 1) {
-      updatePartMotions(parts, idle, 1 / 30);
-      expect(shown()).toBe(0);
-    }
-    expect(readPartMotion({ type: 'flicker', slot: 2, slots: 2, rate: 20 })).toBeNull();
-  });
+    const at = (time: number): typeof idle & { time: number } => ({ ...idle, time });
+    const node = (root: THREE.Object3D, name: string): THREE.Object3D => root.getObjectByName(name) as THREE.Object3D;
+    const recoil = (dist: number, delay = 0, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+      type: 'recoil',
+      axis: [1, 0, 0],
+      dist,
+      attack: 0.05,
+      recover: 0.4,
+      delay,
+      ...extra,
+    });
 
-  it('[PART-01] model muzzle flashes are stripped, so they never glow while the unit idles', () => {
-    const root = new THREE.Object3D();
-    const barrel = new THREE.Object3D();
-    barrel.name = 'BarrelPivot';
-    barrel.userData.anim = { type: 'recoil', axis: [1, 0, 0], dist: 0.2 };
-    const flash = new THREE.Object3D();
-    flash.name = 'FlashPivot';
-    flash.userData.anim = { type: 'flash', axis: [1, 0, 0], dur: 0.08 };
-    flash.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)));
-    root.add(barrel, flash);
-    stripFlashParts(root);
-    expect(root.getObjectByName('FlashPivot')).toBeUndefined();
-    expect(root.getObjectByName('BarrelPivot')).toBeDefined();
-    // Recoil is not played by the game yet; the barrel just stays put.
-    expect(collectPartMotions(root)).toHaveLength(0);
+    it('[PART-02] reads recoil, launch, slide and snap extras; flash and flicker are left to the game', () => {
+      expect(readPartMotion(recoil(1.2, 0.25))).toMatchObject({ type: 'recoil', fire: { snap: 1.2, delay: 0.25, repeat: 1 } });
+      expect(readPartMotion({ type: 'launch', axis: [0.96, 0.28, 0], delay: 0.4, travel: 9, dur: 0.45, reload: 4.4 })).toMatchObject({
+        type: 'launch',
+        fire: { snap: 9, delay: 0.4, dur: 0.45, reload: 4.4 },
+      });
+      expect(readPartMotion({ type: 'slide', axis: [0, -1, 0], amp: 0, speed: 0.1, snap: 0.22, attack: 0.06, recover: 2.2 })?.fire?.snap).toBe(0.22);
+      expect(readPartMotion({ type: 'swing', axis: [1, 0, 0], amp: 0.015, speed: 0.7, snap: 0.45 })?.fire?.snap).toBe(0.45);
+      expect(readPartMotion({ type: 'swing', axis: [1, 0, 0], amp: 0.2, speed: 0.7 })?.fire).toBeNull();
+      expect(readPartMotion({ type: 'flash', axis: [1, 0, 0], dur: 0.08, delay: 0 })).toBeNull();
+      expect(readPartMotion({ type: 'recoil', axis: [1, 0, 0], dist: 0 })).toBeNull();
+      expect(readFireKick({ kick: 0.03, slide: 0.1, attack: 0.05, recover: 0.4, repeat: 2, every: 1.8 })).toMatchObject({ repeat: 2, every: 1.8 });
+      expect(readFireKick({ idle: 1 })).toBeNull();
+    });
+
+    it('[PART-02] each shot collapses its own barrel sleeves back along the axis, and they run out again', () => {
+      const { root, parts, firing } = rig(
+        { BarrelL1Pivot: recoil(1), BarrelL4Pivot: recoil(4), BarrelR4Pivot: recoil(4, 1.8) },
+        { kick: 0.03, slide: 0.1, attack: 0.05, recover: 0.4, repeat: 2, every: 1.8 },
+      );
+      expect(firing.kick?.repeat).toBe(2);
+      expect(firing.barrels).toBe(true);
+      const l1 = node(root, 'BarrelL1Pivot');
+      const l4 = node(root, 'BarrelL4Pivot');
+      const r4 = node(root, 'BarrelR4Pivot');
+      // First shot: the left lance (delay 0), at once.
+      fireUnit(firing, parts, 10);
+      updatePartMotions(parts, at(10.05), 0.05);
+      expect(l1.position.x).toBeCloseTo(1.8 - 1, 5);
+      expect(l4.position.x).toBeCloseTo(1.8 - 4, 5);
+      expect(r4.position.x).toBeCloseTo(1.8, 5);
+      // Halfway through the recovery: the hit has eased to a quarter.
+      updatePartMotions(parts, at(10.25), 0.2);
+      expect(l4.position.x).toBeCloseTo(1.8 - 4 * 0.25, 5);
+      // Settled back at rest, and no longer posed every frame.
+      updatePartMotions(parts, at(10.6), 0.1);
+      expect(l4.position.x).toBeCloseTo(1.8, 5);
+      expect(parts.every((part) => !part.live)).toBe(true);
+      // Second shot: the right lance (art delay 1.8 = the cycle's second shot) collapses at once.
+      fireUnit(firing, parts, 20);
+      updatePartMotions(parts, at(20.05), 0.05);
+      expect(r4.position.x).toBeCloseTo(1.8 - 4, 5);
+      expect(l4.position.x).toBeCloseTo(1.8, 5);
+      // Third shot wraps back to the left.
+      fireUnit(firing, parts, 30);
+      updatePartMotions(parts, at(30.05), 0.05);
+      expect(l4.position.x).toBeCloseTo(1.8 - 4, 5);
+    });
+
+    it('[PART-02] a missile waits for its place in the ripple, flies out, vanishes and is back in its tube after reload', () => {
+      const launch = (delay: number): Record<string, unknown> => ({ type: 'launch', axis: [1, 0, 0], delay, travel: 9, dur: 0.45, reload: 4.4 });
+      const { root, parts, firing } = rig(
+        { MslA: launch(0), MslB: launch(0.2) },
+        { kick: 0.012, slide: 0.04, attack: 0.05, recover: 0.25, repeat: 4, every: 0.2 },
+      );
+      const a = node(root, 'MslA');
+      const b = node(root, 'MslB');
+      fireUnit(firing, parts, 5);
+      updatePartMotions(parts, at(5.225), 0.05);
+      // Half the flight time: a quarter of the travel; the other tube has not fired.
+      expect(a.position.x).toBeCloseTo(1.8 + 9 * 0.25, 5);
+      expect(b.position.x).toBeCloseTo(1.8, 5);
+      updatePartMotions(parts, at(6), 0.1);
+      expect(a.scale.x).toBe(0);
+      updatePartMotions(parts, at(9.5), 0.1);
+      expect(a.scale.x).toBe(1);
+      expect(a.position.x).toBeCloseTo(1.8, 5);
+      expect(parts.find((part) => part.node === a)?.live).toBe(false);
+      // The next shot launches the second tube.
+      fireUnit(firing, parts, 12);
+      updatePartMotions(parts, at(12.3), 0.05);
+      expect(b.position.x).toBeGreaterThan(1.8 + 1);
+      expect(a.position.x).toBeCloseTo(1.8, 5);
+    });
+
+    it('[PART-02] lids snap open on every shot and settle; low quality skips the snap but keeps the barrels', () => {
+      const lid = { type: 'swing', axis: [1, 0, 0], amp: 0.015, speed: 0.7, snap: 0.45, attack: 0.08, recover: 1.8 };
+      const { root, parts, firing } = rig({ CapLPivot: lid, BarrelL1Pivot: recoil(1) }, { kick: 0.06, slide: 0.3, attack: 0.06, recover: 1.1 });
+      const cap = node(root, 'CapLPivot');
+      const barrel = node(root, 'BarrelL1Pivot');
+      const rest = cap.quaternion.clone();
+      fireUnit(firing, parts, 1);
+      updatePartMotions(parts, at(1.08), 0.016);
+      expect(cap.quaternion.angleTo(rest)).toBeGreaterThan(0.4);
+      updatePartMotions(parts, at(3), 0.016);
+      expect(cap.quaternion.angleTo(rest)).toBeLessThan(0.05);
+      fireUnit(firing, parts, 4);
+      updatePartMotions(parts, { ...at(4.05), lite: true }, 0.016);
+      expect(cap.quaternion.angleTo(rest)).toBeLessThan(0.05);
+      expect(barrel.position.x).toBeCloseTo(0.8, 5);
+    });
+
+    it('[PART-02] the hull kick rises over its attack, rings down and is gone once settled', () => {
+      const kick = readFireKick({ kick: 0.06, slide: 0.3, attack: 0.06, recover: 1.1 });
+      expect(kick).not.toBeNull();
+      if (!kick) {
+        return;
+      }
+      expect(fireKickEnvelope(kick, -1)).toBe(0);
+      expect(fireKickEnvelope(kick, 0.03)).toBeCloseTo(0.5, 5);
+      expect(fireKickEnvelope(kick, 0.06)).toBeCloseTo(1, 5);
+      expect(Math.abs(fireKickEnvelope(kick, 0.6))).toBeLessThan(0.5);
+      expect(fireKickEnvelope(kick, 10)).toBe(0);
+      // A model without barrels of its own keeps the whole-turret kick.
+      const plain = rig({}, { kick: 0.015, slide: 0.04 });
+      expect(plain.firing.kick?.kick).toBe(0.015);
+      expect(plain.firing.barrels).toBe(false);
+    });
   });
 });

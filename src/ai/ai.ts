@@ -636,6 +636,7 @@ function tactical(planner: Planner): void {
   const view = perceivedUnits(world, planner.player);
   const enemies = view.units.filter((u) => isHostile(world, planner.player, u.owner));
   const repairer = planner.ownUnits().find((u) => planner.unitType(u)?.repair);
+  const pad = planner.ownStructures().find((s) => planner.structureKind(s) === 'pad');
   for (const unit of planner.ownUnits()) {
     const type = planner.unitType(unit);
     if (!type || !isFighter(type, true) || unit.transform || (Math.floor((world.tick + state.player * 7) / TACTICAL_EVERY_TICKS) + unit.id) % UNIT_ORDER_PERIOD !== 0) {
@@ -647,6 +648,17 @@ function tactical(planner: Planner): void {
         planner.commands.push({ kind: 'move', unitIds: [unit.id], x: home.x, z: home.z });
         continue;
       }
+    }
+    // A defender that locked onto a raider stops chasing once it is well away from home: a fast
+    // scout would otherwise lead it all the way into the enemy's base. The attack group may chase.
+    if (
+      unit.order.kind === 'attack' &&
+      pad &&
+      !state.groupIds.includes(unit.id) &&
+      Math.hypot(unit.x - pad.x, unit.z - pad.z) > DEFEND_RADIUS * 2
+    ) {
+      planner.commands.push({ kind: 'move', unitIds: [unit.id], x: pad.x, z: pad.z });
+      continue;
     }
     if (!type.weapon || unit.order.kind === 'attack' || unit.order.kind === 'move') {
       continue;

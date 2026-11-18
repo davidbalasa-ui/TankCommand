@@ -93,296 +93,201 @@ def lancer():
 
 @asset('human/outrider.glb', 'Terran Outrider (scout)')
 def outrider():
-    hull([(-2.9, [(0, 0.78), (0.9, 0.78), (1.02, 1.08), (0.86, 1.4), (0, 1.4)]),
-          (-2.2, [(0, 0.62), (0.98, 0.62), (1.1, 1.08), (0.92, 1.64), (0, 1.64)]),
-          (0.4, [(0, 0.62), (0.98, 0.62), (1.1, 1.08), (0.9, 1.56), (0, 1.6)]),
-          (2.1, [(0, 0.64), (0.94, 0.64), (1.04, 1.0), (0.78, 1.2), (0, 1.26)]),
-          (3.0, [(0, 0.82), (0.66, 0.82), (0.74, 0.94), (0.62, 1.04), (0, 1.04)])], 'hull', bevel=0.04)
-    # Armoured sensor visor: two dark slits under a brow instead of a windscreen (unmanned).
-    loft([[(0.45, -0.8, 1.6), (0.45, 0.8, 1.6), (1.5, 0.72, 1.36), (1.5, -0.72, 1.36)],
-          [(0.47, -0.8, 1.65), (0.47, 0.8, 1.65), (1.52, 0.72, 1.41), (1.52, -0.72, 1.41)]], 'armor', bevel=0.02)
-    for s in (1, -1):
-        b = box((1.05, s * 0.36, 1.535), (0.14, 0.22, 0.02), 'glass')
-        F.rot(b, 'Y', 12.5, about=(1.05, 0, 1.52))
-    box((0.6, 0, 1.63), (0.07, 0.74, 0.04), 'plate', bevel=0.015)
-    box((3.02, 0, 0.92), (0.02, 0.5, 0.06), 'grille')
+    # Six-wheeled dart: narrow faceted body, needle prow, no crew.
+    hull([(-3.0, [(0, 0.8), (0.7, 0.8), (0.82, 1.08), (0.56, 1.36), (0, 1.36)]),
+          (-2.2, [(0, 0.62), (0.98, 0.62), (1.12, 1.08), (0.68, 1.64), (0, 1.66)]),
+          (0.4, [(0, 0.62), (0.98, 0.62), (1.12, 1.08), (0.64, 1.56), (0, 1.6)]),
+          (2.1, [(0, 0.64), (0.8, 0.64), (0.9, 1.0), (0.46, 1.18), (0, 1.22)]),
+          (4.0, [(0, 0.8), (0.1, 0.8), (0.14, 0.86), (0.07, 0.9), (0, 0.91)])], 'hull', bevel=0.04)
     box((-0.2, 0, 0.55), (2.3, 0.8, 0.1), 'dark', bevel=0.03)
-    # Nose: split hatch, periscopes, winch and hooks.
+    prism([(0.5, 1.58), (3.7, 0.9), (2.0, 1.3), (0.5, 1.7)], -0.08, 0.08, 'armor', bevel=0.02)
+    V.reactor(-2.85, 1.64, 0.9, n=5, L=0.9)
     for s in (1, -1):
-        b = box((2.02, s * 0.3, 1.275), (0.3, 0.25, 0.02), 'olive', bevel=0.012)
-        F.rot(b, 'Y', 11, about=(2.02, 0, 1.27))
-        box((1.72, s * 0.3, 1.36), (0.03, 0.1, 0.02), 'steel')
-        box((3.04, s * 0.56, 0.88), (0.08, 0.04, 0.06), 'steel', bevel=0.01)
-        box((3.06, s * 0.3, 0.9), (0.05, 0.02, 0.1), 'dark')
-    K.periscopes(1.62, 0.0, 1.37, 2, 0.5)
-    cyl((3.07, -0.27, 0.9), (3.07, 0.27, 0.9), 0.085, 8, 'steel')
-    for s in (1, -1):
+        V.eye((1.4, s * 0.36, 1.4), 11.5, s * 16, 0.4, 0.1)
+        V.neon((-0.9, s * 1.115, 1.08), (1.2, 0.014, 0.018))
+        box((3.45, s * 0.12, 0.9), (0.1, 0.02, 0.014), 'amber')
+        box((-3.02, s * 0.5, 1.0), (0.02, 0.08, 0.03), 'amber')
+        for k in range(3):   # prow teeth
+            tx = 2.5 + k * 0.32
+            ty = 0.62 - 0.17 * k
+            prism([(tx, 0.64), (tx + 0.2, 0.66), (tx + 0.24, 0.46)], min(s * ty, s * (ty - 0.07)), max(s * ty, s * (ty - 0.07)), 'steel', bevel=0.01)
         for i, x in enumerate((-1.9, 0.0, 1.9)):
             with F.group(f"Wheel{i}{'L' if s > 0 else 'R'}"):   # each wheel turns
                 K.tire((x, s * 1.42, 0.6), 0.6, 0.46, s)
             cyl((x, s * 0.9, 0.6), (x, s * 1.3, 0.6), 0.1, 6, 'dark')
-            # Separate angular arch per wheel, narrow enough that the tyre shows from above.
-            prism([(x - 0.85, 1.0), (x - 0.5, 1.32), (x + 0.5, 1.32), (x + 0.85, 1.0), (x + 0.8, 0.94), (x + 0.46, 1.24),
-                   (x - 0.46, 1.24), (x - 0.8, 0.94)], min(s * 1.05, s * 1.46), max(s * 1.05, s * 1.46), 'armor' if i != 1 else 'plate', bevel=0.02)
-            box((x, s * 1.47, 1.3), (0.48, 0.012, 0.022), 'steel')
-            box((x, s * 1.475, 1.2), (0.26, 0.012, 0.016), 'glow')
-            # Suspension: wishbone and coil-over damper.
+            # Knife-edged arch over each wheel, swept back, with an energy line.
+            prism([(x - 0.95, 0.98), (x - 0.4, 1.34), (x + 0.6, 1.34), (x + 1.0, 0.9), (x + 0.88, 0.88), (x + 0.52, 1.25),
+                   (x - 0.36, 1.25), (x - 0.86, 0.92)], min(s * 1.05, s * 1.46), max(s * 1.05, s * 1.46), 'armor' if i != 1 else 'plate', bevel=0.02)
+            V.neon((x + 0.1, s * 1.47, 1.295), (0.38, 0.012, 0.018))
             box((x, s * 1.08, 0.74), (0.3, 0.17, 0.03), 'steel', bevel=0.01)
             K.ram((x - 0.3, s * 0.98, 1.16), (x - 0.12, s * 1.2, 0.76), 0.045)
-            for kk in range(4):
-                cyl((x - 0.27 + kk * 0.035, s * (1.0 + kk * 0.045), 1.1 - kk * 0.075), (x - 0.262 + kk * 0.035, s * (1.01 + kk * 0.045), 1.085 - kk * 0.075), 0.085, 8, 'amber' if kk == 0 else 'steel')
-        K.headlamp(2.72, s * 0.62, 1.13, s)
-        box((2.6, s * 1.48, 1.12), (0.12, 0.012, 0.03), 'amber')
-        K.stow((-1.0, s * 1.26, 1.42), (0.4, 0.16, 0.09))
-        box((-2.92, s * 0.72, 1.24), (0.02, 0.1, 0.04), 'red')
-        K.exhaust(-2.6, s * 0.72, 1.5, s, h=0.42, r=0.07)
-        box((-2.5, s * 0.36, 1.78), (0.1, 0.15, 0.17), 'olive', bevel=0.025)   # jerry cans
-        box((-2.5, s * 0.36, 1.96), (0.04, 0.08, 0.02), 'dark')
-    K.vent((-2.0, 0, 1.66), (0.3, 0.6, 0.04))
-    cyl((-1.5, -0.7, 1.74), (-1.5, 0.7, 1.74), 0.1, 8, 'olive')                 # rolled tarp
-    for yy in (-0.4, 0.4):
-        box((-1.5, yy, 1.74), (0.105, 0.03, 0.105), 'rubber')
-    m = F.mark()                                                                 # spare wheel on the tail
-    K.tire((0, 0, 0), 0.44, 0.34, 1, glow=False)
-    F.rot_all(m, 'Z', 90)
-    F.move_all(m, (-3.08, 0, 1.12))
-    K.antenna(-2.5, 0.85, 1.55, 1.5)
-    K.antenna(-2.5, -0.85, 1.55, 1.1, tip='glow')
+        # Swept tail blade.
+        prism([(-3.0, 1.2), (-2.2, 1.3), (-2.5, 1.7), (-3.6, 2.15)], min(s * 0.62, s * 0.68), max(s * 0.62, s * 0.68), 'plate', bevel=0.015)
+        box((-3.2, s * 0.69, 1.9), (0.14, 0.008, 0.02), 'amber')
     tz = 1.62
-    gz = tz + 0.25
+    gz = tz + 0.24
     with F.group('Turret'):
         tube((-0.5, 0, tz - 0.03), (-0.5, 0, tz + 0.07), [(0, 0.66), (1, 0.62)], 16, 'dark')
-        turret_shell(-1.3, 0.55, 0.68, tz, 0.5)
-        box((0.62, 0, gz), (0.14, 0.3, 0.16), 'dark', bevel=0.03)
-        # Long autocannon: receiver, perforated cooling shroud, slotted muzzle brake, feed chute, coax sight.
-        box((0.95, 0, gz), (0.36, 0.15, 0.13), 'armor', bevel=0.03)
-        mg = F.mark()
-        K.gun(0.6, 3.5, 0.0, gz, 0.075)
-        tube((1.35, 0, gz), (2.55, 0, gz), [(0, 0.11), (0.04, 0.145), (0.96, 0.145), (1, 0.11)], 8, 'plate', sharp=30)
-        for kk in range(6):
-            for dy, dz in ((0.146, 0), (-0.146, 0), (0, 0.146)):
-                box((1.5 + kk * 0.18, dy, gz + dz), (0.05, 0.012 if dy else 0.035, 0.035 if dy else 0.012), 'dark')
-        tube((3.3, 0, gz), (3.78, 0, gz), [(0, 0.09), (0.15, 0.155), (0.85, 0.155), (1, 0.11)], 8, 'armor', sharp=30)
-        for dx in (3.45, 3.62):
-            box((dx, 0, gz), (0.04, 0.165, 0.05), 'dark')
-        cyl((3.775, 0, gz), (3.785, 0, gz), 0.07, 8, 'dark')
-        F.regroup(mg, 'Barrel')
-        K.flash(3.8, 0, gz, 0.085, 'Flash')
-        sweep([(0.95, 0.15, gz + 0.02), (0.7, 0.42, gz + 0.12), (0.25, 0.56, gz + 0.1)], [(0.03, 0.08)] * 3, 'steel', sides=4)
-        box((0.1, 0.58, gz + 0.06), (0.22, 0.1, 0.16), 'olive', bevel=0.02)
-        box((0.8, -0.3, gz + 0.14), (0.2, 0.08, 0.07), 'dark', bevel=0.02)
-        cyl((1.0, -0.3, gz + 0.14), (1.02, -0.3, gz + 0.14), 0.045, 8, 'amber')
-        # Scout sensor head: telescoping mast, lensed optic ball, rotating radar bar.
-        for kk, (rr, hh) in enumerate(((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))):
-            zb = tz + 0.42 + sum(h for _, h in ((0.075, 0.38), (0.055, 0.36), (0.038, 0.3))[:kk])
-            cyl((-0.95, -0.3, zb), (-0.95, -0.3, zb + hh), rr, 8, 'steel' if kk % 2 else 'dark')
-            cyl((-0.95, -0.3, zb + hh - 0.03), (-0.95, -0.3, zb + hh), rr * 1.3, 8, 'dark')
-        box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
-        orb((-0.8, -0.3, tz + 1.38), 0.1, 'glass', seg=(10, 8))
-        cyl((-0.71, -0.3, tz + 1.38), (-0.7, -0.3, tz + 1.38), 0.04, 8, 'glow')
+        V.arrow_turret(-1.3, 0.55, 0.68, tz, 0.5, bs=0.55)
+        box((0.5, 0, gz), (0.3, 0.2, 0.17), 'plate', bevel=0.04)
+        V.tele_cannon(0.6, 3.6, gz, 0.11, 4, piston=False)
+        # Scout sensor mast with a rotating scanner bar.
+        cyl((-0.95, -0.3, tz + 0.42), (-0.95, -0.3, tz + 0.8), 0.075, 6, 'dark')
+        cyl((-0.95, -0.3, tz + 0.77), (-0.95, -0.3, tz + 0.8), 0.1, 6, 'black')
+        with F.group('Mast'):   # the upper mast pumps up and down out of the base tube
+            cyl((-0.95, -0.3, tz + 0.5), (-0.95, -0.3, tz + 1.16), 0.055, 6, 'steel')
+            cyl((-0.95, -0.3, tz + 1.13), (-0.95, -0.3, tz + 1.16), 0.072, 6, 'black')
+            cyl((-0.95, -0.3, tz + 1.16), (-0.95, -0.3, tz + 1.46), 0.038, 6, 'dark')
+            box((-0.95, -0.3, tz + 1.38), (0.13, 0.13, 0.1), 'dark', bevel=0.03)
+            cyl((-0.82, -0.3, tz + 1.38), (-0.8, -0.3, tz + 1.38), 0.07, 8, 'hot')
         with F.group('Radar'):
-            K.radar_bar(-0.95, -0.3, tz + 1.48, w=0.62, post=0.16)
-        K.cupola(-0.45, 0.28, tz + 0.5, 0.17, mg=False)
-        for s in (1, -1):
-            box((-0.7, s * 0.69, tz + 0.27), (0.2, 0.012, 0.018), 'glow')
-            K.id_marks(-1.1, s * 0.6, tz + 0.3, s, 2, 0.1)
+            cyl((-0.95, -0.3, tz + 1.48), (-0.95, -0.3, tz + 1.64), 0.045, 6, 'steel')
+            prism([(-1.0, tz + 1.64), (-0.9, tz + 1.64), (-0.88, tz + 1.78), (-1.02, tz + 1.78)], -0.95, 0.35, 'plate', bevel=0.015)
+            box((-0.875, -0.3, tz + 1.71), (0.008, 0.55, 0.02), 'hot')
     wheels = [(f"Wheel{i}{'L' if sd > 0 else 'R'}", (x, sd * 1.42, 0.6), f"Wheel{i}{'L' if sd > 0 else 'R'}Pivot")
               for sd in (1, -1) for i, x in enumerate((-1.9, 0.0, 1.9))]
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Turret')]
-                + K.gun_pivots([('', (0.6, 0, gz), (3.8, 0, gz))]))
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + wheels + [('Mast', (-0.95, -0.3, tz + 0.8), 'MastPivot', 'Turret'), ('Radar', (-0.95, -0.3, tz + 1.5), 'RadarPivot', 'Mast')]
+                + V.cannon_pivots((0.6, 0, gz)) + V.blade_pivots(-1.3, 0.68, tz, 0.5))
 
 
 @asset('human/skimmer.glb', 'Terran Skimmer (hover tank)')
 def skimmer():
-    # Hover hull: broad low wedge riding on a flared rubber plenum skirt.
-    hull([(-3.1, [(0, 0.6), (1.2, 0.6), (1.5, 0.82), (1.25, 1.25), (0, 1.3)]),
-          (-2.2, [(0, 0.5), (1.5, 0.5), (1.85, 0.82), (1.45, 1.42), (0, 1.5)]),
-          (0.8, [(0, 0.5), (1.5, 0.5), (1.85, 0.82), (1.35, 1.36), (0, 1.42)]),
-          (2.5, [(0, 0.55), (1.2, 0.55), (1.45, 0.8), (0.9, 1.05), (0, 1.1)]),
-          (3.4, [(0, 0.68), (0.55, 0.68), (0.66, 0.78), (0.5, 0.86), (0, 0.88)])], 'hull', bevel=0.04)
-    hull([(-3.0, [(0, 0.22), (1.3, 0.22), (1.38, 0.6), (0, 0.6)]),
-          (0.8, [(0, 0.18), (1.56, 0.18), (1.64, 0.56), (0, 0.56)]),
-          (3.1, [(0, 0.3), (0.56, 0.3), (0.62, 0.7), (0, 0.7)])], 'rubber', bevel=0.03)
-    plate([(-1.9, -0.9), (0.6, -0.86), (2.2, -0.5), (2.2, 0.5), (0.6, 0.86), (-1.9, 0.9)], 1.4, 1.5, 'armor', inset=0.06, bevel=0.025)
-    K.periscopes(2.05, 0.0, 1.16, 3, 0.2)
+    # Hover dart on four ducted fans, with a glowing repulsor keel instead of a skirt.
+    hull([(-3.3, [(0, 0.7), (0.9, 0.7), (1.1, 0.86), (0.8, 1.2), (0, 1.25)]),
+          (-2.4, [(0, 0.5), (1.45, 0.5), (1.8, 0.82), (1.2, 1.46), (0, 1.52)]),
+          (0.6, [(0, 0.5), (1.45, 0.5), (1.8, 0.82), (1.1, 1.36), (0, 1.42)]),
+          (2.4, [(0, 0.55), (0.95, 0.55), (1.15, 0.78), (0.6, 1.02), (0, 1.06)]),
+          (4.4, [(0, 0.7), (0.12, 0.7), (0.16, 0.76), (0.08, 0.8), (0, 0.81)])], 'hull', bevel=0.04)
+    hull([(-3.0, [(0, 0.26), (1.1, 0.26), (1.3, 0.52), (0, 0.52)]),
+          (0.8, [(0, 0.22), (1.3, 0.22), (1.5, 0.52), (0, 0.52)]),
+          (3.2, [(0, 0.4), (0.35, 0.4), (0.45, 0.6), (0, 0.6)])], 'black', bevel=0.03)
+    prism([(0.7, 1.4), (4.1, 0.8), (2.2, 1.18), (0.7, 1.52)], -0.09, 0.09, 'armor', bevel=0.02)
+    V.reactor(-3.15, 1.5, 1.1, n=6, L=1.0)
     for s in (1, -1):
+        V.eye((1.7, s * 0.42, 1.24), 11.3, s * 18, 0.44, 0.11)
         for x, r in ((1.55, 0.56), (-1.75, 0.64)):
-            # Ducted lift fan: round shroud, deep duct, pitched blades on a hub, guard bars, glow ring in the lip.
-            y = s * 1.78
-            tube((x, y, 0.4), (x, y, 1.04), [(0, r * 0.92), (0.12, r * 1.1), (0.88, r * 1.1), (1, r), (1, r * 0.86), (0.3, r * 0.84), (0.28, r * 0.15)], 20, 'armor', sharp=40, bevel=0.015)
-            tube((x, y, 0.92), (x, y, 0.95), [(0, r * 0.87), (1, r * 0.87), (1, r * 0.81), (0, r * 0.81)], 20, 'glow')
-            with F.group(f"Fan{'F' if x > 0 else 'B'}{'L' if s > 0 else 'R'}"):   # the rotor spins
-                tube((x, y, 0.62), (x, y, 0.86), [(0, r * 0.22), (0.7, r * 0.22), (1, r * 0.1)], 10, 'steel')
-                for k in range(7):
-                    b = box((r * 0.52, 0, 0), (r * 0.3, r * 0.14, 0.012), 'plate')
-                    F.rot(b, 'X', 28)
-                    F.rot(b, 'Z', 360.0 * k / 7)
-                    F.move(b, (x, y, 0.72))
-            for k in range(3):   # guard bars over the intake
-                b = box((0, 0, 0), (r * 0.86, 0.022, 0.018), 'steel')
-                F.rot(b, 'Z', 60 * k)
-                F.move(b, (x, y, 1.0))
-            cyl((x, y, 0.985), (x, y, 1.03), r * 0.14, 8, 'dark')
-            cyl((x, y, 0.38), (x, y, 0.42), r * 0.82, 14, 'glow')
-            # Yoke arm, pivot pin and tilt ram holding the pod to the hull.
+            V.fan_pod(x, s * 1.78, s, r, f"Fan{'F' if x > 0 else 'B'}{'L' if s > 0 else 'R'}")
             box((x, s * 1.3, 0.76), (0.34, 0.3, 0.12), 'plate', bevel=0.03)
-            cyl((x - 0.42, s * 1.24, 0.76), (x + 0.42, s * 1.24, 0.76), 0.07, 8, 'steel')
             K.ram((x - 0.34, s * 1.0, 1.24), (x - 0.2, s * 1.52, 1.0), 0.045)
-        # Bolt-on side armour slabs following the hull slope.
-        for i, xa in enumerate((-2.0, -0.92, 0.16)):
+        for i, xa in enumerate((-2.0, -0.92, 0.16)):   # raked armour tiles down the flank
             xb = xa + 0.98
-            loft([[(xa, s * 1.84, 0.86), (xb, s * 1.84, 0.86), (xb, s * 1.46, 1.38), (xa, s * 1.46, 1.38)],
-                  [(xa + 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.9, 0.9), (xb - 0.04, s * 1.53, 1.4), (xa + 0.04, s * 1.53, 1.4)]], 'plate' if i != 1 else 'olive', bevel=0.02)
-        box((0.0, s * 1.82, 0.77), (0.7, 0.012, 0.02), 'glow')
-        K.headlamp(2.62, s * 0.75, 1.0, s)
-        box((2.3, s * 1.42, 0.86), (0.12, 0.012, 0.03), 'amber')
-        for k in range(3):   # down-thrust slots under the skirt
-            box((-1.6 + 1.3 * k, s * 1.2, 0.185), (0.34, 0.1, 0.012), 'glow')
-        for k in range(5):
-            box((-2.6 + 0.8 * k, s * (1.38 + 0.03 * k), 0.4), (0.035, 0.035, 0.17), 'dark')
-        # Rear thrusters.
-        tube((-3.0, s * 0.62, 0.95), (-3.55, s * 0.62, 0.95), [(0, 0.34), (0.6, 0.36), (1, 0.28)], 10, 'armor', sharp=40)
-        cyl((-3.5, s * 0.62, 0.95), (-3.56, s * 0.62, 0.95), 0.25, 10, 'glow')
-        for k in range(4):
-            b = box((-3.57, s * 0.62, 0.95), (0.012, 0.27, 0.02), 'dark')
-            F.rot(b, 'X', 45 * k, about=(0, s * 0.62, 0.95))
-        # Swept stabiliser fins with a rudder flap.
-        prism([(-3.45, 1.15), (-2.3, 1.15), (-2.75, 1.55), (-3.12, 2.12), (-3.5, 2.12)], s * 1.0 - 0.035, s * 1.0 + 0.035, 'armor', bevel=0.02)
-        prism([(-3.74, 1.28), (-3.52, 1.22), (-3.54, 2.02), (-3.7, 1.92)], s * 1.0 - 0.02, s * 1.0 + 0.02, 'plate', bevel=0.01)
-        box((-3.3, s * 1.0, 2.135), (0.1, 0.03, 0.012), 'amber')
-        K.exhaust(-2.72, s * 0.42, 1.5, s, h=0.34, r=0.07)
-        sweep([(-2.2, s * 0.62, 1.5), (-2.0, s * 1.2, 1.3), (-1.78, s * 1.5, 1.06)], [(0.05, 0.05)] * 3, 'rubber', sides=6)
-        sweep([(0.9, s * 0.8, 1.38), (1.3, s * 1.25, 1.2), (1.5, s * 1.5, 1.04)], [(0.045, 0.045)] * 3, 'rubber', sides=6)
-    # Raised engine hump.
-    box((-2.2, 0, 1.54), (0.5, 0.6, 0.11), 'armor', bevel=0.04)
-    K.vent((-2.2, 0, 1.67), (0.34, 0.42, 0.035))
-    box((3.4, 0, 0.78), (0.02, 0.4, 0.05), 'grille')
+            loft([[(xa + 0.2, s * 1.84, 0.86), (xb + 0.2, s * 1.84, 0.86), (xb - 0.1, s * 1.3, 1.4), (xa - 0.1, s * 1.3, 1.4)],
+                  [(xa + 0.24, s * 1.9, 0.9), (xb + 0.16, s * 1.9, 0.9), (xb - 0.14, s * 1.37, 1.44), (xa - 0.06, s * 1.37, 1.44)]], 'plate' if i != 1 else 'armor', bevel=0.02)
+        V.neon((0.1, s * 1.83, 0.8), (0.9, 0.012, 0.02))
+        box((2.3, s * 1.2, 0.8), (0.12, 0.012, 0.03), 'amber')
+        for k in range(3):   # repulsor slots along the keel edge
+            V.neon((-1.6 + 1.3 * k, s * 1.36, 0.4), (0.36, 0.012, 0.03))
+        for k in range(4):   # prow teeth
+            tx = 2.5 + k * 0.38
+            ty = 0.8 - 0.19 * k
+            prism([(tx, 0.56), (tx + 0.22, 0.6), (tx + 0.26, 0.38)], min(s * ty, s * (ty - 0.08)), max(s * ty, s * (ty - 0.08)), 'steel', bevel=0.01)
+        # Rear thrusters burning white-blue.
+        tube((-3.1, s * 0.62, 0.95), (-3.65, s * 0.62, 0.95), [(0, 0.34), (0.6, 0.36), (1, 0.28)], 8, 'armor', sharp=20)
+        cyl((-3.6, s * 0.62, 0.95), (-3.66, s * 0.62, 0.95), 0.25, 10, 'neon')
+        cyl((-3.62, s * 0.62, 0.95), (-3.68, s * 0.62, 0.95), 0.14, 10, 'hot')
+        # Swept stabiliser blades.
+        prism([(-3.45, 1.15), (-2.1, 1.15), (-2.75, 1.6), (-3.9, 2.35)], s * 1.0 - 0.035, s * 1.0 + 0.035, 'armor', bevel=0.02)
+        box((-3.5, s * 1.04, 2.0), (0.16, 0.008, 0.02), 'amber')
+        V.neon((-2.9, s * 1.04, 1.4), (0.3, 0.008, 0.02))
     tz = 1.48
+    gz = tz + 0.27
     with F.group('Turret'):
         tube((-0.4, 0, tz - 0.03), (-0.4, 0, tz + 0.07), [(0, 0.78), (1, 0.74)], 16, 'dark')
-        turret_shell(-1.35, 0.75, 0.82, tz, 0.56)
-        box((-0.3, 0, tz + 0.58), (0.5, 0.45, 0.025), 'olive', bevel=0.02)
-        K.mantlet(0.82, tz + 0.27, 0.52, 0.19, guns=(0.3, -0.3), r=0.085, length=0.55)
+        V.arrow_turret(-1.35, 0.9, 0.82, tz, 0.56, bs=0.7)
         for s in (1, -1):
-            K.railgun(0.8, 4.3, s * 0.3, tz + 0.27, 0.095, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
-            box((-0.3, s * 0.83, tz + 0.3), (0.3, 0.012, 0.02), 'glow')
-            K.smoke(-0.1, s * 0.74, tz + 0.36, s, n=3)
-            K.id_marks(-1.05, s * 0.72, tz + 0.3, s, 2, 0.1)
-        K.cupola(-0.55, 0.3, tz + 0.6, 0.19, mg=False)
-        box((-0.2, -0.3, tz + 0.68), (0.16, 0.13, 0.08), 'dark', bevel=0.03)
-        box((-0.04, -0.3, tz + 0.69), (0.012, 0.09, 0.045), 'glass')
-        cyl((0.0, -0.3, tz + 0.77), (0.0, -0.3, tz + 0.79), 0.05, 8, 'amber')
-        K.basket(-1.78, -1.4, 0.5, tz + 0.2, 0.22)
-        K.antenna(-1.1, 0.4, tz + 0.5, 1.0)
-        K.antenna(-1.1, -0.4, tz + 0.5, 0.75, tip='glow')
+            sd = 'L' if s > 0 else 'R'
+            prism([(0.1, gz - 0.2), (0.9, gz - 0.16), (1.15, gz), (0.9, gz + 0.16), (0.1, gz + 0.22)], min(s * 0.16, s * 0.5), max(s * 0.16, s * 0.5), 'plate', bevel=0.03)
+            V.tele_cannon(0.8, 4.3, gz, 0.13, 4, y=s * 0.32, piston=False, prefix='Barrel' + sd, flash_group='Flash' + sd)
     fans = [(f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}", (x, sd * 1.78, 0.84),
              f"Fan{'F' if x > 0 else 'B'}{'L' if sd > 0 else 'R'}Pivot") for sd in (1, -1) for x in (1.55, -1.75)]
-    return dict(pivot=[('Turret', (-0.4, 0, tz))] + fans + K.gun_pivots([(a, (0.8, y, tz + 0.27), (4.45, y, tz + 0.27)) for a, y in (('L', 0.3), ('R', -0.3))]))
+    return dict(pivot=[('Turret', (-0.4, 0, tz))] + fans + V.cannon_pivots((0.8, 0, gz), ('L', 'R')) + V.blade_pivots(-1.35, 0.82, tz, 0.56))
 
 
 @asset('human/bulwark.glb', 'Terran Bulwark (heavy tank)', size=1024)
 def bulwark():
     L, hw, top = 7.8, 1.5, 1.62
-    K.chassis(L, hw, top, pod=2.08, w=0.56, nwheels=6, nose=1.05)
+    V.scifi_chassis(L, hw, top, pod=2.08, w=0.56, nwheels=6, nose=1.0, prow=1.45, fin=0.85)
     for s in (1, -1):
-        # Bolt-on slab armour over the skirts, a thick bow block and glacis slabs.
-        K.applique(-3.7, 3.3, s * 2.74, 0.9, 1.4, s, n=7)
-        K.applique(-3.2, 1.6, s * (hw * 0.955), 1.02, top - 0.06, s, n=5, zone='olive')
-        b = box((L / 2 - 1.3, s * 0.72, top - 0.04), (0.6, 0.45, 0.06), 'olive', bevel=0.02)
-        K.chevron(L / 2 - 1.3, s * 0.72, top + 0.03, 0.12)
-        K.stow((-L / 2 + 0.7, s * 1.0, top + 0.14), (0.42, 0.3, 0.13))
-        K.vent((-L / 2 + 2.1, s * hw * 0.45, top + 0.03), (0.4, hw * 0.3, 0.05), 'vent')
-        box((-L / 2 + 2.1, s * hw * 0.45, top + 0.012), (0.36, hw * 0.26, 0.01), 'amber')
-        for k in range(4):   # spare track links on the bow
-            box((L / 2 - 0.42, s * (0.25 + k * 0.26), 0.98 + 0.0), (0.035, 0.11, 0.1), 'track')
-    box((L / 2 + 0.02, 0, 0.62), (0.12, hw * 0.78, 0.2), 'plate', bevel=0.04)
-    box((L / 2 + 0.15, 0, 0.62), (0.012, hw * 0.6, 0.05), 'hazard')
-    tz, th = top + 0.04, 1.0
+        # Heavy slab armour hung over the skirts, raked like the rest.
+        for k in range(3):
+            x = -2.5 + k * 2.05
+            ya = s * (2.08 + 0.56 + 0.14)
+            prism([(x - 0.6, 0.84), (x + 1.05, 0.84), (x + 0.8, 1.42), (x - 0.85, 1.42)], min(ya, ya + s * 0.12), max(ya, ya + s * 0.12), 'plate' if k % 2 else 'armor', bevel=0.035)
+            V.neon((x + 0.1, ya + s * 0.125, 1.14), (0.5, 0.012, 0.022))
+            for bx in (x - 0.45, x + 0.7):
+                cyl((bx, ya + s * 0.1, 0.98), (bx, ya + s * 0.14, 0.98), 0.04, 6, 'steel')
+    tz, th = top + 0.04, 0.95
+    gz = tz + 0.45
     with F.group('Turret'):
         tube((-0.5, 0, tz - 0.03), (-0.5, 0, tz + 0.1), [(0, 1.4), (1, 1.34)], 24, 'dark')
-        turret_shell(-2.7, 1.5, 1.45, tz, th)
-        turret_kit(-2.7, 1.5, 1.45, tz, th)
-        K.mantlet(1.62, tz + 0.46, 1.0, 0.36, guns=(0.52, -0.52), r=0.19, length=1.0)
+        V.arrow_turret(-2.6, 1.8, 1.4, tz, th, bs=1.3)
         for s in (1, -1):
-            K.railgun(1.7, 8.6, s * 0.52, tz + 0.46, 0.19, evac=True, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
-            # Side missile pods on hinged arms with struts and an open armoured lid.
-            K.missile_box((-0.9, s * 1.86, tz + 0.66), (0.78, 0.3, 0.25), nx=2, nz=2)
-            for xx in (-1.35, -0.45):
-                box((xx, s * 1.52, tz + 0.56), (0.07, 0.14, 0.09), 'plate', bevel=0.02)
-                cyl((xx - 0.1, s * 1.42, tz + 0.56), (xx + 0.1, s * 1.42, tz + 0.56), 0.06, 8, 'steel')
-            K.ram((-0.9, s * 1.3, tz + 0.25), (-0.9, s * 1.7, tz + 0.42), 0.045)
-            lid = box((-0.9, s * 1.86, tz + 0.95), (0.74, 0.3, 0.02), 'plate', bevel=0.012)
-            F.rot(lid, 'X', s * -24, about=(0, s * 1.58, tz + 0.93))
-            for k in range(3):   # spare links on the turret rear quarter
-                box((-2.45 + k * 0.22, s * 1.2, tz + 0.5), (0.09, 0.035, 0.12), 'track')
-        box((2.9, 0, tz + 0.46), (0.7, 0.36, 0.09), 'armor', bevel=0.02)
-        box((2.2, 0, tz + 0.74), (0.5, 0.2, 0.06), 'plate', bevel=0.02)
-        # Remote weapon station on the roof.
-        cyl((0.3, -0.75, tz + th), (0.3, -0.75, tz + th + 0.16), 0.14, 8, 'dark')
-        box((0.3, -0.75, tz + th + 0.26), (0.2, 0.16, 0.1), 'armor', bevel=0.03)
-        for dy in (-0.07, 0.07):
-            K.gun(0.4, 1.6, -0.75 + dy, tz + th + 0.27, 0.03)
-        box((0.3, -0.52, tz + th + 0.26), (0.12, 0.07, 0.09), 'olive', bevel=0.015)
-        box((0.52, -0.75, tz + th + 0.4), (0.06, 0.07, 0.04), 'dark')
-        box((0.585, -0.75, tz + th + 0.4), (0.008, 0.05, 0.025), 'glass')
-        box((0.9, 0.5, tz + th + 0.1), (0.16, 0.16, 0.1), 'dark', bevel=0.03)   # panoramic sight
-        box((1.065, 0.5, tz + th + 0.11), (0.008, 0.11, 0.06), 'glass')
-    return dict(pivot=[('Turret', (-0.5, 0, tz))] + K.gun_pivots([(a, (1.7, y, tz + 0.46), (8.75, y, tz + 0.46)) for a, y in (('L', 0.52), ('R', -0.52))]))
+            sd = 'L' if s > 0 else 'R'
+            prism([(0.2, gz - 0.44), (2.0, gz - 0.36), (2.6, gz), (2.0, gz + 0.36), (0.2, gz + 0.5)], min(s * 0.2, s * 1.02), max(s * 0.2, s * 1.02), 'plate', bevel=0.045)
+            V.neon((1.1, s * 1.03, gz), (0.6, 0.012, 0.028))
+            V.tele_cannon(1.8, 8.6, gz, 0.3, 4, y=s * 0.6, piston=False, prefix='Barrel' + sd, flash_group='Flash' + sd)
+            # Shoulder capacitor bank feeding the gun: armoured block, cooling blades, glowing cells.
+            box((-1.3, s * 1.78, tz + 0.52), (0.95, 0.3, 0.3), 'armor', bevel=0.07)
+            box((-1.3, s * 1.42, tz + 0.45), (0.5, 0.12, 0.14), 'dark')
+            box((-1.3, s * 2.09, tz + 0.52), (0.7, 0.012, 0.1), 'coilhot')
+            mc = F.mark()
+            for k in range(5):
+                fx = -2.0 + k * 0.35
+                prism([(fx, tz + 0.8), (fx + 0.3, tz + 0.8), (fx + 0.05, tz + 1.12), (fx - 0.3, tz + 1.2)], min(s * 1.56, s * 2.0), max(s * 1.56, s * 2.0), 'plate', bevel=0.012)
+            box((-1.3, s * 1.78, tz + 0.83), (0.8, 0.16, 0.02), 'coilhot')
+            F.regroup(mc, 'Cap' + sd)   # the blades flare open when the cannons fire
+            box((-0.3, s * 1.78, tz + 0.52), (0.03, 0.2, 0.18), 'amber')
+    caps = [('Cap' + sd, (-1.3, sy * 1.6, tz + 0.8), f'Cap{sd}Pivot', 'Turret') for sd, sy in (('L', 1), ('R', -1))]
+    return dict(pivot=[('Turret', (-0.5, 0, tz))] + V.cannon_pivots((1.8, 0, gz), ('L', 'R')) + V.blade_pivots(-2.6, 1.4, tz, th) + caps)
 
 
 @asset('human/javelin.glb', 'Terran Javelin (missile tank)')
 def javelin():
     L, hw, top = 6.4, 1.22, 1.42
-    K.chassis(L, hw, top, stowage=False)
-    K.hatch(1.2, 0.0, top + 0.02, 0.26, 6)
-    for s in (1, -1):   # reload canisters strapped along the fenders
-        fy = s * (1.68 - 0.42 * 0.32)
-        tube((-2.3, fy, 1.5), (-0.2, fy, 1.5), [(0, 0.1), (0.04, 0.15), (0.96, 0.15), (1, 0.1)], 10, 'olive', sharp=30)
-        for xx in (-1.9, -1.25, -0.6):
-            box((xx, fy, 1.5), (0.035, 0.16, 0.16), 'rubber')
-        cyl((-0.2, fy, 1.5), (-0.17, fy, 1.5), 0.08, 8, 'amber')
-        box((0.9, fy, 1.385), (0.5, 0.02, 0.02), 'steel')
+    V.scifi_chassis(L, hw, top)
     tz = top + 0.04
     pz = tz + 0.72
     with F.group('Turret'):
         tube((-0.5, 0, tz - 0.03), (-0.5, 0, tz + 0.14), [(0, 1.0), (1, 0.9)], 20, 'dark')
-        for k in range(16):
-            a = 2 * math.pi * k / 16
-            box((-0.5 + math.cos(a) * 0.97, math.sin(a) * 0.97, tz + 0.02), (0.03, 0.03, 0.02), 'steel')
-        hull([(-1.7, [(0, tz + 0.12), (0.62, tz + 0.12), (0.74, tz + 0.55), (0.5, tz + 1.08), (0, tz + 1.08)]),
-              (0.3, [(0, tz + 0.12), (0.62, tz + 0.12), (0.74, tz + 0.5), (0.44, tz + 0.92), (0, tz + 0.92)]),
-              (1.05, [(0, tz + 0.14), (0.36, tz + 0.14), (0.44, tz + 0.38), (0.26, tz + 0.55), (0, tz + 0.55)])], 'armor', bevel=0.04)
-        cyl((-0.5, -1.0, pz), (-0.5, 1.0, pz), 0.2, 12, 'dark')
+        hull([(-1.9, [(0, tz + 0.2), (0.4, tz + 0.2), (0.5, tz + 0.55), (0.3, tz + 0.9), (0, tz + 0.9)]),
+              (-1.2, [(0, tz + 0.12), (0.62, tz + 0.12), (0.74, tz + 0.55), (0.42, tz + 1.08), (0, tz + 1.08)]),
+              (0.3, [(0, tz + 0.12), (0.62, tz + 0.12), (0.74, tz + 0.5), (0.36, tz + 0.92), (0, tz + 0.92)]),
+              (1.6, [(0, tz + 0.14), (0.1, tz + 0.14), (0.13, tz + 0.3), (0.06, tz + 0.4), (0, tz + 0.41)])], 'armor', bevel=0.04)
+        cyl((-0.5, -1.0, pz), (-0.5, 1.0, pz), 0.2, 8, 'dark')
         msl = []
         for s in (1, -1):
-            # Cheek plate, trunnion yoke and elevation ram.
-            box((-0.6, s * 0.76, tz + 0.52), (0.75, 0.03, 0.26), 'olive', bevel=0.02)
-            prism([(-1.05, tz + 0.2), (0.05, tz + 0.2), (-0.2, tz + 1.02), (-0.8, tz + 1.02)], min(s * 0.8, s * 0.9), max(s * 0.8, s * 0.9), 'plate', bevel=0.03)
-            cyl((-0.5, s * 0.78, pz), (-0.5, s * 0.94, pz), 0.27, 12, 'steel')
+            # Swept yoke blade and trunnion.
+            prism([(-1.25, tz + 0.2), (0.25, tz + 0.2), (-0.2, tz + 1.02), (-1.1, tz + 1.3)], min(s * 0.8, s * 0.9), max(s * 0.8, s * 0.9), 'plate', bevel=0.03)
+            cyl((-0.5, s * 0.78, pz), (-0.5, s * 0.94, pz), 0.27, 8, 'steel')
+            cyl((-0.5, s * 0.94, pz), (-0.5, s * 0.97, pz), 0.15, 8, 'hot')
             K.ram((0.2, s * 0.96, tz + 0.2), (0.75, s * 1.0, tz + 0.66), 0.06)
             m = F.mark()
             msl += K.missile_box((-0.7, s * 1.46, pz), (1.85, 0.5, 0.4), nx=3, nz=2, group='Msl' + 'LR'[s < 0])
-            box((-0.7, s * 1.975, pz), (1.2, 0.012, 0.018), 'glow')
-            box((0.95, s * 1.46, pz + 0.42), (0.14, 0.44, 0.012), 'hazard')
+            V.neon((-0.7, s * 1.975, pz), (1.3, 0.012, 0.03))
+            V.neon((-0.7, s * 1.46, pz + 0.412), (1.2, 0.05, 0.012))
+            # Raked dorsal blade and a fanged front lip on each pod.
+            prism([(-2.4, pz + 0.4), (-0.7, pz + 0.4), (-1.7, pz + 0.85), (-3.1, pz + 1.0)], s * 1.46 - 0.03, s * 1.46 + 0.03, 'plate', bevel=0.012)
+            for dy in (-0.42, 0.42):
+                prism([(1.1, pz + 0.3), (1.55, pz + 0.36), (1.15, pz + 0.48)], s * 1.46 + dy - 0.04, s * 1.46 + dy + 0.04, 'steel', bevel=0.01)
+                prism([(1.1, pz - 0.48), (1.55, pz - 0.36), (1.15, pz - 0.3)], s * 1.46 + dy - 0.04, s * 1.46 + dy + 0.04, 'steel', bevel=0.01)
+            box((-2.57, s * 1.46, pz), (0.02, 0.3, 0.2), 'amber')
             F.rot_all(m, 'Y', -16, about=(-0.5, 0, pz))
-        # Targeting optics and a rotating fire-control panel.
-        box((0.25, 0, tz + 1.1), (0.26, 0.2, 0.14), 'dark', bevel=0.04)
-        box((0.52, 0, tz + 1.1), (0.012, 0.14, 0.08), 'glass')
-        cyl((0.52, 0.0, tz + 1.26), (0.54, 0.0, tz + 1.26), 0.04, 8, 'glow')
+            for o in F.since(m):   # pod bodies ride one cradle part; the missiles keep their own parts under it
+                if o.get('group') == 'Turret':
+                    o['group'] = 'Pods'
+        # Targeting sensor and a rotating fire-control panel.
+        box((0.25, 0, tz + 1.02), (0.26, 0.2, 0.12), 'dark', bevel=0.04)
+        box((0.52, 0, tz + 1.02), (0.012, 0.14, 0.05), 'hot')
         with F.group('Radar'):
-            cyl((-1.1, 0, tz + 1.08), (-1.1, 0, tz + 1.5), 0.06, 8, 'steel')
+            cyl((-1.1, 0, tz + 1.08), (-1.1, 0, tz + 1.5), 0.06, 6, 'steel')
             m = F.mark()
-            box((0, 0, 0), (0.05, 0.55, 0.32), 'plate', bevel=0.02)
-            box((-0.06, 0, 0), (0.02, 0.5, 0.03), 'dark')
-            box((-0.06, 0, 0), (0.02, 0.03, 0.28), 'dark')
+            prism([(-0.05, -0.32), (0.05, -0.32), (0.05, 0.32), (-0.05, 0.44)], -0.6, 0.6, 'plate', bevel=0.02)
             for k in (-1, 0, 1):
-                box((0.055, 0, k * 0.2), (0.008, 0.48, 0.02), 'glow')
+                box((0.055, 0, k * 0.2), (0.008, 0.5, 0.02), 'hot')
             F.rot_all(m, 'Y', -14)
             F.move_all(m, (-1.1, 0, tz + 1.82))
-        K.antenna(-1.5, 0.35, tz + 1.05, 1.1)
-        K.antenna(-1.5, -0.35, tz + 1.05, 0.8, tip='glow')
-        K.beacon(-0.3, -0.3, tz + 1.0)
-    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret')] + [(g, p, g + 'Pivot', 'Turret') for g, p in msl])
+    return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Radar', (-1.1, 0, tz + 1.5), 'RadarPivot', 'Turret'), ('Pods', (-0.5, 0, pz), 'PodsPivot', 'Turret')]
+                + [(g, p, g + 'Pivot', 'Pods') for g, p in msl])
 
 
 @asset('human/longbow.glb', 'Terran Longbow (artillery)', size=1024)
@@ -414,6 +319,7 @@ def longbow():
             for q in range(4):
                 box((-2.3 + q * 0.45, s * 0.64, gz), (0.04, 0.02, 0.3), 'black')
         box((0.22, 0, gz), (0.06, 0.66, 0.56), 'plate', bevel=0.02)
+        F.regroup(m, 'Gun')   # the cradle elevates as one part and carries the sleeves
         step = V.tele_cannon(0.2, 9.0, gz, 0.44, 4)
         F.rot_all(m, 'Y', -26, about=(-0.8, 0, gz))
         with F.group('Radar'):   # fire-control dish
@@ -426,42 +332,30 @@ def longbow():
             F.move_all(m, (c[0], c[1], c[2] + 0.12))
     p = (-0.8, 0, gz)
     return dict(pivot=[('Turret', (-0.9, 0, tz)), ('Radar', (-2.0, 0.0, tz + 0.75), 'RadarPivot', 'Turret')]
-                + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Turret') for k in (1, 2, 3, 4)] + [('Flash', p, 'FlashPivot', 'Barrel4')])
+                + [('Gun', p, 'GunPivot', 'Turret'), ('Claw', (0, 0, 1.0), 'ClawPivot')]
+                + [(f'Barrel{k}', p, f'Barrel{k}Pivot', 'Gun') for k in (1, 2, 3, 4)] + [('Flash', p, 'FlashPivot', 'Barrel4')])
 
 
 def cab(x, y, z, sx=0.7, sy=0.6, sz=0.55):
-    """Unmanned control cab: crisp wedge with two armoured sensor slits under a brow, hatch, light bar, beacon."""
-    prism([(x - sx, z), (x + sx, z), (x + sx, z + sz * 0.42), (x + sx * 0.45, z + sz), (x - sx * 0.8, z + sz), (x - sx, z + sz * 0.8)],
-          y - sy, y + sy, 'armor', taper=0.84, bevel=0.03)
-    ang = math.degrees(math.atan2(sz * 0.58, sx * 0.55))
-    m = F.mark()
+    """Unmanned sensor core where a cab would sit: faceted wedge, two slanted glowing eyes, swept blades. No crew, no windows."""
+    prism([(x - sx, z), (x + sx * 1.25, z), (x + sx * 1.3, z + sz * 0.2), (x + sx * 0.3, z + sz), (x - sx * 0.8, z + sz), (x - sx, z + sz * 0.8)],
+          y - sy, y + sy, 'armor', taper=0.7, bevel=0.03)
+    ang = math.degrees(math.atan2(sz * 0.8, sx))
     for sg in (1, -1):
-        box((0, sg * sy * 0.36, 0), (sx * 0.2, sy * 0.27, 0.012), 'glass')
-    box((0, 0, -0.012), (sx * 0.42, sy * 0.74, 0.012), 'dark')
-    box((0, 0, 0.006), (sx * 0.3, sy * 0.06, 0.022), 'armor')
-    for sg in (1, -1):
-        box((sg * sx * 0.27, 0, 0.008), (sx * 0.05, sy * 0.72, 0.02), 'plate')
-    F.rot_all(m, 'Y', ang)
-    F.move_all(m, (x + sx * 0.74, y, z + sz * 0.73))
-    box((x + sx * 0.42, y, z + sz + 0.035), (sx * 0.12, sy * 0.8, 0.035), 'plate', bevel=0.015)   # visor brow
-    # Roof light bar and hatch.
-    box((x + sx * 0.2, y, z + sz + 0.09), (0.05, sy * 0.6, 0.045), 'dark', bevel=0.012)
-    for kk in (-1, 0, 1):
-        box((x + sx * 0.2 + 0.052, y + kk * sy * 0.38, z + sz + 0.09), (0.008, sy * 0.13, 0.03), 'glow' if kk else 'amber')
-    K.hatch(x - sx * 0.3, y - sy * 0.25, z + sz, min(sx, sy) * 0.3, 6)
-    for s in (1, -1):
-        box((x - sx * 0.1, y + s * sy * 0.93, z + sz * 0.5), (sx * 0.3, 0.012, 0.018), 'glow')
-        box((x + sx * 0.5, y + s * (sy * 0.86 + 0.1), z + sz * 0.7), (0.012, 0.1, 0.012), 'steel')        # mirror stalk
-        box((x + sx * 0.5, y + s * (sy * 0.86 + 0.2), z + sz * 0.7), (0.012, 0.035, 0.07), 'dark')
-        box((x - sx * 0.3, y + s * sy * 0.9, z + sz * 0.86), (sx * 0.45, 0.012, 0.012), 'steel')              # grab rail
-    K.beacon(x - sx * 0.55, y + sy * 0.45, z + sz)
+        V.eye((x + sx * 0.8, y + sg * sy * 0.36, z + sz * 0.62), ang, sg * 14, sx * 0.4, sy * 0.16)
+        V.neon((x - sx * 0.1, y + sg * sy * 0.95, z + sz * 0.2), (sx * 0.45, 0.012, 0.02))
+        prism([(x - sx, z + sz * 0.8), (x - sx * 0.2, z + sz), (x - sx * 0.7, z + sz + 0.35), (x - sx * 1.6, z + sz + 0.75)],
+              y + sg * sy * 0.5 - 0.025, y + sg * sy * 0.5 + 0.025, 'plate', bevel=0.01)
+    box((x - sx * 0.25, y, z + sz + 0.03), (sx * 0.5, sy * 0.16, 0.03), 'plate', bevel=0.012)
+    V.neon((x - sx * 0.25, y, z + sz + 0.062), (sx * 0.4, sy * 0.05, 0.008))
+    box((x - sx * 0.82, y, z + sz + 0.02), (0.05, sy * 0.3, 0.02), 'amber')
     box((x - sx - 0.012, y, z + sz * 0.45), (0.012, sy * 0.6, sz * 0.22), 'vent')
 
 
 @asset('human/prospector.glb', 'Terran Prospector (ore miner)')
 def prospector():
     L, hw, top = 6.6, 1.22, 1.3
-    K.chassis(L, hw, top, stowage=False, nose=0.9)
+    V.scifi_chassis(L, hw, top, nose=0.25, prow=0.4)
     cab(1.5, 0.62, top + 0.02, 0.78, 0.52, 0.76)
     # Ore hopper: double-skin sloped walls, rolled top rail, gussets, grizzly bars, tailgate with latch rams.
     x0, x1, wy, z0, z1 = -3.1, 0.55, 1.5, top + 0.02, top + 1.15
@@ -476,7 +370,7 @@ def prospector():
         box(((x0 + x1) / 2, s * (wy - 0.06), z1 - 0.2), ((x1 - x0) / 2 - 0.1, 0.012, 0.25), 'steel')     # scraped inner face
         K.ram((x0 + 0.5, s * (wy + 0.2), z0 + 0.55), (x0 - 0.12, s * (wy + 0.2), z0 + 0.85), 0.05)        # tailgate latch rams
     loft([[(x0, -wy + 0.2, z0), (x0, wy - 0.2, z0), (x0 - 0.2, wy, z1), (x0 - 0.2, -wy, z1)],
-          [(x0 + 0.1, -wy + 0.2, z0), (x0 + 0.1, wy - 0.2, z0), (x0 - 0.1, wy, z1), (x0 - 0.1, -wy, z1)]], 'yellow', bevel=0.02)
+          [(x0 + 0.1, -wy + 0.2, z0), (x0 + 0.1, wy - 0.2, z0), (x0 - 0.1, wy, z1), (x0 - 0.1, -wy, z1)]], 'plate', bevel=0.02)
     box((x0 - 0.22, 0, z0 + 0.75), (0.02, wy * 0.7, 0.05), 'hazard')
     loft([[(x1, -wy + 0.2, z0), (x1, wy - 0.2, z0), (x1 + 0.12, wy, z1), (x1 + 0.12, -wy, z1)],
           [(x1 + 0.1, -wy + 0.2, z0), (x1 + 0.1, wy - 0.2, z0), (x1 + 0.22, wy, z1), (x1 + 0.22, -wy, z1)]], 'armor', bevel=0.02)
@@ -488,7 +382,7 @@ def prospector():
     # Cutter head: boxed arms out to gearboxes on both drum ends, two fat lift rams, spray guard.
     dz, dx, dw = 0.8, 4.3, 2.0
     for s in (1, -1):
-        sweep([(2.5, s * 1.25, 1.15), (3.3, s * (dw + 0.2), 1.05), (dx, s * (dw + 0.2), dz)], [(0.1, 0.16), (0.1, 0.16), (0.1, 0.14)], 'yellow', sides=4)
+        sweep([(2.5, s * 1.25, 1.15), (3.3, s * (dw + 0.2), 1.05), (dx, s * (dw + 0.2), dz)], [(0.1, 0.16), (0.1, 0.16), (0.1, 0.14)], 'plate', sides=4)
         K.ram((2.3, s * 0.95, 1.35), (3.5, s * (dw + 0.02), 1.12), 0.075)
         tube((dx, s * (dw + 0.02), dz), (dx, s * (dw + 0.36), dz), [(0, 0.3), (0.2, 0.36), (0.8, 0.36), (1, 0.28)], 10, 'plate', sharp=30)
         for k in range(8):
@@ -516,25 +410,24 @@ def prospector():
                     F.move(pk, (dx, 0, dz))
     box((dx - 0.5, 0, dz + 0.72), (0.2, dw + 0.1, 0.045), 'hazard', bevel=0.02)
     for s in (1, -1):
-        box((dx - 0.6, s * (dw + 0.2), dz + 0.5), (0.06, 0.08, 0.22), 'yellow')
+        box((dx - 0.6, s * (dw + 0.2), dz + 0.5), (0.06, 0.08, 0.22), 'plate')
     # Chain conveyor from the drum up into the hopper, beside the cab.
     cy = -0.42
     loft([[(3.75, cy - 0.4, 0.8), (3.75, cy + 0.4, 0.8), (0.75, cy + 0.4, z1 + 0.12), (0.75, cy - 0.4, z1 + 0.12)],
-          [(3.75, cy - 0.4, 0.9), (3.75, cy + 0.4, 0.9), (0.75, cy + 0.4, z1 + 0.22), (0.75, cy - 0.4, z1 + 0.22)]], 'rubber', bevel=0.02)
+          [(3.75, cy - 0.4, 0.9), (3.75, cy + 0.4, 0.9), (0.75, cy + 0.4, z1 + 0.22), (0.75, cy - 0.4, z1 + 0.22)]], 'black', bevel=0.02)
     for s in (1, -1):
         loft([[(3.75, cy + s * 0.4 - 0.04, 0.86), (3.75, cy + s * 0.4 + 0.04, 0.86), (0.75, cy + s * 0.4 + 0.04, z1 + 0.18), (0.75, cy + s * 0.4 - 0.04, z1 + 0.18)],
-              [(3.75, cy + s * 0.4 - 0.04, 1.08), (3.75, cy + s * 0.4 + 0.04, 1.08), (0.75, cy + s * 0.4 + 0.04, z1 + 0.4), (0.75, cy + s * 0.4 - 0.04, z1 + 0.4)]], 'yellow', bevel=0.015)
+              [(3.75, cy + s * 0.4 - 0.04, 1.08), (3.75, cy + s * 0.4 + 0.04, 1.08), (0.75, cy + s * 0.4 + 0.04, z1 + 0.4), (0.75, cy + s * 0.4 - 0.04, z1 + 0.4)]], 'plate', bevel=0.015)
     for k in range(9):
         t = (k + 0.5) / 9
         box((3.75 - 3.0 * t, cy, 0.93 + (z1 + 0.25 - 0.93) * t), (0.03, 0.36, 0.035), 'steel')
-    K.antenna(1.0, 1.0, top + 0.8, 1.2)
     return dict(pivot=[('Drum', (dx, 0, dz), 'DrumPivot')])
 
 
 @asset('human/hauler.glb', 'Terran Hauler (cargo tug)')
 def hauler():
     L, hw, top = 6.8, 1.22, 1.2
-    K.chassis(L, hw, top, stowage=False, nose=0.9)
+    V.scifi_chassis(L, hw, top, nose=0.9)
     cab(2.25, 0.0, top + 0.02, 0.85, 1.0, 0.85)
     # Deep cargo bed: thick ribbed walls with a flared lip, tie-down rings, hinged tailgate with latch rams.
     x0, x1, wy, z0 = -3.5, 1.2, 1.7, top + 0.12
@@ -552,20 +445,12 @@ def hauler():
                 tube((x + 0.25, s * (wy + 0.06), z0 + 0.2), (x + 0.25, s * (wy + 0.1), z0 + 0.2), [(0, 0.07), (1, 0.07), (1, 0.04), (0, 0.04)], 8, 'steel')
         box((x0 - 0.02, s * 1.2, z0 + 0.15), (0.02, 0.16, 0.05), 'red')
         K.ram((x0 + 0.6, s * (wy + 0.14), z0 + 0.3), (x0 - 0.1, s * (wy + 0.14), z0 + 0.62), 0.05)
-        K.exhaust(1.38, s * 1.3, top + 0.1, s, h=1.1, r=0.085)
-    box((x0 + 0.04, 0, z0 + bh), (0.06, wy - 0.1, bh), 'yellow', bevel=0.02)
+    box((x0 + 0.04, 0, z0 + bh), (0.06, wy - 0.1, bh), 'plate', bevel=0.02)
     box((x0 - 0.03, 0, z0 + bh), (0.012, wy * 0.6, 0.06), 'hazard')
     box((x1 - 0.04, 0, z0 + 0.62), (0.07, wy - 0.05, 0.62), 'armor', bevel=0.02)
     box((x1 - 0.12, 0, z0 + 0.75), (0.012, wy * 0.6, 0.22), 'vent')
     with F.group('Ore'):   # the cargo; the game can hide it when the bed is empty
         K.ore_load(x0 + 0.35, x1 - 0.8, wy - 0.3, z0 + 0.12, 2 * bh + 0.5, seed=11)
-    # Bull bar with winch and hooks.
-    bx = L / 2 + 0.16
-    box((bx, 0, 0.72), (0.05, 1.5, 0.06), 'steel', bevel=0.015)
-    box((bx, 0, 0.98), (0.04, 1.2, 0.04), 'steel', bevel=0.012)
-    for yy in (-1.0, -0.4, 0.4, 1.0):
-        box((bx, yy, 0.84), (0.04, 0.04, 0.17), 'steel')
-    cyl((bx - 0.08, -0.25, 0.62), (bx - 0.08, 0.25, 0.62), 0.09, 8, 'dark')
     # Knuckle-boom loading crane with a four-tine grapple.
     cx, cy = x1 - 0.35, -1.25
     with F.group('Crane'):   # swings over the bed while loading
@@ -573,19 +458,19 @@ def hauler():
         for k in range(16):
             a = 2 * math.pi * k / 16
             box((cx + math.cos(a) * 0.46, cy + math.sin(a) * 0.46, z0 + 0.07), (0.03, 0.03, 0.05), 'dark')
-        box((cx, cy, z0 + 0.85), (0.16, 0.16, 0.68), 'yellow', bevel=0.03)
+        box((cx, cy, z0 + 0.85), (0.16, 0.16, 0.68), 'plate', bevel=0.03)
         cyl((cx + 0.18, cy - 0.2, z0 + 0.55), (cx + 0.18, cy + 0.2, z0 + 0.55), 0.14, 10, 'steel')    # cable drum
         jz = z0 + 1.5
         cyl((cx, cy - 0.2, jz), (cx, cy + 0.2, jz), 0.17, 10, 'dark')
         m = F.mark()
-        box((cx - 1.0, cy, jz), (1.05, 0.12, 0.13), 'yellow', bevel=0.03)
+        box((cx - 1.0, cy, jz), (1.05, 0.12, 0.13), 'plate', bevel=0.03)
         box((cx - 1.0, cy, jz + 0.135), (0.5, 0.1, 0.008), 'hazard')
         F.rot_all(m, 'Y', 24, about=(cx, 0, jz))
         K.ram((cx - 0.12, cy, z0 + 0.7), (cx - 1.0, cy, jz + 0.26), 0.07)
         ex, ez = cx - 2.0 * math.cos(math.radians(24)), jz + 2.0 * math.sin(math.radians(24))
         cyl((ex, cy - 0.18, ez), (ex, cy + 0.18, ez), 0.15, 10, 'steel')
         m = F.mark()
-        box((ex - 0.75, cy, ez), (0.8, 0.09, 0.1), 'yellow', bevel=0.025)
+        box((ex - 0.75, cy, ez), (0.8, 0.09, 0.1), 'plate', bevel=0.025)
         K.ram((ex + 0.5, cy, ez + 0.2), (ex - 0.6, cy, ez + 0.14), 0.05)
         F.rot_all(m, 'Y', -30, about=(ex, 0, ez))
         hx, hz = ex - 1.5 * math.cos(math.radians(30)), ez - 1.5 * math.sin(math.radians(30))
@@ -602,7 +487,7 @@ def hauler():
 @asset('human/mender.glb', 'Terran Mender (repair vehicle)')
 def mender():
     L, hw, top = 6.4, 1.22, 1.42
-    K.chassis(L, hw, top, stowage=False)
+    V.scifi_chassis(L, hw, top, claws=(-1.7, 0.7))
     cab(1.7, 0.0, top + 0.02, 0.7, 0.8, 0.6)
     # Workshop body: chamfered roof, roll-up locker shutters, grab rails, spares rack, gas cylinders.
     hull([(-2.95, [(0, top + 0.02), (1.15, top + 0.02), (1.15, top + 0.62), (0.95, top + 0.8), (0, top + 0.8)]),
@@ -610,35 +495,28 @@ def mender():
     for s in (1, -1):
         for k in range(3):
             box((-2.5 + k * 0.9, s * 1.16, top + 0.34), (0.38, 0.012, 0.25), 'vent', bevel=0.01)
-            box((-2.5 + k * 0.9, s * 1.165, top + 0.34), (0.4, 0.01, 0.27), 'olive')
+            box((-2.5 + k * 0.9, s * 1.165, top + 0.34), (0.4, 0.01, 0.27), 'armor')
             box((-2.5 + k * 0.9, s * 1.18, top + 0.12), (0.1, 0.012, 0.02), 'steel')
         box((-1.6, s * 1.1, top + 0.74), (1.2, 0.012, 0.012), 'steel')
         for k in range(3):
             c = (-2.62 + k * 0.4, s * 0.72)
             cyl((c[0], c[1], top + 0.82), (c[0], c[1], top + 1.25), 0.15, 10, 'plate')
-            cyl((c[0], c[1], top + 1.05), (c[0], c[1], top + 1.1), 0.155, 10, 'glow')
+            cyl((c[0], c[1], top + 1.05), (c[0], c[1], top + 1.1), 0.155, 10, 'neon')
             tube((c[0], c[1], top + 1.25), (c[0], c[1], top + 1.36), [(0, 0.15), (0.5, 0.08), (1, 0.05)], 8, 'steel')
         box((-2.22, s * 0.72, top + 0.95), (0.66, 0.19, 0.02), 'dark')
-        K.outrigger(-1.7, s * 2.12, 1.46, s, L=1.3, dirn=-1)
-        K.outrigger(0.7, s * 2.12, 1.46, s, L=1.2, dirn=1)
     K.plus(-0.72, 0, top + 0.815, 0.3)
     # Rear rack with spare armour plates.
     for k in range(3):
-        p = box((-3.06 - k * 0.07, 0, top + 0.45), (0.025, 0.7 - k * 0.1, 0.32), 'plate' if k != 1 else 'olive', bevel=0.012)
+        p = box((-3.06 - k * 0.07, 0, top + 0.45), (0.025, 0.7 - k * 0.1, 0.32), 'plate' if k != 1 else 'armor', bevel=0.012)
         F.rot(p, 'Y', -8, about=(-3.0, 0, top + 0.15))
     box((-3.15, 0, top + 0.12), (0.2, 0.8, 0.03), 'steel')
     # Folded auxiliary jib and a cable drum on the roof.
-    box((-1.0, 0.82, top + 0.9), (0.9, 0.07, 0.08), 'yellow', bevel=0.02)
+    box((-1.0, 0.82, top + 0.9), (0.9, 0.07, 0.08), 'plate', bevel=0.02)
     cyl((-1.9, 0.82, top + 0.82), (-1.9, 0.82, top + 1.0), 0.12, 8, 'steel')
     cyl((-0.15, 0.82, top + 0.9), (-0.15, 0.82, top + 0.7), 0.02, 6, 'steel')
-    cyl((-0.75, -1.0, top + 0.98), (-0.75, -0.55, top + 0.98), 0.17, 10, 'rubber')
+    cyl((-0.75, -1.0, top + 0.98), (-0.75, -0.55, top + 0.98), 0.17, 10, 'black')
     for yy in (-1.0, -0.55):
         cyl((-0.75, yy - 0.02, top + 0.98), (-0.75, yy + 0.02, top + 0.98), 0.22, 10, 'steel')
-    # Recovery blade under the nose.
-    prism([(3.42, 0.42), (3.7, 0.36), (3.78, 0.72), (3.66, 1.0), (3.58, 1.0), (3.62, 0.74), (3.5, 0.5)], -1.95, 1.95, 'plate', bevel=0.02)
-    box((3.64, 0, 1.02), (0.05, 1.95, 0.02), 'hazard')
-    for s in (1, -1):
-        K.ram((3.0, s * 0.9, 0.95), (3.52, s * 0.9, 0.62), 0.06)
     tz = top + 0.82
     az = tz + 0.62
     with F.group('Arm'):
@@ -651,20 +529,20 @@ def mender():
         box((-2.51, 0, tz + 0.5), (0.012, 0.3, 0.12), 'hazard')
         m = F.mark()
         for s in (1, -1):   # twin-rail upper boom with cross braces
-            box((-0.1, s * 0.2, az), (1.65, 0.05, 0.13), 'yellow', bevel=0.02)
+            box((-0.1, s * 0.2, az), (1.65, 0.05, 0.13), 'plate', bevel=0.02)
         for k in range(7):
             box((-1.3 + k * 0.42, 0, az), (0.03, 0.2, 0.09), 'steel')
         box((-0.1, 0, az + 0.14), (1.2, 0.03, 0.008), 'hazard')
         K.ram((-1.45, 0, az - 0.3), (0.3, 0, az - 0.16), 0.085)
-        sweep([(-1.6, -0.3, az + 0.1), (-0.5, -0.3, az + 0.2), (1.2, -0.28, az + 0.05)], [(0.04, 0.04)] * 3, 'rubber', sides=6)   # hoses
-        sweep([(-1.6, -0.36, az + 0.02), (-0.5, -0.38, az + 0.12), (1.2, -0.34, az - 0.03)], [(0.03, 0.03)] * 3, 'glow', sides=5)
+        sweep([(-1.6, -0.3, az + 0.1), (-0.5, -0.3, az + 0.2), (1.2, -0.28, az + 0.05)], [(0.04, 0.04)] * 3, 'black', sides=6)   # hoses
+        sweep([(-1.6, -0.36, az + 0.02), (-0.5, -0.38, az + 0.12), (1.2, -0.34, az - 0.03)], [(0.03, 0.03)] * 3, 'neon', sides=5)
         F.rot_all(m, 'Y', -32, about=(-1.7, 0, az))
         ex, ez = -1.7 + 3.2 * math.cos(math.radians(32)), az + 3.2 * math.sin(math.radians(32))
         cyl((ex, -0.3, ez), (ex, 0.3, ez), 0.27, 12, 'dark')
         for s in (1, -1):
             cyl((ex, s * 0.3, ez), (ex, s * 0.34, ez), 0.2, 10, 'steel')
         m = F.mark()
-        box((ex + 1.0, 0, ez), (1.0, 0.14, 0.15), 'yellow', bevel=0.03)
+        box((ex + 1.0, 0, ez), (1.0, 0.14, 0.15), 'plate', bevel=0.03)
         K.ram((ex - 0.2, 0, ez + 0.32), (ex + 1.2, 0, ez + 0.2), 0.06)
         # Tool head: three hydraulic fingers round a welding emitter.
         tx = ex + 2.1
@@ -672,42 +550,36 @@ def mender():
         cyl((tx + 0.2, 0, ez), (tx + 0.3, 0, ez), 0.3, 10, 'steel')
         tube((tx + 0.3, 0, ez), (tx + 0.62, 0, ez), [(0, 0.13), (0.6, 0.1), (1, 0.07)], 8, 'dark')
         cyl((tx + 0.62, 0, ez), (tx + 0.64, 0, ez), 0.075, 8, 'amber')
-        cyl((tx + 0.63, 0, ez), (tx + 0.66, 0, ez), 0.045, 8, 'glow')
+        cyl((tx + 0.63, 0, ez), (tx + 0.66, 0, ez), 0.045, 8, 'neon')
         for k in range(3):
             fg = prism([(tx + 0.25, ez + 0.2), (tx + 0.65, ez + 0.46), (tx + 1.0, ez + 0.3), (tx + 1.08, ez + 0.1), (tx + 0.98, ez + 0.12),
                         (tx + 0.9, ez + 0.24), (tx + 0.66, ez + 0.32), (tx + 0.3, ez + 0.1)], -0.06, 0.06, 'steel', bevel=0.012)
             F.rot(fg, 'X', 120 * k + 90, about=(0, 0, ez))
         with F.group('Spark'):   # welding arc, flickers while repairing
             for k in range(3):
-                b = box((tx + 0.8, 0, ez), (0.16, 0.012, 0.012), 'glow')
+                b = box((tx + 0.8, 0, ez), (0.16, 0.012, 0.012), 'neon')
                 F.rot(b, 'Y', 60 * k - 60, about=(tx + 0.72, 0, ez))
-            orb((tx + 0.72, 0, ez), 0.06, 'glow', seg=(6, 4))
+            orb((tx + 0.72, 0, ez), 0.06, 'neon', seg=(6, 4))
         F.rot_all(m, 'Y', 38, about=(ex, 0, ez))
-        K.beacon(-1.7, 0, tz + 0.88, 'amber')
     return dict(pivot=[('Arm', (-1.7, 0, tz)), ('Spark', (-1.7, 0, tz), 'SparkPivot', 'Arm')])
 
 
 @asset('human/watchman.glb', 'Terran Watchman (mobile radar)')
 def watchman():
     L, hw, top = 6.4, 1.22, 1.42
-    K.chassis(L, hw, top, stowage=False)
+    V.scifi_chassis(L, hw, top, claws=(-1.7, 0.7))
     cab(1.8, 0.0, top + 0.02, 0.65, 0.8, 0.5)
     box((-1.4, 0, top + 0.3), (1.5, 1.1, 0.3), 'armor', bevel=0.05)
     # Generator housing at the rear with vents, conduits to the turntable, lattice beacon mast.
     box((-2.5, 0, top + 0.72), (0.38, 0.8, 0.14), 'plate', bevel=0.04)
     for s in (1, -1):
         K.vent((-2.5, s * 0.45, top + 0.88), (0.3, 0.26, 0.035))
-        box((-1.4, s * 1.11, top + 0.32), (0.8, 0.012, 0.02), 'glow')
-        K.antenna(-2.85, s * 1.0, top + 0.6, 1.9)
-        sweep([(-2.3, s * 0.7, top + 0.66), (-1.9, s * 0.95, top + 0.66), (-1.3, s * 0.9, top + 0.66)], [(0.05, 0.05)] * 3, 'rubber', sides=6)
-        K.outrigger(-1.7, s * 2.12, 1.46, s, L=1.3, dirn=-1)
-        K.outrigger(0.7, s * 2.12, 1.46, s, L=1.2, dirn=1)
-        K.id_marks(-0.6, s * 1.105, top + 0.4, s, 3, 0.12)
-    box((0.1, 0.72, top + 0.72), (0.3, 0.25, 0.12), 'olive', bevel=0.03)
+        box((-1.4, s * 1.11, top + 0.32), (0.8, 0.012, 0.02), 'neon')
+        sweep([(-2.3, s * 0.7, top + 0.66), (-1.9, s * 0.95, top + 0.66), (-1.3, s * 0.9, top + 0.66)], [(0.05, 0.05)] * 3, 'black', sides=6)
+    box((0.1, 0.72, top + 0.72), (0.3, 0.25, 0.12), 'armor', bevel=0.03)
     for dx, dy in ((0, 0), (0.3, 0), (0, 0.3), (0.3, 0.3)):
         cyl((0.0 + dx, -0.95 + dy, top + 0.6), (0.06 + dx * 0.6, -0.89 + dy * 0.6, top + 1.7), 0.02, 4, 'steel')
     box((0.15, -0.8, top + 1.15), (0.14, 0.14, 0.012), 'steel')
-    K.beacon(0.15, -0.8, top + 1.7)
     with F.group('Radar'):   # small spinning bar antenna on the generator
         K.radar_bar(-2.5, 0, top + 0.92, w=0.6, post=0.3)
     tz = top + 0.62
@@ -725,7 +597,7 @@ def watchman():
         prof = [(0.12, 0.0), (0.9, 0.1), (1.6, 0.36), (2.15, 0.8), (2.2, 0.8), (1.62, 0.3), (0.9, 0.02), (0.12, -0.1)]
         F.lathe(prof, 32, 'armor', center=c, sharp=40)
         F.lathe([(2.13, 0.76), (2.3, 0.8), (2.26, 0.92), (2.12, 0.86)], 32, 'dark', center=c)       # rolled lip
-        F.lathe([(2.0, 0.69), (2.08, 0.75), (2.06, 0.77), (1.99, 0.72)], 32, 'glow', center=c)
+        F.lathe([(2.0, 0.69), (2.08, 0.75), (2.06, 0.77), (1.99, 0.72)], 32, 'neon', center=c)
         F.lathe([(1.1, 0.02), (1.24, 0.06), (1.22, -0.08), (1.1, -0.1)], 24, 'steel', center=c)     # back stiffener ring
         for k in range(8):   # truss ribs on the back
             r = F.loft([[(0.3, -0.035, -0.12), (0.3, 0.035, -0.12), (2.05, 0.035, 0.66), (2.05, -0.035, 0.66)],
@@ -740,7 +612,7 @@ def watchman():
             F.move(st, c)
         box((c[0], c[1], c[2] + 1.48), (0.15, 0.15, 0.16), 'plate', bevel=0.03)
         cyl((c[0], c[1], c[2] + 1.28), (c[0], c[1], c[2] + 1.33), 0.24, 12, 'dark')
-        cyl((c[0], c[1], c[2] + 1.26), (c[0], c[1], c[2] + 1.28), 0.1, 10, 'glow')
+        cyl((c[0], c[1], c[2] + 1.26), (c[0], c[1], c[2] + 1.28), 0.1, 10, 'neon')
         F.rot_all(m, 'Y', 62, about=c)
     return dict(pivot=[('Dish', (-1.2, 0, tz)), ('Radar', (-2.5, 0, top + 1.2), 'RadarPivot')])
 
@@ -807,3 +679,13 @@ def condor():
     import aircraft2
     aircraft2.hammer()
     return dict(name='TerranHammerhead', single=True)
+
+
+# ---- Style switch ----
+# David (2026-11-16) preferred the earlier armoured tank designs to the sci-fi set above, with the newer
+# animation (telescoping barrels, per-unit rhythms). TERRAN_STYLE=scifi builds the sci-fi set instead.
+import os as _os
+if _os.environ.get('TERRAN_STYLE', 'classic') == 'classic':
+    import terran_p6 as _p6
+    for _k in ('lancer', 'longbow', 'outrider', 'skimmer', 'bulwark', 'javelin', 'prospector', 'hauler', 'mender', 'watchman'):
+        ASSETS[_k] = _p6.ASSETS[_k]

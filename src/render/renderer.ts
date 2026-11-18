@@ -6,7 +6,7 @@ import { Effects } from './effects';
 import { WreckField } from './wrecks';
 import { applyUnfold, readUnfold, type UnfoldData, type UnfoldStart } from './unfold';
 import { AssetLoader } from '../assets/loader';
-import { DEPOSIT_MODEL_IDS, Landscape, PROP_IDS } from './landscape';
+import { DEPOSIT_MODEL_IDS, LANDSCAPE_LOD_IDS, Landscape, PROP_IDS } from './landscape';
 import type { AssetRegistry } from '../assets/registry';
 import { createThreeDecoders } from '../assets/threeDecoders';
 import { heightAt, slopeAt } from '../sim/map';
@@ -19,7 +19,18 @@ import { SIM_TICK_HZ } from '../sim/constants';
 import type { DropOrder, SimStructureType, StructureState, UnitState, WorldState } from '../sim/types';
 import { RtsCamera, type CameraInfo } from './camera';
 import { buildEdgeBandGeometry, buildOuterLandGeometry, groundHeightAt } from './outerLand';
-import { collectPartMotions, pivotIsSpinner, stripFlashParts, updatePartMotions, type PartMotion, type PartMotionState } from './partMotion';
+import { addOuterLandDetail, groundDetailGlsl, groundNoiseTexture } from './groundDetail';
+import {
+  collectPartMotions,
+  createUnitFiring,
+  fireKickEnvelope,
+  fireUnit,
+  pivotIsSpinner,
+  updatePartMotions,
+  type PartMotion,
+  type PartMotionState,
+  type UnitFiring,
+} from './partMotion';
 import {
   QUALITY_LADDER,
   QualityController,
@@ -57,12 +68,32 @@ const SKIRT_DEPTH = 10;
 const SKY_ZENITH = '#16233a';
 const SKY_MID = '#4d6b8c';
 const SKY_HORIZON = '#b9a98d';
+/**
+ * The light and sky a view is drawn under. Matches use the default daylight; scenery views (the
+ * title backdrop) can ask for their own, which costs nothing extra to draw.
+ */
+export interface SceneMood {
+  skyZenith: string;
+  skyMid: string;
+  skyHorizon: string;
+  /** How far above the horizon its colour gives way to the middle sky (0 = at once, 1 = overhead). */
+  skyHorizonBand: number;
+  /** What distant hills fade into. */
+  haze: string;
+  sunColor: number;
+  sunIntensity: number;
+  /** Where the sun sits relative to what the camera looks at, in metres (x, up, z). */
+  sunOffset: readonly [number, number, number];
+  skyLight: number;
+  groundLight: number;
+  ambientIntensity: number;
+  reflectionIntensity: number;
+}
 /** Sky dome radius: inside the camera's far plane, beyond the outermost hills. */
 const SKY_DOME_RADIUS = 1500;
 const SKIRT_COLOR = 0x3c4234;
 const FAR_COLOR = 0x2f3529;
 const SHADOW_MAP_SIZE = 1024;
-const MAX_FRAME_SAMPLE_MS = 2000;
 
 const ENEMY_TINT = new THREE.Color(1, 0.35, 0.35);
 const COLORBLIND_ENEMY_TINT = new THREE.Color(0.35, 0.65, 1);
@@ -239,10 +270,16 @@ interface UnitVisual {
   pivotRest: THREE.Vector3 | null;
   /** Moving parts from the model's anim extras (drums, dishes, wings). */
   parts: PartMotion[];
+  /** When it last fired and its whole-body kick (model scene extras.fire). */
+  firing: UnitFiring;
   /** Hover units and aircraft bob gently. */
   floats: boolean;
   /** Aircraft lean into turns (radians of roll, smoothed). */
   bank: number;
+  /** The model's muzzle anchors (one per barrel), where its shots visibly leave the gun. */
+  muzzles: THREE.Object3D[];
+  /** Twin guns take turns: the barrel the next shot leaves from. */
+  nextMuzzle: number;
 }
 
 interface PositionSnapshot {
@@ -263,6 +300,20 @@ interface HealthBar {
 }
 
 const ENVIRONMENT_INTENSITY = 0.45;
+export const DAYLIGHT_MOOD: SceneMood = {
+  skyZenith: SKY_ZENITH,
+  skyMid: SKY_MID,
+  skyHorizon: SKY_HORIZON,
+  skyHorizonBand: 0.32,
+  haze: SKY_HORIZON,
+  sunColor: 0xfff3d6,
+  sunIntensity: 2.8,
+  sunOffset: [42, 60, 26],
+  skyLight: 0xd2e6ff,
+  groundLight: 0x3b3524,
+  ambientIntensity: 0.55,
+  reflectionIntensity: ENVIRONMENT_INTENSITY,
+};
 
 interface StructureVisual {
   mesh: THREE.Mesh;
@@ -351,7 +402,7 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function unitBounds(root: THREE.Object3D): THREE.Box3 {
+function unitBounds(root: THREE.Object3D, hullOnly = false): THREE.Box3 {
   root.updateMatrixWorld(true);
   const bounds = new THREE.Box3();
   const meshBounds = new THREE.Box3();
@@ -360,12 +411,63 @@ function unitBounds(root: THREE.Object3D): THREE.Box3 {
     if (!(object instanceof THREE.Mesh) || (!object.visible && !isInstancedPart(object))) {
       return;
     }
+    if (hullOnly && isGunPart(object, root)) {
+      return;
+    }
     meshBounds.setFromObject(object);
     if (!meshBounds.isEmpty()) {
       bounds.union(meshBounds);
     }
   });
-  return bounds;
+  return hullOnly && bounds.isEmpty() ? unitBounds(root) : bounds;
+}
+
+// Gun barrels, muzzle flashes and missiles (nodes Barrel*, Flash*, Msl* and everything under them).
+// They are left out when a unit is sized, so a long gun does not shrink the hull that carries it.
+const GUN_PART = /^(Barrel|Flash|Msl)/;
+
+// The art pipeline's solid muzzle-flash meshes (under Flash* nodes) are made for a viewer that
+// shows them only for a frame after each shot; the game draws its own muzzle effects, so the meshes
+// are dropped from unit models (and their low-detail files, so both keep the same mesh order).
+// Each one leaves an empty Muzzle* node at its centre (FlashL leaves MuzzleL), where the barrel tip is.
+function dropFlashMeshes(root: THREE.Object3D): void {
+  const drop: Array<{ mesh: THREE.Object3D; geometry: THREE.BufferGeometry; flash: string }> = [];
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) {
+      return;
+    }
+    for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+      if (node.name.startsWith('Flash')) {
+        drop.push({ mesh: object, geometry: object.geometry as THREE.BufferGeometry, flash: node.name });
+        return;
+      }
+    }
+  });
+  for (const { mesh, geometry, flash } of drop) {
+    const parent = mesh.parent;
+    if (parent && !parent.getObjectByName(flash.replace(/^Flash/, 'Muzzle'))) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (box && !box.isEmpty()) {
+        mesh.updateMatrix();
+        const anchor = new THREE.Object3D();
+        anchor.name = flash.replace(/^Flash/, 'Muzzle');
+        anchor.position.copy(box.getCenter(new THREE.Vector3()).applyMatrix4(mesh.matrix));
+        parent.add(anchor);
+      }
+    }
+    mesh.removeFromParent();
+    geometry.dispose();
+  }
+}
+
+function isGunPart(object: THREE.Object3D, root: THREE.Object3D): boolean {
+  for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+    if (GUN_PART.test(node.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function tintMaterial(
@@ -506,7 +608,7 @@ export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   return renderer;
 }
 
@@ -540,7 +642,10 @@ export class RenderView {
       object: THREE.Object3D;
       kind: string | undefined;
       splash: number;
-      offset: number;
+      /** Where the shot is drawn relative to the sim's shot at launch, closing to 0 at the target. */
+      offsetX: number;
+      offsetY: number;
+      offsetZ: number;
       startX: number;
       startZ: number;
       shooterId: number | undefined;
@@ -622,9 +727,11 @@ export class RenderView {
   private healthBarsMode: 'damaged' | 'always' = 'damaged';
   private healthBarsHidden = false;
   private colorBlind = false;
+  private readonly mood: SceneMood;
 
-  constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState) {
+  constructor(canvas: HTMLCanvasElement, registry: AssetRegistry, world: WorldState, mood: SceneMood = DAYLIGHT_MOOD) {
     this.world = world;
+    this.mood = mood;
     this.registry = registry;
     this.renderer = createRenderer(canvas);
     this.basePixelRatio = Math.min(globalThis.devicePixelRatio || 1, 2);
@@ -640,7 +747,7 @@ export class RenderView {
       this.rtsCamera.setTarget(0, 0);
     }
 
-    this.directional = new THREE.DirectionalLight(0xfff3d6, 2.8);
+    this.directional = new THREE.DirectionalLight(mood.sunColor, mood.sunIntensity);
     this.lightTarget = new THREE.Object3D();
     this.buildScene();
 
@@ -739,7 +846,7 @@ export class RenderView {
     this.rtsCamera.pitchOverride = pitch;
   }
 
-  /** Hides health bars entirely (scenery views such as the title backdrop). */
+  /** Hides health bars and worker tags entirely (scenery views such as the title backdrop). */
   setHealthBarsHidden(hidden: boolean): void {
     this.healthBarsHidden = hidden;
   }
@@ -1078,7 +1185,7 @@ export class RenderView {
     this.updateLight();
     this.syncUnits(alpha);
     this.syncStructures(world);
-    this.landscape?.sync(world);
+    this.landscape?.sync(world, this.rtsCamera.targetX, this.rtsCamera.targetZ, this.rtsCamera.distance);
     this.syncDropBeams(world);
     this.syncPadTraffic(world, alpha);
     this.syncWorkerCargo(world, alpha);
@@ -1308,7 +1415,8 @@ export class RenderView {
       return;
     }
     const frameMs = now - previous;
-    if (frameMs <= 0 || frameMs > MAX_FRAME_SAMPLE_MS) {
+    // Long gaps are judged by the controller: a lone one is ignored, a run of them counts.
+    if (frameMs <= 0) {
       return;
     }
     if (this.qualityController.sample(frameMs)) {
@@ -1340,6 +1448,7 @@ export class RenderView {
     }
 
     this.landscape?.setShadows(view.shadows);
+    this.landscape?.setFullDetail(level < LOD_QUALITY_LEVEL);
     if (shadowsChanged) {
       this.renderer.shadowMap.needsUpdate = true;
       this.scene.traverse((object) => {
@@ -1378,16 +1487,16 @@ export class RenderView {
   private buildScene(): void {
     this.sky = this.buildSky();
     this.scene.add(this.sky);
-    this.scene.background = new THREE.Color(SKY_HORIZON);
+    this.scene.background = new THREE.Color(this.mood.skyHorizon);
 
-    const hemisphere = new THREE.HemisphereLight(0xd2e6ff, 0x3b3524, 0.55);
+    const hemisphere = new THREE.HemisphereLight(this.mood.skyLight, this.mood.groundLight, this.mood.ambientIntensity);
     this.scene.add(hemisphere);
 
     // Soft reflected light for metal surfaces. Without an environment, metallic materials only
     // reflect black and the Kesh bronze and Terran gunmetal read dull. Built once, tiny, and cheap.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = ENVIRONMENT_INTENSITY;
+    this.scene.environmentIntensity = this.mood.reflectionIntensity;
     pmrem.dispose();
 
     this.directional.castShadow = true;
@@ -1407,6 +1516,7 @@ export class RenderView {
     this.terrain = this.buildTerrain();
     this.scene.add(this.terrain);
     this.landscape = new Landscape(this.scene, this.world.map, this.fogUniforms);
+    this.landscape.setFullDetail(this.effectiveQualityLevel() < LOD_QUALITY_LEVEL);
     const waterLevel = this.world.map.waterLevel;
     if (waterLevel !== null) {
       const water = new THREE.Mesh(
@@ -1448,9 +1558,10 @@ export class RenderView {
     const geometry = new THREE.SphereGeometry(SKY_DOME_RADIUS, 24, 12);
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        uZenith: { value: new THREE.Color(SKY_ZENITH) },
-        uMid: { value: new THREE.Color(SKY_MID) },
-        uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+        uZenith: { value: new THREE.Color(this.mood.skyZenith) },
+        uMid: { value: new THREE.Color(this.mood.skyMid) },
+        uHorizon: { value: new THREE.Color(this.mood.skyHorizon) },
+        uBand: { value: this.mood.skyHorizonBand },
       },
       vertexShader: `
         varying vec3 vDir;
@@ -1463,11 +1574,12 @@ export class RenderView {
         uniform vec3 uZenith;
         uniform vec3 uMid;
         uniform vec3 uHorizon;
+        uniform float uBand;
         varying vec3 vDir;
         void main() {
           float h = normalize(vDir).y;
-          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, 0.32, h));
-          color = mix(color, uZenith, smoothstep(0.32, 0.95, h));
+          vec3 color = mix(uHorizon, uMid, smoothstep(0.0, uBand, h));
+          color = mix(color, uZenith, smoothstep(uBand, 0.95, h));
           gl_FragColor = vec4(color, 1.0);
           #include <colorspace_fragment>
         }
@@ -1554,12 +1666,14 @@ export class RenderView {
       grass: new THREE.Color(0x5f7a3c),
       dry: new THREE.Color(0x8d8455),
       rock: new THREE.Color(0x7d7a70),
-      haze: new THREE.Color(SKY_HORIZON),
+      haze: new THREE.Color(this.mood.haze),
     });
     // A plain lit material: this ground fills much of the screen on low or zoomed-out views, and the
     // battlefield's detailed ground shader there cost a third of the frame on slow devices. Nothing
     // casts a shadow out here, so it receives none.
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    addOuterLandDetail(material, this.terrainDetail, DETAIL_TILE);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = false;
     mesh.name = 'OuterLand';
     return mesh;
@@ -1663,20 +1777,22 @@ export class RenderView {
     });
     const uniforms = this.fogUniforms;
     const detail = this.terrainDetail;
+    const groundNoise = groundNoiseTexture(map.seed);
     uniforms.uFogSize.value = map.size;
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uFog = uniforms.uFog;
       shader.uniforms.uFogOn = uniforms.uFogOn;
       shader.uniforms.uFogSize = uniforms.uFogSize;
       shader.uniforms.uDetail = detail;
+      shader.uniforms.uGroundNoise = { value: groundNoise };
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;\nattribute vec3 surface;\nvarying vec3 vSurface;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;\nvSurface = surface;');
+        .replace('#include <common>', '#include <common>\nvarying vec2 vFogXZ;\nattribute vec3 surface;\nvarying vec3 vSurface;\nvarying vec2 vWall;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFogXZ = position.xz;\nvSurface = surface;\nvWall = vec2(position.y, normal.y);');
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;\nvarying vec3 vSurface;' +
-            (detail.value ? '\nuniform sampler2D uDetail;' : ''),
+          '#include <common>\nvarying vec2 vFogXZ;\nuniform sampler2D uFog;\nuniform float uFogOn;\nuniform float uFogSize;\nvarying vec3 vSurface;\nvarying vec2 vWall;' +
+            (detail.value ? '\nuniform sampler2D uDetail;\nuniform sampler2D uGroundNoise;' : ''),
         )
         .replace(
           '#include <color_fragment>',
@@ -1684,12 +1800,7 @@ export class RenderView {
             // Ground detail: fine grass, pebbles or cracks by ground kind, plus broad patches so a
             // field is not one flat colour. Off until the texture has loaded.
             (detail.value
-              ? `vec3 dFine = texture2D(uDetail, vFogXZ / ${DETAIL_TILE.toFixed(1)}).rgb - 0.5;
-vec3 dBroad = texture2D(uDetail, vFogXZ / ${(DETAIL_TILE * 6.3).toFixed(1)} + 0.37).rgb - 0.5;
-vec3 w = vSurface / max(0.001, vSurface.x + vSurface.y + vSurface.z);
-diffuseColor.rgb *= 1.0 + dot(dFine, w) * 1.3 + dBroad.r * 0.55;
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.82), clamp(dBroad.g * 2.0, 0.0, 1.0) * w.x);
-`
+              ? groundDetailGlsl(DETAIL_TILE)
               : '') +
             'if (uFogOn > 0.5) { float fogLevel = texture2D(uFog, vFogXZ / uFogSize + 0.5).r; diffuseColor.rgb *= fogLevel; }',
         );
@@ -1719,7 +1830,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const targetZ = this.rtsCamera.targetZ;
     const targetY = heightAt(this.world.map, targetX, targetZ);
     this.lightTarget.position.set(targetX, targetY, targetZ);
-    this.directional.position.set(targetX + 42, targetY + 60, targetZ + 26);
+    const [sunX, sunY, sunZ] = this.mood.sunOffset;
+    this.directional.position.set(targetX + sunX, targetY + sunY, targetZ + sunZ);
     this.directional.shadow.camera.left = -30;
     this.directional.shadow.camera.right = 30;
     this.directional.shadow.camera.top = 30;
@@ -1800,7 +1912,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   // Ground detail texture, ore and metal site models and the scattered props. Any that fail to load
   // leave the plain terrain, the placeholder deposit discs, or no props.
   private async loadLandscape(): Promise<void> {
-    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS].filter((id) =>
+    const ids = [TERRAIN_DETAIL_ID, DEPOSIT_MODEL_IDS.ore, DEPOSIT_MODEL_IDS.metal, ...PROP_IDS, ...LANDSCAPE_LOD_IDS].filter((id) =>
       this.registry.has(id),
     );
     const results = await Promise.allSettled(ids.map((id) => this.loader.load(id)));
@@ -1824,15 +1936,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         if (terrainMaterial instanceof THREE.Material) {
           terrainMaterial.needsUpdate = true;
         }
+        const outerMaterial = this.outerLand?.material;
+        if (outerMaterial instanceof THREE.Material) {
+          outerMaterial.needsUpdate = true;
+        }
         this.loadedModels.push(id);
       } else if (asset instanceof THREE.Object3D && this.landscape) {
-        if (id === DEPOSIT_MODEL_IDS.ore) {
-          this.landscape.addDepositModel('ore', asset);
-        } else if (id === DEPOSIT_MODEL_IDS.metal) {
-          this.landscape.addDepositModel('metal', asset);
-        } else {
-          this.landscape.addPropModel(id, asset);
-        }
+        this.landscape.addModel(id, asset);
         this.loadedModels.push(id);
       }
     });
@@ -1866,8 +1976,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       const result = lodResults[index];
       if (result?.status === 'fulfilled' && result.value instanceof THREE.Object3D) {
         // Geometry only: the low-detail file's placeholder material is replaced by the full model's.
-        stripFlashParts(result.value);
         const geometries: THREE.BufferGeometry[] = [];
+        dropFlashMeshes(result.value);
         result.value.traverse((object) => {
           if (object instanceof THREE.Mesh) {
             geometries.push(object.geometry as THREE.BufferGeometry);
@@ -1995,12 +2105,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   }
 
   private prepareTemplate(model: THREE.Object3D): THREE.Group {
-    stripFlashParts(model);
     const plane = model.getObjectByName('Plane');
     if (plane) {
       plane.visible = false;
       plane.removeFromParent();
     }
+    dropFlashMeshes(model);
 
     model.updateMatrixWorld(true);
     // New models (tools/art) ship their own TurretPivot; the proof-of-concept tank needs one built.
@@ -2019,7 +2129,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     }
     model.updateMatrixWorld(true);
 
-    const bounds = unitBounds(model);
+    // Sized and centred on the hull: barrels and missiles stick out beyond one tank length.
+    const bounds = unitBounds(model, true);
     if (!bounds.isEmpty()) {
       const size = new THREE.Vector3();
       bounds.getSize(size);
@@ -2027,12 +2138,12 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       model.scale.multiplyScalar(TANK_LENGTH / footprint);
       model.updateMatrixWorld(true);
 
-      const scaledBounds = unitBounds(model);
+      const scaledBounds = unitBounds(model, true);
       const centre = new THREE.Vector3();
       scaledBounds.getCenter(centre);
       model.position.x -= centre.x;
       model.position.z -= centre.z;
-      model.position.y -= scaledBounds.min.y;
+      model.position.y -= unitBounds(model).min.y;
     }
 
     const root = new THREE.Group();
@@ -2065,7 +2176,6 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   // Structure models are normalised to a 1 x 1 footprint, centred, standing on y = 0.
   // Fold-out towers normalise on their deployed pose without the Carrier (the folded hull).
   private prepareStructureTemplate(model: THREE.Object3D): THREE.Group {
-    stripFlashParts(model);
     model.updateMatrixWorld(true);
     const unfold = readUnfold(model);
     const bounds = unfold ? unfold.bounds : new THREE.Box3().setFromObject(model);
@@ -2178,8 +2288,11 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
       recoil: 0,
       pivotRest: aimed?.position.clone() ?? null,
       parts,
+      firing: createUnitFiring(root, parts),
       floats: this.world.unitTypes.get(unit.typeId)?.movement === 'hover',
       bank: 0,
+      muzzles: collectMuzzles(root),
+      nextMuzzle: 0,
     };
   }
 
@@ -2264,7 +2377,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         visual.turretPivot.rotation.y = rel;
         if (visual.pivotRest) {
           // Recoil: the turret jumps back along its barrel and the hull rocks nose-up.
-          const kick = visual.recoil * 0.28;
+          // Models whose barrels recoil on their own keep the turret still.
+          const kick = visual.firing.barrels ? 0 : visual.recoil * 0.28;
           visual.turretPivot.position.set(
             visual.pivotRest.x - Math.cos(rel) * kick,
             visual.pivotRest.y,
@@ -2272,12 +2386,28 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           );
         }
       }
-      if (visual.recoil > 0.001) {
+      const fireKick = visual.firing.kick;
+      if (fireKick) {
+        // The model's own kick: nose-up (or over to the side) away from the gun, shoved back.
+        const env = fireKickEnvelope(fireKick, performance.now() / 1000 - visual.firing.shotAt);
+        if (env !== 0) {
+          const rel = heading - turretHeading;
+          visual.root.rotation.z += fireKick.kick * env * Math.cos(rel);
+          visual.root.rotation.x += fireKick.kick * env * Math.sin(rel);
+          const shove = fireKick.slide * env * visual.root.scale.x;
+          visual.root.position.x -= Math.cos(turretHeading) * shove;
+          visual.root.position.z -= Math.sin(turretHeading) * shove;
+        }
+      } else if (visual.recoil > 0.001) {
         visual.root.rotation.z += visual.recoil * 0.07 * Math.cos(heading - turretHeading);
-        visual.recoil *= 0.82;
       }
+      visual.recoil *= 0.82;
       if (visual.parts.length > 0) {
-        updatePartMotions(visual.parts, this.unitMotionState(unit, current, previous), this.motionDt);
+        const motion = this.unitMotionState(unit, current, previous);
+        motion.time = performance.now() / 1000;
+        // Low quality keeps barrels and missiles but skips the small extras.
+        motion.lite = this.effectiveQualityLevel() >= QUALITY_LADDER.length - 1;
+        updatePartMotions(visual.parts, motion, this.motionDt);
       }
       if (visual.alien && visual.root.visible && arcBudget > 0 && Math.random() < 0.025) {
         arcBudget -= 1;
@@ -2977,6 +3107,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         });
         ring = new THREE.Mesh(geometry, material);
         ring.rotation.x = -Math.PI / 2;
+        // Rings follow the drawn hull size, so a heavy's ring still clears its hull.
+        const scale = this.world.unitTypes.get(unit.typeId)?.visualScale ?? 1;
+        ring.scale.setScalar(Math.min(1.4, Math.max(0.85, scale)));
         this.scene.add(ring);
         this.selectionRings.set(id, ring);
       }
@@ -3147,7 +3280,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
     const zoomedIn = this.rtsCamera.distance <= WORKER_LABEL_ZOOM;
     const shown = new Set<number>();
     for (const unit of this.world.units) {
-      if (unit.owner !== 1 || unit.hp <= 0) {
+      if (this.healthBarsHidden || unit.owner !== 1 || unit.hp <= 0) {
         continue;
       }
       const type = this.world.unitTypes.get(unit.typeId);
@@ -3205,7 +3338,13 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         // starts at the aircraft and closes onto the sim's path by the time it reaches the target.
         const shooter = projectile.shooterId === undefined ? undefined : this.unitRoots.get(projectile.shooterId);
         const airborne = shooter !== undefined && shooter.lift > 0.5;
-        const offset = airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
+        // A ground gun fires from its barrel tip (the model's muzzle-flash mesh); the sim launches
+        // every shot from the unit's centre, so the shot is drawn from the muzzle and closes onto
+        // the sim's path the same way.
+        const muzzle = shooter && !airborne ? this.muzzlePoint(shooter) : null;
+        const offsetX = muzzle ? muzzle.x - projectile.x : 0;
+        const offsetY = muzzle ? muzzle.y - projectile.y : airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
+        const offsetZ = muzzle ? muzzle.z - projectile.z : 0;
         const human = this.world.factions.find((item) => item.player === projectile.owner)?.faction !== 'alien';
         const object = this.effects.projectileMesh(projectile.kind, human);
         this.scene.add(object);
@@ -3213,7 +3352,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           object,
           kind: projectile.kind,
           splash: projectile.splashRadius,
-          offset,
+          offsetX,
+          offsetY,
+          offsetZ,
           startX: projectile.x,
           startZ: projectile.z,
           shooterId: projectile.shooterId,
@@ -3221,18 +3362,22 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
           alien: !human,
         };
         this.projectileVisuals.set(projectile.id, visual);
-        this.effects.muzzle(projectile.x, projectile.y + offset, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz);
+        this.effects.muzzle(projectile.x, projectile.y + offsetY, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz, muzzle);
         if (shooter && !airborne) {
           shooter.recoil = 1;
+          fireUnit(shooter.firing, shooter.parts, performance.now() / 1000);
         }
       }
       const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
       const progress = visual.aim > 0.01 ? Math.min(1, travelled / visual.aim) : 1;
       // Bombs fall (slow at first, then faster); energy shots fly straight from the gun.
       const left = visual.kind === 'bombs' ? 1 - progress * progress : 1 - progress;
-      const y = projectile.y + visual.offset * left;
       const previous = visual.object.position.clone();
-      visual.object.position.set(projectile.x, y, projectile.z);
+      visual.object.position.set(
+        projectile.x + visual.offsetX * left,
+        projectile.y + visual.offsetY * left,
+        projectile.z + visual.offsetZ * left,
+      );
       const direction = new THREE.Vector3().subVectors(visual.object.position, previous);
       if (direction.lengthSq() < 1e-6 || previous.lengthSq() === 0) {
         direction.set(projectile.vx, projectile.vy, projectile.vz);
@@ -3266,6 +3411,21 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
         }
       }
     }
+  }
+
+  /** World position of the barrel tip the unit's next shot leaves from, or null without one. */
+  private muzzlePoint(visual: UnitVisual): THREE.Vector3 | null {
+    const count = visual.muzzles.length;
+    if (count === 0) {
+      return null;
+    }
+    const anchor = visual.muzzles[visual.nextMuzzle % count];
+    visual.nextMuzzle = (visual.nextMuzzle + 1) % count;
+    if (!anchor) {
+      return null;
+    }
+    visual.root.updateMatrixWorld(true);
+    return anchor.getWorldPosition(new THREE.Vector3());
   }
 
   /** World position of a Shard structure's heart (its Core node), for the lance to start from. */
@@ -3362,4 +3522,15 @@ diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 0.98, 0.8
   private placementGhostType(): SimStructureType | null {
     return this.placementType;
   }
+}
+
+/** A model's muzzle anchors (Muzzle, MuzzleL, MuzzleR... left by dropFlashMeshes), left before right. */
+function collectMuzzles(root: THREE.Object3D): THREE.Object3D[] {
+  const found: THREE.Object3D[] = [];
+  root.traverse((object) => {
+    if (/^Muzzle[A-Z]?$/.test(object.name)) {
+      found.push(object);
+    }
+  });
+  return found.sort((a, b) => a.name.localeCompare(b.name));
 }
