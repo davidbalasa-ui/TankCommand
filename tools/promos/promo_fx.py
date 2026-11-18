@@ -1274,10 +1274,10 @@ def destroy(actor, t, size=None, wreck=True, debris=14, debris_speed=1.0, debris
                 v = Vector((0, 0, 0.6 * S))
                 w = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), 0)) * 0.25
         elif role == 'turret':
-            pop = rnd.random() < 0.8
+            pop = rnd.random() < 0.6
             hd = Vector((dirn.x, dirn.y, 0))
             hd = hd.normalized() if hd.length > 1e-3 else Vector((1, 0, 0))
-            v = hd * rnd.uniform(2.4, 3.6) * S + Vector((0, 0, (rnd.uniform(4.5, 6.2) if pop else 2.2) * S ** 0.5))
+            v = hd * rnd.uniform(2.4, 3.6) * S + Vector((0, 0, (rnd.uniform(3.0, 4.2) if pop else 2.0) * S ** 0.5))
             w = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 0.6))).normalized() * rnd.uniform(2.5, 5.0)
         elif role == 'part':
             v = dirn * rnd.uniform(2.0, 4.0) * S + Vector((0, 0, rnd.uniform(3.0, 6.0) * S ** 0.5))
