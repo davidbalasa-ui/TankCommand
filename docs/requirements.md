@@ -68,6 +68,7 @@
 | CMB-08 | Each weapon fires in its own rhythm: a burst of shots at a set spacing, then a reload; aircraft spend one ammo per burst; the fire-rate upgrade shortens only the reload. |
 | CMB-09 | Every armed unit and turret in the game data has a distinct firing pattern fitted to its role (scouts rapid and light, heavy tanks one big shot, artillery three-shell salvos). |
 | CMB-10 | A shot that misses never flies on far out of range: an indirect shell bursts on the aimed point, a direct shot ends at 1.2x its weapon range (or the aimed distance when longer). |
+| CMB-11 | A turret with no target for a few seconds turns back to face along the hull. |
 | DET-01 | Scripted battles are bit-identical across runs and save/load. |
 | CAM-01 | Camera target, distance and pitch clamp and interpolate. |
 | CAM-02 | The camera never goes below terrain plus three units. |

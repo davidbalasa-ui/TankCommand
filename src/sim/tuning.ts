@@ -12,6 +12,8 @@ export const PROJECTILE_TTL = 5; // placeholder until Stage 0
 export const PROJECTILE_RANGE_OVERSHOOT = 1.2;
 export const WRECK_TTL_SEC = 10; // placeholder until Stage 0
 export const TURRET_ALIGN_TOLERANCE_DEG = 5; // placeholder until Stage 0
+// A turret with nothing to shoot at for this long turns back to face along the hull.
+export const TURRET_RETURN_DELAY_SEC = 3;
 export const FIRE_MOVE_SPEED_MAX = 0.1; // placeholder until Stage 0
 export const ATTACK_REPATH_TICKS = 20; // placeholder until Stage 0
 export const MUZZLE_HEIGHT = 1.5; // placeholder until Stage 0

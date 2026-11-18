@@ -70,6 +70,8 @@ export interface UnitState {
   stuckTicks: number;
   /** Ticks spent waiting for an oncoming friend at a narrow spot (0 when not waiting). */
   yieldTicks?: number;
+  /** Ticks the turret has had no target, capped once it starts turning back to the front. */
+  turretIdleTicks?: number;
   speed: number;
   replans: number;
   attackRepathTick: number;

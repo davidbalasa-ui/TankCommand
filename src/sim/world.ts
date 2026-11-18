@@ -30,6 +30,7 @@ import {
   STUCK_TICKS,
   TARGET_HEIGHT,
   TURRET_ALIGN_TOLERANCE_DEG,
+  TURRET_RETURN_DELAY_SEC,
   UNIT_RADIUS,
   WRECK_TTL_SEC,
 } from './tuning';
@@ -124,6 +125,7 @@ import type {
 
 const DT = 1 / SIM_TICK_HZ;
 const DEG_TO_RAD = Math.PI / 180;
+const TURRET_RETURN_TICKS = Math.round(TURRET_RETURN_DELAY_SEC * SIM_TICK_HZ);
 
 export interface CreateWorldOptions {
   unitTypes?: ReadonlyMap<string, SimUnitType>;
@@ -1182,6 +1184,19 @@ function updateUnits(world: WorldState, rng: Rng): void {
         bearing,
         type.turretTurnDegPerSec * DEG_TO_RAD * DT,
       );
+      unit.turretIdleTicks = 0;
+    } else if (type.turretTurnDegPerSec > 0) {
+      // After a few quiet seconds the turret swings back to the front, so a tank doesn't drive
+      // around with its gun pointing sideways long after a fight.
+      const idle = Math.min(TURRET_RETURN_TICKS, (unit.turretIdleTicks ?? 0) + 1);
+      unit.turretIdleTicks = idle;
+      if (idle >= TURRET_RETURN_TICKS) {
+        unit.turretHeading = rotateTowards(
+          unit.turretHeading,
+          unit.heading,
+          type.turretTurnDegPerSec * DEG_TO_RAD * DT,
+        );
+      }
     }
 
     updateOrderPath(world, unit, type, target);
@@ -1445,6 +1460,7 @@ export function hashWorld(world: WorldState): string {
         ...(unit.burstLeft !== undefined ? { burstLeft: unit.burstLeft } : {}),
         stuckTicks: unit.stuckTicks,
         yieldTicks: unit.yieldTicks ?? 0,
+        ...(unit.turretIdleTicks ? { turretIdleTicks: unit.turretIdleTicks } : {}),
         speed: unit.speed,
         replans: unit.replans,
         attackRepathTick: unit.attackRepathTick,

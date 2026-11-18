@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateMap, heightAt, isBlockedAt, lineOfSightClear } from '../../src/sim/map';
 import { step } from '../../src/sim/world';
 import type { ProjectileState } from '../../src/sim/types';
+import { TURRET_RETURN_DELAY_SEC } from '../../src/sim/tuning';
 import {
   angleDiff,
   dummyType,
@@ -380,5 +381,18 @@ describe('combat', () => {
     );
     draw = step(draw, []);
     expect(draw.result).toEqual({ winner: null });
+  });
+
+  it('[CMB-11] an idle turret turns back to face along the hull a few seconds after its last target', () => {
+    let world = makeWorld(1, [{ owner: 1, typeId: 'unit.test.tank', x: -50, z: -50, heading: 0, turretHeading: Math.PI / 2 }]);
+    for (let i = 0; i < Math.round(TURRET_RETURN_DELAY_SEC * 20) - 2; i += 1) {
+      world = step(world, []);
+    }
+    // Still where the fight left it during the quiet spell.
+    expect(Math.abs(angleDiff(world.units[0]!.turretHeading, Math.PI / 2))).toBeLessThan(1e-6);
+    for (let i = 0; i < 3 * 20; i += 1) {
+      world = step(world, []);
+    }
+    expect(Math.abs(angleDiff(world.units[0]!.turretHeading, world.units[0]!.heading))).toBeLessThan(1e-6);
   });
 });
