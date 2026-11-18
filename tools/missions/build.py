@@ -1194,7 +1194,10 @@ def act3(f):
                 + [U(1, R['heavy'], ax + 18, az + 8), U(1, R['heavy'], bx + 8, bz - 18)]
                 + [U(1, R['miner'], ax - 8, az - 10), U(1, R['tug'], ax - 4, az + 8), U(1, R['miner'], bx - 10, bz + 8),
                    U(1, R['tug'], bx + 8, bz + 4)],
-                [S(1, R['pad'], ax, az), S(1, R['pad'], bx, bz), S(1, R['turret'], ax + 16, az - 8), S(1, R['turret'], bx + 8, bz - 16)],
+                # Two towers per colony: with one each, the last waves broke a colony on about a
+                # third of world seeds (combat dice vary per attempt).
+                [S(1, R['pad'], ax, az), S(1, R['pad'], bx, bz), S(1, R['turret'], ax + 16, az - 8), S(1, R['turret'], bx + 8, bz - 16),
+                 S(1, R['turret'], ax + 10, az - 18), S(1, R['turret'], bx + 18, bz - 6)],
                 [('hold', 'Hold both colonies for 12 minutes', 'primary')],
                 [
                     T('intro', at(0), msg('Watch both colonies. The first wave hits Ashby in one minute.', f)),
