@@ -10,7 +10,7 @@ import {
   isBlockedAt,
   lineOfSightClear,
 } from './map';
-import { computePath, followPath, unitMap } from './motion';
+import { computePath, followPath, queuedLegs, routeThroughLegs, unitMap } from './motion';
 import { separateUnits } from './avoidance';
 import { obstacleMap, pushOutOfObstacles } from './obstacles';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
@@ -241,6 +241,7 @@ function cloneWorld(world: WorldState): WorldState {
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      ...(unit.legs ? { legs: unit.legs.map((point) => ({ ...point })) } : {}),
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,
@@ -431,6 +432,8 @@ function planMove(
         : undefined;
     const anchor = tail ?? pending;
     if (anchor) {
+      // Where the order so far ends becomes a leg end the unit must drive through before this one.
+      const legs = pending ? [...queuedLegs(unit), { x: anchor.x, z: anchor.z }] : [];
       const appended = findPath(unitMap(world, unit), anchor.x, anchor.z, goalX, goalZ) ?? [
         { x: goalX, z: goalZ },
       ];
@@ -438,6 +441,7 @@ function planMove(
       const final = combined[combined.length - 1];
       if (final) {
         unit.path = combined;
+        unit.legs = legs;
         unit.order =
           kind === 'move'
             ? { kind: 'move', x: final.x, z: final.z, queue: true }
@@ -449,6 +453,7 @@ function planMove(
     }
   }
 
+  unit.legs = [];
   const path = computePath(world, unit, goalX, goalZ);
   if (!path) {
     unit.path = [];
@@ -974,14 +979,14 @@ function updateOrderPath(
   }
 
   if (unit.order.kind === 'move') {
-    if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
+    if (queuedLegs(unit).length === 0 && Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
       unit.order = { kind: 'idle' };
       unit.path = [];
       unit.speed = 0;
       return;
     }
     if (unit.path.length === 0) {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       if (!path) {
         unit.order = { kind: 'idle' };
         unit.speed = 0;
@@ -1009,7 +1014,7 @@ function updateOrderPath(
       return;
     }
 
-    if (Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
+    if (queuedLegs(unit).length === 0 && Math.hypot(unit.order.x - unit.x, unit.order.z - unit.z) <= STOP_DISTANCE) {
       unit.order = { kind: 'idle' };
       unit.path = [];
       unit.speed = 0;
@@ -1017,7 +1022,7 @@ function updateOrderPath(
     }
 
     if (unit.path.length === 0) {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       if (!path) {
         unit.order = { kind: 'idle' };
         unit.speed = 0;
@@ -1115,7 +1120,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'move') {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1125,7 +1130,7 @@ function updateStuckUnits(world: WorldState, startPositions: ReadonlyMap<number,
     }
 
     if (unit.order.kind === 'attackMove') {
-      const path = computePath(world, unit, unit.order.x, unit.order.z);
+      const path = routeThroughLegs(world, unit, unit.order.x, unit.order.z);
       unit.path = path ?? [];
       const end = path && path.length > 0 ? path[path.length - 1] : undefined;
       if (end) {
@@ -1461,6 +1466,7 @@ export function hashWorld(world: WorldState): string {
         order: unit.order,
         stance: unit.stance,
         path: unit.path,
+        ...(unit.legs && unit.legs.length > 0 ? { legs: unit.legs } : {}),
         reloadLeft: unit.reloadLeft,
         ...(unit.burstLeft !== undefined ? { burstLeft: unit.burstLeft } : {}),
         stuckTicks: unit.stuckTicks,
@@ -1519,6 +1525,7 @@ export function worldToPayload(world: WorldState): unknown {
       ...unit,
       order: cloneOrder(unit.order),
       path: unit.path.map((point) => ({ ...point })),
+      ...(unit.legs ? { legs: unit.legs.map((point) => ({ ...point })) } : {}),
       job: unit.job ? { ...unit.job } : null,
       upgrades: [...unit.upgrades],
       transform: unit.transform ? { ...unit.transform } : null,

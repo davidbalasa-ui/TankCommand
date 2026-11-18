@@ -2,7 +2,7 @@ import rawManifest from '../public/assets/manifest.json';
 import { parseAssetManifest } from './assets/manifestSchema';
 import { AssetRegistry } from './assets/registry';
 import { createSkirmishWorld, loadSimData, type SimData } from './data/simData';
-import { MISSIONS, buildMissionWorld, missionsOf, nextMission } from './data/missions';
+import { MISSIONS, MISSION_MAP_SEED, buildMissionWorld, missionsOf, nextMission } from './data/missions';
 import { createKvStore, type KvStore } from './platform/kv';
 import {
   emptyProgress,
@@ -1648,7 +1648,8 @@ export class App {
       map: {
         size: map.size,
         cellSize: map.cellSize,
-        seed: 1,
+        // The ground every attempt at this mission is played on.
+        seed: MISSION_MAP_SEED,
         starts: map.starts,
         deposits: map.deposits,
         features: map.features ?? null,

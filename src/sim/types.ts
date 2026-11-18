@@ -61,6 +61,11 @@ export interface UnitState {
   order: Order;
   stance: Stance;
   path: Point[];
+  /**
+   * The ends of the queued legs still ahead on a queued move (the player's waypoints, the AI's
+   * flank point), in order, before the order's own goal. The unit drives through each in turn.
+   */
+  legs?: Point[];
   // Workers: the spot the current path was planned for (its end may stop short of a blocked
   // goal), and where that path ended, so a path set by anything else is never mistaken for it.
   pathGoal?: { x: number; z: number; endX: number; endZ: number };
