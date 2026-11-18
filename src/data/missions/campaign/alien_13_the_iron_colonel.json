@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 13,
   "title": "The Iron Colonel",
-  "briefing": "The Iron Colonel, the Terran commander, is touring the valley in his Bulwark with an escort. Hunt him down before he leaves through the south-east pass in ten minutes.",
+  "briefing": "Colonel Daska, the one his troops call the Iron Colonel, commands the Terrans on Vesper. He is touring the valley in a Bulwark with an escort. Destroy him before he leaves through the north-east pass in ten minutes.",
   "mapId": "map.c_long_reach",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
-        "unit.alien.glider"
+        "unit.alien.artillery",
+        "unit.alien.glider",
+        "structure.alien.missile_battery"
       ],
       "researchDone": [
         "research.alien.fortifications",
@@ -127,7 +127,7 @@
     },
     {
       "side": 2,
-      "unitType": "unit.human.heavy_tank",
+      "unitType": "unit.human.missile_tank",
       "x": 60,
       "z": -60,
       "heading": 2.356,
@@ -196,7 +196,7 @@
   "objectives": [
     {
       "id": "boss",
-      "text": "Destroy the Iron Colonel",
+      "text": "Destroy the Iron Colonel's Bulwark",
       "kind": "primary"
     }
   ],
@@ -210,8 +210,15 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Watch the radar. He moves every couple of minutes; cut him off."
+          "speaker": "Matriarch",
+          "text": "His is the only Bulwark in the escort. I will show you where he goes next."
+        },
+        {
+          "t": "revealArea",
+          "x": 66,
+          "z": -66,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -235,6 +242,13 @@
           "mode": "attack",
           "x": 70,
           "z": 20
+        },
+        {
+          "t": "revealArea",
+          "x": 70,
+          "z": 20,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -258,6 +272,13 @@
           "mode": "attack",
           "x": 20,
           "z": 70
+        },
+        {
+          "t": "revealArea",
+          "x": 20,
+          "z": 70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -281,6 +302,13 @@
           "mode": "attack",
           "x": -40,
           "z": -10
+        },
+        {
+          "t": "revealArea",
+          "x": -40,
+          "z": -10,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -304,6 +332,13 @@
           "mode": "attack",
           "x": -70,
           "z": -70
+        },
+        {
+          "t": "revealArea",
+          "x": -70,
+          "z": -70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -327,6 +362,13 @@
           "mode": "attack",
           "x": 40,
           "z": -70
+        },
+        {
+          "t": "revealArea",
+          "x": 40,
+          "z": -70,
+          "radius": 12,
+          "forSec": 90
         }
       ]
     },
@@ -339,7 +381,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "He is making for the pass!"
         },
         {

@@ -162,6 +162,10 @@ export interface ResultView {
   title: string | null;
   reason: string | null;
   hasNext: boolean;
+  /** The last mission of a story campaign was won: the results screen closes the campaign. */
+  campaignComplete: boolean;
+  /** The campaign's closing text, when campaignComplete. */
+  epilogue: string | null;
 }
 
 export interface HudSnapshot {

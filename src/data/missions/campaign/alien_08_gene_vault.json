@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 8,
   "title": "The Star Vault",
-  "briefing": "The Terrans are licking their wounds. Grow a siphon on the metal seam, send the spare Ferrier to carry the metal home, then wake the Star Vault and research the Weaver.",
+  "briefing": "The colony pad at Kessra burned, and the swarm spreads across the plains. While the Terrans lick their wounds, grow a Metal Siphon on the seam by the nest, then wake the Star Vault and research the Weaver.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -22,6 +22,7 @@
         "structure.alien.radar",
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
+        "unit.alien.missile_tank",
         "unit.alien.repair"
       ],
       "researchDone": [
@@ -115,7 +116,7 @@
   "objectives": [
     {
       "id": "station",
-      "text": "Build a siphon",
+      "text": "Grow a Metal Siphon",
       "kind": "primary"
     },
     {
@@ -139,8 +140,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Metal feeds research only. Grow a siphon. It crawls to the metal seam by itself."
+          "speaker": "Matriarch",
+          "text": "Metal feeds the Star Vault. Grow a Metal Siphon; it crawls to the seam by itself."
         }
       ]
     },
@@ -160,8 +161,8 @@
         },
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Siphon grown. Send the spare Ferrier to it, then tap the locked Weaver in the drop menu to research it."
+          "speaker": "Matriarch",
+          "text": "Siphon grown. Send the spare Ferrier to it, then tap the locked Weaver in Build to research it."
         }
       ]
     },
@@ -189,7 +190,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Terran scouts are sniffing around."
         },
         {

@@ -18,20 +18,21 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery"
+        "unit.human.repair",
+        "unit.human.artillery"
       ],
       "researchDone": [
         "research.human.fortifications",
         "research.human.missiles",
         "research.human.sensors",
         "research.human.heavy_armor",
-        "research.human.heavy_ordnance"
+        "research.human.heavy_ordnance",
+        "research.human.field_repair"
       ]
     },
     {
@@ -190,17 +191,17 @@
   "objectives": [
     {
       "id": "guns",
-      "text": "Destroy the towers on the hill",
+      "text": "Destroy the Sentinels on the hill",
       "kind": "primary"
     },
     {
       "id": "battery",
-      "text": "Destroy the missile battery",
+      "text": "Destroy the Corona missile tower",
       "kind": "primary"
     },
     {
       "id": "camp",
-      "text": "Destroy the camp behind the hill",
+      "text": "Scout the camp behind the hill",
       "kind": "optional"
     }
   ],
@@ -214,7 +215,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Longbows hit from far beyond the guns. Keep tanks in front of them to spot targets."
         }
       ]
@@ -228,7 +229,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Counter-attack coming off the hill!"
         },
         {

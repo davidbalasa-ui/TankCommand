@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 20,
   "title": "Brood War",
-  "briefing": "Two Arcadian broods have dug in on either side of the rift. Destroy both of their landing rings.",
+  "briefing": "Without the Matriarch two broods hold the rift, each on its own: one to the east, one to the north. Destroy both of their Landing Rings.",
   "mapId": "map.c_rift",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -48,7 +48,7 @@
       "controller": "ai",
       "ore": 300,
       "metal": 100,
-      "difficulty": "normal",
+      "difficulty": "hard",
       "team": 2
     },
     {
@@ -245,12 +245,12 @@
   "objectives": [
     {
       "id": "a",
-      "text": "Destroy the eastern brood's nest",
+      "text": "Destroy the eastern brood's Landing Ring",
       "kind": "primary"
     },
     {
       "id": "b",
-      "text": "Destroy the southern brood's nest",
+      "text": "Destroy the northern brood's Landing Ring",
       "kind": "primary"
     }
   ],
@@ -264,8 +264,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Two enemies, one at each side of the rift. Take the weaker southern one first."
+          "speaker": "Col. Daska",
+          "text": "Two broods, one each side of the rift. The northern one is weaker: take it first."
         }
       ]
     },

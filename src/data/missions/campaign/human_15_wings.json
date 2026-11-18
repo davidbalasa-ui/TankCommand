@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 15,
   "title": "Wings",
-  "briefing": "Arcadian fliers have been raiding the supply lines. Build an air base, buy Falcon fighters and clear the four raiders out of the sky. Missile tanks can hit aircraft too.",
+  "briefing": "Survey drones over the rift saw something pulsing at its heart: a crystal we are calling the Shard. Before we can get near it, we need the sky. Build an Airfield, buy Falcon fighters and clear four Arcadian raiders out of the air.",
   "mapId": "map.c_highwater",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter"
       ],
@@ -138,7 +138,7 @@
   "objectives": [
     {
       "id": "roost",
-      "text": "Build an air base",
+      "text": "Build an Airfield",
       "kind": "primary"
     },
     {
@@ -157,8 +157,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "Buy an air base first: aircraft need it to land and rearm."
+          "speaker": "Col. Daska",
+          "text": "Buy an Airfield first: aircraft need it to land and rearm."
         }
       ]
     },
@@ -171,7 +171,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Raiders inbound!"
         },
         {

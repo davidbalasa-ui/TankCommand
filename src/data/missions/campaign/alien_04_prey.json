@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 4,
   "title": "Prey",
-  "briefing": "A Terran supply convoy is running from the outpost. Catch it and destroy its three haulers before they reach the north-west road.",
+  "briefing": "While the brood fed at the landing field, the Terrans crept back into the outpost to save its stores. Now their convoy is running for the north-west road. Catch it and destroy all three Haulers.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -140,7 +140,7 @@
   "objectives": [
     {
       "id": "convoy",
-      "text": "Destroy the three haulers",
+      "text": "Destroy the three Haulers",
       "kind": "primary"
     },
     {
@@ -159,7 +159,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Darters are fast. Send them ahead to cut the convoy off."
         }
       ]
@@ -173,8 +173,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The convoy is moving. It stops to regroup on the way."
+          "speaker": "Matriarch",
+          "text": "The prey is moving west. It stops to regroup on the way."
         },
         {
           "t": "aiOrder",
@@ -224,8 +224,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "They are on the move again. Catch them before the road!"
+          "speaker": "Matriarch",
+          "text": "They run again. Catch them before the road!"
         },
         {
           "t": "aiOrder",

@@ -1172,6 +1172,14 @@ button.corner-action {
   color: var(--soft);
 }
 
+.results-epilogue {
+  max-width: 560px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .results-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 140px));

@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 12,
   "title": "Salvage Rights",
-  "briefing": "Three rich metal seams lie east of the colony, and the Arcadians have already siphoned two of them. Destroy their siphons and put our own stations on all three seams.",
+  "briefing": "Three rich metal seams lie east of Tallis, and the Arcadians have siphoned two of them to feed their research. Destroy their Metal Siphons and put our own Metal Stations on all three seams.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -18,14 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
+        "unit.human.repair",
         "unit.human.artillery",
-        "structure.human.missile_battery",
-        "unit.human.repair"
+        "unit.human.hover_tank",
+        "structure.human.missile_battery"
       ],
       "researchDone": [
         "research.human.fortifications",
@@ -33,7 +34,8 @@
         "research.human.sensors",
         "research.human.heavy_armor",
         "research.human.heavy_ordnance",
-        "research.human.field_repair"
+        "research.human.field_repair",
+        "research.human.hover_drive"
       ]
     },
     {
@@ -152,6 +154,18 @@
       "z": 58
     },
     {
+      "side": 1,
+      "structureType": "structure.human.metal_station",
+      "x": -42,
+      "z": 72
+    },
+    {
+      "side": 1,
+      "structureType": "structure.human.metal_station",
+      "x": -76,
+      "z": 30
+    },
+    {
       "side": 2,
       "structureType": "structure.alien.metal_station",
       "x": 38,
@@ -167,7 +181,7 @@
   "objectives": [
     {
       "id": "sites",
-      "text": "Put a metal station on all three eastern seams",
+      "text": "Put a Metal Station on all three eastern seams",
       "kind": "primary"
     },
     {
@@ -186,8 +200,22 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
-          "text": "The three seams are marked. Clear the enemy off them, then build."
+          "speaker": "Col. Daska",
+          "text": "Our home seams are taken, so new stations head east. Tap a marked seam to send one there."
+        }
+      ]
+    },
+    {
+      "id": "shard",
+      "when": {
+        "t": "time",
+        "tick": 2400
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Col. Daska",
+          "text": "Survey teams report crystal spires growing under the rift. Nobody knows what they are."
         }
       ]
     },
@@ -200,7 +228,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Raiders heading for the seams."
         },
         {

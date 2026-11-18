@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 21,
   "title": "Citadel Walls",
-  "briefing": "The Terran citadel is ringed by gun towers. Break the outer ring: destroy every Bastion gun.",
+  "briefing": "Only the Coalition citadel still stands between the swarm and Vesper. It is ringed by gun towers: break the outer ring and destroy every Bastion Gun.",
   "mapId": "map.c_crystal_fields",
   "sides": [
     {
@@ -23,10 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
-        "unit.alien.artillery",
-        "structure.alien.missile_battery",
         "unit.alien.repair",
+        "unit.alien.artillery",
         "unit.alien.glider",
+        "structure.alien.missile_battery",
         "structure.alien.air_base",
         "unit.alien.fighter",
         "unit.alien.dragonfly",
@@ -233,7 +233,7 @@
   "objectives": [
     {
       "id": "walls",
-      "text": "Destroy every Bastion gun",
+      "text": "Destroy every Bastion Gun",
       "kind": "primary"
     }
   ],
@@ -247,7 +247,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
+          "speaker": "Matriarch",
           "text": "Sunfalls outrange the guns. Shell them from a distance."
         }
       ]

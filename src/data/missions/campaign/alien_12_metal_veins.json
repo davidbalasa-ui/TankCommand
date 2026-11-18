@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 12,
   "title": "Metal Veins",
-  "briefing": "Three rich metal seams lie east of the nest. The Terrans have stations on two of them. Tear their stations down and grow our siphons on all three.",
+  "briefing": "Three rich metal seams lie east of the nest, and the Terrans mine two of them for their research. Tear their Metal Stations down and grow our siphons on all three.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {
@@ -23,9 +23,10 @@
         "unit.alien.heavy_tank",
         "structure.alien.metal_station",
         "unit.alien.missile_tank",
+        "unit.alien.repair",
         "unit.alien.artillery",
-        "structure.alien.missile_battery",
-        "unit.alien.repair"
+        "unit.alien.glider",
+        "structure.alien.missile_battery"
       ],
       "researchDone": [
         "research.alien.fortifications",
@@ -33,7 +34,8 @@
         "research.alien.sensors",
         "research.alien.heavy_armor",
         "research.alien.heavy_ordnance",
-        "research.alien.field_repair"
+        "research.alien.field_repair",
+        "research.alien.hover_drive"
       ]
     },
     {
@@ -152,6 +154,18 @@
       "z": 58
     },
     {
+      "side": 1,
+      "structureType": "structure.alien.metal_station",
+      "x": -42,
+      "z": 72
+    },
+    {
+      "side": 1,
+      "structureType": "structure.alien.metal_station",
+      "x": -76,
+      "z": 30
+    },
+    {
       "side": 2,
       "structureType": "structure.human.metal_station",
       "x": 38,
@@ -167,12 +181,12 @@
   "objectives": [
     {
       "id": "sites",
-      "text": "Put a siphon on all three eastern seams",
+      "text": "Grow a Metal Siphon on all three eastern seams",
       "kind": "primary"
     },
     {
       "id": "keep",
-      "text": "Keep your nest",
+      "text": "Keep your Landing Ring",
       "kind": "primary"
     }
   ],
@@ -186,8 +200,22 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "The three seams are marked. Clear the enemy off them, then build."
+          "speaker": "Matriarch",
+          "text": "Our home seams are full, so new siphons crawl east. Tap a marked seam to steer one."
+        }
+      ]
+    },
+    {
+      "id": "shard",
+      "when": {
+        "t": "time",
+        "tick": 2400
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Matriarch",
+          "text": "Something sings beneath the rift. Crystal grows there, and it is not ours."
         }
       ]
     },
@@ -200,8 +228,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Raiders heading for the seams."
+          "speaker": "Matriarch",
+          "text": "Terran raiders are making for the seams."
         },
         {
           "t": "spawn",

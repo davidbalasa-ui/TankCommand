@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 19,
   "title": "Dead Zone",
-  "briefing": "The ground near the rift is covered in Shard spires that fire on anything that moves, Arcadian or Terran. Get a Watchman radar to the rift's edge so we can see what lies beyond. Keep it alive.",
+  "briefing": "The Shard has grown spires across the ground near the rift, and they fire on anything that moves, Arcadian or Terran. Get a Watchman to the rift's edge in the north-east so we can see what lies beyond. Keep it alive.",
   "mapId": "map.c_crystal_fields",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -225,7 +225,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Spires hit hard and far. Artillery can break them from outside their reach."
         }
       ]

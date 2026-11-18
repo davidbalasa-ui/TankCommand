@@ -3,7 +3,7 @@
   "campaign": "training",
   "order": 2,
   "title": "Mining",
-  "briefing": "Ore pays for everything. Your miner digs an ore deposit and packs the ore into crates beside it; your hauler carries the crates to the pad. Reach 500 ore.",
+  "briefing": "Ore pays for everything. Your miner digs ore out of a deposit, and your hauler carries it home to the pad. Reach 500 ore.",
   "mapId": "map.wp02_skirmish",
   "sides": [
     {
@@ -63,7 +63,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Select the miner and tap an ore deposit. The hauler collects the crates by itself."
+          "text": "Select the miner and tap an ore deposit. The hauler carries the ore home by itself."
         }
       ]
     },

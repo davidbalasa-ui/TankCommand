@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 18,
   "title": "Two Fronts",
-  "briefing": "Two colonies, Ashby and Corran, are in the path of the swarm. Hold both for twelve minutes. The waves switch between them, so you will have to split your forces or move fast.",
+  "briefing": "The swarm is pushing for two colonies: Ashby in the west and Corran in the south. Hold both for twelve minutes. The waves switch between them, so split your forces or move fast.",
   "mapId": "map.c_twin_colonies",
   "sides": [
     {
@@ -18,15 +18,15 @@
         "unit.human.ore_miner",
         "unit.human.tug",
         "structure.human.turret",
+        "structure.human.metal_station",
         "unit.human.radar",
         "structure.human.radar",
         "unit.human.heavy_tank",
-        "structure.human.metal_station",
         "unit.human.missile_tank",
-        "unit.human.artillery",
-        "structure.human.missile_battery",
         "unit.human.repair",
+        "unit.human.artillery",
         "unit.human.hover_tank",
+        "structure.human.missile_battery",
         "structure.human.air_base",
         "unit.human.fighter",
         "unit.human.bomber"
@@ -179,7 +179,7 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Command",
+          "speaker": "Col. Daska",
           "text": "Watch both colonies. The first wave hits Ashby in one minute."
         }
       ]

@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 2,
   "title": "Feeding Ground",
-  "briefing": "The brood is hungry. Set the Sifter on the ore field and gather 400 ore. Terran scouts may come sniffing.",
+  "briefing": "The swarm is hungry, and Vesper is rich. Set the Sifter on the ore and gather 400. Terran scouts will come sniffing.",
   "mapId": "map.c_halden",
   "sides": [
     {
@@ -73,7 +73,7 @@
     },
     {
       "id": "pad",
-      "text": "Keep your landing pad",
+      "text": "Keep your Landing Ring",
       "kind": "primary"
     }
   ],
@@ -87,8 +87,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Select the miner, then tap an ore field to start mining. The hauler carries the crates home by itself."
+          "speaker": "Matriarch",
+          "text": "Select the Sifter, then tap an ore field. The Ferrier carries the ore home by itself."
         }
       ]
     },
@@ -101,8 +101,8 @@
       "do": [
         {
           "t": "message",
-          "speaker": "Brood-mind",
-          "text": "Raiders coming from the north-east!"
+          "speaker": "Matriarch",
+          "text": "Terran raiders, from the north-east. Feed them to the brood."
         },
         {
           "t": "spawn",
