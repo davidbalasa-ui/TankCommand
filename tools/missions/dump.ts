@@ -4,7 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { parseAssetManifest } from '../../src/assets/manifestSchema';
 import { AssetRegistry } from '../../src/assets/registry';
 import rawManifest from '../../public/assets/manifest.json';
-import { loadSimData } from '../../src/data/simData';
+import { createSkirmishWorld, loadSimData } from '../../src/data/simData';
 import { MISSIONS, buildMissionWorld } from '../../src/data/missions';
 import { isBlockedCell, isWaterAt, mapFor } from '../../src/sim/map';
 import type { Condition } from '../../src/sim/missionSchema';
@@ -19,8 +19,22 @@ function areas(cond: Condition, list: Array<{ x: number; z: number; r: number; s
   if (cond.t === 'not') areas(cond.cond, list);
 }
 
-for (const row of MISSIONS.filter((m) => which === 'all' || m.id === which)) {
-  const w = buildMissionWorld(data, row, 1);
+// `skirmish` dumps every skirmish map with a side on each of its starts.
+const rows =
+  which === 'skirmish'
+    ? data.mapRows
+        .filter((map) => !map.campaignOnly)
+        .map((map) => ({ id: map.id, title: `${map.name} (${map.starts.length} players)`, triggers: [], map }))
+    : MISSIONS.filter((m) => which === 'all' || m.id === which).map((m) => ({ ...m, map: null }));
+for (const row of rows) {
+  const w = row.map
+    ? createSkirmishWorld(
+        data,
+        1,
+        row.map.starts.map((s) => ({ player: s.player, faction: s.player % 2 ? 'human' : 'alien', controller: 'human' })),
+        { mapId: row.map.id, fog: false },
+      )
+    : buildMissionWorld(data, MISSIONS.find((m) => m.id === row.id)!, 1);
   const tracked = mapFor(w.map, 'tracked');
   const hover = mapFor(w.map, 'hover');
   const blocked: number[] = [];

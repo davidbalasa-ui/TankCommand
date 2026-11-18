@@ -6,7 +6,7 @@ import { step } from '../../src/sim/world';
 import type { WorldState } from '../../src/sim/types';
 import { data } from './aiHelpers';
 
-// A mined-out Utopia Basin: every ore field empty, both sides down to a few units and pocket change.
+// A mined-out Cinder Basin (map.wp02_skirmish): every ore field empty, both sides down to a few units and pocket change.
 function minedOut(controller: 'human' | 'ai'): WorldState {
   const world = createSkirmishWorld(
     data,

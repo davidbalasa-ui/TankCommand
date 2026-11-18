@@ -3,15 +3,20 @@
   "campaign": "training",
   "order": 2,
   "title": "Mining",
-  "briefing": "Ore pays for everything. Your miner digs ore out of a deposit, and your hauler carries it home to the pad. Reach 500 ore.",
-  "mapId": "map.wp02_skirmish",
+  "briefing": "Ore pays for everything you buy. A Prospector digs ore and stacks it in crates by the field; a Hauler carries the crates home to your landing pad. Get the ore flowing and bank some.",
+  "mapId": "map.t_drill_yard",
   "sides": [
     {
       "player": 1,
       "faction": "human",
       "controller": "human",
-      "ore": 200,
-      "metal": 0
+      "ore": 0,
+      "metal": 0,
+      "available": [
+        "unit.human.light_tank",
+        "unit.human.ore_miner",
+        "unit.human.tug"
+      ]
     },
     {
       "player": 2,
@@ -25,30 +30,30 @@
     {
       "side": 1,
       "unitType": "unit.human.ore_miner",
-      "x": -52,
-      "z": -46,
-      "heading": 0.785
+      "x": -50,
+      "z": 30,
+      "heading": 0.0
     },
     {
       "side": 1,
       "unitType": "unit.human.tug",
-      "x": -56,
-      "z": -44,
-      "heading": 0.785
+      "x": -50,
+      "z": 38,
+      "heading": 0.0
     }
   ],
   "structures": [
     {
       "side": 1,
       "structureType": "structure.human.landing_pad",
-      "x": -50,
-      "z": -50
+      "x": -40,
+      "z": 32
     }
   ],
   "objectives": [
     {
-      "id": "ore",
-      "text": "Reach 500 ore",
+      "id": "dig",
+      "text": "Tap the Prospector, then tap a pink ore field to start digging",
       "kind": "primary"
     }
   ],
@@ -63,26 +68,305 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Select the miner and tap an ore deposit. The hauler carries the ore home by itself."
+          "text": "Your Prospector and Hauler are beside the pad. Ore fields are the pink rocks."
         }
       ]
     },
     {
-      "id": "rich",
+      "id": "dig",
       "when": {
         "t": "resourceReached",
         "side": 1,
-        "ore": 500
+        "ore": 10
       },
       "do": [
         {
           "t": "setObjective",
-          "id": "ore",
+          "id": "dig",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "crew",
+          "status": "add",
+          "text": "Buy a second Prospector and a second Hauler. Send the new Prospector to dig too",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "First load home! Haulers fetch the crates by themselves. Here is 150 ore for more workers."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 150
+        }
+      ]
+    },
+    {
+      "id": "crew",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "dig"
+          },
+          {
+            "t": "and",
+            "conds": [
+              {
+                "t": "unitsAlive",
+                "side": 1,
+                "unitType": "unit.human.ore_miner",
+                "op": ">=",
+                "count": 2
+              },
+              {
+                "t": "unitsAlive",
+                "side": 1,
+                "unitType": "unit.human.tug",
+                "op": ">=",
+                "count": 2
+              }
+            ]
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "crew",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "bank",
+          "status": "add",
+          "text": "Bank 400 ore. Your ore count is at the top of the screen",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Two crews dig twice as fast. Keep an idle miner busy: tap it, then an ore field."
+        }
+      ]
+    },
+    {
+      "id": "crewTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "dig"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "crew"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.ore_miner",
+              "op": ">=",
+              "count": 2
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ],
+      "repeat": true
+    },
+    {
+      "id": "crewTopUp2",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "dig"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "crew"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.tug",
+              "op": ">=",
+              "count": 2
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 50
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 50
+        }
+      ],
+      "repeat": true
+    },
+    {
+      "id": "bank",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "crew"
+          },
+          {
+            "t": "resourceReached",
+            "side": 1,
+            "ore": 400
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "bank",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "spend",
+          "status": "add",
+          "text": "Ore buys everything. Spend some: buy a Lancer",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "400 ore banked. Tanks, buildings and workers are all paid in ore."
+        }
+      ]
+    },
+    {
+      "id": "spend",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "bank"
+          },
+          {
+            "t": "unitsAlive",
+            "side": 1,
+            "unitType": "unit.human.light_tank",
+            "op": ">=",
+            "count": 1
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "spend",
           "status": "done"
         }
       ]
+    },
+    {
+      "id": "spendTopUp1",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "bank"
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "spend"
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "unitsAlive",
+              "side": 1,
+              "unitType": "unit.human.light_tank",
+              "op": ">=",
+              "count": 1
+            }
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "resourceReached",
+              "side": 1,
+              "ore": 100
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Command has topped up your ore for this step."
+        },
+        {
+          "t": "grant",
+          "side": 1,
+          "ore": 100
+        }
+      ],
+      "repeat": true
     }
   ],
-  "timeLimitSec": 900,
-  "placeholder": true
+  "relations": [],
+  "placeholder": false
 }

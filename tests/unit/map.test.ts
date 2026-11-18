@@ -35,15 +35,19 @@ describe('map', () => {
 
 describe('skirmish maps', () => {
   const skirmishMaps = data.mapRows.filter((row) => !row.campaignOnly);
-  const specs = [1, 2, 3, 4].map((player) => ({
+  const allSpecs = [1, 2, 3, 4].map((player) => ({
     player,
     faction: (player % 2 === 1 ? 'human' : 'alien') as 'human' | 'alien',
     controller: 'human' as const,
   }));
 
   it('[MAP-03] ground units can drive between every pair of start positions on every skirmish map', () => {
-    expect(skirmishMaps.length).toBeGreaterThan(1);
+    expect(skirmishMaps.length).toBeGreaterThanOrEqual(6);
+    expect(skirmishMaps.filter((row) => row.starts.length === 4).length).toBeGreaterThanOrEqual(2);
     for (const row of skirmishMaps) {
+      // A side on every start the map has (two or four); two-start maps also get the two extra
+      // corners createSkirmishWorld falls back on for a third or fourth side.
+      const specs = allSpecs.slice(0, Math.max(row.starts.length, row.placeholder ? 4 : 2));
       for (const seed of [1, 7, 1000, 1001, 2006, 424242]) {
         const world = createSkirmishWorld(data, seed, specs, { mapId: row.id, fog: false });
         // Terrain alone decides whether the bases are joined; buildings and sites only add detours.
@@ -69,6 +73,18 @@ describe('skirmish maps', () => {
           }
         }
       }
+    }
+  });
+
+  it('[SKR-01] four-player maps seat at most three sides, and side 3 sits as far from side 1 as from side 2', () => {
+    // Three AI sides (four sides of 64 units, 256) would go past the 192-unit stress test (C-08), so a
+    // four-player map seats you plus up to two AI; start 4 stays empty.
+    for (const row of skirmishMaps.filter((r) => r.starts.length === 4 && !r.placeholder)) {
+      const [p1, p2, p3] = row.starts;
+      const d = (a: { x: number; z: number }, b: { x: number; z: number }): number => Math.hypot(a.x - b.x, a.z - b.z);
+      expect(Math.abs(d(p3!, p1!) - d(p3!, p2!)), row.id).toBeLessThan(0.5);
+      // Sides 1 and 2 face each other across the map, so a one-on-one match is corner to corner.
+      expect(d(p1!, p2!), row.id).toBeGreaterThan(d(p3!, p1!));
     }
   });
 });

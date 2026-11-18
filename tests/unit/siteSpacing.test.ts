@@ -3,6 +3,7 @@ import { data } from './aiHelpers';
 import { MISSIONS, buildMissionWorld } from '../../src/data/missions';
 import { isBlockedAt } from '../../src/sim/map';
 import skirmishMaps from '../../src/data/maps.placeholder.json';
+import { createSkirmishWorld } from '../../src/data/simData';
 
 // Ore and metal sites sit at least 12 m clear of every landing pad's edge, so pad traffic
 // (arrivals driving off, haulers queueing at the delivery spots) has room.
@@ -20,6 +21,16 @@ describe('[SITE-01] ore and metal sites stand clear of landing pads', () => {
         for (const site of map.deposits) {
           expect(padGap(start.x, start.z, site.x, site.z), `${map.id} (${site.x},${site.z})`).toBeGreaterThanOrEqual(MIN_GAP);
         }
+      }
+    }
+  });
+
+  it('[SITE-01] skirmish sites sit on open ground', () => {
+    for (const row of data.mapRows.filter((m) => !m.campaignOnly)) {
+      const specs = row.starts.map((s) => ({ player: s.player, faction: 'human' as const, controller: 'human' as const }));
+      const world = createSkirmishWorld(data, 1, specs, { mapId: row.id, fog: false });
+      for (const site of world.deposits) {
+        expect(isBlockedAt(world.map, site.x, site.z), `${row.id} site (${site.x},${site.z}) on blocked ground`).toBe(false);
       }
     }
   });

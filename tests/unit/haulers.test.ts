@@ -5,7 +5,7 @@ import { step } from '../../src/sim/world';
 import type { WorldState } from '../../src/sim/types';
 import { data } from './aiHelpers';
 
-// Utopia Basin's real corners: the first metal station on each side sits where the planned path
+// Cinder Basin's real corners (map.wp02_skirmish): the first metal station on each side sits where the planned path
 // ends a little over STATION_REACH from the station centre (the QA soak's frozen-hauler spot).
 function stationWorld(seed: number): WorldState {
   const world = createSkirmishWorld(

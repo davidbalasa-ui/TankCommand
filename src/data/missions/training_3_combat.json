@@ -1,0 +1,390 @@
+{
+  "id": "mission.training.3_combat",
+  "campaign": "training",
+  "order": 3,
+  "title": "Combat",
+  "briefing": "Four Lancers are yours to command. Learn to pick them, move them and fight with them. The Arcadian Darters on the range are light scouts, no match for four Lancers.",
+  "mapId": "map.t_drill_yard",
+  "sides": [
+    {
+      "player": 1,
+      "faction": "human",
+      "controller": "human",
+      "ore": 0,
+      "metal": 0,
+      "available": []
+    },
+    {
+      "player": 2,
+      "faction": "alien",
+      "controller": "none",
+      "ore": 0,
+      "metal": 0
+    }
+  ],
+  "units": [
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -30.5,
+      "z": 25.5,
+      "heading": 0.0,
+      "tag": "squad"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -25.5,
+      "z": 25.5,
+      "heading": 0.0,
+      "tag": "squad"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -30.5,
+      "z": 30.5,
+      "heading": 0.0,
+      "tag": "squad"
+    },
+    {
+      "side": 1,
+      "unitType": "unit.human.light_tank",
+      "x": -25.5,
+      "z": 30.5,
+      "heading": 0.0,
+      "tag": "squad"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 30,
+      "z": 4,
+      "heading": 3.1,
+      "tag": "targets"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 34,
+      "z": -4,
+      "heading": 3.1,
+      "tag": "targets"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 30,
+      "z": -24,
+      "heading": 2.3,
+      "tag": "road"
+    },
+    {
+      "side": 2,
+      "unitType": "unit.alien.light_skimmer",
+      "x": 36,
+      "z": -20,
+      "heading": 2.3,
+      "tag": "road"
+    }
+  ],
+  "structures": [
+    {
+      "side": 1,
+      "structureType": "structure.human.landing_pad",
+      "x": -40,
+      "z": 32
+    }
+  ],
+  "objectives": [
+    {
+      "id": "move",
+      "text": "Tap a Lancer to select it, then tap inside the ring to move it",
+      "kind": "primary"
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "t": "time",
+        "tick": 0
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Units are selected by tapping them. Move by tapping the ground."
+        }
+      ]
+    },
+    {
+      "id": "move",
+      "when": {
+        "t": "areaEntered",
+        "side": 1,
+        "x": -14,
+        "z": 18,
+        "radius": 6
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "move",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "all",
+          "status": "add",
+          "text": "Double-tap a Lancer to pick every Lancer on screen, or tap All army. Move them to the ring",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Well done. Drag one finger on the map to look around."
+        }
+      ]
+    },
+    {
+      "id": "all",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "move"
+          },
+          {
+            "t": "areaEntered",
+            "side": 1,
+            "x": 4,
+            "z": 2,
+            "radius": 8
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "all",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "attack",
+          "status": "add",
+          "text": "Two Darters on the range. With your Lancers selected, tap a Darter to attack it",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Through the gap is the target range."
+        }
+      ]
+    },
+    {
+      "id": "attack",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "all"
+          },
+          {
+            "t": "unitDestroyed",
+            "tag": "targets"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "attack",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "advance",
+          "status": "add",
+          "text": "Tap Attack, then tap inside the far ring. Your Lancers fight anything on the way",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Targets down. A plain move drives past enemies; an Attack move fights them."
+        }
+      ]
+    },
+    {
+      "id": "advance",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "attack"
+          },
+          {
+            "t": "areaEntered",
+            "side": 1,
+            "x": 46,
+            "z": -40,
+            "radius": 8
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "advance",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "add",
+          "text": "Select your Lancers and tap Hold: they stay put and fire at anything in range. Beat the raid",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Well fought. Arcadian raiders are coming through the gap behind you!"
+        },
+        {
+          "t": "spawn",
+          "side": 2,
+          "unitType": "unit.alien.light_skimmer",
+          "count": 3,
+          "x": -46,
+          "z": -56,
+          "tag": "raid"
+        },
+        {
+          "t": "aiOrder",
+          "tag": "raid",
+          "mode": "attack",
+          "x": 46,
+          "z": -40
+        }
+      ]
+    },
+    {
+      "id": "hold",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "advance"
+          },
+          {
+            "t": "unitDestroyed",
+            "tag": "raid"
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "hold",
+          "status": "done"
+        },
+        {
+          "t": "setObjective",
+          "id": "group",
+          "status": "add",
+          "text": "Tap All army, then hold tile 1 to save them as a group. Tap 1, then tap the ring",
+          "kind": "primary"
+        },
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Raid beaten. Groups let you pick a squad again with one tap."
+        }
+      ]
+    },
+    {
+      "id": "group",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "objectiveDone",
+            "id": "hold"
+          },
+          {
+            "t": "areaEntered",
+            "side": 1,
+            "x": -14,
+            "z": 6,
+            "radius": 8
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "setObjective",
+          "id": "group",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "id": "reinforce",
+      "when": {
+        "t": "and",
+        "conds": [
+          {
+            "t": "unitsAlive",
+            "side": 1,
+            "op": "<=",
+            "count": 1
+          },
+          {
+            "t": "not",
+            "cond": {
+              "t": "objectiveDone",
+              "id": "group"
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "t": "message",
+          "speaker": "Command",
+          "text": "Reinforcements are landing at your pad."
+        },
+        {
+          "t": "spawn",
+          "side": 1,
+          "unitType": "unit.human.light_tank",
+          "count": 3,
+          "x": -30,
+          "z": 26,
+          "drop": true
+        }
+      ],
+      "repeat": true
+    }
+  ],
+  "relations": [
+    {
+      "a": 1,
+      "b": 2,
+      "relation": "hostile"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "relation": "hostile"
+    }
+  ],
+  "placeholder": false
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { data } from './aiHelpers';
-import { MISSIONS, buildMissionWorld, loadMissionTable, nextMission } from '../../src/data/missions';
-import { parseMission, type Action, type Condition, type Trigger } from '../../src/sim/missionSchema';
+import { MISSIONS, buildMissionWorld, checkMissionReferences, loadMissionTable, nextMission } from '../../src/data/missions';
+import { parseMission, type Action, type Condition, type MissionRow, type Trigger } from '../../src/sim/missionSchema';
 import { evalCondition, runAction, updateMission, tagUnit, type MissionState } from '../../src/sim/triggers';
 import { stepWithAi } from '../../src/ai/driver';
 import { decodeSave, encodeSave } from '../../src/platform/saves';
@@ -86,6 +86,34 @@ describe('mission data', () => {
     const dup = JSON.parse(JSON.stringify(MISSIONS[0]));
     expect(() => loadMissionTable([dup, dup])).toThrow(/Duplicate/);
   });
+
+  it('[MSN-01] every unit and structure type a trigger, spawn or buy list names exists (campaigns and training)', () => {
+    expect(MISSIONS.filter((m) => m.campaign === 'training')).toHaveLength(5);
+    expect(MISSIONS.filter((m) => m.campaign !== 'training').length).toBeGreaterThanOrEqual(44);
+    for (const row of MISSIONS) {
+      expect(() => checkMissionReferences(data, row), row.id).not.toThrow();
+    }
+    const withCond = (when: Condition): MissionRow => {
+      const row = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+      row.triggers.push({ id: 'typo', when: { t: 'and', conds: [{ t: 'time', tick: 1 }, { t: 'not', cond: when }] }, do: [{ t: 'win' }] });
+      return row;
+    };
+    const typos: [MissionRow, RegExp][] = [
+      [withCond({ t: 'unitsAlive', side: 1, unitType: 'unit.human.lite_tank', op: '>=', count: 1 }), /unit\.human\.lite_tank/],
+      [withCond({ t: 'structureBuilt', side: 1, structureType: 'structure.human.turet' }), /structure\.human\.turet/],
+      [withCond({ t: 'areaEntered', side: 1, x: 0, z: 0, radius: 5, unitType: 'unit.nope' }), /unit\.nope/],
+      [withCond({ t: 'allDestroyed', side: 2, unitType: 'unit.nope2' }), /unit\.nope2/],
+    ];
+    const spawn = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+    spawn.triggers.push({ id: 's', when: { t: 'time', tick: 1 }, do: [{ t: 'spawn', side: 2, unitType: 'unit.nope3', count: 1, x: 0, z: 0 }] });
+    typos.push([spawn, /unit\.nope3/]);
+    const buy = JSON.parse(JSON.stringify(MISSIONS[0])) as MissionRow;
+    buy.sides[0]!.available = ['unit.nope4'];
+    typos.push([buy, /unit\.nope4/]);
+    for (const [row, message] of typos) {
+      expect(() => buildMissionWorld(data, row, 1)).toThrow(message);
+    }
+  });
 });
 
 describe('triggers', () => {
@@ -116,6 +144,10 @@ describe('triggers', () => {
       [{ t: 'relationIs', a: 1, b: 3, relation: 'neutral' }, true],
       [{ t: 'unitsAlive', side: 1, op: '>=', count: 2 }, true],
       [{ t: 'unitsAlive', side: 1, op: '<=', count: 1 }, false],
+      [{ t: 'unitsAlive', side: 1, unitType: 'unit.test.tank', op: '>=', count: 2 }, true],
+      [{ t: 'unitsAlive', side: 1, unitType: 'unit.test.other', op: '>=', count: 1 }, false],
+      [{ t: 'upgraded', side: 1 }, false],
+      [{ t: 'upgraded', side: 1, upgrade: 'armor' }, false],
       [{ t: 'unitEscorted', tag: 'vip', x: 0, z: 0, radius: 3 }, true],
       [{ t: 'unitEscorted', tag: 'vip', x: 20, z: 20, radius: 3 }, false],
       [{ t: 'and', conds: [{ t: 'time', tick: 0 }, { t: 'time', tick: 9 }] }, false],
@@ -125,6 +157,12 @@ describe('triggers', () => {
     for (const [cond, expected] of cases) {
       expect(evalCondition(w, m, cond), JSON.stringify(cond)).toBe(expected);
     }
+    // An upgrade on one vehicle meets `upgraded` for that upgrade (and for any upgrade).
+    w.units[1]?.upgrades.push('fireRate');
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1 })).toBe(true);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1, upgrade: 'fireRate' })).toBe(true);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1, upgrade: 'armor' })).toBe(false);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 2, upgrade: 'fireRate' })).toBe(false);
   });
 
   it('[MSN-02] every action type runs', () => {
@@ -240,15 +278,18 @@ describe('[MSN-07] neutral armed side', () => {
 });
 
 describe('placeholder missions', () => {
+  // Training lessons are the exception: they can't be lost (tests/unit/training.test.ts, TRN-02).
+  const losable = MISSIONS.filter((m) => m.campaign !== 'training');
+
   it('[MSN-04] every shipped mission has a time limit or a lose action', () => {
-    for (const row of MISSIONS) {
+    for (const row of losable) {
       const hasLose = row.triggers.some((t) => t.do.some((a) => a.t === 'lose'));
       expect(row.timeLimitSec !== undefined || hasLose, row.id).toBe(true);
       expect(row.objectives.some((o) => o.kind === 'primary'), row.id).toBe(true);
     }
   });
 
-  for (const row of MISSIONS) {
+  for (const row of losable) {
     it(`[MSN-03] ${row.id} can be lost by doing nothing`, async () => {
       let w = buildMissionWorld(data, row, 3);
       const limit = ((row.timeLimitSec ?? 900) + 5) * SEC;
@@ -263,31 +304,16 @@ describe('placeholder missions', () => {
   }
 
   it('[MSN-03] training missions are won by scripted commands', () => {
-    const t1 = MISSIONS.find((m) => m.id === 'mission.training.1_drops');
-    const t2 = MISSIONS.find((m) => m.id === 'mission.training.2_mining');
-    if (!t1 || !t2) {
-      throw new Error('missing');
+    // The step-by-step lessons are played through by the scripted beginner (campaignBot.ts);
+    // tests/unit/training.test.ts plays every one of them.
+    for (const id of ['mission.training.1_drops', 'mission.training.2_mining']) {
+      const row = MISSIONS.find((m) => m.id === id);
+      if (!row) {
+        throw new Error(id);
+      }
+      const w = playMission(buildMissionWorld(data, row, 4), 600 * SEC);
+      expect(w.result, id).toEqual({ winner: 1 });
     }
-    let w = buildMissionWorld(data, t1, 4);
-    const pad = w.structures.find((s) => s.owner === 1);
-    w = step(w, [{ kind: 'buy', issuer: 1, tick: w.tick + 1, itemId: 'unit.human.light_tank', padId: pad?.id ?? 0 }]);
-    const tank = w.units.find((u) => u.owner === 1);
-    w = step(w, [{ kind: 'move', issuer: 1, tick: w.tick + 1, unitIds: [tank?.id ?? 0], x: -25, z: -25 }]);
-    for (let i = 0; i < 120 * SEC && !w.result; i += 1) {
-      w = step(w, []);
-    }
-    expect(w.result).toEqual({ winner: 1 });
-
-    let m = buildMissionWorld(data, t2, 4);
-    const miner = m.units.find((u) => u.owner === 1);
-    const deposit = m.deposits.filter((d) => d.kind === 'ore').sort(
-      (a, b) => Math.hypot(a.x + 50, a.z + 50) - Math.hypot(b.x + 50, b.z + 50),
-    )[0];
-    m = step(m, [{ kind: 'mine', issuer: 1, tick: m.tick + 1, unitIds: [miner?.id ?? 0], depositId: deposit?.id ?? 0 }]);
-    for (let i = 0; i < 600 * SEC && !m.result; i += 1) {
-      m = step(m, []);
-    }
-    expect(m.result).toEqual({ winner: 1 });
   }, 120_000);
 
   it('[MSN-03] the combat missions can be won by a scripted attack', () => {
@@ -305,7 +331,7 @@ describe('placeholder missions', () => {
   it('[MSN-05] each campaign has an ordered chain and nextMission walks it', () => {
     const first = MISSIONS.find((m) => m.id === 'mission.training.1_drops');
     expect(first && nextMission(first)?.id).toBe('mission.training.2_mining');
-    const last = MISSIONS.find((m) => m.id === 'mission.training.2_mining');
+    const last = MISSIONS.find((m) => m.id === 'mission.training.5_air');
     expect(last && nextMission(last)).toBeNull();
   });
 });
