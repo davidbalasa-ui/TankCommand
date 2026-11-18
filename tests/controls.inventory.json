@@ -96,6 +96,7 @@
   "settings.import",
   "settings.leftHanded",
   "settings.rebind",
+  "settings.restorePurchases",
   "settings.showFps",
   "settings.textSize",
   "skirmishSetup.back",
@@ -141,5 +142,8 @@
   "title.load",
   "title.resume",
   "title.settings",
-  "title.skirmish"
+  "title.skirmish",
+  "unlock.back",
+  "unlock.buy",
+  "unlock.restore"
 ]

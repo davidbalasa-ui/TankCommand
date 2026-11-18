@@ -95,6 +95,8 @@ import { missionMarkers } from './sim/triggers';
 import type { AiDifficulty, StructureState } from './sim/types';
 import type { BaseAction, BaseView, ResearchNodeView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
+import { needsFullGame, type ContentRef } from './data/fullGame';
+import { PurchaseService } from './platform/purchases';
 
 export type { IssuedCommand } from './ui/input';
 
@@ -296,6 +298,8 @@ export class App {
   private readonly controlGroups = new Map<number, number[]>();
   private hud: HudHandle | null = null;
   private services: GameServices | null = null;
+  /** The "full game unlock" purchase (everything is unlocked on the web). */
+  readonly purchases = new PurchaseService();
 
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
@@ -457,13 +461,18 @@ export class App {
             deposits: row.deposits,
             features: row.features ?? null,
           },
+          fullGame: this.lockedByPurchase({ kind: 'skirmishMap', mapId: row.id }),
         })),
       beginSkirmish: () => {
         this.freshStart = true;
         this.mode = { kind: 'skirmish' };
         this.fogValue = this.skirmishConfig.fog;
-        this.mapIdValue = this.skirmishConfig.mapId || this.mapIdValue;
+        const chosen = this.skirmishConfig.mapId || this.mapIdValue;
+        // The setup screen sends a locked map to the unlock screen; this only guards a stale choice.
+        this.mapIdValue =
+          chosen && this.lockedByPurchase({ kind: 'skirmishMap', mapId: chosen }) ? undefined : chosen;
       },
+      purchases: this.purchases,
       getBaseView: () => this.baseView(),
       baseAction: (action) => this.baseAction(action),
       getWorkerActions: () => this.workerActions(),
@@ -501,6 +510,7 @@ export class App {
   }
 
   start(): void {
+    void this.purchases.init();
     if (introFilmDue()) {
       // First launch: the opening film, then the title (the title's own opening plays after it).
       void playIntroFilm().then(() => {
@@ -1684,7 +1694,13 @@ export class App {
       status: missionStatus(this.progress, missions, mission.id),
       // Training is the same on every difficulty, so it shows none.
       bestDifficulty: mission.campaign === 'training' ? undefined : this.progress.completed[mission.id]?.bestDifficulty,
+      fullGame: this.lockedByPurchase({ kind: 'mission', campaign: mission.campaign, order: mission.order }),
     }));
+  }
+
+  /** True when the item is part of the full game and the player has not unlocked it. */
+  private lockedByPurchase(item: ContentRef): boolean {
+    return needsFullGame(item, this.purchases.isUnlocked());
   }
 
   private chooseMission(id: string): boolean {
@@ -1693,7 +1709,7 @@ export class App {
       return false;
     }
     const status = missionStatus(this.progress, missionsOf(mission.campaign), id);
-    if (status === 'locked') {
+    if (status === 'locked' || this.lockedByPurchase({ kind: 'mission', campaign: mission.campaign, order: mission.order })) {
       return false;
     }
     this.selectedMissionId = id;
@@ -1750,7 +1766,8 @@ export class App {
     }
     const row = MISSIONS.find((item) => item.id === mission.def.id);
     const won = this.world.result?.winner === mission.humanSide;
-    const hasNext = row ? nextMission(row) !== null : false;
+    const next = row ? nextMission(row) : null;
+    const hasNext = next !== null;
     const alien = row?.sides.find((side) => side.player === mission.humanSide)?.faction === 'alien';
     const campaignComplete = won && !hasNext && row !== undefined && row.campaign !== 'training';
     const reasons: Record<string, string> = {
@@ -1771,6 +1788,7 @@ export class App {
       title: row?.title ?? null,
       reason: mission.failReason ? (reasons[mission.failReason] ?? 'The mission failed.') : null,
       hasNext,
+      nextNeedsFullGame: next !== null && this.lockedByPurchase({ kind: 'mission', campaign: next.campaign, order: next.order }),
       campaignComplete,
       epilogue: campaignComplete ? (row?.epilogue ?? null) : null,
       difficulty: row?.campaign === 'training' ? undefined : (mission.def.difficulty ?? 'normal'),

@@ -17,7 +17,8 @@ export type ScreenId =
   | 'credits'
   | 'bugReport'
   | 'saveSlots'
-  | 'recovery';
+  | 'recovery'
+  | 'unlock';
 
 export interface RendererHandle {
   error: string | null;
@@ -117,6 +118,8 @@ export interface MissionListItem {
   status: 'locked' | 'open' | 'done';
   /** The hardest difficulty the mission has been won on. */
   bestDifficulty?: CampaignDifficulty;
+  /** Part of the full game and not yet unlocked: tapping opens the unlock screen. */
+  fullGame?: boolean;
 }
 
 export interface BriefingView {
@@ -168,6 +171,8 @@ export interface ResultView {
   title: string | null;
   reason: string | null;
   hasNext: boolean;
+  /** The next mission is part of the full game, which is not unlocked: Next opens the unlock screen. */
+  nextNeedsFullGame?: boolean;
   /** The last mission of a story campaign was won: the results screen closes the campaign. */
   campaignComplete: boolean;
   /** The campaign's closing text, when campaignComplete. */
@@ -285,10 +290,23 @@ export interface ScreenContext {
   canRestart?: () => boolean;
   getSkirmishConfig?: () => SkirmishConfig;
   setSkirmishConfig?: (config: SkirmishConfig) => void;
-  getSkirmishMaps?: () => Array<{ id: string; name: string; preview?: BriefingView['map'] }>;
+  /** `fullGame` marks a map that needs the full game unlock (not yet bought). */
+  getSkirmishMaps?: () => Array<{ id: string; name: string; preview?: BriefingView['map']; fullGame?: boolean }>;
   beginSkirmish?: () => void;
+  /** The "full game unlock" purchase. */
+  purchases?: PurchasesView;
   getBaseView?: () => import('./basePanel').BaseView;
   baseAction?: (action: import('./basePanel').BaseAction) => boolean;
+}
+
+export interface PurchasesView {
+  isUnlocked(): boolean;
+  /** False on the web: the full game is bought in the Android app. */
+  canPurchase(): boolean;
+  price(): Promise<string | null>;
+  buy(): Promise<{ status: string; message: string }>;
+  restore(): Promise<{ status: string; message: string }>;
+  subscribe(listener: () => void): () => void;
 }
 
 export interface ScreenModule {
@@ -314,20 +332,21 @@ const OVERLAY_IDS = new Set<ScreenId>([
 const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   title: ['campaignSelect', 'skirmishSetup', 'settings', 'credits', 'help', 'saveSlots'],
   campaignSelect: ['title', 'missionSelect'],
-  missionSelect: ['campaignSelect', 'briefing'],
+  missionSelect: ['campaignSelect', 'briefing', 'unlock'],
   briefing: ['missionSelect', 'loading'],
-  skirmishSetup: ['title', 'loading'],
+  skirmishSetup: ['title', 'loading', 'unlock'],
   loading: ['inGame', 'title'],
   inGame: ['pause', 'objectives', 'help', 'bugReport', 'saveSlots', 'recovery', 'results', 'title'],
   pause: ['settings', 'bugReport', 'saveSlots', 'help', 'objectives', 'loading', 'title', 'inGame'],
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
-  results: ['title', 'missionSelect', 'briefing', 'loading'],
+  results: ['title', 'missionSelect', 'briefing', 'loading', 'unlock'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
   saveSlots: ['pause', 'inGame', 'title'],
   recovery: ['inGame', 'title'],
+  unlock: ['missionSelect', 'skirmishSetup', 'results', 'title'],
 };
 
 const PARENT: Partial<Record<ScreenId, ScreenId>> = {
@@ -346,7 +365,11 @@ const PARENT: Partial<Record<ScreenId, ScreenId>> = {
   saveSlots: 'title',
   recovery: 'inGame',
   pause: 'inGame',
+  unlock: 'title',
 };
+
+/** Screens whose Back returns to the screen that opened them rather than to a fixed parent. */
+const RETURN_TO_OPENER: ReadonlySet<ScreenId> = new Set<ScreenId>(['unlock']);
 
 /** Overlays drawn over the screen below rather than replacing it (the battlefield behind the pause card). */
 const SEE_THROUGH_OVERLAYS: ReadonlySet<ScreenId> = new Set<ScreenId>(['pause']);
@@ -358,6 +381,8 @@ export class ScreenRouter {
   private context: ScreenContext | null = null;
   private base: MountedScreen | null = null;
   private overlays: MountedScreen[] = [];
+  /** The base screen a RETURN_TO_OPENER screen was opened from. */
+  private opener: ScreenId | null = null;
 
   constructor(
     root: HTMLElement,
@@ -392,6 +417,9 @@ export class ScreenRouter {
     if (overlay) {
       this.mountOverlay(id);
     } else {
+      if (RETURN_TO_OPENER.has(id)) {
+        this.opener = this.base?.id ?? null;
+      }
       this.mountBase(id);
     }
   }
@@ -408,7 +436,8 @@ export class ScreenRouter {
       this.go('pause');
       return;
     }
-    const parent = PARENT[this.base.id];
+    const opener = RETURN_TO_OPENER.has(this.base.id) ? this.opener : null;
+    const parent = opener && this.canGo(this.base.id, opener) ? opener : PARENT[this.base.id];
     if (parent) {
       this.go(parent);
     }
