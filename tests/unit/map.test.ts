@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap, isBlockedAt, slopeAt } from '../../src/sim/map';
+import { generateMap, isBlockedAt, mapFor, slopeAt } from '../../src/sim/map';
 import { findPath } from '../../src/sim/pathfinding';
 import { MAX_SLOPE } from '../../src/sim/tuning';
+import { createSkirmishWorld } from '../../src/data/simData';
+import { data } from './aiHelpers';
 
 describe('map', () => {
   it('[MAP-01] same seed produces identical heights and different seeds differ', () => {
@@ -28,5 +30,45 @@ describe('map', () => {
     const path = findPath(map, -50, -50, 50, 50);
     expect(path).not.toBeNull();
     expect(path?.length ?? 0).toBeGreaterThan(1);
+  });
+});
+
+describe('skirmish maps', () => {
+  const skirmishMaps = data.mapRows.filter((row) => !row.campaignOnly);
+  const specs = [1, 2, 3, 4].map((player) => ({
+    player,
+    faction: (player % 2 === 1 ? 'human' : 'alien') as 'human' | 'alien',
+    controller: 'human' as const,
+  }));
+
+  it('[MAP-03] ground units can drive between every pair of start positions on every skirmish map', () => {
+    expect(skirmishMaps.length).toBeGreaterThan(1);
+    for (const row of skirmishMaps) {
+      for (const seed of [1, 7, 1000, 1001, 2006, 424242]) {
+        const world = createSkirmishWorld(data, seed, specs, { mapId: row.id, fog: false });
+        // Terrain alone decides whether the bases are joined; buildings and sites only add detours.
+        const view = mapFor(world.map, 'tracked');
+        const anchors = specs.map((spec) => {
+          const pad = world.structures.find(
+            (structure) => structure.owner === spec.player && world.structureTypes.get(structure.typeId)?.kind === 'pad',
+          );
+          expect(pad, `${row.id} side ${spec.player}`).toBeDefined();
+          return pad ?? { x: 0, z: 0 };
+        });
+        for (let a = 0; a < anchors.length; a += 1) {
+          for (let b = 0; b < anchors.length; b += 1) {
+            const from = anchors[a];
+            const to = anchors[b];
+            if (a === b || !from || !to) {
+              continue;
+            }
+            const path = findPath(view, from.x, from.z, to.x, to.z);
+            const end = path?.[path.length - 1];
+            const gap = end ? Math.hypot(end.x - to.x, end.z - to.z) : Number.POSITIVE_INFINITY;
+            expect(gap, `${row.id} seed ${seed}: start ${a + 1} -> start ${b + 1}`).toBeLessThan(1);
+          }
+        }
+      }
+    }
   });
 });

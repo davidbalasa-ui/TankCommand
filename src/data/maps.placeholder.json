@@ -190,7 +190,10 @@
             }
           ]
         }
-      ]
+      ],
+      "terrain": {
+        "centreRidge": false
+      }
     },
     "placeholder": true
   }

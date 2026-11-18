@@ -51,6 +51,7 @@
 | PERF-01 | Sustained slow frames step quality down in order, fast frames step it back up, and quality never changes more than once per second. |
 | MAP-01 | Same seed produces identical heights and different seeds differ. |
 | MAP-02 | Start areas are flat and connected by an A* path. |
+| MAP-03 | On every skirmish map, for any seed, ground units can drive between every pair of start positions (two- and four-side layouts). |
 | MOVE-01 | A single tank ordered to a reachable point arrives within 0.5 units in time. |
 | MOVE-02 | A tank ordered behind the ridge routes around it and never enters a blocked cell. |
 | MOVE-03 | Orders outside the map are clamped and units never leave the map. |
