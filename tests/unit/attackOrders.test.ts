@@ -66,6 +66,27 @@ describe('attack orders', () => {
     expect(after(miner.id).job?.kind).toBe('oreMiner');
   });
 
+  it('[ORD-05] repeating an attack order on the same target keeps the unit driving at speed', () => {
+    const run = (every: number): number => {
+      let state = world();
+      const tank = addUnit(state, { owner: 1, typeId: 'unit.human.heavy_tank', x: -30, z: -40 })!;
+      const target = addUnit(state, { owner: 2, typeId: 'unit.alien.light_tank', x: 30, z: -40 })!;
+      target.stance = 'hold';
+      state = step(state, [attack(state, [tank.id], target.id)]);
+      const start = state.units.find((unit) => unit.id === tank.id)!;
+      const from = { x: start.x, z: start.z };
+      for (let tick = 1; tick < 10 * 20; tick += 1) {
+        state = step(state, every > 0 && tick % every === 0 ? [attack(state, [tank.id], target.id)] : []);
+      }
+      const end = state.units.find((unit) => unit.id === tank.id)!;
+      return Math.hypot(end.x - from.x, end.z - from.z);
+    };
+    const once = run(0);
+    expect(once).toBeGreaterThan(20);
+    // Re-sent every half second (a player tapping again to confirm): the same distance covered.
+    expect(run(10)).toBeGreaterThan(once * 0.95);
+  });
+
   it('[AI-14] the AI never sends ground-only guns after aircraft in flight', () => {
     const state = world('ai');
     const tanks = [

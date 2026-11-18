@@ -95,6 +95,7 @@
 | ORD-02 | Attack-move: unit moves to the point but engages enemies met on the way, then continues. |
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
 | ORD-04 | Units that cannot hit an attack target (unarmed workers, ground-only guns against aircraft in flight) ignore the order and keep their job; if none can, the order is refused with a reason. |
+| ORD-05 | Repeating an attack order on the same target changes nothing (the unit keeps its speed and route); a new target re-plans without stopping the unit. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
 | GAME-01 | Pause stops the sim tick and refuses orders; backgrounding and the back button auto-pause. |

@@ -538,9 +538,14 @@ function applyAttackCommand(
     }
     taken += 1;
     unit.stance = 'free';
+    // The same order again (a second tap to confirm) changes nothing: the unit keeps driving.
+    if (unit.order.kind === 'attack' && unit.order.targetId === command.targetId) {
+      continue;
+    }
+    // A new target re-plans the route but keeps the unit's speed, as a move order does, so a
+    // tank already rolling doesn't lurch to a stop.
     unit.order = { kind: 'attack', targetId: command.targetId };
     unit.path = [];
-    unit.speed = 0;
     unit.replans = 0;
     unit.stuckTicks = 0;
     unit.attackRepathTick = 0;
