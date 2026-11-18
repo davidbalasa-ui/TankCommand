@@ -1,0 +1,218 @@
+{
+ "terran_lancer": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_outrider": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_prospector": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_hauler": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_mender": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_watchman": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_skimmer": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_bulwark": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_javelin": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_longbow": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_falcon": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_condor": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_lumen": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_darter": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_sifter": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_ferrier": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_weaver": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_seer": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_glider": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_aegis": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_flare": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_sunfall": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_halo": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_disc": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_dragonfly": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_bastion": {
+  "state": "scripted",
+  "note": "pilot"
+ },
+ "terran_harpoon": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_radar": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_metal_station": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_airfield": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_lab": {
+  "state": "todo",
+  "note": ""
+ },
+ "terran_landing_pad": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_sentinel": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_corona": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_oracle": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_metal_siphon": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_aerie": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_star_vault": {
+  "state": "todo",
+  "note": ""
+ },
+ "arcadian_landing_ring": {
+  "state": "todo",
+  "note": ""
+ },
+ "world_shard": {
+  "state": "todo",
+  "note": ""
+ },
+ "world_ore": {
+  "state": "todo",
+  "note": ""
+ },
+ "world_metal": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_dreadnought": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_broadside": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_frigate": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_missile_ship": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_corvette": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_terran_twinx": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_crescent": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_shell": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_lens": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_corvette": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_stingray": {
+  "state": "todo",
+  "note": ""
+ },
+ "fleet_arcadian_orb": {
+  "state": "todo",
+  "note": ""
+ }
+}
