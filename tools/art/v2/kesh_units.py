@@ -8,11 +8,20 @@ import kesh_kit as K
 ASSETS = {}
 
 
-def asset(path, label, size=512):
+# Role glow: the same parts in a different light, so a unit's job reads from far away.
+ROLE_GLOW = {
+    'ember': {'core': 'embercore', 'glow': 'ember', 'slat': 'emberslat'},   # miners and haulers
+    'pale': {'core': 'palecore', 'glow': 'pale', 'slat': 'paleslat'},       # repair and sensors
+}
+
+
+def asset(path, label, size=512, role=None):
     def deco(fn):
         def run(glb, render, report):
             F.begin('kesh')
             kw = fn() or {}
+            for o in F.ST['parts']:
+                o['zone'] = ROLE_GLOW.get(role, {}).get(o['zone'], o['zone'])
             kw.setdefault('clear', ('halo',))
             kw.setdefault('clear_alpha', 0.3)
             F.finish(kw.pop('name', fn.__name__.title().replace('_', '')), glb, render=render, report=report,
@@ -22,7 +31,27 @@ def asset(path, label, size=512):
     return deco
 
 
-def turret(tz, L=2.9, w=0.85, h=0.62, x0=-1.6, gun=(5.4, 0.15), crest=True, prongs=3):
+def light_rail(pts, w=0.11, beads=6, zone='glow', bead_zone='core'):
+    """A line of light as a set gem channel: dark trough, gold lips, a rounded glow seam and a chain of bright beads."""
+    sweep([(x, y, z - 0.01) for x, y, z in pts], [(w * 1.25, 0.05)] * len(pts), 'under', sides=6)
+    for s in (1, -1):
+        sweep([(x, y + s * w * 1.2, z + 0.02) for x, y, z in pts], [(0.022, 0.022)] * len(pts), 'gold', sides=5)
+    sweep([(x, y, z + 0.04) for x, y, z in pts], [(w * 0.7, 0.045)] * len(pts), zone, sides=8)
+    seg = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    tot = sum(seg)
+    for b in range(beads):
+        d = tot * (b + 0.5) / beads
+        i = 0
+        while i < len(seg) - 1 and d > seg[i]:
+            d -= seg[i]; i += 1
+        t = d / seg[i]
+        p = [pts[i][j] + (pts[i + 1][j] - pts[i][j]) * t for j in range(3)]
+        dx, dy = pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]
+        o = orb((p[0], p[1], p[2] + 0.08), w * 0.7, bead_zone, seg=(10, 6), sq=(1.9, 1.0, 0.8))
+        F.rot(o, 'Z', math.degrees(math.atan2(dy, dx)), about=tuple(p))
+
+
+def turret(tz, L=2.9, w=0.85, h=0.62, x0=-1.6, gun=(5.4, 0.15), crest=True, prongs=3, halo=False):
     """Low layered turret with a gold collar ring, a sensor slit, an energy lance and a small crest fin."""
     tf = lensfn(x0, x0 + L, w, tz + h, tz - 0.1, tz + 0.16, nose=0.85)
     body(tf, 'under', off=-0.04, nu=10, nv=12)
@@ -32,6 +61,9 @@ def turret(tz, L=2.9, w=0.85, h=0.62, x0=-1.6, gun=(5.4, 0.15), crest=True, pron
         K.plate(tf, 0.12, 0.95, vc, 56, 'shell', lines=0, nu=8, nv=4, off=0.08, lift=0.08)
     cx = x0 + L * 0.5
     K.ring((cx, 0, tz + 0.0), w * 1.1, 0.024, 'gold', sides=24)
+    if halo:   # a ring of light round the turret foot
+        K.ring((cx, 0, tz + 0.16), w * 1.42, 0.09, 'glow', sides=28, flat=0.6)
+        K.ring((cx, 0, tz + 0.12), w * 1.58, 0.03, 'gold', sides=28)
     sweep([tuple(tf(0.13, v, 0.085)) for v in (48, 66, 90, 114, 132)], [(0.03, 0.02), (0.055, 0.03), (0.06, 0.03), (0.055, 0.03), (0.03, 0.02)], 'glow', sides=4)
     if gun:
         K.barrel(x0 + L * 0.72, gun[0], 0, tz + 0.2, gun[1], prongs=prongs, group='Barrel', flash_group='Flash')
@@ -53,19 +85,21 @@ def stinger():
     K.thrusters([(-3.0, 0.45, 1.12), (-3.0, -0.45, 1.12)], 1.2)
     tz = 1.78
     with F.group('Turret'):
-        turret(tz, gun=(5.6, 0.16))
+        turret(tz, gun=(5.6, 0.16), halo=True)   # reads as: a teardrop, one lance, one ring of light
     return dict(pivot=[('Turret', (-0.2, 0, tz))] + K.gun_pivots([('', (0.5, 0, tz + 0.2), (5.7, 0, tz + 0.2))]))
 
 
 @asset('alien/darter.glb', 'Arcadian Darter (scout)')
 def darter():
-    fn = lensfn(-2.6, 3.6, 1.05, 1.5, 0.66, 1.02, nose=0.6)
+    # Reads as: a needle with a two-pronged fork out in front and one line of light down its back.
+    fn = lensfn(-2.6, 3.6, 0.86, 1.5, 0.66, 1.02, nose=0.6)
     K.layered_hull(fn, sides=False)
     K.lifters([(1.5, 0, 0.68), (-1.3, 0, 0.7)], 0.28)
+    for u0, u1 in ((0.05, 0.4), (0.74, 0.97)):   # spine of light, fore and aft of the turret
+        light_rail([tuple(fn(u0 + (u1 - u0) * k / 5, 90, 0.2)) for k in range(6)], w=0.1, beads=3)
     for s in (1, -1):
-        # Forward-swept pincer blade, slim and raised, and a raked tail fin.
-        b = K.blade((1.0, s * 0.1, 1.1), 2.0, s * 12, s * 150, 0.22, 0.06, sq=(1.5, 0.72))
-        F.rot(b, 'X', -s * 10, about=(1.0, 0, 1.1))
+        # Forward-swept pincer blade reaching well past the nose, slim and raised, and a raked tail fin.
+        b = K.blade((1.6, s * 3.4, 1.12), 3.0, s * -104, s * -48, 0.46, 0.09, sq=(1.6, 1.0), zone='shell')
         K.fin((-1.9, s * 0.45, 1.25), 1.1, 215, 75, 0.34, 0.05, lean=-s * 22)
     K.eye((2.1, 0, 1.27), 0.17, brow=False)
     K.thrusters([(-2.4, 0, 1.05)], 1.3)
@@ -86,15 +120,17 @@ def glider():
     K.layered_hull(fn, sides=False)
     K.lifters([(1.2, 0, 0.6), (-1.2, 0, 0.6)], 0.3)
     for s in (1, -1):
-        b1 = K.blade((0.4, s * 2.5, 1.02), 2.2, s * -60, s * -172, 0.95, 0.09, zone='shell')
+        # Reads as: a wide manta, wider than it is long, with a light on each wingtip.
+        b1 = K.blade((0.6, s * 3.5, 1.02), 3.2, s * -60, s * -172, 1.25, 0.09, zone='shell')
         F.rot(b1, 'X', s * 7, about=(0, 0, 1.0))
-        b2 = K.blade((-0.7, s * 2.0, 1.14), 1.6, s * -60, s * -170, 0.6, 0.07)
+        b2 = K.blade((-0.6, s * 2.8, 1.14), 2.3, s * -60, s * -170, 0.75, 0.07)
         F.rot(b2, 'X', s * 12, about=(0, 0, 1.1))
         K.fin((-1.9, s * 0.5, 1.3), 1.0, 215, 80, 0.3, 0.05, lean=-s * 18)
-        K.barrel(1.2, 4.3, s * 0.55, 0.92, 0.1, prongs=2, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
+        K.barrel(1.2, 3.7, s * 0.55, 0.92, 0.1, prongs=2, group='Barrel' + 'LR'[s < 0], flash_group='Flash' + 'LR'[s < 0])
+        K.core((-2.35, s * 3.0, 1.55), 0.3, ring=False)
     K.core((0.3, 0, 1.72), 0.3)
-    K.thrusters([(-2.5, 0, 1.05)], 1.3)
-    return dict(pivot=K.gun_pivots([(a, (1.2, y, 0.92), (4.4, y, 0.92)) for a, y in (('L', 0.55), ('R', -0.55))], parent=None))
+    K.thrusters([(-2.5, 0, 1.05)], 1.0)
+    return dict(pivot=K.gun_pivots([(a, (1.2, y, 0.92), (3.8, y, 0.92)) for a, y in (('L', 0.55), ('R', -0.55))], parent=None))
 
 
 @asset('alien/carapace.glb', 'Arcadian Carapace (heavy tank)', size=1024)
@@ -102,23 +138,25 @@ def carapace():
     fn = lensfn(-4.2, 4.2, 3.1, 2.2, 0.62, 1.22, nose=0.9)
     K.layered_hull(fn, extra=True)
     for s in (1, -1):   # great forward horns
-        b = K.blade((2.3, s * 0.9, 1.34), 2.7, s * -25, s * 92, 0.55, 0.2, sq=(1.25, 0.85), zone='shell')
+        b = K.blade((2.3, s * 0.9, 1.34), 2.7, s * -25, s * 92, 0.85, 0.24, sq=(1.25, 0.85), zone='shell')
         F.rot(b, 'Y', -5, about=(2.3, 0, 1.34))
     K.lifters([(2.3, 0, 0.64), (-2.0, 1.2, 0.66), (-2.0, -1.2, 0.66), (0.3, 1.4, 0.64), (0.3, -1.4, 0.64)], 0.42)
     for s in (1, -1):
         K.fin((-3.0, s * 1.0, 1.76), 2.0, 222, 60, 0.6, 0.08, lean=-s * 10)
         K.fin((-2.2, s * 1.7, 1.42), 1.35, 215, 70, 0.42, 0.06, lean=-s * 26)
-        K.core((1.9, s * 1.05, 1.6), 0.22)
+        # Reads as: the biggest hull, great horns, and four cores set in a square.
+        K.core((2.0, s * 1.5, 1.8), 0.36)
+        K.core((-1.3, s * 2.3, 1.75), 0.36)
     K.flanks(8.3, 3.15, 1.42)
     K.slit_eyes(fn, 0.05, v=(66, 114), r=0.09)
     K.thrusters([(-3.9, 0.9, 1.3), (-3.9, -0.9, 1.3)], 1.6, r=0.034)
     tz = 2.1
     with F.group('Turret'):
-        turret(tz, L=3.9, w=1.25, h=0.85, x0=-2.2, gun=(7.4, 0.27))
+        turret(tz, L=3.9, w=1.25, h=0.85, x0=-2.2, gun=(6.6, 0.31))
         for s in (1, -1):
             K.fin((-1.2, s * 0.75, tz + 0.3), 1.0, 200, 75, 0.36, 0.05, lean=-s * 24)
             K.barrel(0.2, 3.1, s * 1.0, tz + 0.2, 0.1, prongs=2)
-    return dict(pivot=[('Turret', (-0.3, 0, tz))] + K.gun_pivots([('', (0.6, 0, tz + 0.2), (7.6, 0, tz + 0.2))]))
+    return dict(pivot=[('Turret', (-0.3, 0, tz))] + K.gun_pivots([('', (0.6, 0, tz + 0.2), (6.8, 0, tz + 0.2))]))
 
 
 @asset('alien/spitter.glb', 'Arcadian Spitter (missile tank)')
@@ -127,8 +165,8 @@ def spitter():
     K.layered_hull(fn)
     K.lifters([(1.5, 0, 0.64), (-1.3, 0.8, 0.66), (-1.3, -0.8, 0.66)], 0.34)
     for s in (1, -1):   # twin tail spikes, gold-tipped
-        sweep([(-1.6, s * 1.0, 1.1), (-3.4, s * 1.25, 1.25), (-5.2, s * 1.2, 1.6)], [(0.3, 0.16), (0.22, 0.12), (0.03, 0.03)], 'bronze', sides=6)
-        sweep([(-3.4, s * 1.25, 1.32), (-4.4, s * 1.23, 1.5), (-5.25, s * 1.2, 1.63)], [(0.06, 0.03), (0.05, 0.03), (0.02, 0.02)], 'gold', sides=4)
+        sweep([(-1.6, s * 1.0, 1.1), (-3.1, s * 1.25, 1.25), (-4.4, s * 1.2, 1.6)], [(0.3, 0.16), (0.22, 0.12), (0.03, 0.03)], 'bronze', sides=6)
+        sweep([(-3.1, s * 1.25, 1.32), (-3.8, s * 1.23, 1.47), (-4.45, s * 1.2, 1.63)], [(0.06, 0.03), (0.05, 0.03), (0.02, 0.02)], 'gold', sides=4)
     K.slit_eyes(fn, 0.07)
     K.thrusters([(-2.9, 0.4, 1.08), (-2.9, -0.4, 1.08)], 1.2)
     tz = 1.7
@@ -148,11 +186,12 @@ def spitter():
             for dx in (-0.75, 0.75):
                 y, z = 1.52 * math.cos(math.radians(a)), tz + 0.25 + 1.45 * math.sin(math.radians(a))
                 m = F.mark()
-                tube((dx - 0.2, y, z), (dx + 0.9, y, z), [(0, 0.1), (0.15, 0.2), (0.6, 0.2), (0.85, 0.13), (1, 0.02)], 10, 'barrel')
-                cyl((dx + 0.05, y, z), (dx + 0.3, y, z), 0.215, 10, 'slat')
-                K.xring(dx + 0.38, y, z, 0.225, 0.04, 'gold', 10, 0.03)
-                cyl((dx - 0.22, y, z), (dx - 0.2, y, z), 0.08, 8, 'glow')
-                orb((dx + 0.88, y, z), 0.045, 'core', seg=(6, 4))
+                # Reads as: an arch of six bright seeker heads (fatter pods, each with a glowing nose).
+                tube((dx - 0.2, y, z), (dx + 0.9, y, z), [(0, 0.13), (0.15, 0.27), (0.6, 0.27), (0.82, 0.2), (1, 0.12)], 10, 'barrel')
+                cyl((dx + 0.05, y, z), (dx + 0.3, y, z), 0.285, 10, 'slat')
+                K.xring(dx + 0.38, y, z, 0.3, 0.04, 'gold', 10, 0.03)
+                cyl((dx - 0.22, y, z), (dx - 0.2, y, z), 0.1, 8, 'glow')
+                orb((dx + 0.92, y, z), 0.22, 'core', seg=(8, 6))
                 K.arc((dx - 0.2, y, z), (dx - 1.3, y, z), rnd, r=0.03, rough=0.2, depth=2, forks=1, tip=True)   # launch trail
                 F.rot_all(m, 'Y', -22, about=(dx, y, z))
                 g = f'Pod{i}{"FB"[dx < 0]}'
@@ -197,7 +236,7 @@ def mortar_beast():
     return dict(pivot=[('Turret', (-0.5, 0, tz)), ('Flash', (-0.5, 0, tz + 2.5), 'FlashPivot', 'Turret')])
 
 
-@asset('alien/gorger.glb', 'Arcadian Gorger (ore miner)')
+@asset('alien/gorger.glb', 'Arcadian Sifter (ore miner)', role='ember')
 def gorger():
     fn = lensfn(-3.1, 2.9, 2.3, 1.55, 0.62, 1.06, nose=1.0)
     K.layered_hull(fn, rear=False, tone='worker')
@@ -217,8 +256,9 @@ def gorger():
         orb((x, y, z), 0.17, 'bronze', seg=(8, 6))
     # Feeding mandibles and a toothed grinder drum at the nose.
     for s in (1, -1):
-        K.blade((2.6, s * 0.15, 0.92), 1.7, s * -35, s * 100, 0.28, 0.1, sq=(1.15, 0.8), zone='shell')
-        K.blade((2.9, s * 0.1, 0.77), 1.1, s * -30, s * 95, 0.18, 0.07, sq=(1.15, 0.8))
+        # Reads as: a beetle with great open jaws round a glowing grinder, ore heaped on its back.
+        K.blade((2.5, s * 0.5, 0.95), 2.3, s * -22, s * 100, 0.5, 0.13, sq=(1.15, 0.8), zone='shell')
+        K.blade((2.9, s * 0.1, 0.77), 1.25, s * -30, s * 95, 0.22, 0.07, sq=(1.15, 0.8))
         cyl((1.6, s * 0.45, 1.5), (2.75, s * 0.42, 1.2), 0.045, 8, 'barrel')
         cyl((1.6, s * 0.45, 1.5), (2.2, s * 0.435, 1.35), 0.07, 8, 'bronze')
         K.xring(2.3, s * 0.43, 1.32, 0.07, 0.025, 'gold', 8, 0.02)
@@ -231,7 +271,8 @@ def gorger():
         L = 0.75
         rr = lambda t: 0.56 - 0.2 * t
         tube((gx0 + 0.75, 0, gz), (gx0 + 0.75 + L, 0, gz), [(0, rr(0)), (1, rr(1)), (1, rr(1) * 0.6), (0.7, 0.1)], 16, 'under', sharp=40)
-        cyl((gx0 + 0.72 + L * 0.75, 0, gz), (gx0 + 0.76 + L * 0.75, 0, gz), 0.2, 10, 'glow')          # gold throat
+        cyl((gx0 + 0.72 + L * 0.75, 0, gz), (gx0 + 0.76 + L * 0.75, 0, gz), 0.2, 10, 'glow')
+        orb((gx0 + 0.75 + L, 0, gz), 0.26, 'core', seg=(10, 8))          # gold throat
         K.xring(gx0 + 0.75 + L, 0, gz, rr(1) * 1.02, 0.04, 'gold', 16, 0.025)
         for row in range(3):
             for i in range(7):
@@ -245,11 +286,19 @@ def gorger():
     return dict(pivot=[('Grinder', (gx0 + 1.0, 0, gz), 'GrinderPivot')])
 
 
-@asset('alien/ferrier.glb', 'Arcadian Ferrier (cargo tug)')
+@asset('alien/ferrier.glb', 'Arcadian Ferrier (cargo tug)', role='ember')
 def ferrier():
-    fn = lensfn(-3.1, 3.0, 2.35, 1.35, 0.62, 1.0, nose=1.0)
+    # Reads as: a long barge with two straight rails of light and four tall claws round the load.
+    fn = lensfn(-3.7, 3.5, 1.95, 1.35, 0.62, 1.0, nose=1.0)
     K.layered_hull(fn, rear=False, tone='worker')
     K.lifters([(1.5, 0, 0.64), (-1.5, 0.85, 0.66), (-1.5, -0.85, 0.66)], 0.34)
+    for s in (1, -1):   # cargo rails: long floating tusks held off each flank, a line of ember light along each
+        pts = [(-3.9, s * 1.55, 1.5), (-2.2, s * 1.98, 1.42), (-0.4, s * 2.1, 1.4), (1.4, s * 1.98, 1.42), (3.1, s * 1.55, 1.5)]
+        sweep(pts, [(0.03, 0.03), (0.2, 0.11), (0.24, 0.13), (0.2, 0.11), (0.03, 0.03)], 'bronze', sides=6)
+        light_rail([(x, y, z + 0.17) for x, y, z in pts[1:-1]], w=0.1, beads=5)
+        sweep([(x, y + s * 0.2, z) for x, y, z in pts], [(0.02, 0.02), (0.05, 0.03), (0.05, 0.03), (0.05, 0.03), (0.02, 0.02)], 'gold', sides=4)
+        for x in (-1.9, 0.9):   # struts holding the rail off the hull
+            sweep([(x, s * 1.1, 1.15), (x, s * 1.95, 1.38)], [(0.08, 0.08), (0.05, 0.05)], 'bronze', sides=5)
     # Cargo cradle: a ribbed dish with a toothed gold collar, gripped by four tall claws, heaped with ore.
     c = (-1.0, 0, 1.25)
     lathe([(0.2, 0.0), (1.2, 0.08), (1.55, 0.3), (1.62, 0.3), (1.25, -0.02), (0.2, -0.12)], 24, 'under', center=c)
@@ -264,21 +313,22 @@ def ferrier():
         K.ore_heap((c[0], c[1], c[2] + 0.1), 1.25, 0.6, n=13, seed=9, crystals=8)
     for k in range(4):
         m = F.mark()
-        K.fin((0, 0, 0.1), 1.25, -40, 75, 0.4, 0.1, zone='shell')
-        F.move_all(m, (0.5, 0, 0))
+        K.fin((0, 0, 0.1), 1.6, -40, 75, 0.5, 0.1, zone='shell')
+        F.move_all(m, (0.25, 0, 0))
         F.rot_all(m, 'Z', 45 + 90 * k)
         F.move_all(m, c)
-    K.core((1.9, 0, 1.35), 0.24)
+    K.core((2.3, 0, 1.35), 0.24)
     K.thrusters([(-2.95, 0.4, 1.0), (-2.95, -0.4, 1.0)], 1.1)
     return {}
 
 
-@asset('alien/weaver.glb', 'Arcadian Weaver (repair)')
+@asset('alien/weaver.glb', 'Arcadian Weaver (repair)', role='pale')
 def weaver():
-    fn = lensfn(-2.8, 2.8, 2.15, 1.65, 0.62, 1.05, nose=1.0)
+    # Reads as: a round body under a turning three-armed star, a pale light at each arm tip.
+    fn = lensfn(-2.5, 2.5, 2.3, 1.65, 0.62, 1.05, nose=1.0)
     K.layered_hull(fn, tone='worker')
     K.lifters([(1.5, 0, 0.64), (-1.3, 0.8, 0.66), (-1.3, -0.8, 0.66)], 0.34)
-    K.thrusters([(-2.7, 0, 1.05)], 1.1)
+    K.thrusters([(-2.4, 0, 1.05)], 0.9)
     tz = 1.6
     tube((-0.2, 0, tz - 0.05), (-0.2, 0, tz + 0.35), [(0, 0.8), (0.5, 0.7), (1, 0.4)], 16, 'bronze')
     for z, r in ((0.1, 0.78), (0.34, 0.42)):
@@ -304,40 +354,42 @@ def weaver():
             F.rot_all(m, 'Z', 120 * k)
             F.move_all(m, c)
             m = F.mark()
-            path = [(1.2, 0, 0.0), (1.9, 0, -0.1), (2.5, 0, -0.5), (2.8, 0, -1.0)]
-            sweep(path, [(0.12, 0.1), (0.1, 0.09), (0.07, 0.06), (0.03, 0.03)], 'shell', sides=6)
-            sweep([(p[0], 0, p[2] + 0.05) for p in path], [(0.025, 0.02)] * 4, 'gold', sides=4)
+            path = [(1.2, 0, 0.0), (2.1, 0, 0.14), (2.9, 0, 0.05), (3.5, 0, -0.3)]
+            sweep(path, [(0.2, 0.13), (0.17, 0.11), (0.12, 0.08), (0.05, 0.04)], 'shell', sides=6)
+            sweep([(p[0], 0, p[2] + 0.08) for p in path], [(0.035, 0.025)] * 4, 'gold', sides=4)
+            ax, az = 0.7, 0.7   # the emitter fork rides out at the arm tip
             for s in (1, -1):
-                sweep([(2.78, s * 0.02, -0.96), (2.9, s * 0.13, -1.12), (2.92, s * 0.09, -1.32)], [(0.035, 0.035), (0.03, 0.03), (0.008, 0.008)], 'gold', sides=5)
-            K.arc((2.92, 0.09, -1.3), (2.92, -0.09, -1.3), rnd, r=0.014, rough=0.3, depth=2, forks=0)
-            orb((2.82, 0, -1.05), 0.08, 'core', seg=(10, 6))
+                sweep([(2.78 + ax, s * 0.03, -0.96 + az), (2.9 + ax, s * 0.2, -1.12 + az), (2.92 + ax, s * 0.14, -1.4 + az)], [(0.05, 0.05), (0.045, 0.045), (0.01, 0.01)], 'gold', sides=5)
+            K.arc((2.92 + ax, 0.14, -1.38 + az), (2.92 + ax, -0.14, -1.38 + az), rnd, r=0.02, rough=0.3, depth=2, forks=0)
+            orb((2.84 + ax, 0, -1.02 + az), 0.2, 'core', seg=(10, 8))
             F.rot_all(m, 'Z', 120 * k + 60)
             F.move_all(m, c)
     return dict(pivot=('Halo', (-0.2, 0, tz)))
 
 
-@asset('alien/seer.glb', 'Arcadian Seer (mobile sensor)')
+@asset('alien/seer.glb', 'Arcadian Seer (mobile sensor)', role='pale')
 def seer():
-    fn = lensfn(-2.6, 2.6, 2.0, 1.55, 0.62, 1.05, nose=1.0)
+    # Reads as: a small slim body carrying a tall mast with a crescent moon turning round one pale eye.
+    fn = lensfn(-2.5, 2.5, 1.55, 1.55, 0.62, 1.05, nose=0.85)
     K.layered_hull(fn, tone='worker')
-    K.lifters([(1.4, 0, 0.64), (-1.2, 0.75, 0.66), (-1.2, -0.75, 0.66)], 0.32)
-    K.thrusters([(-2.5, 0, 1.05)], 1.1)
+    K.lifters([(1.4, 0, 0.64), (-1.2, 0.6, 0.66), (-1.2, -0.6, 0.66)], 0.32)
+    K.thrusters([(-2.4, 0, 1.05)], 0.9)
     tz = 1.5
     tube((-0.3, 0, tz - 0.05), (-0.3, 0, tz + 0.3), [(0, 0.75), (0.5, 0.65), (1, 0.4)], 16, 'bronze')
     K.ring((-0.3, 0, tz + 0.1), 0.72, 0.025, 'gold', sides=20)
     with F.group('Eye'):
         # The eye: a large orb with a dark forward pupil, cradled by two tall horns, with flat orbit bands.
-        c = (-0.3, 0, tz + 2.0)
-        orb(c, 0.62, 'core', seg=(18, 12))
-        orb((c[0] + 0.56, 0, c[2]), 0.14, 'under', seg=(8, 8), sq=(0.5, 0.6, 1.5))
-        K.xring(c[0] + 0.55, 0, c[2], 0.27, 0.035, 'gold', 14, 0.015)
+        c = (-0.3, 0, tz + 2.7)
+        orb(c, 0.7, 'core', seg=(18, 12))
+        orb((c[0] + 0.63, 0, c[2]), 0.16, 'under', seg=(8, 8), sq=(0.5, 0.6, 1.5))
+        K.xring(c[0] + 0.62, 0, c[2], 0.3, 0.04, 'gold', 14, 0.015)
         for s in (1, -1):
-            K.fin((-0.3, 0, tz + 1.55), 1.5, 270 - s * 80, 270 + s * 38 - s * 180, 0.36, 0.07, zone='shell', plane='yz')
-        K.ring(c, 0.95, 0.03, 'bronze', sides=24, flat=2.6, tilt=(24, 0))
-        K.ring(c, 1.12, 0.025, 'gold', sides=24, flat=2.6, tilt=(-18, 30))
-        tube((-0.3, 0, tz + 0.3), (-0.3, 0, tz + 1.0), [(0, 0.3), (1, 0.12)], 10, 'shell')
-        for z, r in ((0.45, 0.28), (0.7, 0.21), (0.95, 0.15)):
-            K.ring((-0.3, 0, tz + z), r, 0.02, 'gold', sides=12)
+            K.fin((-0.3, 0, tz + 2.15), 1.95, 270 - s * 80, 270 + s * 38 - s * 180, 0.6, 0.09, zone='shell', plane='yz')
+        K.ring(c, 1.1, 0.045, 'bronze', sides=24, flat=2.6, tilt=(24, 0))
+        K.ring(c, 1.32, 0.04, 'gold', sides=24, flat=2.6, tilt=(-18, 30))
+        tube((-0.3, 0, tz + 0.3), (-0.3, 0, tz + 1.6), [(0, 0.32), (1, 0.13)], 10, 'shell')
+        for z, r in ((0.5, 0.29), (0.9, 0.23), (1.3, 0.17)):
+            K.ring((-0.3, 0, tz + z), r, 0.025, 'gold', sides=12)
     return dict(pivot=('Eye', (-0.3, 0, tz)))
 
 
@@ -400,7 +452,7 @@ def disc():
     K.ring((0, 0, Z + 0.1), R + 0.03, 0.03, 'gold', sides=40)
     for k in range(12):
         a = math.radians(30 * k + 15)
-        orb(((R + 0.1) * math.cos(a), (R + 0.1) * math.sin(a), Z + 0.04), 0.09, 'core', seg=(8, 6))
+        orb(((R + 0.1) * math.cos(a), (R + 0.1) * math.sin(a), Z + 0.04), 0.15, 'core', seg=(8, 6))
     # Crown: white-gold core in six slim fins with a tilted ring.
     lathe([(0.75, Z + 0.98), (0.95, Z + 1.2), (0.86, Z + 1.24), (0.62, Z + 1.05)], 18, 'bronze')
     K.ring((0, 0, Z + 1.22), 0.9, 0.025, 'gold', sides=18)

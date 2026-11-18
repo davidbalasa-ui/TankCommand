@@ -612,6 +612,7 @@ class N:
 
 
 UV_PRIORITY = {'track': 0.5, 'wheel': 0.6, 'dark': 0.6, 'under': 0.6, 'slat': 0.6, 'glow': 0.45, 'amber': 0.45,
+               'ember': 0.45, 'pale': 0.45, 'emberslat': 0.6, 'paleslat': 0.6,
                'red': 0.45, 'coil': 0.7, 'neon': 0.45, 'hot': 0.45, 'coilhot': 0.7, 'black': 0.5}
 EDGE = {'terran': (0.27, 0.28, 0.3, 2.5), 'kesh': (0.5, 0.45, 0.36, 1.2), 'nature': (0.06, 0.055, 0.05, 1.5)}
 CYAN = (0.03, 0.62, 1.0)
@@ -666,6 +667,13 @@ ZONES = {
         'bolt': dict(kind='glow', emit=(1.0, 0.95, 0.8), strength=2.6),
         'flash': dict(kind='glow', emit=(1.0, 0.62, 0.16), strength=2.4),
         'halo': dict(kind='glow', emit=(1.0, 0.5, 0.06), strength=1.15),
+        # Role glows: haulers and miners burn a deep ember orange, support units a pale white gold.
+        'ember': dict(kind='glow', emit=(1.0, 0.16, 0.012), strength=2.2),
+        'embercore': dict(kind='orb', emit=(1.0, 0.16, 0.012), strength=1.7),
+        'emberslat': dict(kind='ribs', emit=(1.0, 0.16, 0.012), strength=2.0, freq=11.0),
+        'pale': dict(kind='glow', emit=(1.0, 0.86, 0.6), strength=2.3),
+        'palecore': dict(kind='orb', emit=(1.0, 0.86, 0.6), strength=1.8),
+        'paleslat': dict(kind='ribs', emit=(1.0, 0.86, 0.6), strength=1.6, freq=11.0),
     },
     'nature': {
         'rock': dict(kind='rock', base=(0.2, 0.18, 0.16), base2=(0.33, 0.3, 0.26), moss=0.35),
