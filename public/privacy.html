@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TankCommand privacy policy</title>
+  <meta name="description" content="What TankCommand does and does not collect: no accounts, ads, analytics or tracking.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070c15;
+      --panel: #0f1a2c;
+      --line: rgba(120, 200, 255, 0.22);
+      --text: #e8f1ff;
+      --dim: #8aa0b8;
+      --cyan: #3fd8ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: 0.02em; }
+    h2 { font-size: 19px; margin: 28px 0 8px; color: var(--cyan); }
+    p, li { color: var(--text); }
+    ul { padding-left: 22px; }
+    li { margin: 4px 0; }
+    .updated { color: var(--dim); margin: 0 0 20px; }
+    .summary {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .summary ul { margin: 6px 0 0; }
+    a { color: var(--cyan); }
+    code { font-size: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>TankCommand privacy policy</h1>
+  <p class="updated">Last updated: 18 November 2026. Applies to the TankCommand Android app and the web version at tankcommand.vercel.app.</p>
+
+  <section class="summary" aria-label="Summary">
+    <strong>In short</strong>
+    <ul>
+      <li>No accounts, no ads, no analytics and no tracking.</li>
+      <li>Your saves stay on your device (and in your own Android backup).</li>
+      <li>A bug report leaves your device only when you tap <em>Send report</em>.</li>
+      <li>Purchases are handled by Google Play. We never see your payment details.</li>
+    </ul>
+  </section>
+
+  <h2>What the game does not do</h2>
+  <ul>
+    <li>There are no accounts or sign-in. TankCommand is a single-player game.</li>
+    <li>There are no advertisements and no advertising identifiers.</li>
+    <li>There are no analytics, crash-reporting or tracking services, and no data is sold or shared for marketing.</li>
+    <li>The game has no database of players. We cannot see who plays or how.</li>
+  </ul>
+
+  <h2>Saves, progress and settings</h2>
+  <p>Your saved games, campaign progress, settings and whether you own the full game are stored in the app's private storage on your device. In the web version they are stored in your browser.</p>
+  <p>On Android the app allows Android's built-in backup. If backup is turned on in your phone's settings, Android copies this data to your own Google account backup so it comes back when you reinstall or change phones. That backup belongs to you and is managed by Google under your account; we cannot see it. You can turn it off in your phone's backup settings.</p>
+  <p>Uninstalling the app deletes the data on the device. Deleting the backup from your Google account removes the copy there.</p>
+
+  <h2>Bug reports</h2>
+  <p>The bug report screen has two buttons:</p>
+  <ul>
+    <li><strong>Save to device</strong> writes the report to a file on your device. Nothing is sent.</li>
+    <li><strong>Send report</strong> sends the report to the developer. Nothing is sent unless you tap it.</li>
+  </ul>
+  <p>A sent report contains what the form shows:</p>
+  <ul>
+    <li>the description you type;</li>
+    <li>device and app information: the game version, whether it is the Android app or the web version, your device's browser identification string (which names the operating system version and often the phone model), screen size and language;</li>
+    <li>the game's recent log lines and, if the game froze, how long it stalled;</li>
+    <li>your current saved game, only if you tick <em>Include save file</em>.</li>
+  </ul>
+  <p>The report goes to a small server function run for the game on Vercel. It checks the report, removes anything in the text that looks like an email address or IP address, and creates an issue in the game's GitHub project, where the developer tracks bugs. The issue holds the report as described above and nothing else.</p>
+  <p>The server function does not store reports and does not store your IP address. To stop flooding, it counts reports per connection for a few minutes using a scrambled (salted and hashed) form of the IP address, kept only in memory and gone when the function stops. Vercel and GitHub handle the request and the issue under their own privacy policies.</p>
+  <p>Please do not type personal information into a bug report. If you want a report you sent removed, contact us (below) with roughly when you sent it and what it said.</p>
+
+  <h2>Purchases</h2>
+  <p>TankCommand is free to download, with one optional in-app purchase, the full game unlock. Purchases are made and processed by Google Play under Google's terms and privacy policy. We never receive your name, email address or payment details. The app only asks Google Play whether your Google account owns the full game unlock, and stores the answer on your device.</p>
+
+  <h2>Permissions</h2>
+  <p>The Android app uses the internet permission (for Send report and for Google Play purchases) and Google Play's billing permission. It does not ask for your location, contacts, camera, microphone or files.</p>
+
+  <h2>Children</h2>
+  <p>The game does not collect personal information from anyone, including children.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or requests about privacy: [contact email]</p>
+</main>
+</body>
+</html>

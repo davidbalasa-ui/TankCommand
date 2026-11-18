@@ -1,0 +1,80 @@
+name: Android
+
+# Builds the Capacitor Android app: a debug APK to sideload and a release AAB for Play Console.
+# The release bundle is signed when the four ANDROID_* signing secrets exist (see
+# docs/play-release.md) and is left unsigned otherwise (forks, or before the secrets are added).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'src/platform/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the web app
+        run: npm run build
+
+      - name: Copy the web app and plugins into the Android project
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Build debug APK and release AAB
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleDebug bundleRelease
+
+      - name: Report signing
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "$HAS_KEYSTORE" = "true" ]; then
+            echo "Release AAB for version $VERSION is signed with the upload key." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Release AAB for version $VERSION is UNSIGNED: add the four ANDROID_* secrets to sign it (docs/play-release.md)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tankcommand-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tankcommand-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error

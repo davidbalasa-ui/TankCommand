@@ -1,6 +1,7 @@
 import type { ScreenContext } from './router';
 import { button } from './controls';
 import { DEFAULT_SETTINGS, type SettingsState } from '../platform/settings';
+import { openPrivacyPolicy } from '../platform/links';
 
 function downloadText(fileName: string, text: string): void {
   const blob = new Blob([text], { type: 'application/json' });
@@ -192,11 +193,40 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     });
   });
 
+  // Restore purchases: asks Google Play again for the full game unlock (a new phone, a reinstall).
+  let restoring = false;
+  const restorePurchases = button('settings', 'restorePurchases', 'Restore purchases', () => {
+    const purchases = ctx.purchases;
+    if (!purchases) {
+      status.textContent = 'Purchases are unavailable in this environment.';
+      return;
+    }
+    if (restoring) {
+      return;
+    }
+    restoring = true;
+    restorePurchases.disabled = true;
+    status.textContent = 'Checking Google Play…';
+    void purchases
+      .restore()
+      .then((result) => {
+        status.textContent = result.message;
+      })
+      .finally(() => {
+        restoring = false;
+        restorePurchases.disabled = false;
+      });
+  });
+
+  const privacy = button('settings', 'privacy', 'Privacy', () => {
+    openPrivacyPolicy();
+  });
+
   const back = button('settings', 'back', 'Back', () => {
     ctx.router.back();
   });
 
-  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, back, fileInput);
+  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, restorePurchases, privacy, back, fileInput);
 
   function refreshLabels(): void {
     const values = current();

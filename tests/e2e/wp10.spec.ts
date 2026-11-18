@@ -404,3 +404,53 @@ test('[BUG-01] bug report collects fields and saves a report without a network r
   const fetchCount = await page.evaluate(() => (window as unknown as { __fetchCount: number }).__fetchCount);
   expect(fetchCount).toBe(0);
 });
+
+test('[BUG-02] Send posts the report and says so; a failed send saves it on the device instead', async ({ page }, testInfo) => {
+  requirePhone(testInfo);
+  const bodies: string[] = [];
+  let status = 201;
+  await page.route('https://tankcommand.vercel.app/api/bug-report', async (route) => {
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: cors });
+      return;
+    }
+    bodies.push(route.request().postData() ?? '');
+    await route.fulfill({ status, headers: { ...cors, 'Content-Type': 'application/json' }, body: '{}' });
+  });
+  await enterGame(page);
+  await tap(page, 'inGame.pause');
+  await waitScreen(page, 'pause');
+  await tap(page, 'pause.bugReport');
+  await waitScreen(page, 'bugReport');
+  await expect(page.locator('[data-control-id="bugReport.send"]')).toBeVisible();
+  await expect(page.locator('[data-control-id="bugReport.save"]')).toBeVisible();
+
+  // Nothing to send without a description.
+  await tap(page, 'bugReport.send');
+  await expect(page.locator('[data-bug-status]')).toContainText('Describe what went wrong first.');
+  expect(bodies).toHaveLength(0);
+
+  await page.locator('.bug-text').fill('Tank drove through a hill.');
+  await tap(page, 'bugReport.send');
+  await expect(page.locator('[data-bug-status]')).toContainText('Report sent');
+  expect(bodies).toHaveLength(1);
+  const sent = JSON.parse(bodies[0] ?? '{}') as { message?: string; platform?: string; logs?: unknown[]; device?: unknown };
+  expect(sent.message).toBe('Tank drove through a hill.');
+  expect(sent.platform).toBe('web');
+  expect(Array.isArray(sent.logs)).toBe(true);
+  expect(sent.device).toBeTruthy();
+  expect(await page.evaluate(() => window.__TC_TEST__?.lastBugReport() ?? null)).toBeNull();
+
+  // The server is not configured yet: the report is kept as a local file.
+  status = 503;
+  await tap(page, 'bugReport.send');
+  await expect(page.locator('[data-bug-status]')).toContainText('Not sent: the report server is not set up yet');
+  await expect(page.locator('[data-bug-status]')).toContainText('Saved on this device');
+  const report = await page.evaluate(() => window.__TC_TEST__?.lastBugReport() ?? null);
+  expect(report?.content).toContain('Tank drove through a hill.');
+});
