@@ -84,6 +84,21 @@ test('[ORD-03] a queued waypoint is drawn as an extended order path', async ({ p
     )
     .toBe(true);
 
+  // Freeze the sim as soon as the queued leg is in, so a slow runner (whose page reads can take
+  // seconds) cannot let the unit finish the first leg before the drawn path is read.
+  await expect
+    .poll(async () =>
+      page.evaluate((id) => {
+        const hook = window.__TC_TEST__;
+        const queued = hook?.units().find((item) => item.id === id)?.queued ?? false;
+        if (queued) {
+          hook?.pauseSim(true);
+        }
+        return queued;
+      }, ownId),
+    )
+    .toBe(true);
+
   // Read the drawn path and its queued flag together: the unit re-plans its path as it drives
   // (avoidance), so the entry can be missing for a frame between two separate reads.
   await expect
@@ -96,4 +111,5 @@ test('[ORD-03] a queued waypoint is drawn as an extended order path', async ({ p
       { message: 'the drawn path covers both legs and is marked as a queued path' },
     )
     .toEqual({ extended: true, queued: true });
+  await page.evaluate(() => window.__TC_TEST__?.pauseSim(false));
 });
