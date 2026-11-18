@@ -61,7 +61,7 @@
   "objectives": [
     {
       "id": "station",
-      "text": "Buy a Metal Station. It drives to a blue metal site and unpacks there",
+      "text": "Open Build, tap Structures and buy a Metal Station. It drives to a blue metal site",
       "kind": "primary"
     }
   ],
@@ -76,7 +76,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Metal sites are the pale blue rocks. Tap your landing pad to open Build."
+          "text": "Metal sites are the blue rocks by your pad. Tap your landing pad to open Build."
         }
       ]
     },
@@ -180,7 +180,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Missiles researched: the Javelin card is open now."
+          "text": "Missiles researched! Upgrades cost a little ore and metal. Here is 100 ore."
         },
         {
           "t": "grant",

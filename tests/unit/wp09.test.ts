@@ -116,6 +116,10 @@ describe('triggers', () => {
       [{ t: 'relationIs', a: 1, b: 3, relation: 'neutral' }, true],
       [{ t: 'unitsAlive', side: 1, op: '>=', count: 2 }, true],
       [{ t: 'unitsAlive', side: 1, op: '<=', count: 1 }, false],
+      [{ t: 'unitsAlive', side: 1, unitType: 'unit.test.tank', op: '>=', count: 2 }, true],
+      [{ t: 'unitsAlive', side: 1, unitType: 'unit.test.other', op: '>=', count: 1 }, false],
+      [{ t: 'upgraded', side: 1 }, false],
+      [{ t: 'upgraded', side: 1, upgrade: 'armor' }, false],
       [{ t: 'unitEscorted', tag: 'vip', x: 0, z: 0, radius: 3 }, true],
       [{ t: 'unitEscorted', tag: 'vip', x: 20, z: 20, radius: 3 }, false],
       [{ t: 'and', conds: [{ t: 'time', tick: 0 }, { t: 'time', tick: 9 }] }, false],
@@ -125,6 +129,12 @@ describe('triggers', () => {
     for (const [cond, expected] of cases) {
       expect(evalCondition(w, m, cond), JSON.stringify(cond)).toBe(expected);
     }
+    // An upgrade on one vehicle meets `upgraded` for that upgrade (and for any upgrade).
+    w.units[1]?.upgrades.push('fireRate');
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1 })).toBe(true);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1, upgrade: 'fireRate' })).toBe(true);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 1, upgrade: 'armor' })).toBe(false);
+    expect(evalCondition(w, m, { t: 'upgraded', side: 2, upgrade: 'fireRate' })).toBe(false);
   });
 
   it('[MSN-02] every action type runs', () => {

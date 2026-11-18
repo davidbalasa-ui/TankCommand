@@ -95,7 +95,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "First load home! Haulers fetch the crates by themselves. Here is 150 ore to grow."
+          "text": "First load home! Haulers fetch the crates by themselves. Here is 150 ore for more workers."
         },
         {
           "t": "grant",
@@ -144,7 +144,7 @@
           "t": "setObjective",
           "id": "bank",
           "status": "add",
-          "text": "Bank 400 ore. The ore count is at the top of the screen",
+          "text": "Bank 400 ore. Your ore count is at the top left",
           "kind": "primary"
         },
         {

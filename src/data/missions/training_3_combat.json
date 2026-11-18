@@ -3,7 +3,7 @@
   "campaign": "training",
   "order": 3,
   "title": "Combat",
-  "briefing": "Four Lancers are yours to command. Learn to pick them, move them and fight with them. The Arcadian Darters on the range are old and slow to shoot.",
+  "briefing": "Four Lancers are yours to command. Learn to pick them, move them and fight with them. The Arcadian Darters on the range are light scouts, no match for four Lancers.",
   "mapId": "map.t_drill_yard",
   "sides": [
     {
@@ -137,7 +137,7 @@
           "t": "setObjective",
           "id": "all",
           "status": "add",
-          "text": "Double-tap a Lancer to pick all four, or tap All at the bottom. Move them to the ring",
+          "text": "Double-tap a Lancer to pick all four, or tap All army at the bottom. Move them to the ring",
           "kind": "primary"
         },
         {
@@ -248,13 +248,13 @@
           "t": "setObjective",
           "id": "hold",
           "status": "add",
-          "text": "Raiders incoming! Tap Hold: your Lancers stay put and fire at anything in range",
+          "text": "Select your Lancers and tap Hold: they stay put and fire at anything in range. Beat the raid",
           "kind": "primary"
         },
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Good. Now stand your ground."
+          "text": "Well fought. Arcadian raiders are coming through the gap behind you!"
         },
         {
           "t": "spawn",
@@ -299,7 +299,7 @@
           "t": "setObjective",
           "id": "group",
           "status": "add",
-          "text": "Select all, then hold tile 1 at the bottom to save a group. Tap 1, then the ring",
+          "text": "Tap All army, then hold tile 1 to save them as a group. Tap 1, then tap the ring",
           "kind": "primary"
         },
         {

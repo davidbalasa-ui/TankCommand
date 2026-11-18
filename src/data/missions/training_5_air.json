@@ -3,7 +3,7 @@
   "campaign": "training",
   "order": 5,
   "title": "Air",
-  "briefing": "Aircraft fly over hills and water, but they need an Airfield to land, refuel and rearm. Only some weapons can hit them: missiles and other aircraft. Build an air wing and use it.",
+  "briefing": "Aircraft fly over hills and water, but they need an Airfield to land, refuel and rearm. Only some weapons can hit them: missiles and fighters. Build an air wing and put it to work.",
   "mapId": "map.t_kestrel_field",
   "sides": [
     {
@@ -76,7 +76,7 @@
   "objectives": [
     {
       "id": "airfield",
-      "text": "Buy an Airfield. Aircraft land, refuel and rearm there",
+      "text": "Open Build, tap Structures and buy an Airfield. Aircraft land, refuel and rearm there",
       "kind": "primary"
     }
   ],
@@ -91,7 +91,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Tap your landing pad to open Build."
+          "text": "Aviation research is done for you. Tap your landing pad to open Build."
         }
       ]
     },

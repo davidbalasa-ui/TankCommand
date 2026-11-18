@@ -51,7 +51,8 @@
 | PERF-01 | Sustained slow frames step quality down in order, fast frames step it back up, and quality never changes more than once per second. |
 | MAP-01 | Same seed produces identical heights and different seeds differ. |
 | MAP-02 | Start areas are flat and connected by an A* path. |
-| MAP-03 | On every skirmish map, for any seed, ground units can drive between every pair of start positions (two- and four-side layouts). |
+| MAP-03 | On every skirmish map, for any seed, ground units can drive between every pair of start positions (two- and four-side layouts). There are at least six skirmish maps, two of them for four sides. |
+| MAP-04 | On every designed skirmish map, a normal-vs-normal AI match ends with a winner inside 30 game minutes (two seeds each). |
 | MOVE-01 | A single tank ordered to a reachable point arrives within 0.5 units in time. |
 | MOVE-02 | A tank ordered behind the ridge routes around it and never enters a blocked cell. |
 | MOVE-03 | Orders outside the map are clamped and units never leave the map. |
@@ -175,13 +176,17 @@
 | AIR-06 | Interceptors (air-only weapons, e.g. the Arcadian Dragonfly) never fire at ground units or structures; the computer buys them only against enemy aircraft and never sends them on ground strikes. |
 | MSN-01 | Mission files validate against the schema; an invalid file is rejected with the field named. |
 | MSN-02 | Every condition and action type has a unit test that fires it. |
-| MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). |
+| MSN-03 | Each placeholder mission can be won and lost by a scripted command stream (headless). Training lessons are the exception: they cannot be lost (TRN-02). |
 | MSN-04 | No placeholder mission can reach a state with no way to win or lose. |
+| TRN-01 | Five training lessons in order (drops, mining, combat, research, air), each on a training map with no time limit, are won by the scripted beginner in a few minutes. |
+| TRN-02 | A training lesson cannot be lost: a player who does nothing for ten minutes is never defeated. |
+| TRN-03 | A lesson shows only the current step's goal ring; later steps' rings appear once the step before is done. |
+| TRN-04 | The training chain holds exactly the five lessons. |
 | MSN-05 | Completing a mission unlocks the next; progress persists across reload; reached missions can be replayed. |
 | MSN-06 | Objectives sheet and trigger messages work by touch on the phone. |
 | MSN-07 | A neutral armed side turns hostile when attacked and fights back; `unitsAlive` fails the mission; `setRelation` and `relationIs` work. |
 | MSN-08 | Goal areas the player must reach (areaEntered for the player's side, unitEscorted) are drawn on the ground and minimap until their trigger fires. |
-| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). |
+| SKR-01 | Skirmish setup options all take effect, with 1 or 2 AI opponents (David 2026-11-11: at most two AI sides of 64 units; approved UI redesign v1 shows 1 AI / 2 AI). A map seats one side per start: two-player maps offer 1 AI, four-player maps 1 or 2 AI. |
 | SKR-02 | Every side starts with the same layout of tanks, miner and tug round its pad, turned to face the middle of the map. |
 | DET-07 | Trigger state survives save/load with an identical hash. |
 | DET-06 | Air and water scenarios are deterministic. |

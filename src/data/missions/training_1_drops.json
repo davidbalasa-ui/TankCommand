@@ -53,7 +53,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Your landing pad is the square with lights. Tap it to see what you can buy."
+          "text": "Your landing pad is the big square platform. Tap it to see what you can buy."
         }
       ]
     },
@@ -125,7 +125,7 @@
         {
           "t": "message",
           "speaker": "Command",
-          "text": "Good. Close Build with the X when you want the map back."
+          "text": "All landed. Close Build with the X to see the whole map again."
         }
       ]
     },
@@ -157,7 +157,7 @@
           "t": "setObjective",
           "id": "tower",
           "status": "add",
-          "text": "Buildings come by drop too. Buy a Bastion Gun: it drives out and sets itself up",
+          "text": "Buildings come by drop too. Open Build, tap Structures, buy a Bastion Gun. It sets itself up",
           "kind": "primary"
         },
         {
