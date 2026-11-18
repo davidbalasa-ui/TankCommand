@@ -168,4 +168,26 @@ describe('movement', () => {
     b = step(b, []);
     expect(hashWorld(a)).toBe(hashWorld(b));
   });
+
+  it('[MOVE-07] tanks each sent on their own to the same point settle instead of circling it', () => {
+    const starts = Array.from({ length: 5 }, (_, index) => ({
+      owner: 1,
+      typeId: 'unit.test.tank',
+      x: -50 + index * 4,
+      z: -50,
+    }));
+    let world = makeWorld(1, starts);
+    // One command per unit (as the AI recalls units one at a time): no formation spreads them out.
+    world = step(
+      world,
+      world.units.map((unit) => ({ kind: 'move' as const, unitIds: [unit.id], x: -29, z: -30, tick: 1, issuer: 1 })),
+    );
+    for (let i = 0; i < 40 * 20 && !world.units.every((unit) => unit.order.kind === 'idle'); i += 1) {
+      world = step(world, []);
+    }
+    for (const unit of world.units) {
+      expect(unit.order.kind).toBe('idle');
+      expect(Math.hypot(unit.x + 29, unit.z + 30)).toBeLessThan(UNIT_RADIUS * 6);
+    }
+  });
 });

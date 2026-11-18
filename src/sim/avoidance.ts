@@ -261,9 +261,23 @@ export function goalTaken(world: WorldState, unit: UnitState, goalX: number, goa
   if (unit.air || goalDistance > r * 3) {
     return false;
   }
-  for (const other of nearbyUnits(world, goalX, goalZ, r + MAX_RADIUS)) {
-    // Only our own side's parked units count: an enemy on the spot is something to fight, not a reason to stop.
-    if (other === unit || other.hp <= 0 || other.owner !== unit.owner || other.speed > 0.3) {
+  for (const other of nearbyUnits(world, goalX, goalZ, r * 3 + MAX_RADIUS)) {
+    // Only our own side's units count: an enemy on the spot is something to fight, not a reason to stop.
+    if (other === unit || other.hp <= 0 || other.owner !== unit.owner) {
+      continue;
+    }
+    // A friend driving to this very spot and nearer to it has it (ties go to the lower id). Units
+    // sent one by one to the same point would otherwise circle it forever, each pushing the
+    // others off.
+    const order = other.order;
+    if ((order.kind === 'move' || order.kind === 'attackMove') && order.x === goalX && order.z === goalZ) {
+      const otherDistance = Math.hypot(other.x - goalX, other.z - goalZ);
+      if (otherDistance < goalDistance || (otherDistance === goalDistance && other.id < unit.id)) {
+        return true;
+      }
+      continue;
+    }
+    if (other.speed > 0.3) {
       continue;
     }
     const ro = unitRadius(world, other);

@@ -58,6 +58,7 @@
 | MOVE-04 | Twelve tanks ordered to one point settle without overlaps or active orders. |
 | MOVE-05 | A destination inside a blocked area stops at the nearest reachable cell. |
 | MOVE-06 | Commands for units the issuer does not own change nothing. |
+| MOVE-07 | Units sent one by one to the same point settle round it instead of circling it forever. |
 | CMB-01 | Turrets turn at their turn rate independently of the hull. |
 | CMB-02 | A tank fires only when aligned and reloaded, with the configured reload interval. |
 | CMB-03 | Damage uses armor with a minimum of one (and armor never stops more than 75% of a hit), HP clamps and wrecks expire after ten seconds. |
