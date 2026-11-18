@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 20,
   "title": "Brood War",
-  "briefing": "Without the Matriarch the broods have split, and two of them now hold the rift: one to the east, one to the north. Destroy both of their Landing Rings.",
+  "briefing": "Without the Matriarch two broods hold the rift, each on its own: one to the east, one to the north. Destroy both of their Landing Rings.",
   "mapId": "map.c_rift",
   "sides": [
     {

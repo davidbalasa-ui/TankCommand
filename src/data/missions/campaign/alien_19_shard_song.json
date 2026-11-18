@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 19,
   "title": "Shard Song",
-  "briefing": "The brood has nested among the Shard's crystals at the rift. Learn its song and the rift will open wide for the whole swarm, but the Shard is waking and it serves no one. Hold the nest for ten minutes against the Terrans and the spires both.",
+  "briefing": "The brood has nested among the Shard's crystals at the rift. Learn its song and the rift will open wide for the whole swarm, but the Shard grows restless and serves no one. Hold the nest for ten minutes against the Terrans and the spires both.",
   "mapId": "map.c_crystal_fields",
   "sides": [
     {
@@ -204,7 +204,7 @@
         {
           "t": "message",
           "speaker": "Matriarch",
-          "text": "The crystals are quiet for now. Get ready."
+          "text": "The spires are quiet for the moment. Get ready."
         }
       ]
     },

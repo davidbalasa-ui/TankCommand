@@ -3,7 +3,7 @@
   "campaign": "alien",
   "order": 11,
   "title": "The Long Hunger",
-  "briefing": "The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten minutes. Coronas are ready to grow, and they outreach Terran tanks.",
+  "briefing": "The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten minutes. Coronas are ready to grow, and they outrange Terran tanks.",
   "mapId": "map.c_quiet_fields",
   "sides": [
     {

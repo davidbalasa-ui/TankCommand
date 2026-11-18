@@ -3,7 +3,7 @@
   "campaign": "human",
   "order": 22,
   "title": "Close the Rift",
-  "briefing": "The anchors are down and the rift is failing. The Shard still holds it open, and the last Arcadian hive has dug in beside it to feed on its power. Destroy the Shard and the hive, and the rift closes for good.",
+  "briefing": "The anchor spires are down and the rift is failing. The Shard and its last spires still hold it open, and the last Arcadian hive has dug in beside it to feed on its power. Destroy the Shard and the hive, and the rift closes for good.",
   "mapId": "map.c_rift",
   "sides": [
     {

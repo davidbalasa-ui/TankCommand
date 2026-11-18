@@ -784,7 +784,7 @@ def act2(f):
     mission(f, 9, say('long_reach', 'slow_rain'), say('Long Reach', 'Slow Rain'),
             say('The Arcadians have dug guns into the hill at the centre of the valley. They outrange our tanks, but '
                 'not our new Longbow artillery. Shell the hill until every gun is gone.',
-                'The Terrans have fortified the hill in the middle of the valley. Their guns outreach our Lumens, '
+                'The Terrans have fortified the hill in the middle of the valley. Their guns outrange our Lumens, '
                 'but not our new Sunfalls. Rain on the hill until every gun is gone.'),
             'map.c_long_reach',
             [player_side(f, 700, available=avail(f, *ACT2_UNITS, 'artillery'),
@@ -873,7 +873,7 @@ def act2(f):
             say('Tallis colony is about to be hit by five waves, each bigger than the last. Hold for ten minutes. '
                 'Harpoon Battery missile towers are now in Build, and they outrange tanks.',
                 'The Terrans will throw five waves at our siphon nest, each bigger than the last. Hold for ten '
-                'minutes. Coronas are ready to grow, and they outreach Terran tanks.'),
+                'minutes. Coronas are ready to grow, and they outrange Terran tanks.'),
             'map.c_quiet_fields',
             [player_side(f, 1100, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair')), enemy_side(e)],
@@ -1259,7 +1259,7 @@ def act3(f):
     else:
         mission(f, 19, 'shard_song', 'Shard Song',
                 'The brood has nested among the Shard\'s crystals at the rift. Learn its song and the rift will open '
-                'wide for the whole swarm, but the Shard is waking and it serves no one. Hold the nest for ten '
+                'wide for the whole swarm, but the Shard grows restless and serves no one. Hold the nest for ten '
                 'minutes against the Terrans and the spires both.',
                 'map.c_crystal_fields',
                 [player_side(f, 1200, available=avail(f, *units3, 'saucer'),
@@ -1272,7 +1272,7 @@ def act3(f):
                 [S(1, R['pad'], gx, gz), S(1, R['turret'], gx - 18, gz + 2)] + spires,
                 [('hold', 'Hold the nest for 10 minutes', 'primary'), ('spires', 'Shatter all five spires', 'optional')],
                 [
-                    T('intro', at(0), msg('The crystals are quiet for now. Get ready.', f)),
+                    T('intro', at(0), msg('The spires are quiet for the moment. Get ready.', f)),
                     T('wake', at(120), msg('The Shard is singing. The spires are turning on us!', f),
                       {'t': 'setRelation', 'a': 1, 'b': 3, 'relation': 'hostile'}),
                     *[T(f't{i}', at(90 + i * 110), spawn(2, E['light'], 2 + i, hx + 10, hz - 10, tag=f't{i}'),
@@ -1293,7 +1293,7 @@ def act3(f):
     b_x, b_z = RIFT_ENEMY_B
     sx, sz = RIFT_SHARD
     mission(f, 20, say('brood_war', 'two_banners'), say('Brood War', 'Two Banners'),
-            say('Without the Matriarch the broods have split, and two of them now hold the rift: one to the east, one '
+            say('Without the Matriarch two broods hold the rift, each on its own: one to the east, one '
                 'to the north. Destroy both of their Landing Rings.',
                 'With their relay gone, the Coalition has hired a mercenary company to hold the rift against us. The '
                 'Coalition base lies east of it, the mercenaries to the north. Destroy both Landing Pads.'),
@@ -1374,7 +1374,7 @@ def act3(f):
     hx, hz = RIFT_HOME
     shard = [S(3, SHARD_CORE, sx, sz)] + [S(3, SHARD_SPIRE, sx + dx, sz + dz) for dx, dz in [(-16, 0), (0, 16), (14, -12)]]
     mission(f, 22, say('close_the_rift', 'vesper_falls'), say('Close the Rift', 'Vesper Falls'),
-            say('The anchors are down and the rift is failing. The Shard still holds it open, and the last Arcadian '
+            say('The anchor spires are down and the rift is failing. The Shard and its last spires still hold it open, and the last Arcadian '
                 'hive has dug in beside it to feed on its power. Destroy the Shard and the hive, and the rift closes '
                 'for good.',
                 'The citadel\'s walls are down. Destroy its two Radar Towers, which carry its commands, and every '
