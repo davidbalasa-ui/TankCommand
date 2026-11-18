@@ -56,3 +56,12 @@ export function tickReload(left: number): number {
   const next = left - DT;
   return next < 1e-6 ? 0 : next;
 }
+
+/**
+ * Indirect-fire weapons (the Longbow's and the Mortar Beast's shells) lob their round onto the
+ * aimed point: in the sim a miss bursts there instead of flying on, and the view draws the shell on
+ * a ballistic arc.
+ */
+export function isArcingWeapon(kind: string | undefined): boolean {
+  return kind === 'shell';
+}

@@ -7,6 +7,9 @@ export const STOP_DISTANCE = 0.5; // placeholder until Stage 0
 export const WAYPOINT_REACHED = 1; // placeholder until Stage 0
 export const FORMATION_SPACING = 4; // placeholder until Stage 0
 export const PROJECTILE_TTL = 5; // placeholder until Stage 0
+// A direct-fire shot that misses flies on to this multiple of its weapon's range (or of the aimed
+// distance, when that is longer), then bursts: a miss never lands far outside the gun's reach.
+export const PROJECTILE_RANGE_OVERSHOOT = 1.2;
 export const WRECK_TTL_SEC = 10; // placeholder until Stage 0
 export const TURRET_ALIGN_TOLERANCE_DEG = 5; // placeholder until Stage 0
 export const FIRE_MOVE_SPEED_MAX = 0.1; // placeholder until Stage 0

@@ -24,6 +24,7 @@ import {
   MAX_REPLANS,
   MOVE_EPS,
   MUZZLE_HEIGHT,
+  PROJECTILE_RANGE_OVERSHOOT,
   PROJECTILE_TTL,
   STOP_DISTANCE,
   STUCK_TICKS,
@@ -69,7 +70,7 @@ import {
   updateResearch,
 } from './research';
 import { applyUpgradeCommand, unitArmor, structureArmor } from './upgrades';
-import { burstSize, tickReload, afterShot, damageAfterArmor, isLastShotOfBurst } from './weaponCycle';
+import { burstSize, tickReload, afterShot, damageAfterArmor, isArcingWeapon, isLastShotOfBurst } from './weaponCycle';
 import { resolveRepairCommand, updateRepair } from './repair';
 import {
   applyDeployCommand,
@@ -752,7 +753,14 @@ function fireProjectile(
     vy: (targetY - startY) / travelTime,
     vz: Math.sin(angle) * weapon.projectileSpeed,
     damage: weapon.damage,
-    ttl: PROJECTILE_TTL,
+    // A miss doesn't fly on for the full TTL: an indirect shell bursts on the aimed point, a
+    // direct shot a little past its weapon's range (one tick added so it gets all the way there).
+    ttl: Math.min(
+      PROJECTILE_TTL,
+      (isArcingWeapon(weapon.kind) ? distance : Math.max(distance, weapon.range) * PROJECTILE_RANGE_OVERSHOOT) /
+        weapon.projectileSpeed +
+        DT,
+    ),
     splashRadius: weapon.splashRadius,
   };
   if (targetStructureId !== undefined) {
