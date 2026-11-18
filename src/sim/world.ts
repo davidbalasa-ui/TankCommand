@@ -46,6 +46,7 @@ import {
   applyBuyCommand,
   applyCancelCommand,
   applyPlaceKitCommand,
+  setOutcome,
   updateDropQueues,
 } from './drops';
 import { updateMatchResult } from './match';
@@ -520,7 +521,22 @@ function applyAttackCommand(
   world: WorldState,
   command: Extract<Command, { kind: 'attack' }>,
 ): void {
+  const targetUnit = world.units.find((other) => other.id === command.targetId && other.hp > 0);
+  const targetStructure = targetUnit
+    ? undefined
+    : world.structures.find((structure) => structure.id === command.targetId && structure.hp > 0);
+  const targetKind = targetUnit ? unitTargetKind(targetUnit) : targetStructure ? 'structure' : null;
+  let refused = 0;
+  let taken = 0;
   for (const unit of ownedUnits(world, command.issuer, command.unitIds)) {
+    // Units that can't hurt the target (unarmed workers, ground guns against an aircraft in
+    // flight) don't take the order: they keep their job or order instead of chasing it uselessly.
+    const weapon = world.unitTypes.get(unit.typeId)?.weapon;
+    if (targetKind !== null && (!weapon || weapon.damage <= 0 || !weaponCanHit(weapon, targetKind))) {
+      refused += 1;
+      continue;
+    }
+    taken += 1;
     unit.stance = 'free';
     unit.order = { kind: 'attack', targetId: command.targetId };
     unit.path = [];
@@ -528,6 +544,9 @@ function applyAttackCommand(
     unit.replans = 0;
     unit.stuckTicks = 0;
     unit.attackRepathTick = 0;
+  }
+  if (taken === 0 && refused > 0) {
+    setOutcome(world, command.tick, 'attack', false, 'cannotHit');
   }
 }
 
@@ -668,8 +687,9 @@ function selectTarget(
   return best;
 }
 
-// An ordered target can be one the weapon can't reach (an interceptor told to attack a tank, a
-// bomber told to attack an aircraft in flight): the unit follows the order but never fires.
+// An ordered target can stop being one the weapon can reach (an aircraft hit on the ground takes
+// off): the unit follows the order but never fires. Orders it could never carry out are refused
+// in applyAttackCommand.
 function canHitTarget(world: WorldState, weapon: WeaponStats, target: TargetRef): boolean {
   if (target.kind === 'structure') {
     return weaponCanHit(weapon, 'structure');

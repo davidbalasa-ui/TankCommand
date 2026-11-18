@@ -94,6 +94,7 @@
 | ORD-01 | Hold: unit fires at enemies in range and never moves, even when attacked. |
 | ORD-02 | Attack-move: unit moves to the point but engages enemies met on the way, then continues. |
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
+| ORD-04 | Units that cannot hit an attack target (unarmed workers, ground-only guns against aircraft in flight) ignore the order and keep their job; if none can, the order is refused with a reason. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
 | GAME-01 | Pause stops the sim tick and refuses orders; backgrounding and the back button auto-pause. |
@@ -154,6 +155,7 @@
 | AI-11 | Hard beats normal in most fixed-seed matches, playing either side. |
 | AI-12 | A defender that locked onto a raider breaks off once it is far from home, instead of chasing it into the enemy base. |
 | AI-13 | Once every ore field is mined out and the AI cannot buy another fighter, it attacks with whatever army it has left instead of idling at home. |
+| AI-14 | The AI only orders a unit to attack targets its weapon can hit (no ground guns after aircraft in flight). |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |

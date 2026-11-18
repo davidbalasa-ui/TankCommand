@@ -1,7 +1,7 @@
 import type { Command } from '../sim/commands';
 import { isHostile } from '../sim/diplomacy';
 import { crateOre, isFightingUnitType } from '../sim/economy';
-import { hasFreeAirSlot, isAirborne } from '../sim/air';
+import { hasFreeAirSlot, isAirborne, unitTargetKind, weaponCanHit } from '../sim/air';
 import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
 import { placementValidity } from '../sim/spawn';
@@ -674,16 +674,21 @@ function tactical(planner: Planner): void {
     if (!type.weapon || unit.order.kind === 'attack' || unit.order.kind === 'move') {
       continue;
     }
-    const range = type.weapon.range;
-    const structureInRange = view.structures
-      .filter((e) => isHostile(world, planner.player, e.owner) && Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 2)
-      .sort((a, b) => a.hp - b.hp || a.id - b.id)[0];
-    const anyEnemyNear = enemies.some((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 4);
+    const weapon = type.weapon;
+    const range = weapon.range;
+    // Only targets this gun can hit: a ground tank never chases an aircraft in flight.
+    const hittable = enemies.filter((e) => weaponCanHit(weapon, unitTargetKind(e)));
+    const structureInRange = weaponCanHit(weapon, 'structure')
+      ? view.structures
+          .filter((e) => isHostile(world, planner.player, e.owner) && Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 2)
+          .sort((a, b) => a.hp - b.hp || a.id - b.id)[0]
+      : undefined;
+    const anyEnemyNear = hittable.some((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range + 4);
     if (structureInRange && !anyEnemyNear) {
       planner.commands.push({ kind: 'attack', unitIds: [unit.id], targetId: structureInRange.id });
       continue;
     }
-    const inRange = enemies
+    const inRange = hittable
       .filter((e) => Math.hypot(e.x - unit.x, e.z - unit.z) <= range)
       .sort((a, b) => a.hp - b.hp || a.id - b.id)[0];
     if (inRange && data.focusFire) {
