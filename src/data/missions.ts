@@ -5,7 +5,7 @@ import { createWorld } from '../sim/world';
 import { tagUnit, type MissionState } from '../sim/triggers';
 import { convertResearchIds, sideResearch } from '../sim/research';
 import type { SimData } from './simData';
-import type { WorldState } from '../sim/types';
+import type { AiDifficulty, WorldState } from '../sim/types';
 import { TRAINING_MISSIONS } from './missions/training';
 import { CAMPAIGN_MISSIONS } from './missions/campaign';
 
@@ -97,12 +97,42 @@ export const MISSION_MAP_SEED = 1;
  * Build a mission's world. `seed` varies per attempt: scripted beats (units, triggers, waves) are
  * fixed by the mission data, while combat and the computer opponents' choices follow the seed.
  */
+const LEVELS: readonly AiDifficulty[] = ['easy', 'normal', 'hard'];
+
+/**
+ * Campaign difficulty. Normal is each mission exactly as written. Easy and Hard move every AI
+ * side's level one step (within easy..hard) and scale the starting ore and metal of the enemy
+ * AI sides; most missions' enemies are scripted rather than AI, so the player's own starting
+ * ore is scaled the other way too, which is the lever every mission has.
+ */
+export const DIFFICULTY_TUNING: Record<AiDifficulty, { aiStep: number; aiStock: number; playerOre: number }> = {
+  easy: { aiStep: -1, aiStock: 0.75, playerOre: 1.25 },
+  normal: { aiStep: 0, aiStock: 1, playerOre: 1 },
+  hard: { aiStep: 1, aiStock: 1.25, playerOre: 0.8 },
+};
+
+function shiftLevel(level: AiDifficulty, step: number): AiDifficulty {
+  const index = Math.min(LEVELS.length - 1, Math.max(0, LEVELS.indexOf(level) + step));
+  return LEVELS[index] ?? level;
+}
+
 export function buildMissionWorld(
   data: SimData,
   mission: MissionRow,
   seed: number,
-  options: { fog?: boolean } = {},
+  options: { fog?: boolean; difficulty?: AiDifficulty } = {},
 ): WorldState {
+  const difficulty = options.difficulty ?? 'normal';
+  const tuning = DIFFICULTY_TUNING[difficulty];
+  const startStock = (side: MissionRow['sides'][number]): { ore: number; metal: number } => {
+    if (side.controller === 'human') {
+      return { ore: Math.round(side.ore * tuning.playerOre), metal: side.metal };
+    }
+    if (side.controller === 'ai') {
+      return { ore: Math.round(side.ore * tuning.aiStock), metal: Math.round(side.metal * tuning.aiStock) };
+    }
+    return { ore: side.ore, metal: side.metal };
+  };
   const mapRow = data.mapRows.find((row) => row.id === mission.mapId);
   if (!mapRow) {
     throw new Error(`Mission ${mission.id}: unknown map ${mission.mapId}`);
@@ -127,6 +157,8 @@ export function buildMissionWorld(
       id: mission.id,
       triggers: mission.triggers,
       timeLimitTicks: mission.timeLimitSec ? Math.round(mission.timeLimitSec * SIM_TICK_HZ) : null,
+      // Normal leaves the field out, so a Normal mission is byte-for-byte the mission as written.
+      ...(difficulty !== 'normal' ? { difficulty } : {}),
       ...(mission.sides.some((side) => side.available)
         ? {
             available: Object.fromEntries(
@@ -164,7 +196,7 @@ export function buildMissionWorld(
     })),
     deposits: mapRow.deposits.map((deposit) => ({ ...deposit })),
     factions: mission.sides.map((side) => ({ player: side.player, faction: side.faction })),
-    startResources: mission.sides.map((side) => ({ player: side.player, ore: side.ore, metal: side.metal })),
+    startResources: mission.sides.map((side) => ({ player: side.player, ...startStock(side) })),
     size: mapRow.size,
     cellSize: mapRow.cellSize,
     fog: options.fog ?? false,
@@ -196,7 +228,7 @@ export function buildMissionWorld(
       }
     }
     if (side.controller === 'ai') {
-      addAi(world, side.player, side.difficulty ?? 'normal', side.aiAttackScale ? { attackScaleRange: side.aiAttackScale } : {});
+      addAi(world, side.player, shiftLevel(side.difficulty ?? 'normal', tuning.aiStep), side.aiAttackScale ? { attackScaleRange: side.aiAttackScale } : {});
     }
   }
   return world;

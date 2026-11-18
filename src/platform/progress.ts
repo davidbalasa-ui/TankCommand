@@ -2,20 +2,32 @@ import type { KvStore } from './kv';
 
 export type CampaignId = 'training' | 'human' | 'alien';
 
+/** Campaign difficulty, chosen on the campaign screen and kept with the progress. */
+export type CampaignDifficulty = 'easy' | 'normal' | 'hard';
+
+const DIFFICULTIES: readonly CampaignDifficulty[] = ['easy', 'normal', 'hard'];
+
 export interface MissionRecord {
   bestTimeSec: number;
   wins: number;
+  /** The hardest difficulty the mission has been won on (absent in progress saved before difficulty). */
+  bestDifficulty?: CampaignDifficulty;
 }
 
 export interface CampaignProgress {
   version: 1;
   completed: Record<string, MissionRecord>;
+  difficulty: CampaignDifficulty;
 }
 
 export const PROGRESS_KEY = 'progress.campaign';
 
 export function emptyProgress(): CampaignProgress {
-  return { version: 1, completed: {} };
+  return { version: 1, completed: {}, difficulty: 'normal' };
+}
+
+function isDifficulty(value: unknown): value is CampaignDifficulty {
+  return typeof value === 'string' && (DIFFICULTIES as readonly string[]).includes(value);
 }
 
 export function parseProgress(raw: string | null): CampaignProgress {
@@ -28,15 +40,23 @@ export function parseProgress(raw: string | null): CampaignProgress {
       return emptyProgress();
     }
     const completed = (value as { completed?: unknown }).completed;
+    const difficulty = (value as { difficulty?: unknown }).difficulty;
     const result = emptyProgress();
+    if (isDifficulty(difficulty)) {
+      result.difficulty = difficulty;
+    }
     if (typeof completed === 'object' && completed !== null) {
       for (const [id, entry] of Object.entries(completed)) {
         if (typeof entry !== 'object' || entry === null) {
           continue;
         }
-        const e = entry as { bestTimeSec?: unknown; wins?: unknown };
+        const e = entry as { bestTimeSec?: unknown; wins?: unknown; bestDifficulty?: unknown };
         if (typeof e.bestTimeSec === 'number' && typeof e.wins === 'number') {
-          result.completed[id] = { bestTimeSec: e.bestTimeSec, wins: e.wins };
+          result.completed[id] = {
+            bestTimeSec: e.bestTimeSec,
+            wins: e.wins,
+            ...(isDifficulty(e.bestDifficulty) ? { bestDifficulty: e.bestDifficulty } : {}),
+          };
         }
       }
     }
@@ -58,18 +78,33 @@ export async function saveProgress(store: KvStore, progress: CampaignProgress): 
   await store.set(PROGRESS_KEY, JSON.stringify(progress));
 }
 
-export function recordWin(progress: CampaignProgress, missionId: string, timeSec: number): CampaignProgress {
+function harder(a: CampaignDifficulty | undefined, b: CampaignDifficulty): CampaignDifficulty {
+  return a !== undefined && DIFFICULTIES.indexOf(a) > DIFFICULTIES.indexOf(b) ? a : b;
+}
+
+export function recordWin(
+  progress: CampaignProgress,
+  missionId: string,
+  timeSec: number,
+  difficulty: CampaignDifficulty = 'normal',
+): CampaignProgress {
   const previous = progress.completed[missionId];
   return {
-    version: 1,
+    ...progress,
     completed: {
       ...progress.completed,
       [missionId]: {
         bestTimeSec: previous ? Math.min(previous.bestTimeSec, timeSec) : timeSec,
         wins: (previous?.wins ?? 0) + 1,
+        // A win recorded before difficulty existed was a Normal win.
+        bestDifficulty: harder(previous ? (previous.bestDifficulty ?? 'normal') : undefined, difficulty),
       },
     },
   };
+}
+
+export function setCampaignDifficulty(progress: CampaignProgress, difficulty: CampaignDifficulty): CampaignProgress {
+  return { ...progress, difficulty };
 }
 
 // A mission is open when it is first in its campaign or the one before it has been won.

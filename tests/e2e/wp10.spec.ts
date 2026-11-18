@@ -197,6 +197,9 @@ test('[SAVE-09] resume last game is offered after an autosave and quit offers to
   await tap(page, 'pause.confirmSaveQuit');
   await waitScreen(page, 'title');
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.lastSaveOutcome()?.status ?? '')).toBe('ok');
+  // Save & quit leaves the manual slots alone and is what Continue picks up.
+  expect(await page.evaluate(async () => (await window.__TC_TEST__?.listSaveSlots())?.every((slot) => slot.status === 'missing'))).toBe(true);
+  await expect(page.locator('[data-control-id="title.resume"]')).toBeVisible({ timeout: 10_000 });
 });
 
 test('[SAVE-10] web export/import round-trips a save and storage full shows a message', async ({ page }, testInfo) => {
@@ -238,7 +241,10 @@ test('[SAVE-10] web export/import round-trips a save and storage full shows a me
   await waitScreen(page, 'pause');
   await tap(page, 'pause.save');
   await waitScreen(page, 'saveSlots');
+  // The import went into the empty slot 1, so saving there asks before overwriting it.
   await tap(page, 'saveSlots.save1');
+  await expect(page.locator('[data-control-id="saveSlots.confirmOverwrite"]')).toBeVisible();
+  await tap(page, 'saveSlots.confirmOverwrite');
   await expect(page.locator('[data-save-status]')).toContainText('full');
 });
 
@@ -253,7 +259,10 @@ test('[SET-01] settings persist across reload and take effect immediately', asyn
   await tap(page, 'settings.graphicsQuality');
   await tap(page, 'settings.textSize');
   await tap(page, 'settings.haptics');
-  await tap(page, 'settings.edgeScroll');
+  // Desktop-only settings are not offered on a touch screen.
+  await expect(page.locator('[data-control-id="settings.edgeScroll"]')).toHaveCount(0);
+  await expect(page.locator('[data-control-id="settings.rebind"]')).toHaveCount(0);
+  await expect(page.locator('[data-setting="edgeScrollSpeed"]')).toHaveCount(0);
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.settings().graphicsQuality ?? '')).not.toBe('auto');
   await expect.poll(async () => page.evaluate(() => document.documentElement.dataset.textSize ?? '')).toBe('large');
   await expect.poll(async () => page.evaluate(() => window.__TC_TEST__?.quality().level ?? 0)).toBeGreaterThan(0);
