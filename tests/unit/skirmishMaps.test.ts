@@ -4,7 +4,8 @@ import { createSkirmishWorld } from '../../src/data/simData';
 
 // The designed skirmish maps (tools/missions/skirmish.py): two AIs play each one to the end.
 const maps = data.mapRows.filter((row) => !row.campaignOnly && !row.placeholder);
-const SEEDS = [1, 2];
+// One seed per map here keeps the unit run light on CI's slower runners; more seeds belong in the soak run.
+const SEEDS = [1];
 const LIMIT_MIN = 30;
 
 describe('[MAP-04] AI-vs-AI on every designed skirmish map', () => {

@@ -156,13 +156,17 @@ describe('enemy AI', () => {
     expect(world.result?.winner).toBe(2);
   }, 120_000);
 
-  it('[AI-11] hard beats normal in most fixed-seed matches, playing either side', () => {
+  it('[AI-11] hard beats normal in most fixed-seed matches, playing either side', async () => {
     let hardWins = 0;
     for (let seed = 300; seed < 303; seed += 1) {
       for (const hardFirst of [true, false]) {
         let world = aiMatch(seed, hardFirst ? 'hard' : 'normal', hardFirst ? 'normal' : 'hard');
         while (world.result === null && world.tick < 45 * 60 * 20) {
           world = stepWithAi(world);
+          // Yield now and then: one long synchronous run starves the worker's reporter channel on slow CI.
+          if (world.tick % 2000 === 0) {
+            await new Promise<void>((resolve) => setImmediate(resolve));
+          }
         }
         if (world.result?.winner === (hardFirst ? 1 : 2)) {
           hardWins += 1;
