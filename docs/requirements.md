@@ -121,6 +121,7 @@
 | DROP-04 | Structure kits are placed only on valid ground; metal stations only on metal deposits. |
 | MATCH-01 | Destroying every enemy pad and fighting unit triggers victory; losing your own triggers defeat. |
 | MATCH-02 | Results screen shows outcome, time, units built/lost and resources gathered. |
+| MATCH-03 | In skirmish, once the map's ore is mined out, a side that keeps a pad but has no fighting units, nothing on the way and no money (counting refunds) for any fighter is eliminated; missions keep the pad rule. |
 | HUD-05 | Top bar resources update live; build menu shows cost, time, locked reason, queue and cancel, usable by touch on the phone. |
 | HINT-01 | Hint bubbles grow to fit their text on a phone screen instead of cutting it off, and every mission objective, mission message and help hint stays within the word limits set in src/ui/textLimits.ts. |
 | PART-01 | Model parts with anim extras (spin or swing about their own axis) move only while their condition holds (always, mining, working, moving), use busySpeed while working, and a spinning TurretPivot is never aimed. |
@@ -152,6 +153,7 @@
 | AI-10 | With aviation researched, the AI builds an air base, buys aircraft and launches them at enemy targets; interceptors go after enemy aircraft near its base. |
 | AI-11 | Hard beats normal in most fixed-seed matches, playing either side. |
 | AI-12 | A defender that locked onto a raider breaks off once it is far from home, instead of chasing it into the enemy base. |
+| AI-13 | Once every ore field is mined out and the AI cannot buy another fighter, it attacks with whatever army it has left instead of idling at home. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |

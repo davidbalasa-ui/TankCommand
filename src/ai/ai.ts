@@ -1,6 +1,6 @@
 import type { Command } from '../sim/commands';
 import { isHostile } from '../sim/diplomacy';
-import { isFightingUnitType } from '../sim/economy';
+import { crateOre, isFightingUnitType } from '../sim/economy';
 import { hasFreeAirSlot, isAirborne } from '../sim/air';
 import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
@@ -490,7 +490,18 @@ function strategic(planner: Planner): void {
         structures.some((st) => st.depositId === d.id && planner.structureKind(st) === 'metalStation'),
     );
   const cheapestTankMetal = Math.min(...types.filter((t) => isFighter(t)).map((t) => t.metalCost), Infinity);
-  const desperate = !metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false;
+  const cheapest = types
+    .filter((t) => isFighter(t, true))
+    .sort((a, b) => valueOf(a) - valueOf(b) || a.id.localeCompare(b.id))[0];
+  // Skirmish endgame: every ore field is mined out, nothing is still being hauled in and the
+  // cheapest fighter is out of reach. No bigger army is ever coming, so whatever is left attacks
+  // instead of idling at home for the rest of the match. (Missions script their own sides.)
+  const broke =
+    world.mission === null &&
+    !world.deposits.some((d) => d.kind === 'ore' && (d.amount > 1 || crateOre(d, planner.player) > 1)) &&
+    !units.some((u) => (u.job?.load ?? 0) > 0) &&
+    (!cheapest || !planner.canAfford(cheapest.oreCost, cheapest.metalCost, 0, false));
+  const desperate = broke || (!metalLeft && planner.canAfford(0, cheapestTankMetal, 0, false) === false);
   const fighters = units.filter((u) => isFighter(planner.unitType(u), desperate));
   const armyValue = fighters.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   const known = knownEnemyStructures(world, planner.player);
@@ -571,7 +582,7 @@ function strategic(planner: Planner): void {
     if (alive.length === 0) {
       state.groupIds = [];
       state.groupStartValue = 0;
-    } else if (value < state.groupStartValue * (1 - data.retreatLossFraction)) {
+    } else if (!broke && value < state.groupStartValue * (1 - data.retreatLossFraction)) {
       planner.commands.push({ kind: 'move', unitIds: alive.map((u) => u.id), x: pad.x, z: pad.z });
       state.groupIds = [];
     }
@@ -600,7 +611,7 @@ function strategic(planner: Planner): void {
     return;
   }
   const decay = Math.max(0.15, 1 - world.tick / (15 * 1200));
-  const threshold = data.attackThresholdValue * decay;
+  const threshold = broke ? 0 : data.attackThresholdValue * decay;
   const idleValue = idle.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   if (idle.length > 0 && (idleValue >= threshold || (armyValue >= threshold && state.groupIds.length === 0))) {
     let target: { x: number; z: number } | undefined;
