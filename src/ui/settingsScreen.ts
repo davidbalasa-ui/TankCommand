@@ -1,6 +1,7 @@
 import type { ScreenContext } from './router';
 import { button } from './controls';
 import { DEFAULT_SETTINGS, type SettingsState } from '../platform/settings';
+import { openPrivacyPolicy } from '../platform/links';
 
 function downloadText(fileName: string, text: string): void {
   const blob = new Blob([text], { type: 'application/json' });
@@ -217,11 +218,15 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
       });
   });
 
+  const privacy = button('settings', 'privacy', 'Privacy', () => {
+    openPrivacyPolicy();
+  });
+
   const back = button('settings', 'back', 'Back', () => {
     ctx.router.back();
   });
 
-  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, restorePurchases, back, fileInput);
+  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, restorePurchases, privacy, back, fileInput);
 
   function refreshLabels(): void {
     const values = current();

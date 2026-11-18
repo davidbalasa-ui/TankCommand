@@ -6,6 +6,7 @@ import { emblem } from './emblem';
 import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './widgets';
 import { playIntroFilm } from './introFilm';
 import { APP_VERSION } from '../platform/appInfo';
+import { openPrivacyPolicy } from '../platform/links';
 import type {
   CampaignDifficulty,
   CampaignId,
@@ -1281,7 +1282,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const text = document.createElement('div');
       text.className = 'credits-text';
       text.textContent = 'Loading credits...';
-      root.append(text);
+      // The privacy policy sits above the (long) credits so it is reachable without scrolling.
+      const privacy = button('credits', 'privacy', 'Privacy policy', () => {
+        openPrivacyPolicy();
+      });
+      privacy.classList.add('credits-privacy');
+      root.append(privacy, text);
       let cancelled = false;
       void Promise.resolve()
         .then(() => fetch('./CREDITS.md'))

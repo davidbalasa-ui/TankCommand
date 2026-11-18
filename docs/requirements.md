@@ -122,6 +122,7 @@
 | IAP-01 | One data table (src/data/fullGame.ts) decides the free download: all training, the first 5 missions of each campaign and the Cinder Basin and Lakeside Crossing skirmish maps; everything else needs the full game unlock, and the unlock opens all of it. |
 | IAP-02 | The `full_game_unlock` purchase (Google Play Billing, non-consumable): in the app `isUnlocked` answers from a flag cached in Preferences and a restore at startup refreshes it (a refund relocks, an unreachable Play changes nothing); buy and restore report unlocked, cancelled, pending, not owned or unavailable; store calls run one at a time; on the web everything is unlocked unless the test hook overrides it. |
 | IAP-03 | Locked missions and skirmish maps show a lock and "Full game"; tapping one opens the unlock screen (price from the store, pitch, Buy, Restore purchases, Back), Back returns to the list, and Settings offers Restore purchases; controls meet the touch-size rules on the phone. |
+| PRIV-01 | A plain-language privacy policy is served at /privacy.html (https://tankcommand.vercel.app/privacy.html) and the Privacy buttons in Settings and Credits open it. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
 | ECO-03 | Metal is credited only when a tug delivers a container to a pad; killing the tug loses the load. |
