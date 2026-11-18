@@ -64,9 +64,12 @@ describe('[MSN-05] campaign difficulty', () => {
     expect(sideOre(easy, ai?.player ?? 2).metal).toBe(ai?.metal ?? 0);
     expect(sideOre(hard, ai?.player ?? 2).metal).toBe(Math.round((ai?.metal ?? 0) * 1.25));
 
-    // Levels stop at the ends of the scale.
+    // Levels stop at the ends of the scale, and a side's hardDifficulty replaces the step up on
+    // Hard (Brood War keeps its northern side at Easy so two bases stay beatable).
     const broodWar = mission('mission.human.20_brood_war');
-    expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'hard' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'normal']);
+    expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'hard' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'easy']);
+    const stepped = { ...broodWar, sides: broodWar.sides.map(({ hardDifficulty: _hard, ...side }) => side) };
+    expect(buildMissionWorld(data, stepped, 1, { difficulty: 'hard' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'normal']);
     // Easy leaves a Hard side as it is (the Normal level hits harder early than Hard).
     expect(buildMissionWorld(data, broodWar, 1, { difficulty: 'easy' }).aiStates.map((s) => s.difficulty)).toEqual(['hard', 'easy']);
   });
