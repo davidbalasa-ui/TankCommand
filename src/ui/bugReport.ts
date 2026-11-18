@@ -1,5 +1,6 @@
 import type { ScreenContext } from './router';
 import { button } from './controls';
+import { APP_VERSION } from '../platform/appInfo';
 
 function formatFreeze(ctx: ScreenContext): string {
   const report = ctx.api?.lastFreezeReport();
@@ -29,7 +30,7 @@ export function mountBugReport(root: HTMLElement, ctx: ScreenContext): () => voi
   meta.dataset.bugMeta = 'true';
   const logs = api?.logs() ?? [];
   meta.textContent = [
-    `Version: ${api?.version() ?? '0.1.0'}`,
+    `Version: ${api?.version() ?? APP_VERSION}`,
     `Device: ${navigator.userAgent}`,
     `Last freeze: ${formatFreeze(ctx)}`,
     `Log lines: ${logs.length}`,
