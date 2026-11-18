@@ -537,8 +537,16 @@ function strategic(planner: Planner): void {
   const activeScout = units.find((u) => u.id === state.scoutId);
   if (activeScout) {
     if (known.length > 0) {
+      // Its job is done: back home, once. A scout already fighting (in the attack group, or on
+      // an attack order) is left to it, or it would be pulled out of every fight it joins.
       state.scoutId = null;
-      planner.commands.push({ kind: 'move', unitIds: [activeScout.id], ...homeSpot(world, pad) });
+      const fighting =
+        state.groupIds.includes(activeScout.id) ||
+        activeScout.order.kind === 'attack' ||
+        activeScout.order.kind === 'attackMove';
+      if (!fighting && Math.hypot(activeScout.x - pad.x, activeScout.z - pad.z) > DEFEND_RADIUS) {
+        planner.commands.push({ kind: 'move', unitIds: [activeScout.id], ...homeSpot(world, pad) });
+      }
     } else if (activeScout.order.kind === 'idle') {
       const points = waypoints(world, pad);
       const point = points[state.waypoint % points.length];
@@ -655,8 +663,11 @@ function strategic(planner: Planner): void {
     }
     if (target && idle.length > 0) {
       planner.commands.push({ kind: 'attackMove', unitIds: idle.map((u) => u.id), x: target.x, z: target.z });
-      state.groupIds = idle.map((u) => u.id);
-      state.groupStartValue = idleValue;
+      // New units join the group already out fighting rather than replacing it: a member dropped
+      // from the group while on an attack order would be recalled home as a stray defender.
+      const staying = fighters.filter((u) => state.groupIds.includes(u.id) && u.order.kind !== 'idle');
+      state.groupIds = [...staying, ...idle].map((u) => u.id);
+      state.groupStartValue = [...staying, ...idle].reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
     }
   }
 }

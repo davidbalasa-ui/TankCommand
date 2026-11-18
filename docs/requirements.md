@@ -163,6 +163,7 @@
 | AI-13 | Once every ore field is mined out the AI buys no more workers or stations, spends its last ore on any fighter it can afford (no reserve), and then attacks with whatever army it has left instead of idling at home. |
 | AI-14 | The AI only orders a unit to attack targets its weapon can hit (no ground guns after aircraft in flight). |
 | AI-15 | Units the AI sends home (a returning scout, a retreating group, a recalled defender, units in a kit's way) park past the pad's rally point, never on the landing pad. |
+| AI-16 | Fresh units the AI sends to attack join the group already out fighting instead of replacing it, and a scout already fighting is not called home. |
 | DET-05 | AI-vs-AI matches are deterministic: same seed, same hash; save/load mid-match keeps the hash. |
 | TER-01 | Maps may have lakes and rivers; tracked units cannot enter water except at fords, hover and air units can. |
 | TER-02 | Map features are saved with the world and regenerate to the same terrain and hash on load. |

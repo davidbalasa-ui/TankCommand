@@ -128,4 +128,25 @@ describe('skirmish endgame', () => {
     // Nothing is spent on workers with no ore left to mine.
     expect(bought.some((type) => type?.workerKind)).toBe(false);
   });
+
+  it('[AI-16] fresh units sent to attack join the group already fighting instead of replacing it', () => {
+    const world = minedOut('ai');
+    const tanks = world.units.filter((unit) => unit.owner === 1 && world.unitTypes.get(unit.typeId)?.role === 'tank');
+    expect(tanks.length).toBeGreaterThanOrEqual(2);
+    const [out, fresh] = tanks;
+    // One tank is already on its way to the enemy, far from home, as the attack group.
+    out!.x = 10;
+    out!.z = 10;
+    out!.order = { kind: 'attackMove', x: 50, z: 50, queue: false };
+    let state = { ...world.aiStates.find((entry) => entry.player === 1)!, groupIds: [out!.id], groupStartValue: 100 };
+    let launched = false;
+    for (let tick = 0; tick < 200 && !launched; tick += 1) {
+      const result = thinkAi({ ...world, tick }, state);
+      state = result.state;
+      launched = result.commands.some((command) => command.kind === 'attackMove' && command.unitIds.includes(fresh!.id));
+    }
+    expect(launched).toBe(true);
+    expect(state.groupIds).toContain(out!.id);
+    expect(state.groupIds).toContain(fresh!.id);
+  });
 });
