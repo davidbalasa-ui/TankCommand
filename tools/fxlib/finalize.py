@@ -24,6 +24,17 @@ def premul(a):
     o = a.copy(); o[..., :3] *= o[..., 3:4]; return o
 
 
+def hue_guard(f):
+    """Straight-alpha 8-bit frames clip bright fire per channel (R and G both hit 1), which reads
+    olive/green once alpha is applied. Pull saturated yellow back to orange and never let a pixel be
+    greener than its red."""
+    f = f.copy()
+    r, g, b = f[..., 0], f[..., 1], f[..., 2]
+    g = np.where(b < 0.6 * g, np.minimum(g, 0.78 * r), g)
+    f[..., 1] = np.minimum(g, r * 0.97 + 0.01)
+    return f
+
+
 def unpremul(a):
     o = a.copy(); al = np.maximum(o[..., 3:4], 1e-4); o[..., :3] = np.where(o[..., 3:4] > 0, o[..., :3] / al, 0); return o
 
@@ -63,6 +74,8 @@ def main():
         os.remove(f)
     imgs = []
     for i, f in enumerate(fr):
+        if a.tint in ('fire', 'gold'):
+            f = hue_guard(f)
         im = Image.fromarray((np.clip(f, 0, 1) * 255 + 0.5).astype(np.uint8), 'RGBA')
         im.save(os.path.join(od, '%04d.png' % (i + 1)), optimize=True)
         imgs.append(im)
