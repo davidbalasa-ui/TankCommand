@@ -114,6 +114,7 @@
 | ECO-04 | Income stops entirely when every miner and tug is dead. |
 | ECO-05 | Resources never go negative under any command sequence (property test with random commands). |
 | ECO-06 | Miner salvage refunds exactly the data-sheet percentage. |
+| ECO-07 | A hauler serving a metal station keeps looping station, pad, station: a station centre it cannot drive onto still counts as reached once it holds at the end of a path planned into reach. |
 | DROP-01 | Buying deducts the full cost at order time; unaffordable, unknown, over-cap and no-pad orders are refused with a reason. |
 | DROP-02 | Cancelling a queued item refunds the full cost; delivered items can't be cancelled. |
 | DROP-03 | Units are delivered beside the chosen pad after the delivery time; with no pad they wait. |
