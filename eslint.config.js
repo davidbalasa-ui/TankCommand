@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 
 const baseConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
   ...config,
-  files: ['src/**/*.ts'],
+  files: ['src/**/*.ts', 'api/**/*.ts'],
 }));
 
 export default tseslint.config(
@@ -23,7 +23,7 @@ export default tseslint.config(
   },
   ...baseConfigs,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'api/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: {

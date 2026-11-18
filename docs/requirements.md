@@ -117,6 +117,8 @@
 | ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
 | ALRT-03 | A merged "under attack" line counts the distinct units hit, not the number of hits. |
 | BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |
+| BUG-02 | Send posts the report (the form's text, device and app info, log, optional save) to https://tankcommand.vercel.app/api/bug-report from the web build and the Android app and says it was sent; offline, unreachable, not configured (503) or refused, it saves the report file on the device instead and says it was saved but not sent. |
+| BUG-03 | The api/bug-report function validates and size-limits the report, drops unknown fields, scrubs email and IP addresses, rate-limits per IP in memory only (salted hash, never stored), allows only the web and Capacitor origins (CORS), answers 503 without GITHUB_TOKEN/GITHUB_REPO, and otherwise opens a GitHub issue labelled bug-report. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
 | ECO-03 | Metal is credited only when a tug delivers a container to a pad; killing the tug loses the load. |

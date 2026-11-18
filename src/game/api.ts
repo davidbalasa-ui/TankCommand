@@ -46,7 +46,11 @@ export interface BugReportInput {
 }
 
 export interface BugReportResult {
-  status: 'ok' | 'error';
+  /**
+   * ok: saved on the device (Save). sent: the report server took it (Send). notSent: Send failed,
+   * so it was saved on the device instead. error: nothing was saved or sent.
+   */
+  status: 'ok' | 'sent' | 'notSent' | 'error';
   message: string;
   fileName?: string;
   content?: string;
@@ -79,7 +83,10 @@ export interface GameApi {
   raiseAlert(kind: AlertKind, x: number, z: number, message?: string): void;
   alerts(): AlertSnapshot[];
   jumpToAlert(id: number): void;
+  /** Saves the report as a file on the device, with no network request (BUG-01). */
   saveBugReport(input: BugReportInput): Promise<BugReportResult>;
+  /** Sends the report to the report server; if that fails it is saved on the device instead. */
+  sendBugReport(input: BugReportInput): Promise<BugReportResult>;
   lastFreezeReport(): WatchdogReport | null;
   logs(): string[];
   version(): string;

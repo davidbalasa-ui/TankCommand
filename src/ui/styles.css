@@ -560,6 +560,33 @@ p {
   overflow: auto;
 }
 
+/* Send and Save side by side under the log, so both stay above the fold at 915x412. */
+.bug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bug-actions button {
+  flex: 1 1 0;
+}
+
+.bug-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.bug-status[data-bug-result='sent'],
+.bug-status[data-bug-result='ok'] {
+  color: var(--green);
+}
+
+.bug-status[data-bug-result='notSent'],
+.bug-status[data-bug-result='error'] {
+  color: var(--amber);
+}
+
 .base-row {
   display: flex;
   align-items: center;

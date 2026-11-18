@@ -4,6 +4,12 @@ import rawGameplay from '../data/gameplay.json';
 import { parseGameplayConfig } from '../data/gameplaySchema';
 import { AudioEngine, type AudioStatusView, type SoundEvent } from '../audio/audio';
 import { APP_VERSION } from '../platform/appInfo';
+import {
+  SEND_FAILURE_TEXT,
+  sendBugReport,
+  type BugReportPayload,
+  type SendResult,
+} from '../platform/bugReportSender';
 import { HapticsService } from '../platform/haptics';
 import { createKvStore, StorageFullError, type KvStore } from '../platform/kv';
 import { pushLog, recentLogs } from '../platform/logBuffer';
@@ -58,6 +64,8 @@ export interface GameServicesOptions {
   audio?: AudioEngine;
   /** Built from the stored Haptics setting when left out (tests pass one with a fake plugin). */
   haptics?: HapticsService;
+  /** Posts a bug report to the report server (tests pass a fake). */
+  sendReport?: (payload: BugReportPayload) => Promise<SendResult>;
   mount?: HTMLElement;
   now?: () => number;
 }
@@ -73,7 +81,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown error';
 }
 
-function deviceInfo(): Record<string, string> {
+function deviceInfo(): BugReportPayload['device'] {
   if (typeof navigator === 'undefined') {
     return { userAgent: 'unknown', platform: 'unknown', language: 'unknown', screen: 'unknown' };
   }
@@ -113,6 +121,7 @@ export class GameServices implements GameApi {
   private readonly settingsStore: SettingsStore;
   private readonly audioEngine: AudioEngine;
   private readonly haptics: HapticsService;
+  private readonly sendReport: (payload: BugReportPayload) => Promise<SendResult>;
   private readonly alertsCenter: AlertCenter;
   private readonly speed = new GameSpeed();
   private readonly autosaveMs: number;
@@ -122,6 +131,7 @@ export class GameServices implements GameApi {
   private lastLoadResult: LoadSlotResult | null = null;
   private lastImportResult: ImportSaveResult | null = null;
   private lastReport: { fileName: string; content: string } | null = null;
+  private lastSendResult: BugReportResult | null = null;
   private forceStorageFull = false;
   /** The running match: every save of it carries this id, so its autosaves go when it ends. */
   private matchId: string | null = null;
@@ -137,6 +147,7 @@ export class GameServices implements GameApi {
     this.settingsStore = options.settings ?? new SettingsStore();
     this.audioEngine = options.audio ?? new AudioEngine();
     this.haptics = options.haptics ?? new HapticsService(this.settingsStore.getValue('haptics'));
+    this.sendReport = options.sendReport ?? ((payload) => sendBugReport(payload));
     this.alertsCenter = new AlertCenter({
       host: options.mount ?? document.body,
       onJump: (x, z) => {
@@ -478,6 +489,49 @@ export class GameServices implements GameApi {
     } catch (error) {
       return { status: 'error', message: `Could not save report: ${errorMessage(error)}` };
     }
+  }
+
+  async sendBugReport(input: BugReportInput): Promise<BugReportResult> {
+    if (input.message.trim().length === 0) {
+      return { status: 'error', message: 'Describe what went wrong first.' };
+    }
+    const freeze = this.host.freezeReport();
+    const platform = Capacitor.getPlatform();
+    const payload: BugReportPayload = {
+      message: input.message,
+      version: APP_VERSION,
+      platform: platform === 'android' || platform === 'ios' ? platform : 'web',
+      device: deviceInfo(),
+      lastFreeze: freeze ? `${freeze.channel} stalled for ${Math.round(freeze.stalledMs)} ms` : null,
+      logs: recentLogs(200),
+      save: input.includeSave
+        ? encodeSave(this.host.getWorld(), { gameVersion: APP_VERSION, savedAtIso: new Date().toISOString() })
+        : null,
+    };
+    const sent = await this.sendReport(payload);
+    if (sent.ok) {
+      pushLog('info', 'Bug report sent');
+      const result: BugReportResult = { status: 'sent', message: 'Report sent. Thank you!' };
+      this.lastSendResult = result;
+      return result;
+    }
+    const reason = SEND_FAILURE_TEXT[sent.reason];
+    const saved = await this.saveBugReport(input);
+    const result: BugReportResult =
+      saved.status === 'ok'
+        ? {
+            status: 'notSent',
+            message: `Not sent: ${reason}. Saved on this device instead${saved.fileName ? ` (${saved.fileName})` : ''}.`,
+            ...(saved.fileName ? { fileName: saved.fileName } : {}),
+            ...(saved.content ? { content: saved.content } : {}),
+          }
+        : { status: 'error', message: `Not sent: ${reason}. ${saved.message}` };
+    this.lastSendResult = result;
+    return result;
+  }
+
+  lastSendOutcome(): BugReportResult | null {
+    return this.lastSendResult;
   }
 
   lastFreezeReport(): WatchdogReport | null {
