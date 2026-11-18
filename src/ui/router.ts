@@ -304,7 +304,7 @@ const ALLOWED: Record<ScreenId, readonly ScreenId[]> = {
   settings: ['title', 'pause', 'inGame'],
   help: ['title', 'inGame'],
   objectives: ['inGame'],
-  results: ['title', 'missionSelect', 'loading'],
+  results: ['title', 'missionSelect', 'briefing', 'loading'],
   credits: ['title'],
   bugReport: ['title', 'inGame', 'pause'],
   saveSlots: ['pause', 'inGame'],

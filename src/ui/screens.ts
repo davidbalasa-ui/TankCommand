@@ -959,8 +959,24 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         ]],
         ['build', 'Base', [
           'Tap your landing pad to open Build: units and structure kits arrive by orbital drop.',
-          'Miners bring pink ore to the pad; stations dig metal that haulers carry home.',
+          'Structure kits drive to the spot you tap and unpack there; they are weak until unpacked.',
           'Tap any other building of yours to open Base: research, upgrades, pack up or dismantle.',
+        ]],
+        ['worker', 'Ore and metal', [
+          'Ore pays for everything you buy. Metal pays only for research.',
+          'Miners dig pink ore and stack it in crates beside the deposit.',
+          'Haulers carry the crates to your pad, and carry metal home from metal stations.',
+          'Build a metal station on a blue metal site so haulers have metal to fetch.',
+        ]],
+        ['star', 'Research', [
+          'Locked cards in Build show what research unlocks them.',
+          'Research costs ore and metal and takes time; tap your research building to start it.',
+          'Upgrades make one unit type tougher or stronger for the rest of the match.',
+        ]],
+        ['air', 'Air and sight', [
+          'Aircraft need a free slot at an air base and return there to rearm.',
+          'Many ground weapons cannot hit aircraft: bring anti-air units or towers.',
+          'Dark ground is unexplored; you only see what your units, buildings and radar can see.',
         ]],
       ];
       const grid = document.createElement('div');
@@ -1064,7 +1080,7 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         if (view.won && view.hasNext) {
           action('next', 'Next mission', () => {
             if (ctx.chooseNextMission?.()) {
-              ctx.go('loading');
+              ctx.go('briefing');
             }
           }, true);
         }

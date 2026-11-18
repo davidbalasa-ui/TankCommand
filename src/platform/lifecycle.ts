@@ -60,8 +60,9 @@ export class Lifecycle {
     this.handleResume();
   };
 
+  // Back is a navigation key, not the app leaving the screen: it must not mark the app paused,
+  // or the match stays frozen after Resume and later background autosaves are skipped.
   private readonly onBackButton = (): void => {
-    this.handlePause();
     this.emit('back');
   };
 

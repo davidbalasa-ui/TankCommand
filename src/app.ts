@@ -61,6 +61,8 @@ import {
   installGlobalErrorCapture,
   type WatchdogReport,
 } from './platform/watchdog';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { bindLifecycleToBrowserAndCapacitor, type Lifecycle } from './platform/lifecycle';
 import { pushLog } from './platform/logBuffer';
 import {
@@ -1400,7 +1402,6 @@ export class App {
   }
 
   pressAndroidBack(): void {
-    this.pauseLifecycle();
     this.handleAndroidBack();
   }
 
@@ -1630,12 +1631,20 @@ export class App {
     const reasons: Record<string, string> = {
       timeout: 'Time ran out.',
       defeated: 'Your base was lost.',
+      padLost: 'Your landing pad was destroyed.',
+      colonyLost: 'A colony fell.',
+      bossEscaped: 'Your target escaped through the pass.',
+      columnEscaped: 'The tank column got through the pass.',
+      convoyEscaped: 'The convoy escaped.',
+      convoyLost: 'Too many Bulwarks were lost.',
+      radarLost: 'The Watchman radar was destroyed.',
+      vipLost: 'The supply hauler was destroyed.',
     };
     return {
       mission: true,
       won,
       title: row?.title ?? null,
-      reason: mission.failReason ? (reasons[mission.failReason] ?? mission.failReason) : null,
+      reason: mission.failReason ? (reasons[mission.failReason] ?? 'The mission failed.') : null,
       hasNext: row ? nextMission(row) !== null : false,
     };
   }
@@ -1896,22 +1905,23 @@ export class App {
   }
 
   private resumeLifecycle(): void {
+    const before = this.lifecyclePauseScreen;
     this.lifecyclePaused = false;
     this.lifecyclePauseScreen = null;
+    // Coming back to a running match opens the pause card first, so the battle doesn't restart
+    // under the player's thumb before they have looked at the screen.
+    if (before === 'inGame' && this.matchActive && !this.world.result && this.router.current() === 'inGame') {
+      this.go('pause');
+    }
     this.applyPauseState();
   }
 
+  /** Android Back: in a match it opens the pause card (Back again resumes); on the title screen it leaves the app. */
   private handleAndroidBack(): void {
-    const before = this.lifecyclePauseScreen;
-    this.lifecyclePauseScreen = null;
-    if (before === 'inGame') {
-      this.go('pause');
-      return;
-    }
-    if (before === 'pause') {
-      this.lifecyclePaused = false;
-      this.applyPauseState();
-      this.router.back();
+    if (this.router.current() === 'title') {
+      if (Capacitor.isNativePlatform()) {
+        void CapacitorApp.exitApp();
+      }
       return;
     }
     this.router.back();
