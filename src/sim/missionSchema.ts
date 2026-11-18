@@ -148,6 +148,14 @@ const missionSide = z.object({
   controller: z.enum(['human', 'ai', 'scripted', 'none']),
   team: z.number().int().positive().optional(),
   difficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+  /**
+   * For an AI side: the range its attack threshold is scaled by, per attack (default AI_VARIETY's
+   * 0.8 to 1.2). Narrow it where a mission's balance hangs on when the AI first attacks.
+   */
+  aiAttackScale: z
+    .tuple([z.number().min(0.5).max(2), z.number().min(0.5).max(2)])
+    .refine(([min, max]) => min <= max, 'aiAttackScale: min must not exceed max')
+    .optional(),
   provokable: z.boolean().optional(),
   forgiveAfterSec: z.number().positive().optional(),
   groupId: z.string().optional(),

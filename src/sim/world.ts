@@ -143,6 +143,11 @@ export interface CreateWorldOptions {
   startResources?: StartResources[];
   size?: number;
   cellSize?: number;
+  /**
+   * Seed for the map's terrain noise and prop scatter. Defaults to the world seed. Missions pin it
+   * so every attempt plays on the same ground while the world seed (combat, AI) changes.
+   */
+  mapSeed?: number;
 }
 
 interface TargetRef {
@@ -295,7 +300,7 @@ export function createWorld(seed: number, options: CreateWorldOptions = {}): Wor
   const unitTypes = options.unitTypes ?? new Map<string, SimUnitType>();
   const structureTypes = options.structureTypes ?? new Map<string, SimStructureType>();
   const mapFeatures = options.mapFeatures ?? NO_FEATURES;
-  const map = generateMap(seed, options.size, options.cellSize, mapFeatures);
+  const map = generateMap(options.mapSeed ?? seed, options.size, options.cellSize, mapFeatures);
   const rng = new Rng(seed);
   const deposits: DepositState[] = (options.deposits ?? []).map((def, index) => ({
     id: index + 1,
@@ -1506,7 +1511,7 @@ export function worldToPayload(world: WorldState): unknown {
     sides: world.sides.map((side) => ({ ...side })),
     relations: world.relations.map((item) => ({ ...item })),
     mission: world.mission ? cloneMission(world.mission) : null,
-    mapSpec: { size: world.map.size, cellSize: world.map.cellSize, features: world.mapFeatures },
+    mapSpec: { size: world.map.size, cellSize: world.map.cellSize, seed: world.map.seed, features: world.mapFeatures },
     fogEnabled: world.fogEnabled,
     vision: world.vision.map(cloneVision),
     aiStates: world.aiStates.map((item) => ({ ...item, groupIds: [...item.groupIds], lastPads: item.lastPads.map((p) => ({ ...p })) })),
@@ -1574,8 +1579,9 @@ export function payloadToWorld(input: unknown): WorldState | null {
   const spec = isRecord(input.mapSpec) ? input.mapSpec : null;
   const mapFeatures: MapFeatures =
     spec && isRecord(spec.features) ? (spec.features as unknown as MapFeatures) : NO_FEATURES;
+  // Saves from before the map had its own seed generated it from the world seed.
   const map = generateMap(
-    seed,
+    spec && typeof spec.seed === 'number' && Number.isFinite(spec.seed) ? spec.seed : seed,
     spec && typeof spec.size === 'number' ? spec.size : undefined,
     spec && typeof spec.cellSize === 'number' ? spec.cellSize : undefined,
     mapFeatures,

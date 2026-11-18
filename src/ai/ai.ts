@@ -6,7 +6,8 @@ import { Rng } from '../sim/rng';
 import { isItemUnlocked, researchDone } from '../sim/research';
 import { placementValidity } from '../sim/spawn';
 import { padLayout } from '../sim/pad';
-import { clampToMap } from '../sim/map';
+import { clampToMap, isBlockedAt } from '../sim/map';
+import { findPath } from '../sim/pathfinding';
 import { UNIT_RADIUS } from '../sim/tuning';
 import { perceivedUnits } from '../sim/vision';
 import { isPackedOnTheWay } from '../sim/unpack';
@@ -20,22 +21,62 @@ import type {
   UnitState,
   WorldState,
 } from '../sim/types';
-import { AI_DATA, AI_RESEARCH_ORDER, HOME_PAST_RALLY, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
+import { AI_DATA, AI_RESEARCH_ORDER, AI_VARIETY, HOME_PAST_RALLY, UNIT_ORDER_PERIOD, DEFEND_RADIUS, KIT_RING_RADIUS, RETREAT_HP_FRACTION, TACTICAL_EVERY_TICKS } from './aiData';
 
 type Untimed = Command extends infer C ? (C extends Command ? Omit<C, 'tick' | 'issuer'> : never) : never;
 
-export function createAiState(player: PlayerId, difficulty: AiDifficulty, seed: number): AiState {
+export interface AiOptions {
+  /** Narrower bounds for the per-attack threshold scale (a mission's aiAttackScale). */
+  attackScaleRange?: [number, number];
+}
+
+export function createAiState(player: PlayerId, difficulty: AiDifficulty, seed: number, options: AiOptions = {}): AiState {
+  // Integer mixing (not float multiplication, which loses the low bits of a large seed).
+  const rng = new Rng((Math.imul(seed >>> 0, 0x9e3779b1) ^ Math.imul(player, 0x85ebca6b)) >>> 0);
+  const traitSeed = rng.nextU32();
+  const range = options.attackScaleRange;
+  const attackScale = drawAttackScale(rng.next(), range);
   return {
     player,
     difficulty,
-    rngState: (seed * 2654435761 + player * 40503) >>> 0,
+    rngState: rng.getState(),
     scoutId: null,
     groupIds: [],
     groupStartValue: 0,
     waypoint: 0,
     lastPads: [],
     spent: 0,
+    traitSeed,
+    attackScale,
+    ...(range ? { attackScaleRange: [range[0], range[1]] as [number, number] } : {}),
   };
+}
+
+function drawAttackScale(roll: number, range: readonly [number, number] | undefined): number {
+  return between(roll, range?.[0] ?? AI_VARIETY.attackScaleMin, range?.[1] ?? AI_VARIETY.attackScaleMax);
+}
+
+function between(roll: number, min: number, max: number): number {
+  return min + roll * (max - min);
+}
+
+// A fixed roll in [0, 1) for one named trait of this side's play style: the same all match long.
+function traitRoll(state: AiState, key: string): number | null {
+  if (state.traitSeed === undefined) {
+    return null;
+  }
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i += 1) {
+    hash ^= key.charCodeAt(i) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return new Rng((state.traitSeed ^ hash) >>> 0).next();
+}
+
+// How much this side favours a fighting unit type (1 = plain, even mix).
+function mixWeight(state: AiState, typeId: string): number {
+  const roll = traitRoll(state, `mix:${typeId}`);
+  return roll === null ? 1 : between(roll, AI_VARIETY.mixWeightMin, AI_VARIETY.mixWeightMax);
 }
 
 function faction(world: WorldState, player: PlayerId): string | null {
@@ -69,6 +110,24 @@ class Planner {
 
   endRng(): number {
     return this.rng.getState();
+  }
+
+  /** A roll in [0, 1) from this side's own random stream (deterministic for the world seed). */
+  roll(): number {
+    return this.rng.next();
+  }
+
+  /** Whether this side has a seeded play style (sides from older saves play the plain one). */
+  get varied(): boolean {
+    return this.state.traitSeed !== undefined;
+  }
+
+  /** Picks one of the items at random, or the first without a play style (none for an empty list). */
+  pick<T>(items: readonly T[]): T | undefined {
+    if (items.length <= 1 || !this.varied) {
+      return items[0];
+    }
+    return items[Math.min(items.length - 1, Math.floor(this.roll() * items.length))];
   }
 
   ownUnits(): UnitState[] {
@@ -315,6 +374,29 @@ function waypoints(world: WorldState, home: { x: number; z: number }): Array<{ x
   );
 }
 
+// The scout's route: the same corners and centre, but this side visits the farthest three in its
+// own order and each point is shifted a little (where the shifted spot is open ground).
+function scoutPoints(world: WorldState, state: AiState, home: { x: number; z: number }): Array<{ x: number; z: number }> {
+  const points = waypoints(world, home);
+  if (state.traitSeed === undefined) {
+    return points;
+  }
+  const order = traitRoll(state, 'scout:order') ?? 0;
+  const head = points.slice(0, 3);
+  // One of the six orders of the first three points.
+  const perm = Math.floor(order * 6);
+  const first = head.splice(perm % 3, 1);
+  const second = head.splice(Math.floor(perm / 3) % head.length, 1);
+  const ordered = [...first, ...second, ...head, ...points.slice(3)];
+  const reach = world.map.size * AI_VARIETY.scoutJitter;
+  return ordered.map((point, index) => {
+    const dx = ((traitRoll(state, `scout:x${index}`) ?? 0.5) * 2 - 1) * reach;
+    const dz = ((traitRoll(state, `scout:z${index}`) ?? 0.5) * 2 - 1) * reach;
+    const moved = clampToMap(world.map, point.x + dx, point.z + dz, UNIT_RADIUS * 4);
+    return isBlockedAt(world.map, moved.x, moved.z) ? point : moved;
+  });
+}
+
 function isAircraft(type: SimUnitType | undefined): boolean {
   return type?.air !== null && type?.air !== undefined;
 }
@@ -548,7 +630,7 @@ function strategic(planner: Planner): void {
         planner.commands.push({ kind: 'move', unitIds: [activeScout.id], ...homeSpot(world, pad) });
       }
     } else if (activeScout.order.kind === 'idle') {
-      const points = waypoints(world, pad);
+      const points = scoutPoints(world, state, pad);
       const point = points[state.waypoint % points.length];
       state.waypoint += 1;
       if (point) {
@@ -591,8 +673,9 @@ function strategic(planner: Planner): void {
     .filter((t) => isFighter(t, desperate))
     .sort((a, b) => a.id.localeCompare(b.id));
   if (combat.length > 0) {
+    // Fewest of first, each count scaled by this side's liking for the type.
     const order = combat
-      .map((t) => ({ t, count: units.filter((u) => u.typeId === t.id).length + planner.queued(t.id) }))
+      .map((t) => ({ t, count: (units.filter((u) => u.typeId === t.id).length + planner.queued(t.id) + 0.5) / mixWeight(state, t.id) }))
       .sort((x, y) => x.count - y.count || x.t.id.localeCompare(y.t.id));
     for (const entry of order) {
       if (planner.buyUnit(entry.t, armyReserve)) {
@@ -639,20 +722,22 @@ function strategic(planner: Planner): void {
     return;
   }
   const decay = Math.max(0.15, 1 - world.tick / (15 * 1200));
-  const threshold = broke ? 0 : data.attackThresholdValue * decay;
+  const threshold = broke ? 0 : data.attackThresholdValue * decay * (state.attackScale ?? 1);
   const idleValue = idle.reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
   if (idle.length > 0 && (idleValue >= threshold || (armyValue >= threshold && state.groupIds.length === 0))) {
     let target: { x: number; z: number } | undefined;
+    let knownTarget = false;
     const workers = view.units.filter((u) => isHostile(world, planner.player, u.owner) && (u.job !== null));
-    const worker = workers[0];
+    const worker = planner.varied ? planner.pick(comparable(workers, pad)) : workers[0];
     if (worker) {
       target = { x: worker.x, z: worker.z };
+      knownTarget = true;
     } else {
       const rank = (kind: string): number => (kind === 'radar' ? 0 : kind === 'pad' ? 1 : 2);
-      const pick = [...known].sort(
-        (a, b) => rank(a.kind) - rank(b.kind) || Math.hypot(a.x - pad.x, a.z - pad.z) - Math.hypot(b.x - pad.x, b.z - pad.z) || a.id - b.id,
-      )[0];
+      const best = Math.min(...known.map((k) => rank(k.kind)));
+      const pick = planner.pick(comparable(known.filter((k) => rank(k.kind) === best), pad));
       if (pick) {
+        knownTarget = true;
         target = { x: pick.x, z: pick.z };
         state.lastPads = [{ x: pick.x, z: pick.z }];
       } else {
@@ -662,7 +747,17 @@ function strategic(planner: Planner): void {
       }
     }
     if (target && idle.length > 0) {
-      planner.commands.push({ kind: 'attackMove', unitIds: idle.map((u) => u.id), x: target.x, z: target.z });
+      const ids = idle.map((u) => u.id);
+      const via = knownTarget ? flankPoint(planner, idle, target) : null;
+      if (via) {
+        planner.commands.push({ kind: 'attackMove', unitIds: ids, x: via.x, z: via.z });
+        planner.commands.push({ kind: 'attackMove', unitIds: ids, x: target.x, z: target.z, queue: true });
+      } else {
+        planner.commands.push({ kind: 'attackMove', unitIds: ids, x: target.x, z: target.z });
+      }
+      if (state.attackScale !== undefined) {
+        state.attackScale = drawAttackScale(planner.roll(), state.attackScaleRange);
+      }
       // New units join the group already out fighting rather than replacing it: a member dropped
       // from the group while on an attack order would be recalled home as a stray defender.
       const staying = fighters.filter((u) => state.groupIds.includes(u.id) && u.order.kind !== 'idle');
@@ -670,6 +765,87 @@ function strategic(planner: Planner): void {
       state.groupStartValue = [...staying, ...idle].reduce((sum, u) => sum + valueOf(planner.unitType(u)), 0);
     }
   }
+}
+
+// The candidates about as close to home as the nearest one, nearest first (ties by id), so the
+// AI may go for any of them rather than always the same one.
+function comparable<T extends { x: number; z: number; id: number }>(items: readonly T[], home: { x: number; z: number }): T[] {
+  const sorted = items
+    .map((item) => ({ item, d: Math.hypot(item.x - home.x, item.z - home.z) }))
+    .sort((a, b) => a.d - b.d || a.item.id - b.item.id);
+  const nearest = sorted[0]?.d ?? 0;
+  const limit = nearest * AI_VARIETY.targetSlackFactor + AI_VARIETY.targetSlackMetres;
+  return sorted.filter((entry) => entry.d <= limit).map((entry) => entry.item);
+}
+
+function pathLength(from: { x: number; z: number }, path: ReadonlyArray<{ x: number; z: number }>): number {
+  let total = 0;
+  let at = from;
+  for (const point of path) {
+    total += Math.hypot(point.x - at.x, point.z - at.z);
+    at = point;
+  }
+  return total;
+}
+
+// Somewhere to swing out to on the way to the target, to one side of the straight line, or null
+// to go straight in. The point must be open ground the group can reach, and the detour through it
+// no more than a set fraction longer than the direct route.
+function flankPoint(planner: Planner, group: readonly UnitState[], target: { x: number; z: number }): { x: number; z: number } | null {
+  const { world, state } = planner;
+  if (state.traitSeed === undefined || group.length === 0) {
+    return null;
+  }
+  // Draw every roll up front so the stream advances the same whatever the terrain allows.
+  const flank = planner.roll();
+  const sideRoll = planner.roll();
+  const offsetRoll = planner.roll();
+  const alongRoll = planner.roll();
+  if (flank >= AI_VARIETY.flankChance) {
+    return null;
+  }
+  const from = {
+    x: group.reduce((sum, u) => sum + u.x, 0) / group.length,
+    z: group.reduce((sum, u) => sum + u.z, 0) / group.length,
+  };
+  const dx = target.x - from.x;
+  const dz = target.z - from.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance < AI_VARIETY.flankMinDistance) {
+    return null;
+  }
+  const direct = findPath(world.map, from.x, from.z, target.x, target.z);
+  if (!direct) {
+    return null;
+  }
+  const directLength = pathLength(from, direct);
+  const along = between(alongRoll, 0.4, 0.6);
+  const offset = between(offsetRoll, AI_VARIETY.flankOffsetMin, AI_VARIETY.flankOffsetMax) * distance;
+  const firstSide = sideRoll < 0.5 ? 1 : -1;
+  // The chosen side first, then the other, then each at half the swing.
+  for (const [side, scale] of [[firstSide, 1], [-firstSide, 1], [firstSide, 0.5], [-firstSide, 0.5]] as const) {
+    const raw = {
+      x: from.x + dx * along + (-dz / distance) * offset * scale * side,
+      z: from.z + dz * along + (dx / distance) * offset * scale * side,
+    };
+    const point = clampToMap(world.map, raw.x, raw.z, UNIT_RADIUS * 4);
+    if (isBlockedAt(world.map, point.x, point.z)) {
+      continue;
+    }
+    const out = findPath(world.map, from.x, from.z, point.x, point.z);
+    const end = out?.[out.length - 1];
+    if (!out || !end || Math.hypot(end.x - point.x, end.z - point.z) > 3) {
+      continue;
+    }
+    const back = findPath(world.map, point.x, point.z, target.x, target.z);
+    if (!back) {
+      continue;
+    }
+    if (pathLength(from, out) + pathLength(point, back) <= directLength * AI_VARIETY.flankMaxDetour) {
+      return point;
+    }
+  }
+  return null;
 }
 
 function tactical(planner: Planner): void {

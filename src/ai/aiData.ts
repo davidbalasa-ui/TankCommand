@@ -89,3 +89,31 @@ export const UNIT_ORDER_PERIOD = 10; // a unit gets at most one tactical order p
 
 /** How far past its pad's rally point (toward the map centre) the AI parks units it sends home, m. */
 export const HOME_PAST_RALLY = 8;
+
+/**
+ * How much one match's computer opponent differs from the next (drawn from the world seed, so a
+ * replay or a save plays out the same). Every range is centred on the plain behaviour, so each
+ * difficulty stays as strong on average.
+ */
+export const AI_VARIETY = {
+  /** The attack threshold is scaled by a fresh factor in this range for every attack. */
+  attackScaleMin: 0.8,
+  attackScaleMax: 1.2,
+  /** Per unit type preference in the army mix (a weight of 1.25 buys about a quarter more of it). */
+  mixWeightMin: 0.8,
+  mixWeightMax: 1.25,
+  /** Chance an attack swings out round one side instead of going straight at the target. */
+  flankChance: 2 / 3,
+  /** Sideways offset of the flank waypoint, as a fraction of the distance to the target. */
+  flankOffsetMin: 0.15,
+  flankOffsetMax: 0.35,
+  /** No flanking when the target is closer than this, m. */
+  flankMinDistance: 40,
+  /** A flank route may be at most this much longer than the direct route. */
+  flankMaxDetour: 1.6,
+  /** Targets count as comparable within this factor (plus the slack in metres) of the nearest. */
+  targetSlackFactor: 1.3,
+  targetSlackMetres: 10,
+  /** Scout waypoints shift by up to this fraction of the map size. */
+  scoutJitter: 0.06,
+};

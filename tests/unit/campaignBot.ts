@@ -47,6 +47,13 @@ export interface BotPlan {
   gatherOffEdge?: number;
 }
 
+// Per-mission bot tuning. Mission 20 (two enemy bases) goes better with the army waiting right
+// at the pad's exit edge rather than out at the rally point.
+export const CAMPAIGN_PLANS: Record<string, BotPlan> = {
+  'mission.human.20_brood_war': { gatherOffEdge: 2 },
+  'mission.alien.20_two_banners': { gatherOffEdge: 2 },
+};
+
 export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {
   if (w.tick % THINK_EVERY !== 1 || !w.mission) {
     return [];

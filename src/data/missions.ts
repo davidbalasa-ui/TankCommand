@@ -87,6 +87,16 @@ export function checkMissionReferences(data: SimData, mission: MissionRow): void
   }
 }
 
+/**
+ * Every attempt at a mission plays on the same ground (terrain noise and props come from this
+ * seed, as the briefing preview does); the world seed only drives combat dice and the AI's choices.
+ */
+export const MISSION_MAP_SEED = 1;
+
+/**
+ * Build a mission's world. `seed` varies per attempt: scripted beats (units, triggers, waves) are
+ * fixed by the mission data, while combat and the computer opponents' choices follow the seed.
+ */
 export function buildMissionWorld(
   data: SimData,
   mission: MissionRow,
@@ -135,6 +145,7 @@ export function buildMissionWorld(
     failReason: null,
   };
   const world = createWorld(seed, {
+    mapSeed: MISSION_MAP_SEED,
     unitTypes: data.unitTypes,
     structureTypes: data.structureTypes,
     researchTree: data.researchTree,
@@ -185,7 +196,7 @@ export function buildMissionWorld(
       }
     }
     if (side.controller === 'ai') {
-      addAi(world, side.player, side.difficulty ?? 'normal');
+      addAi(world, side.player, side.difficulty ?? 'normal', side.aiAttackScale ? { attackScaleRange: side.aiAttackScale } : {});
     }
   }
   return world;
