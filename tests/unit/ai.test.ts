@@ -98,6 +98,8 @@ describe('enemy AI', () => {
       '../sim/types', '../sim/commands', '../sim/vision', '../sim/diplomacy', '../sim/spawn',
       '../sim/rng', '../sim/economy', '../sim/research', '../sim/world', '../sim/air', '../sim/unpack', '../sim/pad',
       '../sim/map', '../sim/tuning', './ai', './aiData', './driver',
+      // Routes over bare terrain for flank waypoints: the map is known to every side.
+      '../sim/pathfinding',
     ];
     for (const file of files) {
       const text = readFileSync(`src/ai/${file}`, 'utf8');

@@ -1,12 +1,12 @@
 import type { Command } from '../sim/commands';
 import { step } from '../sim/world';
 import type { AiDifficulty, PlayerId, WorldState } from '../sim/types';
-import { createAiState, thinkAi } from './ai';
+import { createAiState, thinkAi, type AiOptions } from './ai';
 
-export function addAi(world: WorldState, player: PlayerId, difficulty: AiDifficulty): void {
+export function addAi(world: WorldState, player: PlayerId, difficulty: AiDifficulty, options: AiOptions = {}): void {
   world.aiStates = [
     ...world.aiStates.filter((item) => item.player !== player),
-    createAiState(player, difficulty, world.seed),
+    createAiState(player, difficulty, world.seed, options),
   ].sort((a, b) => a.player - b.player);
 }
 

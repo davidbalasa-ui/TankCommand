@@ -44,7 +44,11 @@
       "controller": "ai",
       "ore": 0,
       "metal": 100,
-      "difficulty": "normal"
+      "difficulty": "normal",
+      "aiAttackScale": [
+        0.8,
+        1.0
+      ]
     }
   ],
   "units": [

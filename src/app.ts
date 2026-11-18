@@ -217,6 +217,7 @@ export class App {
   private selectedIds: number[] = [];
   private simSpeedMultiplier = 1;
   private nextSeed = 1;
+  private missionAttempts = 0;
   private queueModeValue = false;
   private selectModeValue = false;
   private attackMoveArmedValue = false;
@@ -1554,13 +1555,22 @@ export class App {
     if (!row) {
       return this.newSkirmish();
     }
-    const world = buildMissionWorld(this.simData, row, 1, { fog: this.fogValue });
+    const world = buildMissionWorld(this.simData, row, this.missionSeed(), { fog: this.fogValue });
     if (!this.aiValue) {
       world.aiStates = [];
     }
     this.dropPadId = null;
     this.placementState = null;
     return world;
+  }
+
+  // A fresh world seed for every mission attempt (start, retry, next), so the computer opponents and
+  // the dice play out differently each time. The app may use the clock; the sim only sees the seed,
+  // which the world (and so every save) keeps.
+  private missionSeed(): number {
+    this.missionAttempts += 1;
+    const mixed = Math.imul((Date.now() % 0x7fffffff) ^ Math.imul(this.missionAttempts, 0x9e3779b1), 0x85ebca6b) >>> 0;
+    return (mixed % 0x7ffffffe) + 1;
   }
 
   private missionList(): MissionListItem[] {

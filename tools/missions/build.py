@@ -377,10 +377,13 @@ def player_side(faction, ore, metal=0, available=None, research_done=None):
     return s
 
 
-def enemy_side(faction, controller='none', ore=0, metal=0, difficulty=None, player=2, team=None):
+def enemy_side(faction, controller='none', ore=0, metal=0, difficulty=None, player=2, team=None,
+               ai_attack_scale=None):
     s = {'player': player, 'faction': faction, 'controller': controller, 'ore': ore, 'metal': metal}
     if difficulty:
         s['difficulty'] = difficulty
+    if ai_attack_scale:
+        s['aiAttackScale'] = list(ai_attack_scale)
     if team:
         s['team'] = team
     return s
@@ -982,7 +985,10 @@ def act2(f):
             'map.c_iron_gate',
             [player_side(f, 1200, available=avail(f, *ACT2_UNITS, 'missile', 'artillery', 'battery', 'repair', 'hover'),
                          research_done=research(f, *ACT2_BASE, 'artillery', 'repair', 'hover')),
-             enemy_side(e, 'ai', ore=0, metal=100, difficulty='normal')],
+             # The enemy's starting army (700) just meets Normal's attack threshold, so it comes
+             # straight at the player at once: its attack size may vary only downward, or on half
+             # the seeds it would sit behind the ridges instead and the mission would be far harder.
+             enemy_side(e, 'ai', ore=0, metal=100, difficulty='normal', ai_attack_scale=(0.8, 1.0))],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 14, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 24, hz - 4, 2)]
             + [U(1, R['miner'], hx - 10, hz - 2), U(1, R['tug'], hx - 4, hz + 10), U(1, R['radar'], hx + 4, hz - 4)]
