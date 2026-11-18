@@ -10,9 +10,12 @@ import {
   missionStatus,
   recordWin,
   saveProgress,
+  setCampaignDifficulty,
+  type CampaignDifficulty,
   type CampaignProgress,
 } from './platform/progress';
 import type { MapRow } from './data/mapSchema';
+import type { MissionRow } from './sim/missionSchema';
 import type { StructureRow } from './data/structureSchema';
 import type { UnitRow } from './data/unitSchema';
 import { createScreens } from './ui/screens';
@@ -377,6 +380,12 @@ export class App {
         this.campaignValue = campaign;
       },
       getCampaign: () => this.campaignValue,
+      getDifficulty: () => this.progress.difficulty,
+      setDifficulty: (difficulty) => {
+        this.progress = setCampaignDifficulty(this.progress, difficulty);
+        void saveProgress(this.kv, this.progress).catch(() => undefined);
+      },
+      inMatch: () => this.matchActive,
       getMissionList: () => this.missionList(),
       chooseMission: (id) => this.chooseMission(id),
       getBriefing: () => this.briefing(),
@@ -432,6 +441,10 @@ export class App {
       applySettings: (settings) => {
         this.applySettings(settings);
       },
+      describeWorld: (world) => {
+        const id = world.mission?.def.id;
+        return id ? (MISSIONS.find((item) => item.id === id)?.title ?? 'Campaign') : 'Skirmish';
+      },
     });
     this.leftHandedValue = this.services.settings().leftHanded;
   }
@@ -463,6 +476,9 @@ export class App {
     }
     if (id === 'title' || id === 'results') {
       this.matchActive = false;
+    }
+    if (id === 'results') {
+      void this.services?.finishMatch();
     }
     this.router.go(id);
     this.services?.setMatchActive(this.matchActive && id !== 'results');
@@ -1336,6 +1352,8 @@ export class App {
 
   setFogOn(value: boolean): void {
     this.fogValue = value;
+    // The skirmish setup screen starts from this value (it overrides fogValue on Start).
+    this.skirmishConfig = { ...this.skirmishConfig, fog: value };
     try {
       window.localStorage.setItem('setting.fog', value ? 'on' : 'revealed');
     } catch {
@@ -1554,13 +1572,19 @@ export class App {
     if (!row) {
       return this.newSkirmish();
     }
-    const world = buildMissionWorld(this.simData, row, 1, { fog: this.fogValue });
+    // The fog toggle is a skirmish option: campaign missions are always played under fog.
+    const world = buildMissionWorld(this.simData, row, 1, { fog: true, difficulty: this.difficultyFor(row) });
     if (!this.aiValue) {
       world.aiStates = [];
     }
     this.dropPadId = null;
     this.placementState = null;
     return world;
+  }
+
+  /** Training is the same for everyone; the story campaigns follow the chosen difficulty. */
+  private difficultyFor(row: MissionRow): CampaignDifficulty {
+    return row.campaign === 'training' ? 'normal' : this.progress.difficulty;
   }
 
   private missionList(): MissionListItem[] {
@@ -1573,6 +1597,7 @@ export class App {
       title: mission.title,
       order: mission.order,
       status: missionStatus(this.progress, missions, mission.id),
+      bestDifficulty: this.progress.completed[mission.id]?.bestDifficulty,
     }));
   }
 
@@ -1606,6 +1631,7 @@ export class App {
       title: mission.title,
       text: mission.briefing,
       objectives: mission.objectives.map((o) => ({ text: o.text, kind: o.kind })),
+      difficulty: mission.campaign === 'training' ? undefined : this.difficultyFor(mission),
       map: {
         size: map.size,
         cellSize: map.cellSize,
@@ -1659,6 +1685,7 @@ export class App {
       hasNext,
       campaignComplete,
       epilogue: campaignComplete ? (row?.epilogue ?? null) : null,
+      difficulty: row?.campaign === 'training' ? undefined : (mission.def.difficulty ?? 'normal'),
     };
   }
 
@@ -1669,7 +1696,7 @@ export class App {
     }
     this.resultRecorded = true;
     if (this.world.result.winner === mission.humanSide) {
-      this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ);
+      this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ, mission.def.difficulty ?? 'normal');
       void saveProgress(this.kv, this.progress).catch(() => undefined);
     }
   }
@@ -1685,6 +1712,7 @@ export class App {
     this.matchActive = true;
     this.services?.resetAlerts(this.world);
     this.services?.setMatchActive(true);
+    this.services?.beginMatch();
   }
 
   private loadWorld(world: WorldState, startMatch: boolean): void {

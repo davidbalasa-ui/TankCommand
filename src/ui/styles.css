@@ -4035,3 +4035,108 @@ html.quality-low .title-embers {
     display: none;
   }
 }
+
+/* ---------- Save slots, difficulty, pause extras ---------- */
+.save-row .save-label {
+  flex: none;
+  width: 52px;
+}
+
+.save-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.save-title,
+.save-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-title {
+  font-weight: 700;
+}
+
+.save-detail {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.save-row[data-empty='true'] .save-title {
+  font-weight: 400;
+  color: var(--dim);
+}
+
+.save-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.save-actions[hidden] {
+  display: none;
+}
+
+.save-actions button,
+.save-confirm button {
+  min-width: 76px;
+  min-height: 44px;
+}
+
+.save-row.confirming {
+  border-color: #d98080;
+}
+
+.save-confirm {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-confirm-text {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.campaign-difficulty {
+  width: 100%;
+  max-width: 640px;
+}
+
+.difficulty-note {
+  margin: 6px 0 0 114px;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.briefing-text p.briefing-difficulty,
+.results-difficulty {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--soft);
+}
+
+.briefing-difficulty[data-difficulty='hard'],
+.results-difficulty[data-difficulty='hard'] {
+  color: var(--orange);
+}
+
+/* The pause list holds up to eight entries: two columns keep them on a 412 px-tall phone. */
+.pause-card .pause-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pause-card button.pause-item {
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.pause-card button.pause-quit {
+  grid-column: 1 / -1;
+}

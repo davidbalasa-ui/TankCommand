@@ -42,6 +42,7 @@ export const ICON_PATHS = {
   phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18 h2"/>',
   deploy: '<path d="M3 21 h18"/><path d="M6 21 v-5 h12 v5"/><path d="M12 16 V4 M8 8 l4-4 4 4"/>',
   speed: '<path d="M4 6 L11 12 L4 18 Z"/><path d="M12 6 L19 12 L12 18 Z"/>',
+  restart: '<path d="M5 12 a7 7 0 1 0 2.1-5"/><path d="M5 4 v4 h4"/>',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
