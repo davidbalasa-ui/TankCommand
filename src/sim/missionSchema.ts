@@ -149,6 +149,11 @@ const missionSide = z.object({
   team: z.number().int().positive().optional(),
   difficulty: z.enum(['easy', 'normal', 'hard']).optional(),
   /**
+   * For an AI side: its level when the campaign is played on Hard, in place of the usual one step
+   * up. Lets a mission with more than one AI keep its weaker side weak so Hard stays beatable.
+   */
+  hardDifficulty: z.enum(['easy', 'normal', 'hard']).optional(),
+  /**
    * For an AI side: the range its attack threshold is scaled by, per attack (default AI_VARIETY's
    * 0.8 to 1.2). Narrow it where a mission's balance hangs on when the AI first attacks.
    */

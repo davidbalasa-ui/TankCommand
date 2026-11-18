@@ -379,10 +379,12 @@ def player_side(faction, ore, metal=0, available=None, research_done=None):
 
 
 def enemy_side(faction, controller='none', ore=0, metal=0, difficulty=None, player=2, team=None,
-               ai_attack_scale=None):
+               ai_attack_scale=None, hard_difficulty=None):
     s = {'player': player, 'faction': faction, 'controller': controller, 'ore': ore, 'metal': metal}
     if difficulty:
         s['difficulty'] = difficulty
+    if hard_difficulty:
+        s['hardDifficulty'] = hard_difficulty
     if ai_attack_scale:
         s['aiAttackScale'] = list(ai_attack_scale)
     if team:
@@ -1311,7 +1313,8 @@ def act3(f):
             [player_side(f, 1600, available=avail(f, *units3, *(('bomber',) if terran else ('saucer',))),
                          research_done=base_research if terran else research(f, *ACT2_BASE, 'artillery', 'repair', 'hover', 'disc')),
              enemy_side(e, 'ai', ore=300, metal=100, difficulty='hard', team=2),
-             enemy_side(e, 'ai', ore=200, metal=100, difficulty='easy', player=3, team=2)],
+             # On Hard the northern side stays Easy: two active bases at once beat every soak seed.
+             enemy_side(e, 'ai', ore=200, metal=100, difficulty='easy', player=3, team=2, hard_difficulty='easy')],
             [U(1, R['light'], x, z, -0.785) for x, z in spread(hx + 16, hz - 14, 4)]
             + [U(1, R['heavy'], x, z, -0.785) for x, z in spread(hx + 26, hz - 4, 3)]
             + [U(1, R['artillery'], hx + 10, hz - 22), U(1, R['missile'], hx + 20, hz - 20)]
