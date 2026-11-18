@@ -4,6 +4,7 @@ import { drawMapPreview } from './mapPreview';
 import { icon, type IconName } from './icons';
 import { emblem } from './emblem';
 import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './widgets';
+import { playIntroFilm } from './introFilm';
 import { APP_VERSION } from '../platform/appInfo';
 import type {
   CampaignDifficulty,
@@ -248,6 +249,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         }),
         iconButton('title', 'credits', 'Credits', 'star', () => {
           ctx.go('credits');
+        }),
+        iconButton('title', 'intro', 'Intro', 'play', () => {
+          void playIntroFilm();
         }),
       );
       const version = document.createElement('div');

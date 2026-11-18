@@ -1,0 +1,102 @@
+"""Weapon FX test bench (not a promo clip): one small staged shot per effect, for look-dev of
+promo_fx_weapons.py. Pick the case with FXCASE=<case>:
+
+    cannon | autocannon | missile | laser | lightning | shield | shield_gold | shell | bomb
+
+    FXCASE=missile python tools/promos/fx/weapons_bench.py --quality preview --frames 10,20,30 --out /tmp/x
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from promo_kit import COL, Promo  # noqa: E402
+
+CASE = os.environ.get('FXCASE', 'cannon')
+P = Promo('fxbench_' + CASE, seconds=3.0)
+if CASE == 'space':
+    P.space()
+else:
+    P.env('desert', sun=(48, 0, -40), clear=[(0, 0, 30)], props=0)
+    P.flatten(0, 0, 30)
+
+if CASE in ('cannon', 'autocannon'):
+    a = P.load('lancer', at=(0, 0), heading=0)
+    a.split_barrels()
+    if CASE == 'cannon':
+        a.fire(0.3, (13, 2, 0.1), kind='cannon')
+        a.fire(1.4, (12, -2, 0.1), kind='heavy', size=1.1)
+    else:
+        for i in range(8):
+            a.fire(0.3 + 0.12 * i, (17, 0.5 * (i % 3) - 0.5, 0.1), kind='autocannon', recoil=False, spread=0.6)
+    P.camera([(0, (5, -16, 3.0), (6, 0, 0.8), 30)])
+elif CASE == 'missile':
+    a = P.load('javelin', at=(0, 0), heading=0)
+    P.muzzle_flash(a.muzzle(), 0.3, COL['fire'], 0.8)
+    th = P.missile(a.world_at(a.muzzle(), 0.3), (22, 3, 0.2), 0.3)
+    P.impact((22, 3, 0.2), th, size=1.2)
+    P.camera([(0, (10, -17, 3.5), (11, 2, 2.5), 24)])
+elif CASE == 'laser':
+    a = P.load('lancer', at=(0, 0), heading=0)
+    a.split_barrels()
+    a.fire(0.3, (16, 1, 0.1), kind='laser', color=COL['laser_blue'])
+    P.beam(a.world_at(a.muzzle(), 1.0), (15, -2, 0.1), 1.0, 1.8, COL['terran_neon'], width=0.12)
+    P.impact((15, -2, 0.1), 1.05, size=0.8, color=COL['terran_neon'])
+    P.camera([(0, (8, -16, 3.0), (8.5, 0, 0.8), 28)])
+elif CASE == 'lightning':
+    a = P.load('lumen', at=(0, 0), heading=0)
+    a.fire(0.3, (14, 1, 0.1), kind='lightning')
+    a.fire(1.2, (13, -2, 0.1), kind='lightning', size=1.4)
+    P.camera([(0, (6, -14, 2.5), (7, 0, 0.8), 28)])
+elif CASE in ('shield', 'shield_gold'):
+    gold = CASE == 'shield_gold'
+    hits = [(0.5, (-4.2, -3.0, 2.5)), (1.1, (-5.4, 0.5, 1.2)), (1.35, (-3.0, -3.5, 3.4))]
+    P.shield_dome((0, 0, 0), 6.0, 0.1, 3.0, color=COL['arc_gold'] if gold else None, hits=hits)
+    a = P.load('lancer' if gold else 'lumen', at=(0, 0), heading=0)
+    s = P.load('lumen' if not gold else 'lancer', at=(-20, -6), heading=15)
+    for t, p in hits:
+        if gold:
+            P.projectile(s.world_at(s.muzzle(), t - 0.3), p, t - 0.3, 60, COL['tracer'], size=0.15)
+        else:
+            P.lightning(s.world_at(s.muzzle(), t - 0.05), p, t - 0.05, t + 0.12)
+    P.camera([(0, (-17, -17, 4.5), (-1, 0, 2.6), 30)])
+elif CASE == 'shield_push':
+    import promo_fx_weapons as W
+    sh = P.shield_dome((0, 0, 0), 6.0, 0.0, 3.0, hits=[(0.4, (4, -4, 2.5))])
+    a = P.load('lancer', at=(-2, 0), heading=0)
+    a.path([(0.0, (-2, 0)), (2.2, (11, 0))])
+    W.shield_push(P, sh, a, 0.3, 2.2)
+    P.camera([(0, (4, -17, 4.5), (5, 0, 1.6), 30)])
+elif CASE == 'space':
+    # Arcadian fighters lashing a moving Terran frigate: moving-end lightning + lightning thrust
+    import promo_fx_weapons as W
+    tw = []
+    for i, (y, z) in enumerate([(6, 2.0), (-5, -1.5)]):
+        e = P.load('terran_twinx', at=(30, y, z), heading=180, label=f'twinx{i}')
+        e.path([(0.0, (34, y, z)), (3.0, (16, y * 0.6, z + 1))])
+        tw.append(e)
+    rays = []
+    for i, (y, z) in enumerate([(-4, 1.5), (4, -1.0)]):
+        a = P.load('arcadian_stingray', at=(-6, y, z), heading=0, label=f'ray{i}')
+        a.path([(0.0, (-10, y, z)), (3.0, (2, y * 1.3, z))])
+        rays.append(a)
+        W.lightning_thruster(P, a, 0.0, 3.0, local=(-a.size * 0.4, 0, 0), length=a.size * 0.45, width=0.05)
+    for k in range(4):   # lashes from the moving rays onto the moving fighters (glow on)
+        t = 0.4 + 0.5 * k
+        P.shot((rays[k % 2], (rays[0].size * 0.4, 0, 0)), tw[(k // 2) % 2], 'lightning', t, width=0.08, dur=0.22)
+    # turret-less Terran fighters answer from hull points: laser, autocannon, missile
+    P.shot((tw[0], (-4.0, 0, 0)), rays[0], 'laser', 0.7, size=1.2)
+    for k in range(4):
+        P.shot((tw[1], (-4.0, 0.6 * (-1) ** k, 0)), rays[1], 'autocannon', 1.1 + 0.1 * k, spread=0.6)
+    P.shot((tw[0], (-3.0, 0, -0.5)), rays[1], 'missile', 1.6, arc=1.0)
+    P.camera([(0, (4, -40, 8), (8, 0, 0), 32), (3.0, (8, -38, 7), (10, 0, 0), 32)])
+elif CASE == 'shell':
+    a = P.load('longbow', at=(0, 0), heading=0)
+    a.fire(0.3, (40, 4, 0.1), kind='shell')
+    P.camera([(0, (20, -40, 8), (20, 3, 4), 26)])
+elif CASE == 'bomb':
+    a = P.load('condor', at=(0, 0, 14), heading=0)
+    for i in range(3):
+        a.fire(0.3 + 0.15 * i, (10 + 2.5 * i, 0, 0.1), kind='bomb', recoil=False)
+    P.camera([(0, (4, -24, 5), (8, 0, 5), 30)])
+
+P.render()

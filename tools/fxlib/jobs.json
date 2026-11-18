@@ -1,0 +1,370 @@
+{
+ "explo_ground": {
+  "recipe": "ground_blast",
+  "sim": {
+   "frames": 56,
+   "res": 1.3
+  },
+  "test_frames": [
+   4,
+   8,
+   14,
+   20,
+   30,
+   44,
+   56
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    3,
+    3.5
+   ],
+   "view_size": 7.0,
+   "elev": 12,
+   "style": {}
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "fire",
+   "note": "Ground explosion, tank-size (fireball ~2.5 m). Lock card to Z."
+  }
+ },
+ "explo_ground_arc": {
+  "recipe": "ground_blast",
+  "sim_as": "explo_ground",
+  "sim": {
+   "frames": 56,
+   "res": 1.3
+  },
+  "test_frames": [
+   4,
+   8,
+   14,
+   20,
+   30
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    3,
+    3.5
+   ],
+   "view_size": 7.0,
+   "elev": 12,
+   "style": {
+    "ramp": [
+     [
+      0.0,
+      [
+       0,
+       0,
+       0
+      ]
+     ],
+     [
+      0.1,
+      [
+       0.3,
+       0.12,
+       0.0
+      ]
+     ],
+     [
+      0.35,
+      [
+       1.0,
+       0.45,
+       0.03
+      ]
+     ],
+     [
+      0.7,
+      [
+       1.0,
+       0.66,
+       0.12
+      ]
+     ],
+     [
+      1.0,
+      [
+       1.0,
+       0.8,
+       0.32
+      ]
+     ]
+    ],
+    "smoke_color": [
+     0.62,
+     0.58,
+     0.5
+    ]
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "gold",
+   "note": "Arcadian unit death: same blast, gold-white fire."
+  }
+ },
+ "explo_air": {
+  "recipe": "air_blast",
+  "sim": {
+   "frames": 48,
+   "res": 1.3
+  },
+  "test_frames": [
+   4,
+   10,
+   18,
+   30,
+   48
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    3,
+    3.0
+   ],
+   "view_size": 6.0,
+   "elev": 12,
+   "style": {}
+  },
+  "finalize": {
+   "origin_v": 0.38,
+   "tint": "fire",
+   "note": "Mid-air burst (aircraft). Camera-facing card."
+  }
+ },
+ "explo_small": {
+  "recipe": "small_blast",
+  "sim": {
+   "frames": 32,
+   "res": 1.3
+  },
+  "test_frames": [
+   2,
+   5,
+   9,
+   16,
+   32
+  ],
+  "render": {
+   "res": 384,
+   "samples": 48,
+   "view_center": [
+    1.2,
+    1.2
+   ],
+   "view_size": 2.4,
+   "elev": 12,
+   "style": {
+    "smoke_color": [
+     0.55,
+     0.47,
+     0.38
+    ],
+    "fire_noise_scale": 7.0,
+    "detail_scale": 12.0
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "fire",
+   "note": "Shell impact on ground with dirt. Lock to Z."
+  }
+ },
+ "explo_big": {
+  "recipe": "big_blast",
+  "sim": {
+   "frames": 60,
+   "res": 1.2
+  },
+  "test_frames": [
+   5,
+   12,
+   20,
+   32,
+   46,
+   60
+  ],
+  "render": {
+   "res": 768,
+   "samples": 48,
+   "view_center": [
+    5,
+    6.5
+   ],
+   "view_size": 13.0,
+   "elev": 12,
+   "style": {
+    "detail_scale": 3.0,
+    "fire_noise_scale": 1.6
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "fire",
+   "note": "Structure / big unit death with secondary pops. Lock to Z."
+  }
+ },
+ "explo_space": {
+  "recipe": "space_blast",
+  "sim": {
+   "frames": 40,
+   "res": 1.3
+  },
+  "test_frames": [
+   3,
+   8,
+   14,
+   24,
+   40
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    3,
+    3
+   ],
+   "view_size": 6.0,
+   "elev": 0,
+   "style": {
+    "world": 0.25,
+    "world_color": [
+     0.4,
+     0.45,
+     0.6
+    ]
+   }
+  },
+  "finalize": {
+   "origin_v": 0.5,
+   "tint": "fire",
+   "note": "Zero-g explosion: no rise, no ground. Camera-facing."
+  }
+ },
+ "fire_loop": {
+  "recipe": "fire_loop",
+  "sim": {
+   "frames": 96,
+   "res": 1.3
+  },
+  "test_frames": [
+   40,
+   60,
+   80
+  ],
+  "render": {
+   "res": 384,
+   "samples": 48,
+   "view_center": [
+    1.05,
+    1.4
+   ],
+   "view_size": 2.8,
+   "elev": 12,
+   "style": {
+    "smoke_density": 6.0,
+    "fire_strength": 14.0,
+    "flame_boost": 5.0,
+    "emit_cap": 7.0,
+    "heat_lo": 0.35,
+    "fire_noise_scale": 8.0,
+    "detail_scale": 14.0
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "fire",
+   "loop": 16,
+   "drop_first": 24,
+   "note": "Burning wreck flames, seamless loop. Lock to Z."
+  }
+ },
+ "smoke_plume": {
+  "recipe": "smoke_plume",
+  "sim": {
+   "frames": 120,
+   "res": 1.2
+  },
+  "test_frames": [
+   60,
+   90,
+   120
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    2.1,
+    3.9
+   ],
+   "view_size": 7.8,
+   "elev": 12,
+   "style": {
+    "fire_strength": 0.0,
+    "flame_boost": 0.0,
+    "smoke_density": 4.0,
+    "detail": 0.45,
+    "detail_scale": 5.0,
+    "smoke_color": [
+     0.66,
+     0.64,
+     0.62
+    ]
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "smoke",
+   "loop": 24,
+   "drop_first": 40,
+   "note": "Lingering wreck smoke column drifting +X, seamless loop. Lock to Z."
+  }
+ },
+ "dust_burst": {
+  "recipe": "dust_burst",
+  "sim": {
+   "frames": 40,
+   "res": 1.3
+  },
+  "test_frames": [
+   3,
+   8,
+   16,
+   28,
+   40
+  ],
+  "render": {
+   "res": 512,
+   "samples": 48,
+   "view_center": [
+    2.0,
+    2.0
+   ],
+   "view_size": 4.0,
+   "elev": 12,
+   "style": {
+    "fire_strength": 0.0,
+    "flame_boost": 0.0,
+    "smoke_color": [
+     0.85,
+     0.72,
+     0.55
+    ],
+    "smoke_density": 1.6
+   }
+  },
+  "finalize": {
+   "origin_v": 0.0,
+   "tint": "dust",
+   "note": "Dust kicked up by impact/landing; tint for terrain. Lock to Z."
+  }
+ }
+}
