@@ -1,5 +1,7 @@
 import type { ScreenContext } from './router';
 import { button } from './controls';
+import { APP_VERSION } from '../platform/appInfo';
+import { REPORT_LIMITS } from '../platform/bugReportSender';
 
 function formatFreeze(ctx: ScreenContext): string {
   const report = ctx.api?.lastFreezeReport();
@@ -11,7 +13,7 @@ function formatFreeze(ctx: ScreenContext): string {
 
 /**
  * Two columns so the description, the include-save checkbox, the log preview,
- * the status line and both buttons are all on screen at 915x412. A single
+ * the status line and the Send and Save buttons are all on screen at 915x412. A single
  * column needs ~570 px and, with `touch-action: none` on <html> (TCH-04), the
  * player cannot scroll to the Save/Back buttons that would sit below the fold.
  */
@@ -29,7 +31,7 @@ export function mountBugReport(root: HTMLElement, ctx: ScreenContext): () => voi
   meta.dataset.bugMeta = 'true';
   const logs = api?.logs() ?? [];
   meta.textContent = [
-    `Version: ${api?.version() ?? '0.1.0'}`,
+    `Version: ${api?.version() ?? APP_VERSION}`,
     `Device: ${navigator.userAgent}`,
     `Last freeze: ${formatFreeze(ctx)}`,
     `Log lines: ${logs.length}`,
@@ -39,6 +41,7 @@ export function mountBugReport(root: HTMLElement, ctx: ScreenContext): () => voi
   textarea.className = 'bug-text';
   textarea.placeholder = 'What went wrong?';
   textarea.setAttribute('aria-label', 'Bug description');
+  textarea.maxLength = REPORT_LIMITS.message;
 
   const includeRow = document.createElement('label');
   includeRow.className = 'setting-row';
@@ -56,31 +59,64 @@ export function mountBugReport(root: HTMLElement, ctx: ScreenContext): () => voi
   const status = document.createElement('p');
   status.className = 'bug-status';
   status.dataset.bugStatus = 'true';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
 
-  const save = button('bugReport', 'save', 'Save report', () => {
-    void (async () => {
-      if (!api) {
-        status.textContent = 'Bug reports are unavailable in this environment.';
-        return;
-      }
-      save.disabled = true;
-      status.textContent = 'Saving…';
-      const result = await api.saveBugReport({
-        message: textarea.value,
-        includeSave: include.checked,
-      });
-      status.textContent =
-        result.status === 'ok' ? `Saved ${result.fileName ?? ''}`.trim() : result.message;
+  const note = document.createElement('p');
+  note.className = 'bug-note';
+  note.textContent = 'Send posts this report, with the version, device and log shown here, to the developer. Save keeps a file on this device and sends nothing.';
+
+  const setStatus = (text: string, result: string): void => {
+    status.textContent = text;
+    status.dataset.bugResult = result;
+  };
+
+  let busy = false;
+  const run = (job: (api: NonNullable<typeof ctx.api>) => Promise<void>): void => {
+    if (busy) {
+      return;
+    }
+    if (!api) {
+      setStatus('Bug reports are unavailable in this environment.', 'error');
+      return;
+    }
+    busy = true;
+    send.disabled = true;
+    save.disabled = true;
+    void job(api).finally(() => {
+      busy = false;
+      send.disabled = false;
       save.disabled = false;
-    })();
+    });
+  };
+
+  const send = button('bugReport', 'send', 'Send report', () => {
+    run(async (game) => {
+      setStatus('Sending…', 'pending');
+      const result = await game.sendBugReport({ message: textarea.value, includeSave: include.checked });
+      setStatus(result.message, result.status);
+    });
   });
+  send.classList.add('primary');
+
+  const save = button('bugReport', 'save', 'Save to device', () => {
+    run(async (game) => {
+      setStatus('Saving…', 'pending');
+      const result = await game.saveBugReport({ message: textarea.value, includeSave: include.checked });
+      setStatus(result.status === 'ok' ? `Saved ${result.fileName ?? ''}`.trim() : result.message, result.status);
+    });
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'bug-actions';
+  actions.append(send, save);
 
   const back = button('bugReport', 'back', 'Back', () => {
     ctx.router.back();
   });
 
   left.append(meta, textarea, includeRow);
-  right.append(logBox, status, save, back);
+  right.append(logBox, note, status, actions, back);
   form.append(left, right);
   root.append(form);
 

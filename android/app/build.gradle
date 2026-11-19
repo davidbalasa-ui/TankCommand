@@ -1,0 +1,96 @@
+import groovy.json.JsonSlurper
+
+apply plugin: 'com.android.application'
+
+// One place for the version: package.json "version" (also shown in the game as APP_VERSION).
+// versionName is that string; versionCode is major * 10000 + minor * 100 + patch, so every
+// release uploaded to Play needs a higher package.json version (0.1.0 -> 100, 0.1.1 -> 101).
+def appVersionName = new JsonSlurper().parse(rootProject.file('../package.json')).version as String
+def appVersionParts = appVersionName.tokenize('-')[0].tokenize('.').collect { it as int }
+if (appVersionParts.size() != 3 || appVersionParts[1] > 99 || appVersionParts[2] > 99) {
+    throw new GradleException("package.json version '${appVersionName}' must be major.minor.patch with minor and patch below 100")
+}
+def appVersionCode = appVersionParts[0] * 10000 + appVersionParts[1] * 100 + appVersionParts[2]
+
+// Release signing comes from the environment (GitHub Actions secrets). With any of the four
+// missing, the release build is left unsigned and Gradle says so.
+def keystoreBase64 = System.getenv('ANDROID_KEYSTORE_BASE64')
+def envStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def envKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
+def envKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = [keystoreBase64, envStorePassword, envKeyAlias, envKeyPassword].every { it != null && !it.trim().isEmpty() }
+def releaseKeystoreFile = null
+if (hasReleaseSigning) {
+    def keystoreDir = layout.buildDirectory.dir('signing').get().asFile
+    keystoreDir.mkdirs()
+    releaseKeystoreFile = new File(keystoreDir, 'release.keystore')
+    releaseKeystoreFile.bytes = keystoreBase64.replaceAll('\\s', '').decodeBase64()
+} else {
+    logger.lifecycle('Release signing secrets not set: the release build will be unsigned.')
+}
+
+android {
+    namespace = "com.davidbalasa.tankcommand"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.davidbalasa.tankcommand"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile = releaseKeystoreFile
+                storePassword = envStorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

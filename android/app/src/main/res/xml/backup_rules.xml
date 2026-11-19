@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup rules for Android 11 and lower (android:fullBackupContent).
+  Saves and campaign progress are files under filesDir/saves (Capacitor Filesystem,
+  Directory.Data); settings and the purchase flag are SharedPreferences (Capacitor
+  Preferences). Both go to the player's own Google account backup. Local bug-report
+  files are left out.
+-->
+<full-backup-content>
+    <include domain="file" path="." />
+    <include domain="sharedpref" path="." />
+    <exclude domain="file" path="bug-reports/" />
+</full-backup-content>

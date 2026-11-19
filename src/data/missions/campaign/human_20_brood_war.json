@@ -58,6 +58,7 @@
       "ore": 200,
       "metal": 100,
       "difficulty": "easy",
+      "hardDifficulty": "easy",
       "team": 2
     }
   ],

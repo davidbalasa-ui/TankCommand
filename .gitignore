@@ -1,6 +1,5 @@
 node_modules/
 dist/
-android/
 coverage/
 playwright-report/
 test-results/
@@ -10,3 +9,9 @@ test-results/
 .env.local
 .deepseek-runs/
 __pycache__/
+# Android build outputs and local signing material (the android/ project itself is committed).
+android/**/build/
+android/.gradle/
+android/local.properties
+*.jks
+*.keystore

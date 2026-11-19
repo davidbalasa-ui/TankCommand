@@ -292,6 +292,8 @@ export interface TestHook {
   setStorageFullForTest(value: boolean): void;
   pressAndroidBack(): void;
   stressSpawn(perSide: number, withEnemies?: boolean): number;
+  setFullGameUnlocked(value: boolean | null): void;
+  fullGameUnlocked(): boolean;
 }
 
 declare global {

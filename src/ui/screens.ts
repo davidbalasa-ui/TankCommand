@@ -6,6 +6,7 @@ import { emblem } from './emblem';
 import { iconButton, menuButton, segmentRow, setMenuButtonSubtitle } from './widgets';
 import { playIntroFilm } from './introFilm';
 import { APP_VERSION } from '../platform/appInfo';
+import { openPrivacyPolicy } from '../platform/links';
 import type {
   CampaignDifficulty,
   CampaignId,
@@ -18,6 +19,7 @@ import type {
 import { mountBugReport } from './bugReport';
 import { mountSaveSlots } from './saveSlots';
 import { mountSettings } from './settingsScreen';
+import { mountUnlock } from './unlockScreen';
 import { SIM_SPEED_FAST, SIM_SPEED_NORMAL, SIM_SPEED_SLOW } from '../sim/tuning';
 import { SIM_TICK_HZ } from '../sim/constants';
 
@@ -347,15 +349,27 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const rows = document.createElement('div');
       rows.className = 'mission-list';
       for (const item of list) {
-        const label = `${item.order}. ${item.title}${item.status === 'done' ? ' ✓' : item.status === 'locked' ? ' (locked)' : ''}`;
+        // A mission of the full game the player has not unlocked shows "Full game" and opens the
+        // unlock screen, whatever its campaign progress.
+        const fullGame = item.fullGame === true;
+        const label = `${item.order}. ${item.title}${
+          fullGame ? ' (full game)' : item.status === 'done' ? ' ✓' : item.status === 'locked' ? ' (locked)' : ''
+        }`;
         const entry = button('missionSelect', 'mission', label, () => {
+          if (fullGame) {
+            ctx.go('unlock');
+            return;
+          }
           if (item.status !== 'locked' && ctx.chooseMission?.(item.id)) {
             ctx.go('briefing');
           }
         });
-        entry.disabled = item.status === 'locked';
+        entry.disabled = item.status === 'locked' && !fullGame;
         entry.dataset.missionId = item.id;
         entry.dataset.status = item.status;
+        if (fullGame) {
+          entry.dataset.fullGame = 'true';
+        }
         entry.classList.add('mission-row');
         entry.setAttribute('aria-label', label);
         const order = document.createElement('span');
@@ -366,13 +380,14 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         name.textContent = item.title;
         const state = document.createElement('span');
         state.className = 'mission-state';
-        state.textContent =
-          item.status === 'done'
+        state.textContent = fullGame
+          ? 'Full game'
+          : item.status === 'done'
             ? `Complete${item.bestDifficulty ? ` · ${DIFFICULTY_LABELS[item.bestDifficulty]}` : ''}`
             : item.status === 'locked'
               ? 'Locked'
               : 'Ready';
-        entry.replaceChildren(order, name, state, icon(item.status === 'locked' ? 'lock' : 'right', 'chev'));
+        entry.replaceChildren(order, name, state, icon(item.status === 'locked' || fullGame ? 'lock' : 'right', 'chev'));
         rows.append(entry);
       }
       root.append(rows);
@@ -513,16 +528,33 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const options = document.createElement('div');
       options.className = 'setup-options';
 
+      const currentMap = (): (typeof maps)[number] | undefined => maps.find((m) => m.id === config.mapId) ?? maps[0];
       const start = button('skirmishSetup', 'start', 'Start', () => {
+        // A full-game map the player has not unlocked opens the unlock screen instead.
+        if (currentMap()?.fullGame) {
+          ctx.go('unlock');
+          return;
+        }
         ctx.beginSkirmish?.();
         ctx.go('loading');
       });
       start.classList.add('primary', 'start-button');
-      start.setAttribute('aria-label', 'Start');
-      start.replaceChildren(icon('play'), 'START');
+      const lockBadge = document.createElement('div');
+      lockBadge.className = 'full-game-badge';
+      lockBadge.dataset.fullGame = 'true';
+      lockBadge.replaceChildren(icon('lock'), 'Full game');
 
       const render = (): void => {
-        const map = maps.find((m) => m.id === config.mapId) ?? maps[0];
+        const map = currentMap();
+        const locked = map?.fullGame === true;
+        start.setAttribute('aria-label', locked ? 'Unlock full game' : 'Start');
+        start.replaceChildren(icon(locked ? 'lock' : 'play'), locked ? 'UNLOCK' : 'START');
+        start.dataset.fullGame = locked ? 'true' : 'false';
+        if (locked) {
+          preview.append(lockBadge);
+        } else {
+          lockBadge.remove();
+        }
         const title = document.createElement('b');
         title.textContent = map?.name ?? 'Default';
         const info = document.createElement('div');
@@ -1217,7 +1249,11 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
         }, true);
       } else if (view?.mission) {
         if (view.won && view.hasNext) {
-          action('next', 'Next mission', () => {
+          action('next', view.nextNeedsFullGame ? 'Next mission (full game)' : 'Next mission', () => {
+            if (view.nextNeedsFullGame) {
+              ctx.go('unlock');
+              return;
+            }
             if (ctx.chooseNextMission?.()) {
               ctx.go('briefing');
             }
@@ -1246,7 +1282,12 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
       const text = document.createElement('div');
       text.className = 'credits-text';
       text.textContent = 'Loading credits...';
-      root.append(text);
+      // The privacy policy sits above the (long) credits so it is reachable without scrolling.
+      const privacy = button('credits', 'privacy', 'Privacy policy', () => {
+        openPrivacyPolicy();
+      });
+      privacy.classList.add('credits-privacy');
+      root.append(privacy, text);
       let cancelled = false;
       void Promise.resolve()
         .then(() => fetch('./CREDITS.md'))
@@ -1277,6 +1318,8 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
     bugReport: makeScreen('bugReport', 'Report Bug', (root, ctx) => mountBugReport(root, ctx)),
 
     saveSlots: makeScreen('saveSlots', 'Save / Load', (root, ctx) => mountSaveSlots(root, ctx)),
+
+    unlock: makeScreen('unlock', 'Full game', (root, ctx) => mountUnlock(root, ctx)),
 
     recovery: makeScreen('recovery', 'Recovery', (root) => {
       addButton(root, 'recovery', 'resume', 'Resume', () => {

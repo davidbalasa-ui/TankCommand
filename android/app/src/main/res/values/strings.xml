@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TankCommand</string>
+    <string name="title_activity_main">TankCommand</string>
+    <string name="package_name">com.davidbalasa.tankcommand</string>
+    <string name="custom_url_scheme">com.davidbalasa.tankcommand</string>
+</resources>

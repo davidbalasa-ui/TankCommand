@@ -250,7 +250,7 @@ export function buildMissionWorld(
     }
     if (side.controller === 'ai') {
       const written = side.difficulty ?? 'normal';
-      const level = shiftLevel(written, tuning.aiStep);
+      const level = difficulty === 'hard' && side.hardDifficulty ? side.hardDifficulty : shiftLevel(written, tuning.aiStep);
       addAi(world, side.player, level, side.aiAttackScale ? { attackScaleRange: attackScaleFor(side.aiAttackScale, written, level) } : {});
     }
   }

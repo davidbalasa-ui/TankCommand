@@ -110,6 +110,9 @@ export interface TestHook {
   spawnStructure(typeId: string, owner: number, x: number, z: number): number | null;
   /** Hands a side to the AI (test playthroughs only), so a whole match plays itself in the browser. */
   autoplay(player: number, difficulty?: 'easy' | 'normal' | 'hard'): void;
+  /** Forces the full game unlock on or off (null: the real state; the web build is unlocked). */
+  setFullGameUnlocked(value: boolean | null): void;
+  fullGameUnlocked(): boolean;
 }
 
 export function installTestHook(app: App): void {
@@ -198,6 +201,10 @@ export function installTestHook(app: App): void {
     autoplay: (player, difficulty) => {
       app.autoplayForTest(player, difficulty ?? 'normal');
     },
+    setFullGameUnlocked: (value) => {
+      app.purchases.setTestOverride(value);
+    },
+    fullGameUnlocked: () => app.purchases.isUnlocked(),
   };
 
   (window as unknown as { __TC_TEST__?: TestHook }).__TC_TEST__ = hook;

@@ -113,9 +113,16 @@
 | SET-01 | Every setting persists across reload and takes effect immediately. |
 | AUD-01 | Every listed event plays a sound; order acks don't repeat the same variant twice in a row; volumes apply live. |
 | AUD-02 | No audio starts before the first user gesture. |
+| HAP-01 | In the Android app, selection, orders and alerts give a light vibration through the official `@capacitor/haptics` plugin; the Haptics setting turns it off; the web build never vibrates, and a missing or failing plugin is ignored. |
 | ALRT-01 | Each alert type fires on its event, is rate-limited, and tapping it moves the camera to its location. |
 | ALRT-03 | A merged "under attack" line counts the distinct units hit, not the number of hits. |
 | BUG-01 | Bug report screen collects the fields and saves a report file without any network request. |
+| BUG-02 | Send posts the report (the form's text, device and app info, log, optional save) to https://tankcommand.vercel.app/api/bug-report from the web build and the Android app and says it was sent; offline, unreachable, not configured (503) or refused, it saves the report file on the device instead and says it was saved but not sent. |
+| BUG-03 | The api/bug-report function validates and size-limits the report, drops unknown fields, scrubs email and IP addresses, rate-limits per IP in memory only (salted hash, never stored), allows only the web and Capacitor origins (CORS), answers 503 without GITHUB_TOKEN/GITHUB_REPO, and otherwise opens a GitHub issue labelled bug-report. |
+| IAP-01 | One data table (src/data/fullGame.ts) decides the free download: all training, the first 5 missions of each campaign and the Cinder Basin and Lakeside Crossing skirmish maps; everything else needs the full game unlock, and the unlock opens all of it. |
+| IAP-02 | The `full_game_unlock` purchase (Google Play Billing, non-consumable): in the app `isUnlocked` answers from a flag cached in Preferences and a restore at startup refreshes it (a refund relocks, an unreachable Play changes nothing); buy and restore report unlocked, cancelled, pending, not owned or unavailable; store calls run one at a time; on the web everything is unlocked unless the test hook overrides it. |
+| IAP-03 | Locked missions and skirmish maps show a lock and "Full game"; tapping one opens the unlock screen (price from the store, pitch, Buy, Restore purchases, Back), Back returns to the list, and Settings offers Restore purchases; controls meet the touch-size rules on the phone. |
+| PRIV-01 | A plain-language privacy policy is served at /privacy.html (https://tankcommand.vercel.app/privacy.html) and the Privacy buttons in Settings and Credits open it. |
 | ECO-01 | Ore is credited only when a miner's load reaches a pad; amounts match load size exactly. |
 | ECO-02 | Deposits are finite, reach zero and stay empty; the miner stops and reports it. |
 | ECO-03 | Metal is credited only when a tug delivers a container to a pad; killing the tug loses the load. |
