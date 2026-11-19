@@ -24,9 +24,8 @@ test('[ORD-03] a queued waypoint is drawn as an extended order path', async ({ p
     )
     .toBe(true);
 
-  // A long first leg so the order is still in flight when the second waypoint is
-  // queued: the drawn path then covers both, and the assertion cannot race the
-  // unit's arrival.
+  // Both orders go in from one page call (the second a tick after the first), so a slow runner
+  // cannot let the unit finish the first leg between two separate page reads.
   await expect
     .poll(async () =>
       page.evaluate(
@@ -36,50 +35,28 @@ test('[ORD-03] a queued waypoint is drawn as an extended order path', async ({ p
           if (!hook || !unit) {
             return false;
           }
-          return hook.sendCommand({
+          const tick = hook.snapshot().tick;
+          const first = hook.sendCommand({
             kind: 'move',
             unitIds: [input.id],
             x: unit.x + input.dx,
             z: unit.z,
             queue: false,
-            tick: hook.snapshot().tick + 1,
+            tick: tick + 1,
             issuer: 1,
           });
-        },
-        { id: ownId, dx: FIRST_LEG },
-      ),
-    )
-    .toBe(true);
-
-  await expect
-    .poll(async () =>
-      page.evaluate((id) => {
-        const unit = window.__TC_TEST__?.units().find((item) => item.id === id);
-        return unit ? unit.pathPoints : 0;
-      }, ownId),
-    )
-    .toBeGreaterThan(0);
-
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        (input) => {
-          const hook = window.__TC_TEST__;
-          const unit = hook?.units().find((item) => item.id === input.id);
-          if (!hook || !unit) {
-            return false;
-          }
-          return hook.sendCommand({
+          const second = hook.sendCommand({
             kind: 'move',
             unitIds: [input.id],
             x: unit.x,
             z: unit.z + input.dz,
             queue: true,
-            tick: hook.snapshot().tick + 1,
+            tick: tick + 2,
             issuer: 1,
           });
+          return first && second;
         },
-        { id: ownId, dz: SECOND_LEG },
+        { id: ownId, dx: FIRST_LEG, dz: SECOND_LEG },
       ),
     )
     .toBe(true);
