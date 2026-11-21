@@ -358,6 +358,7 @@
     "sightRange": 14,
     "modelId": "structure.human.missile_battery",
     "weapon": {
+      "kind": "missile",
       "damage": 11,
       "range": 20,
       "reloadSec": 2.7,
@@ -404,6 +405,7 @@
     "sightRange": 14,
     "modelId": "structure.alien.missile_battery",
     "weapon": {
+      "kind": "missile",
       "damage": 11,
       "range": 20,
       "reloadSec": 2.7,

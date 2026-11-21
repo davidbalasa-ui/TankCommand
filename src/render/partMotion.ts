@@ -25,8 +25,10 @@
 //       offset = amp * sin(2 pi speed t + phase) + snap * hit(tf) metres along axis
 //   { type: 'swing', ..., phase?, snap?, attack?, recover? }   adds snap * hit(tf) radians
 //   { type: 'launch', axis, delay, travel, dur, reload }
-//       a missile: in its tube until tf >= delay, flies travel * (x / dur)^2 out along axis, is
-//       hidden until tf >= reload, then sits back in its tube
+//       a missile in its tube. Each shot fires the next loaded tube in turn (in delay order), at
+//       once: the model's missile is hidden until tf >= reload, then sits back in its tube. The
+//       game draws the missile in flight from that tube onto the sim's shot, so it really reaches
+//       what it was fired at (the art's own 9 m fly-out vanished in mid-air).
 //
 // hit(x) = x / attack while x < attack, then (1 - (x - attack) / recover)^2 until 0. The art's
 // delays describe a whole firing cycle (the scene's extras.fire `repeat` shots `every` seconds
@@ -269,15 +271,21 @@ export function fireKickEnvelope(kick: FireKick, tf: number): number {
  * The unit fired one shot at `now` (renderer clock, seconds): each firing part that belongs to
  * this shot's place in the art's firing cycle starts its hit.
  */
-export function fireUnit(firing: UnitFiring, parts: readonly PartMotion[], now: number): void {
+export function fireUnit(firing: UnitFiring, parts: readonly PartMotion[], now: number): THREE.Object3D | null {
   const repeat = firing.kick?.repeat ?? 1;
   const every = firing.kick?.every ?? 0;
   const slot = firing.shots % repeat;
+  const launched = nextTube(parts, firing.shots, now);
   firing.shots += 1;
   firing.shotAt = now;
+  if (launched) {
+    launched.shotAt = now;
+    launched.offsets = [0];
+    launched.live = true;
+  }
   for (const part of parts) {
     const fire = part.spec.fire;
-    if (!fire) {
+    if (!fire || part.spec.type === 'launch') {
       continue;
     }
     const offsets: number[] = [];
@@ -303,6 +311,26 @@ export function fireUnit(firing: UnitFiring, parts: readonly PartMotion[], now: 
       part.live = true;
     }
   }
+  return launched?.node ?? null;
+}
+
+/** The tube this shot's missile leaves from: the next loaded one in delay order (or null). */
+function nextTube(parts: readonly PartMotion[], shot: number, now: number): PartMotion | null {
+  const tubes = parts
+    .filter((part) => part.spec.type === 'launch' && part.spec.fire)
+    .sort((a, b) => (a.spec.fire?.delay ?? 0) - (b.spec.fire?.delay ?? 0));
+  if (tubes.length === 0) {
+    return null;
+  }
+  for (let i = 0; i < tubes.length; i += 1) {
+    const tube = tubes[(shot + i) % tubes.length] as PartMotion;
+    const reload = tube.spec.fire?.reload ?? 0;
+    if (!tube.live || now - tube.shotAt >= reload) {
+      return tube;
+    }
+  }
+  // Every tube is still reloading: fire the one in turn anyway.
+  return tubes[shot % tubes.length] as PartMotion;
 }
 
 /** Every moving part under a model, with its rest rotation. Call on the cloned model. */
@@ -454,14 +482,10 @@ function poseFiringPart(part: PartMotion, fire: PartFireSpec, now: number): bool
     node.scale.copy(part.restScale);
     return tf < fire.reload;
   }
-  if (x < fire.dur) {
-    const t = x / fire.dur;
-    node.position.copy(part.restPos).addScaledVector(part.dir, fire.snap * t * t);
-    node.scale.copy(part.restScale);
-  } else {
-    // Gone from the tube until it is reloaded (a zero scale draws nothing in the instanced batch).
-    node.scale.setScalar(0);
-  }
+  // Gone from the tube until it is reloaded (a zero scale draws nothing in the instanced batch):
+  // the game draws the missile in flight from here on.
+  node.position.copy(part.restPos);
+  node.scale.setScalar(0);
   return true;
 }
 

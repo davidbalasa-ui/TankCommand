@@ -3382,7 +3382,9 @@ export class RenderView {
         // A ground gun fires from its barrel tip (the model's muzzle-flash mesh); the sim launches
         // every shot from the unit's centre, so the shot is drawn from the muzzle and closes onto
         // the sim's path the same way.
-        const muzzle = shooter && !airborne ? this.muzzlePoint(shooter) : null;
+        // A missile launcher fires the next loaded tube: its missile leaves from that tube.
+        const tube = shooter && !airborne ? fireUnit(shooter.firing, shooter.parts, performance.now() / 1000) : null;
+        const muzzle = shooter && !airborne ? (tube ? this.tubePoint(shooter, tube) : this.muzzlePoint(shooter)) : null;
         const offsetX = muzzle ? muzzle.x - projectile.x : 0;
         const offsetY = muzzle ? muzzle.y - projectile.y : airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
         const offsetZ = muzzle ? muzzle.z - projectile.z : 0;
@@ -3413,7 +3415,6 @@ export class RenderView {
         this.effects.muzzle(projectile.x, projectile.y + offsetY, projectile.z, projectile.kind, !human, projectile.vx, projectile.vz, muzzle);
         if (shooter && !airborne) {
           shooter.recoil = 1;
-          fireUnit(shooter.firing, shooter.parts, performance.now() / 1000);
         }
       }
       const travelled = Math.hypot(projectile.x - visual.startX, projectile.z - visual.startZ);
@@ -3481,6 +3482,13 @@ export class RenderView {
     }
     visual.root.updateMatrixWorld(true);
     return anchor.getWorldPosition(new THREE.Vector3());
+  }
+
+  /** World position of the middle of a launch tube's missile (read before it is hidden). */
+  private tubePoint(visual: UnitVisual, tube: THREE.Object3D): THREE.Vector3 {
+    visual.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(tube);
+    return box.isEmpty() ? tube.getWorldPosition(new THREE.Vector3()) : box.getCenter(new THREE.Vector3());
   }
 
   /** World position of a Shard structure's heart (its Core node), for the lance to start from. */
