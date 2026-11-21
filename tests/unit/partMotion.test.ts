@@ -251,30 +251,31 @@ describe('moving model parts', () => {
       expect(l4.position.x).toBeCloseTo(1.8 - 4, 5);
     });
 
-    it('[PART-02] a missile waits for its place in the ripple, flies out, vanishes and is back in its tube after reload', () => {
+    it('[PART-02] each shot fires the next loaded tube at once; its missile leaves the model and is back after reload', () => {
       const launch = (delay: number): Record<string, unknown> => ({ type: 'launch', axis: [1, 0, 0], delay, travel: 9, dur: 0.45, reload: 4.4 });
       const { root, parts, firing } = rig(
-        { MslA: launch(0), MslB: launch(0.2) },
+        { MslB: launch(0.2), MslA: launch(0) },
         { kick: 0.012, slide: 0.04, attack: 0.05, recover: 0.25, repeat: 4, every: 0.2 },
       );
       const a = node(root, 'MslA');
       const b = node(root, 'MslB');
-      fireUnit(firing, parts, 5);
-      updatePartMotions(parts, at(5.225), 0.05);
-      // Half the flight time: a quarter of the travel; the other tube has not fired.
-      expect(a.position.x).toBeCloseTo(1.8 + 9 * 0.25, 5);
-      expect(b.position.x).toBeCloseTo(1.8, 5);
-      updatePartMotions(parts, at(6), 0.1);
+      // The first shot fires the first tube in delay order, and names it so the game can draw the
+      // missile in flight from there.
+      expect(fireUnit(firing, parts, 5)).toBe(a);
+      updatePartMotions(parts, at(5.02), 0.02);
+      // The model's missile never flies off on its own: it is gone from its tube, still in place.
       expect(a.scale.x).toBe(0);
+      expect(a.position.x).toBeCloseTo(1.8, 5);
+      expect(b.scale.x).toBe(1);
+      // The next shot takes the second tube while the first reloads.
+      expect(fireUnit(firing, parts, 6)).toBe(b);
+      updatePartMotions(parts, at(6.02), 0.02);
+      expect(b.scale.x).toBe(0);
       updatePartMotions(parts, at(9.5), 0.1);
       expect(a.scale.x).toBe(1);
-      expect(a.position.x).toBeCloseTo(1.8, 5);
       expect(parts.find((part) => part.node === a)?.live).toBe(false);
-      // The next shot launches the second tube.
-      fireUnit(firing, parts, 12);
-      updatePartMotions(parts, at(12.3), 0.05);
-      expect(b.position.x).toBeGreaterThan(1.8 + 1);
-      expect(a.position.x).toBeCloseTo(1.8, 5);
+      // A third shot: tube A is loaded again and goes next.
+      expect(fireUnit(firing, parts, 9.6)).toBe(a);
     });
 
     it('[PART-02] lids snap open on every shot and settle; low quality skips the snap but keeps the barrels', () => {
