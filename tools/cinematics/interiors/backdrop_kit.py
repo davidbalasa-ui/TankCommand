@@ -478,6 +478,24 @@ class Kit:
         o.visible_shadow = False
         return o
 
+    FX_DIR = os.environ.get('FX_DIR', '/mnt/project-files/promos/fx/explo_ground_a')
+
+    def fx_impact(self, p, size, seed=1, light=0.0, col=(1.0, 0.55, 0.2), age=4):
+        """Beam hit on a hull: a baked fireball frame (shared effects library) as two crossed, rolled cards
+        plus a small white-hot point. Replaces the old plain glowing ball."""
+        rnd = random.Random(seed)
+        p = Vector(p)
+        for k, (fr, sc, st) in enumerate(((age, 1.0, 5.0), (max(age - 1, 2), 0.62, 9.0))):
+            png = os.path.join(self.FX_DIR, '%04d.png' % fr)
+            off = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * size * 0.08 * k
+            self.fx_card(p + off, size * sc * 1.6, png, strength=st, roll=rnd.uniform(0, 2 * math.pi))
+        c = C.uv_sphere(self.uid('ImpCore'), 1.0, seg=(12, 6), mat=C.emit_mat(self.uid('ImpCoreM'), (1, 0.9, 0.7), 40.0),
+                        scale=(size * 0.07,) * 3)
+        c.location = p
+        c.visible_shadow = False
+        if light:
+            self.light(p, col, light, size * 0.4)
+
     def light(self, p, col, energy, soft=2.0):
         L = bpy.data.objects.new(self.uid('L'), bpy.data.lights.new(self.uid('L'), 'POINT'))
         SP.link(L)
@@ -509,8 +527,28 @@ class Kit:
 
     def boom(self, p, size, kind='fire', age=5, light=0.0, seed=0):
         """Fireball caught `age` frames after it went off (5 = near its brightest, 14+ = fading cloud)."""
+        if kind != 'blue' and os.path.isdir(self.FX_DIR) and os.environ.get('FX_OFF') != '1':
+            return self.fx_boom(p, size, kind, age, light, seed)
         fn = {'fire': SP.boom, 'blue': SP.blue_boom, 'gold': SP.gold_boom}[kind]
         return fn(Vector(p), FRAME - age, size, light=light, seed=seed, life=1.4)
+
+    def fx_boom(self, p, size, kind='fire', age=5, light=0.0, seed=0):
+        """Explosion from the shared baked effects library (real simulated fireball frames on crossed,
+        rolled cards) instead of the old procedural glowing ball. age 4-6 = young fireball, 12+ = late cloud."""
+        rnd = random.Random(seed * 31 + int(size * 10))
+        p = Vector(p)
+        tint = {'fire': (1, 1, 1), 'gold': (1.15, 0.95, 0.6), 'blue': (0.22, 0.6, 1.9)}[kind]
+        col = {'fire': (1, 0.5, 0.2), 'gold': (1, 0.7, 0.3), 'blue': (0.3, 0.7, 1.0)}[kind]
+        n = len([f for f in os.listdir(self.FX_DIR) if f.endswith('.png')])
+        fr = max(2, min(n, int(round(age * 0.9))))
+        st = float(ARGS.get('fxk', 2.2)) * (1.0 if fr < 8 else 0.6)
+        for j, (df, sc) in enumerate(((0, 1.0), (-1, 0.75), (1, 0.55))):
+            f2 = max(2, min(n, fr + df))
+            off = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * size * 0.05 * j
+            self.fx_card(p + off, size * sc * 1.6, os.path.join(self.FX_DIR, '%04d.png' % f2), tint=tint,
+                         strength=st * (1.0 + 0.4 * j), roll=rnd.uniform(0, 2 * math.pi))
+        if light:
+            self.light(p, col, light, size * 0.4)
 
     def shards(self, p, n, col, size, speed, seed, age=6, kind='tri', strength=4.0, drift=None):
         return SP.shards(Vector(p), FRAME - age, n, col, size, speed, seed, life=1.6, kind=kind, strength=strength,
