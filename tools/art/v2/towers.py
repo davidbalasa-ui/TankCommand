@@ -35,13 +35,13 @@ def register(key, faction, build, unit, structure):
         for o in F.ST['parts']:
             if o['group'] == 'Carrier':
                 o['uv'] = float(o.get('uv', F.UV_PRIORITY.get(o['zone'], 1.0))) * 0.5
-        poses = {g: dict(packed=m) for g, m in info['packed'].items()}
+        poses = {g: dict(packed=m) for g, m in info.get('structure_packed', info['packed']).items()}
         poses['Carrier'] = dict(deployed=HIDE)
         pivot = info['pivot'] if 'pivot' in info else (0, 0, info['tz'])
         plist = ([('Turret', pivot, 'TurretPivot')] if pivot else []) + list(info.get('more', []))
         F.finish(structure[2], glb, render=render, report=report, label=structure[1], size=1024,
                  pivot=plist or None, poses=poses, bake_offset={'Carrier': (40.0, 0, 0)},
-                 clip=render[:-4] + '_unfold.mp4', **crev)
+                 clip=render[:-4] + '_unfold.mp4' if render else None, fit=info.get('fit'), **crev)
 
     ASSETS[key + '_packed'] = dict(fn=run_unit, path=unit[0], set=faction)
     ASSETS[structure[0].split('/')[-1][:-4]] = dict(fn=run_structure, path=structure[0], set='structures')
@@ -50,7 +50,7 @@ def register(key, faction, build, unit, structure):
 def terran_carrier():
     L, hw, top = 6.2, 1.22, 1.25
     with F.group('Carrier'):
-        TK.chassis(L, hw, top, stowage=False, nose=0.9)
+        TK.chassis(L, hw, top, stowage=False, nose=0.9, fittings=False)   # phone budget: the carrier only shows in transit
         TU.cab(2.1, 0.0, top + 0.02, 0.6, 0.8, 0.5)
         box((-0.9, 0, top + 0.06), (2.1, 1.5, 0.07), 'armor', bevel=0.03)
         # Deck edge rails, folded stabiliser legs at the corners, lift rams and stowage.
@@ -80,31 +80,52 @@ def bastion():
             v = box((1.2, 0, z + 0.45), (0.012, 0.3, 0.12), 'vent')
             F.rot(v, 'Z', 90 * a + 90)
     tz = z + 0.7
+    # Twin heavy rail cannons, about four times the old barrels: half again as long, twice as thick.
+    gz, gy, gx0, gx1, gr = tz + 0.5, 0.56, 0.9, 6.2, 0.27
     with F.group('Turret'):
         tube((0, 0, tz - 0.03), (0, 0, tz + 0.1), [(0, 1.0), (1, 0.95)], 20, 'dark')
-        TU.turret_shell(-1.35, 1.05, 1.05, tz, 0.86)
-        F.plate([(-0.9, -0.6), (0.3, -0.55), (0.55, 0), (0.3, 0.55), (-0.9, 0.6)], tz + 0.85, tz + 0.92, 'plate', inset=0.05, bevel=0.02)
-        box((1.12, 0, tz + 0.4), (0.2, 0.72, 0.26), 'dark', bevel=0.05)
+        TU.turret_shell(-1.35, 1.05, 1.05, tz, 0.96)
+        F.plate([(-0.9, -0.6), (0.3, -0.55), (0.55, 0), (0.3, 0.55), (-0.9, 0.6)], tz + 0.95, tz + 1.02, 'plate', inset=0.05, bevel=0.02)
+        # Heavy mantlet cradling both guns, and a counterweight slab on the bustle.
+        box((1.05, 0, gz), (0.32, 1.0, 0.44), 'dark', bevel=0.06)
+        box((1.3, 0, gz + 0.46), (0.22, 0.7, 0.04), 'hazard')
+        box((-1.42, 0, tz + 0.5), (0.18, 0.8, 0.32), 'plate', bevel=0.05)
         for s in (1, -1):
-            TK.railgun(1.1, 4.3, s * 0.4, tz + 0.4, 0.13)
-            cyl((-0.5, s * 1.0, tz + 0.42), (-0.5, s * 1.32, tz + 0.42), 0.36, 12, 'plate')
-            cyl((-0.5, s * 1.32, tz + 0.42), (-0.5, s * 1.35, tz + 0.42), 0.16, 8, 'amber')
-            box((-0.2, s * 1.07, tz + 0.75), (0.5, 0.012, 0.02), 'glow')
-        box((-0.3, 0.45, tz + 1.0), (0.2, 0.16, 0.1), 'dark', bevel=0.03)
-        box((-0.1, 0.45, tz + 1.01), (0.012, 0.1, 0.06), 'glass')
-        TK.antenna(-1.0, -0.5, tz + 0.75, 1.0)
+            cyl((-0.5, s * 1.0, tz + 0.46), (-0.5, s * 1.32, tz + 0.46), 0.38, 12, 'plate')
+            cyl((-0.5, s * 1.32, tz + 0.46), (-0.5, s * 1.35, tz + 0.46), 0.17, 8, 'amber')
+            box((-0.2, s * 1.07, tz + 0.82), (0.5, 0.012, 0.02), 'glow')
+        box((-0.3, 0.45, tz + 1.1), (0.2, 0.16, 0.1), 'dark', bevel=0.03)
+        box((-0.1, 0.45, tz + 1.11), (0.012, 0.1, 0.06), 'glass')
+        TK.antenna(-1.0, -0.5, tz + 0.85, 1.0)
+    with F.group('Guns'):
+        for s in (1, -1):
+            TK.railgun(gx0, gx1, s * gy, gz, gr)
+            # Cooling jacket bands down the long barrel.
+            for k in range(3):
+                px = gx0 + (gx1 - gx0) * (0.55 + 0.12 * k)
+                cyl((px - 0.05, s * gy, gz), (px + 0.05, s * gy, gz), gr * 1.3, 8, 'steel')
+        box((gx0 + 0.9, 0, gz), (0.5, gy, 0.06), 'armor', bevel=0.02)     # bridge strap tying the pair
     sb = (0.68, 0.68, 0.55)
+    st = 0.78
     with F.group('Carrier'):   # A-frame travel lock clamping the stowed barrels over the tail
-        gz = deck + tz * sb[2] + 0.4 * 0.78
+        lz = deck + tz * sb[2] + 0.5 * st
         for s in (1, -1):
-            cyl((-2.95, s * 0.95, deck - 0.05), (-2.95, s * 0.36, gz - 0.14), 0.05, 6, 'steel')
-            box((-2.95, s * 0.31, gz), (0.07, 0.15, 0.15), 'yellow', bevel=0.02)
-        box((-2.95, 0, gz - 0.16), (0.05, 0.5, 0.035), 'steel')
-        box((-2.95, 0, gz + 0.16), (0.05, 0.5, 0.03), 'hazard')
-    return dict(tz=tz, packed={
+            cyl((-2.75, s * 1.0, deck - 0.05), (-2.75, s * 0.62, lz - 0.2), 0.06, 6, 'steel')
+            box((-2.75, s * 0.44, lz), (0.08, 0.24, 0.24), 'yellow', bevel=0.02)
+        box((-2.75, 0, lz - 0.25), (0.06, 0.72, 0.04), 'steel')
+        box((-2.75, 0, lz + 0.25), (0.06, 0.72, 0.035), 'hazard')
+    turret = trs(t=(-0.8, 0, deck + tz * sb[2] - tz), r=(0, 0, 180), s=(st, st, st), about=(0, 0, tz))
+    retract = (0.3, 1, 1)   # the barrels telescope back into the mantlet for the road
+    return dict(tz=tz, fit='Base', more=[('Guns', (gx0, 0, gz), 'GunsPivot', 'Turret')], packed={
         'Base': trs(t=(-0.8, 0, deck), s=sb),
         # Gun turned to the rear and drawn in, seated on the folded footing.
-        'Turret': trs(t=(-0.8, 0, deck + tz * sb[2] - tz), r=(0, 0, 180), s=(0.78, 0.78, 0.78), about=(0, 0, tz)),
+        'Turret': turret,
+        'Guns': turret @ trs(s=retract, about=(gx0, 0, gz)),
+    }, structure_packed={
+        'Base': trs(t=(-0.8, 0, deck), s=sb),
+        'Turret': turret,
+        # Local to the turret pivot: shrink along the barrels about the breech.
+        'Guns': trs(s=retract, about=(gx0, 0, gz - tz)),
     })
 
 

@@ -1027,8 +1027,9 @@ def _tread_surface(obj, bake_dir):
 
 def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=None, label=None,
            ao_floor=0.35, views=None, report=None, crevice=None, supersample=2, edge_color=None,
-           poses=None, bake_offset=None, clip=None, clear=None, clear_alpha=0.42):
-    """pivot = (group_name, (x, y, z)) puts that group under an empty called TurretPivot.
+           poses=None, bake_offset=None, clip=None, clear=None, clear_alpha=0.42, fit=None):
+    """fit = group whose bounds the game fits to the building footprint (the rest may overhang).
+    pivot = (group_name, (x, y, z)) puts that group under an empty called TurretPivot.
     single = one mesh named `name` with no parent (props). gem = zone name kept as a second
     material called OreGem (deposits)."""
     scene = bpy.context.scene
@@ -1240,10 +1241,12 @@ def finish(name, out_glb, pivot=None, size=512, single=False, render=None, gem=N
             packed, deployed = ps['packed'] @ rest, rest
         node['packed'] = _gltf_trs(packed)
         anim[node] = (packed, deployed)
+    if fit:
+        made[fit]['fitFootprint'] = 1
     bpy.context.view_layer.update()
     bpy.ops.export_scene.gltf(filepath=out_glb, export_format='GLB', export_yup=True, export_apply=True,
                               export_image_format='JPEG', export_jpeg_quality=88, export_animations=False,
-                              export_extras=bool(poses))
+                              export_extras=bool(poses or fit))
     info = dict(name=name, file=os.path.basename(out_glb), triangles=tris, texture=size,
                 bytes=os.path.getsize(out_glb), parts=len(made))
     print('FORGE', json.dumps(info))
