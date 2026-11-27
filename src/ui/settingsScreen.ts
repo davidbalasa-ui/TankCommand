@@ -218,6 +218,55 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
       });
   });
 
+  // Cloud save (Play build only): optional Google Play Games sign-in; progress then follows the
+  // player to another phone. Left out on the web and when Play Games is not set up.
+  const cloud = ctx.cloudSave;
+  const cloudButton = cloud?.available()
+    ? button('settings', 'cloudSave', 'Cloud save: sign in', () => {
+        if (!cloud) {
+          return;
+        }
+        const state = cloud.state();
+        if (state === 'signingIn' || state === 'syncing') {
+          return;
+        }
+        status.textContent = state === 'signedOut' ? 'Signing in to Google Play Games…' : 'Syncing with the cloud…';
+        void (state === 'signedOut' ? cloud.signIn() : cloud.syncNow()).then(() => {
+          const after = cloud.state();
+          status.textContent =
+            after === 'synced'
+              ? 'Progress is saved to your Google Play Games account.'
+              : after === 'offline'
+                ? 'Could not reach the cloud. Progress is still saved on this phone.'
+                : after === 'signedOut'
+                  ? 'Not signed in. Progress is saved on this phone only.'
+                  : '';
+        });
+      })
+    : null;
+  const refreshCloud = (): void => {
+    if (!cloud || !cloudButton) {
+      return;
+    }
+    const state = cloud.state();
+    const name = cloud.playerName();
+    cloudButton.textContent =
+      state === 'signedOut'
+        ? 'Cloud save: sign in'
+        : state === 'signingIn'
+          ? 'Cloud save: signing in…'
+          : state === 'syncing'
+            ? 'Cloud save: syncing…'
+            : state === 'offline'
+              ? 'Cloud save: retry'
+              : name
+                ? `Cloud save: on (${name})`
+                : 'Cloud save: on';
+    cloudButton.disabled = state === 'signingIn' || state === 'syncing';
+  };
+  const unsubscribeCloud = cloudButton ? cloud?.subscribe(refreshCloud) : undefined;
+  refreshCloud();
+
   const privacy = button('settings', 'privacy', 'Privacy', () => {
     openPrivacyPolicy();
   });
@@ -226,7 +275,16 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
     ctx.router.back();
   });
 
-  actions.append(...(desktop ? [rebind] : []), exportButton, importButton, restorePurchases, privacy, back, fileInput);
+  actions.append(
+    ...(desktop ? [rebind] : []),
+    exportButton,
+    importButton,
+    restorePurchases,
+    ...(cloudButton ? [cloudButton] : []),
+    privacy,
+    back,
+    fileInput,
+  );
 
   function refreshLabels(): void {
     const values = current();
@@ -246,5 +304,6 @@ export function mountSettings(root: HTMLElement, ctx: ScreenContext): () => void
 
   return () => {
     window.removeEventListener('keydown', keyHandler);
+    unsubscribeCloud?.();
   };
 }
