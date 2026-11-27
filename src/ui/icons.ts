@@ -11,6 +11,7 @@ export const ICON_PATHS = {
   attack: '<path d="M4 20 L14 10"/><path d="M11 6 L18 6 L18 13"/><path d="M14 10 L18 6"/><path d="M3 15 l3 3"/>',
   stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
   hold: '<path d="M12 3 L19 6 V12 C19 16 16 19 12 21 C8 19 5 16 5 12 V6 Z"/>',
+  patrol: '<path d="M4 9 h13 l-3-3 M20 15 H7 l3 3"/>',
   way: '<circle cx="5" cy="18" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="19" cy="16" r="2"/><path d="M6.5 16.5 L10.5 9.5 M13.5 9.5 L17.5 14.5" stroke-dasharray="2 2"/>',
   group: '<rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="13" width="8" height="7" rx="1.5"/><path d="M17 14 v6 M14 17 h6"/>',
   mine: '<path d="M4 20 L13 11"/><path d="M9 5 C13 3 18 5 20 9 C17 8 14 8 12 9"/><path d="M9 5 L15 11"/>',

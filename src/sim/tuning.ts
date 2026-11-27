@@ -5,7 +5,7 @@ export const MAX_REPLANS = 6; // give up the order after this many fruitless re-
 export const MOVE_EPS = 0.05; // placeholder until Stage 0
 export const STOP_DISTANCE = 0.5; // placeholder until Stage 0
 export const WAYPOINT_REACHED = 1; // placeholder until Stage 0
-export const FORMATION_SPACING = 4; // placeholder until Stage 0
+export const FORMATION_SPACING = 5; // a tank is ~4.5 m long: room nose to tail
 export const PROJECTILE_TTL = 5; // placeholder until Stage 0
 // A direct-fire shot that misses flies on to this multiple of its weapon's range (or of the aimed
 // distance, when that is longer), then bursts: a miss never lands far outside the gun's reach.

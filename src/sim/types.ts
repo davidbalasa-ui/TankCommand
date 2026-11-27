@@ -87,6 +87,12 @@ export interface UnitState {
   transform: { left: number; x?: number; z?: number } | null;
   /** A packed structure vehicle on its way to unpack here (overhaul step 5). */
   deployTarget?: { x: number; z: number; tries: number } | null;
+  /**
+   * Patrol: drive (attack-moving) between A and B forever, until another order. `toB` says which
+   * end it is heading for; `fails` counts legs in a row that found no route (it gives up at 3).
+   * Replaced, never changed in place, so shallow world copies can share it.
+   */
+  patrol?: { ax: number; az: number; bx: number; bz: number; toB: boolean; fails: number } | null;
   air: AirState | null;
 }
 

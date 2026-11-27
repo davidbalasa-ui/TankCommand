@@ -273,6 +273,7 @@ export class App {
   private queueModeValue = false;
   private selectModeValue = false;
   private attackMoveArmedValue = false;
+  private patrolArmedValue = false;
   private leftHandedValue = false;
   private fogValue = true;
   private aiValue = true;
@@ -388,9 +389,22 @@ export class App {
       isAttackMoveArmed: () => this.attackMoveArmedValue,
       setAttackMoveArmed: (value) => {
         this.attackMoveArmedValue = value;
+        if (value) {
+          this.patrolArmedValue = false;
+        }
+      },
+      isPatrolArmed: () => this.patrolArmedValue,
+      setPatrolArmed: (value) => {
+        this.patrolArmedValue = value;
+        if (value) {
+          this.attackMoveArmedValue = false;
+        }
       },
       assignGroup: (group) => {
         this.assignGroup(group);
+      },
+      clearGroup: (group) => {
+        this.clearGroup(group);
       },
       selectGroup: (group) => {
         this.selectGroup(group);
@@ -1444,6 +1458,10 @@ export class App {
     this.controlGroups.set(group, [...this.selectedIds]);
   }
 
+  clearGroup(group: number): void {
+    this.controlGroups.delete(group);
+  }
+
   selectGroup(group: number): void {
     const ids = this.controlGroups.get(group);
     if (ids) {
@@ -1968,6 +1986,10 @@ export class App {
           getQueueMode: () => this.queueModeValue,
           isSelectMode: () => this.selectModeValue,
           getAttackMoveArmed: () => this.attackMoveArmedValue,
+          getPatrolArmed: () => this.patrolArmedValue,
+          clearPatrol: () => {
+            this.patrolArmedValue = false;
+          },
           clearAttackMove: () => {
             this.attackMoveArmedValue = false;
           },

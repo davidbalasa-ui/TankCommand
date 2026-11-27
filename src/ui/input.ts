@@ -24,7 +24,7 @@ import {
 } from './inputTuning';
 
 export interface IssuedCommand {
-  kind: 'move' | 'attackMove' | 'attack' | 'hold' | 'stop';
+  kind: 'move' | 'attackMove' | 'patrol' | 'attack' | 'hold' | 'stop';
   x: number | null;
   z: number | null;
   targetId: number | null;
@@ -56,6 +56,8 @@ export interface InputHost {
   getAttackMoveArmed?: () => boolean;
   clearAttackMove?: () => void;
   setAttackMoveArmed?: (value: boolean) => void;
+  getPatrolArmed?: () => boolean;
+  clearPatrol?: () => void;
   assignGroup?: (group: number) => void;
   selectGroup?: (group: number) => void;
   centerGroup?: (group: number) => void;
@@ -963,6 +965,11 @@ export class InputController {
     if (!unit) {
       const selection = this.host.getSelection();
       const ground = this.lastGroundPick;
+      if (this.host.getPatrolArmed?.() && ground && selection.length > 0) {
+        this.issuePatrol(selection, ground.x, ground.z);
+        this.host.clearPatrol?.();
+        return;
+      }
       if (this.host.getAttackMoveArmed?.() && ground && selection.length > 0) {
         this.issueMove(selection, ground.x, ground.z, false, 'attackMove');
         this.host.clearAttackMove?.();
@@ -1020,7 +1027,10 @@ export class InputController {
 
     const queue = this.host.getQueueMode?.() ?? false;
     if (ground && selection.length > 0) {
-      if (this.host.getAttackMoveArmed?.()) {
+      if (this.host.getPatrolArmed?.()) {
+        this.issuePatrol(selection, ground.x, ground.z);
+        this.host.clearPatrol?.();
+      } else if (this.host.getAttackMoveArmed?.()) {
         this.issueMove(selection, ground.x, ground.z, queue, 'attackMove');
         this.host.clearAttackMove?.();
       } else {
@@ -1078,6 +1088,13 @@ export class InputController {
       tick: world.tick + 1,
       issuer: 1,
     });
+  }
+
+  /** Patrol between where the units are and (x, z), fighting anything met on the way. */
+  private issuePatrol(ids: number[], x: number, z: number): void {
+    this.lastIssued = { kind: 'patrol', x, z, targetId: null, unitIds: [...ids], queue: false };
+    const world = this.host.getWorld();
+    this.host.sendCommand({ kind: 'patrol', unitIds: ids, x, z, tick: world.tick + 1, issuer: 1 });
   }
 
   private issueAttack(ids: number[], targetId: number): void {

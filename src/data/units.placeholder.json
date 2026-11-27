@@ -432,7 +432,7 @@
       "armor"
     ],
     "deploysTo": "structure.human.turret",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.human.bastion_packed",
     "source": {
       "kind": "tuned",
@@ -514,7 +514,7 @@
       "armor"
     ],
     "deploysTo": "structure.alien.turret",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.alien.thornmound_packed",
     "source": {
       "kind": "tuned",
@@ -1185,7 +1185,7 @@
       "armor"
     ],
     "deploysTo": "structure.human.missile_battery",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.human.spire_packed",
     "source": {
       "kind": "tuned",
@@ -1383,7 +1383,7 @@
       "armor"
     ],
     "deploysTo": "structure.alien.missile_battery",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.alien.spore_tower_packed",
     "source": {
       "kind": "tuned",
@@ -1420,7 +1420,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.human.radar",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.human.radar_tower_packed",
     "source": {
       "kind": "tuned",
@@ -1457,7 +1457,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.human.metal_station",
-    "deploySec": 6,
+    "deploySec": 1.5,
     "modelAssetId": "unit.human.metal_station_packed",
     "source": {
       "kind": "tuned",
@@ -1494,7 +1494,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.human.air_base",
-    "deploySec": 6,
+    "deploySec": 1.5,
     "modelAssetId": "unit.human.air_base_packed",
     "source": {
       "kind": "tuned",
@@ -1531,7 +1531,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.alien.radar",
-    "deploySec": 4,
+    "deploySec": 1,
     "modelAssetId": "unit.alien.radar_tower_packed",
     "source": {
       "kind": "tuned",
@@ -1568,7 +1568,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.alien.metal_station",
-    "deploySec": 6,
+    "deploySec": 1.5,
     "modelAssetId": "unit.alien.metal_station_packed",
     "source": {
       "kind": "tuned",
@@ -1605,7 +1605,7 @@
     ],
     "upgrades": [],
     "deploysTo": "structure.alien.air_base",
-    "deploySec": 6,
+    "deploySec": 1.5,
     "modelAssetId": "unit.alien.air_base_packed",
     "source": {
       "kind": "tuned",

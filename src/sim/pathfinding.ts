@@ -274,6 +274,41 @@ export function cellKeyAt(map: MapDef, x: number, z: number): number {
 /** Extra cost of driving through a cell another unit is parked in (in cells of plain driving). */
 export const AVOID_CELL_COST = 6;
 
+/** Extra cost for a step into a cell that touches blocked ground: routes keep off walls and cliffs. */
+const WALL_HUG_COST = 0.25;
+/** Shortcuts keep this far (m) from blocked ground on either side, so long hulls clear corners. */
+const SHORTCUT_HALF_WIDTH = 0.9;
+
+const wallCache = new WeakMap<MapDef, Uint8Array>();
+
+/** 1 for open cells with blocked ground among their eight neighbours (cached per map view). */
+function wallCells(map: MapDef): Uint8Array {
+  let cells = wallCache.get(map);
+  if (cells) {
+    return cells;
+  }
+  cells = new Uint8Array(map.cols * map.rows);
+  for (let cz = 0; cz < map.rows; cz += 1) {
+    for (let cx = 0; cx < map.cols; cx += 1) {
+      if (isBlockedCell(map, cx, cz)) {
+        continue;
+      }
+      let near = 0;
+      for (let dz = -1; dz <= 1 && near === 0; dz += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if ((dx !== 0 || dz !== 0) && isBlockedCell(map, cx + dx, cz + dz)) {
+            near = 1;
+            break;
+          }
+        }
+      }
+      cells[cz * map.cols + cx] = near;
+    }
+  }
+  wallCache.set(map, cells);
+  return cells;
+}
+
 function astar(map: MapDef, start: Cell, goal: Cell, avoid?: ReadonlySet<number>): Cell[] | null {
   const startKey = keyOf(map, start.cx, start.cz);
   const goalKey = keyOf(map, goal.cx, goal.cz);
@@ -289,6 +324,7 @@ function astar(map: MapDef, start: Cell, goal: Cell, avoid?: ReadonlySet<number>
   const closed = new Uint8Array(total);
   const open = new MinHeap();
 
+  const walls = wallCells(map);
   gScore[startKey] = 0;
   open.push({ key: startKey, f: heuristic(map, startKey, goalKey) });
 
@@ -318,7 +354,11 @@ function astar(map: MapDef, start: Cell, goal: Cell, avoid?: ReadonlySet<number>
       if (closed[nKey] === 1) {
         continue;
       }
-      const tentative = currentG + neighbour.cost + (avoid?.has(nKey) ? AVOID_CELL_COST : 0);
+      const tentative =
+        currentG +
+        neighbour.cost +
+        (walls[nKey] === 1 ? WALL_HUG_COST * neighbour.cost : 0) +
+        (avoid?.has(nKey) ? AVOID_CELL_COST : 0);
       if (tentative < (gScore[nKey] ?? Number.POSITIVE_INFINITY)) {
         gScore[nKey] = tentative;
         cameFrom[nKey] = current.key;
@@ -329,16 +369,25 @@ function astar(map: MapDef, start: Cell, goal: Cell, avoid?: ReadonlySet<number>
   return null;
 }
 
-function lineClear(map: MapDef, a: Cell, b: Cell, avoid?: ReadonlySet<number>): boolean {
+function lineClear(map: MapDef, a: Cell, b: Cell, avoid?: ReadonlySet<number>, halfWidth = SHORTCUT_HALF_WIDTH): boolean {
   const start = cellCenter(map, a.cx, a.cz);
   const end = cellCenter(map, b.cx, b.cz);
   const distance = Math.hypot(end.x - start.x, end.z - start.z);
   const samples = Math.max(1, Math.ceil(distance / (map.cellSize / 2)));
+  // Check a strip as wide as a hull, not a thin line, so a shortcut never shaves a corner.
+  const side =
+    distance > 0
+      ? { x: (-(end.z - start.z) / distance) * halfWidth, z: ((end.x - start.x) / distance) * halfWidth }
+      : { x: 0, z: 0 };
   for (let i = 1; i < samples; i += 1) {
     const t = i / samples;
     const x = start.x + (end.x - start.x) * t;
     const z = start.z + (end.z - start.z) * t;
-    if (isBlockedAt(map, x, z)) {
+    if (
+      isBlockedAt(map, x, z) ||
+      isBlockedAt(map, x + side.x, z + side.z) ||
+      isBlockedAt(map, x - side.x, z - side.z)
+    ) {
       return false;
     }
     if (avoid && avoid.size > 0) {
@@ -363,11 +412,18 @@ function smoothCells(map: MapDef, cells: Cell[], avoid?: ReadonlySet<number>): C
   result.push(first);
   let index = 0;
   while (index < cells.length - 1) {
-    let next = cells.length - 1;
-    for (; next > index + 1; next -= 1) {
-      const a = cells[index];
-      const b = cells[next];
-      if (a && b && lineClear(map, a, b, avoid)) {
+    // A shortcut wide enough for a hull first; where the way is tight, a plain line will do.
+    let next = index + 1;
+    for (const halfWidth of [SHORTCUT_HALF_WIDTH, 0]) {
+      next = cells.length - 1;
+      for (; next > index + 1; next -= 1) {
+        const a = cells[index];
+        const b = cells[next];
+        if (a && b && lineClear(map, a, b, avoid, halfWidth)) {
+          break;
+        }
+      }
+      if (next > index + 1) {
         break;
       }
     }
