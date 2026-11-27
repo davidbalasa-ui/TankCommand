@@ -234,6 +234,17 @@ interface SelectionKinds {
   air: boolean;
 }
 
+/** Short reasons shown while placing a building somewhere it can't go. */
+const PLACEMENT_REASONS: Record<string, string> = {
+  outside: 'Too close to the map edge',
+  blocked: 'Something is in the way',
+  overlap: 'Too close to another building',
+  steep: 'The ground is too steep',
+  rubble: 'Rubble is in the way',
+  needsMetalDeposit: 'Needs a metal deposit',
+  padLane: "Keep the pad's exit clear",
+};
+
 export class Hud implements HudHandle {
   private readonly root: HTMLDivElement;
   private readonly ctx: HudContext;
@@ -285,6 +296,9 @@ export class Hud implements HudHandle {
   private readonly placementBar: HTMLDivElement;
   private readonly confirmPlacement: HTMLButtonElement;
   private readonly cancelPlacement: HTMLButtonElement;
+  private readonly placementInfo: HTMLDivElement;
+  private readonly placementName: HTMLDivElement;
+  private readonly placementHint: HTMLDivElement;
   private readonly groupButtons: HTMLButtonElement[] = [];
   private readonly timer: number;
   private buildMenuOpen = false;
@@ -548,7 +562,7 @@ export class Hud implements HudHandle {
 
     this.placementBar = el('div', 'hud-placement panel');
     this.placementBar.dataset.hudItem = 'placementBar';
-    this.confirmPlacement = button('inGame', 'placeConfirm', 'Confirm', () => {
+    this.confirmPlacement = button('inGame', 'placeConfirm', 'Place', () => {
       this.ctx.confirmPlacement?.();
       this.refresh();
     });
@@ -557,7 +571,11 @@ export class Hud implements HudHandle {
       this.ctx.cancelPlacement?.();
       this.refresh();
     });
-    this.placementBar.append(this.confirmPlacement, this.cancelPlacement);
+    this.placementInfo = el('div', 'hud-placement-info');
+    this.placementName = el('div', 'hud-placement-name');
+    this.placementHint = el('div', 'hud-placement-hint');
+    this.placementInfo.append(this.placementName, this.placementHint);
+    this.placementBar.append(this.placementInfo, this.cancelPlacement, this.confirmPlacement);
 
     this.root.append(
       resources,
@@ -724,9 +742,17 @@ export class Hud implements HudHandle {
     document.documentElement.dataset.hand = this.ctx.isLeftHanded() ? 'left' : 'right';
     this.root.classList.toggle('build-open', this.buildMenuOpen);
     this.root.classList.toggle('base-open', this.baseOpen);
-    const placing = this.ctx.getPlacement?.() !== null;
+    const placement = this.ctx.getPlacement?.() ?? null;
+    const placing = placement !== null;
     this.root.classList.toggle('placing', placing);
     this.placementBar.classList.toggle('open', placing);
+    if (placement) {
+      this.placementName.textContent = placement.name;
+      const why = placement.valid ? null : PLACEMENT_REASONS[placement.reason ?? ''] ?? "Can't build here";
+      this.placementHint.textContent = why ?? 'Drag it, or tap the ground, to move it';
+      this.placementBar.classList.toggle('invalid', !placement.valid);
+      this.confirmPlacement.disabled = !placement.valid;
+    }
     this.refreshGroups(selection);
     this.buildDrawer.refresh();
     this.basePanel.refresh();

@@ -99,6 +99,8 @@ export interface PlacementView {
   x: number;
   z: number;
   valid: boolean;
+  /** Why it can't go here (placement reason code), or null when it can. */
+  reason?: string | null;
 }
 
 export interface WorkerActions {

@@ -2174,7 +2174,7 @@ button.corner-action {
 .hud-placement {
   position: absolute;
   left: 50%;
-  bottom: 92px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   display: none;
   gap: 6px;
   padding: 4px;
@@ -2185,10 +2185,43 @@ button.corner-action {
 
 .hud-placement.open {
   display: flex;
+  align-items: center;
 }
 
 .hud-placement button {
-  min-width: 110px;
+  min-width: 96px;
+}
+
+.hud-placement button:disabled {
+  opacity: 0.45;
+}
+
+.hud-placement-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 0 10px 0 8px;
+  line-height: 1.2;
+}
+
+.hud-placement-name {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-placement-hint {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.hud-placement.invalid .hud-placement-hint {
+  color: #ff8a80;
+  opacity: 1;
 }
 
 /* Focused modes: placing a kit, or a drawer open. */
