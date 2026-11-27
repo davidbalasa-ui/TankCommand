@@ -29,6 +29,12 @@ const commandSchema = z.discriminatedUnion('kind', [
     queue: z.boolean().optional(),
   }),
   baseCommand.extend({
+    kind: z.literal('patrol'),
+    unitIds,
+    x: z.number().finite(),
+    z: z.number().finite(),
+  }),
+  baseCommand.extend({
     kind: z.literal('attackMove'),
     unitIds,
     x: z.number().finite(),

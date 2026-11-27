@@ -135,7 +135,7 @@ test('[HINT-01] the objective bubble grows to fit a full-length message instead 
     const node = document.querySelector('.hud-objective') as HTMLElement;
     const target = node.querySelector('.hud-objective-text') as HTMLElement;
     target.innerHTML = `<span class="hud-toast"><strong>Command: </strong>${text}</span>`;
-    node.classList.add('message');
+    node.classList.add('message', 'expanded');
     const box = node.getBoundingClientRect();
     return {
       clipped: target.scrollHeight > target.clientHeight + 1 || target.scrollWidth > target.clientWidth + 1,
@@ -148,8 +148,9 @@ test('[HINT-01] the objective bubble grows to fit a full-length message instead 
   }, words);
   await page.screenshot({ path: 'test-results/shots/hint-01-objective.png' });
   expect(fit.clipped).toBe(false);
-  expect(fit.left).toBeGreaterThanOrEqual(90);
-  expect(fit.right).toBeLessThanOrEqual(fit.viewport - 90);
+  // Top right, in the right half of the screen, clear of the centre where the units are.
+  expect(fit.left).toBeGreaterThanOrEqual(fit.viewport / 2);
+  expect(fit.right).toBeLessThanOrEqual(fit.viewport - 4);
   expect(fit.lines).toBeLessThanOrEqual(3);
   expect(fit.shown).toContain('to research it.');
 });

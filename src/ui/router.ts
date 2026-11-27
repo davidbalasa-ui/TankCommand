@@ -240,10 +240,13 @@ export interface ScreenContext {
   setQueueMode?: (value: boolean) => void;
   isAttackMoveArmed?: () => boolean;
   setAttackMoveArmed?: (value: boolean) => void;
+  isPatrolArmed?: () => boolean;
+  setPatrolArmed?: (value: boolean) => void;
   assignGroup?: (group: number) => void;
   selectGroup?: (group: number) => void;
   centerGroup?: (group: number) => void;
   groupMembers?: (group: number) => number[];
+  clearGroup?: (group: number) => void;
   registerHud?: (hud: HudHandle | null) => void;
   getBuildItems?: () => BuildItemView[];
   /** Draws the live 3D title background into the canvas; resolves to its dispose function. */

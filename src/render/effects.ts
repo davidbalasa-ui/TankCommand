@@ -179,12 +179,17 @@ export class Effects {
   private readonly tracked = new Map<THREE.Object3D, Tracked>();
   private readonly bombGeometry = new THREE.CapsuleGeometry(0.22, 0.7, 3, 8).rotateX(Math.PI / 2);
   private readonly bombMaterial = new THREE.MeshStandardMaterial({ color: 0x23272c, metalness: 0.7, roughness: 0.45 });
+  /** A small missile pointing along +Z: body, nose cone and four tail fins in one geometry. */
+  private readonly missileGeometry = buildMissileGeometry();
+  private readonly missileMaterial = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, metalness: 0.55, roughness: 0.4 });
+  private readonly missileMaterialAlien = new THREE.MeshStandardMaterial({ color: 0xc9a457, metalness: 0.8, roughness: 0.3, emissive: 0x3a2a08 });
   private readonly chunkGeometry = new THREE.DodecahedronGeometry(1, 0);
   private readonly chunkMaterial = new THREE.MeshStandardMaterial({ color: 0x2e2822, roughness: 0.95, flatShading: true });
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly euler = new THREE.Euler();
   private readonly vec = new THREE.Vector3();
+  private readonly vec2 = new THREE.Vector3();
   private readonly scaleVec = new THREE.Vector3();
   private time = 0;
   /** 1 = full detail; lower values thin the optional particles (set from the quality level). */
@@ -228,6 +233,10 @@ export class Effects {
       const bomb = new THREE.Mesh(this.bombGeometry, this.bombMaterial);
       bomb.castShadow = true;
       group.add(bomb);
+    }
+    if (kind === 'missile') {
+      const missile = new THREE.Mesh(this.missileGeometry, human ? this.missileMaterial : this.missileMaterialAlien);
+      group.add(missile);
     }
     this.tracked.set(group, { kind, alien: !human, scale: WEAPON_SCALE[kind ?? ''] ?? 1, prev: null, frames: 0 });
     return group;
@@ -292,8 +301,11 @@ export class Effects {
       return;
     }
     if (kind === 'missile') {
-      this.streak(p, forward, 0.9, FIRE, 0.22, 1);
-      this.flash(p.x - forward.x * 0.5, p.y - forward.y * 0.5, p.z - forward.z * 0.5, 0.55, FIRE, 0.95);
+      // Exhaust: a short flame out of the tail with a hot core, smoke puffs behind.
+      const tail = this.vec2.copy(p).addScaledVector(forward, -0.55);
+      this.streak(tail, forward, 0.9, FIRE, 0.2, 1);
+      this.flash(tail.x, tail.y, tail.z, 0.5, FIRE, 0.95);
+      this.flash(tail.x, tail.y, tail.z, 0.22, HOT, 1);
       if (info.frames % 2 === 0 && this.optional(1) > 0) {
         this.spawn(1, p.x - forward.x * 0.6, p.y, p.z - forward.z * 0.6, rand(-0.3, 0.3), 0.6, rand(-0.3, 0.3), 1.1, 0.35, 1.3, SMOKE_LIGHT, SMOKE_LIGHT, 0.45, 1);
       }
@@ -1124,11 +1136,51 @@ export class Effects {
     this.burners.length = 0;
     this.delayed.length = 0;
     this.tracked.clear();
-    for (const g of [this.chunkGeometry, this.bombGeometry]) {
+    for (const g of [this.chunkGeometry, this.bombGeometry, this.missileGeometry]) {
       g.dispose();
     }
-    for (const m of [this.chunkMaterial, this.bombMaterial]) {
+    for (const m of [this.chunkMaterial, this.bombMaterial, this.missileMaterial, this.missileMaterialAlien]) {
       m.dispose();
     }
   }
+}
+
+/** Missile body along +Z (about 1.1 m): cylinder, nose cone and four tail fins, merged. */
+function buildMissileGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const body = new THREE.CylinderGeometry(0.075, 0.075, 0.8, 8).rotateX(Math.PI / 2);
+  parts.push(body);
+  const nose = new THREE.ConeGeometry(0.075, 0.3, 8).rotateX(Math.PI / 2).translate(0, 0, 0.55);
+  parts.push(nose);
+  for (let i = 0; i < 4; i += 1) {
+    const fin = new THREE.BoxGeometry(0.02, 0.16, 0.18).translate(0, 0.11, -0.32).rotateZ((i * Math.PI) / 2);
+    parts.push(fin);
+  }
+  const merged = mergeSimple(parts);
+  for (const part of parts) {
+    part.dispose();
+  }
+  return merged;
+}
+
+/** Merges non-indexed copies of simple geometries (position + normal only). */
+function mergeSimple(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  for (const part of parts) {
+    const flat = part.index ? part.toNonIndexed() : part;
+    const position = flat.getAttribute('position');
+    const normal = flat.getAttribute('normal');
+    for (let i = 0; i < position.count; i += 1) {
+      positions.push(position.getX(i), position.getY(i), position.getZ(i));
+      normals.push(normal.getX(i), normal.getY(i), normal.getZ(i));
+    }
+    if (flat !== part) {
+      flat.dispose();
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return geometry;
 }

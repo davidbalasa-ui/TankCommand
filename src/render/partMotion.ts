@@ -464,6 +464,44 @@ function partHit(part: PartMotion, fire: PartFireSpec, now: number): number {
   return most;
 }
 
+/** Seconds the next missile takes to slide into its tube at the end of a reload. */
+const RELOAD_SLIDE_SEC = 0.7;
+
+const missileLengths = new WeakMap<PartMotion, number>();
+const lengthBox = new THREE.Box3();
+const lengthSize = new THREE.Vector3();
+
+/** A tube's missile length along its launch axis, in the parent's units (measured once). */
+function missileLength(part: PartMotion): number {
+  const known = missileLengths.get(part);
+  if (known !== undefined) {
+    return known;
+  }
+  let length = 0;
+  lengthBox.makeEmpty();
+  part.node.traverse((object) => {
+    const geometry = object instanceof THREE.Mesh ? (object.geometry as THREE.BufferGeometry | undefined) : undefined;
+    if (geometry) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (box) {
+        lengthBox.union(box);
+      }
+    }
+  });
+  if (!lengthBox.isEmpty()) {
+    lengthBox.getSize(lengthSize);
+    const axis = part.spec.axis;
+    const along =
+      Math.abs(axis.x) * lengthSize.x * part.restScale.x +
+      Math.abs(axis.y) * lengthSize.y * part.restScale.y +
+      Math.abs(axis.z) * lengthSize.z * part.restScale.z;
+    length = Number.isFinite(along) ? along * 0.6 : 0;
+  }
+  missileLengths.set(part, length);
+  return length;
+}
+
 /** Poses a recoil or launch part; returns false once it is back at rest and need not be posed. */
 function poseFiringPart(part: PartMotion, fire: PartFireSpec, now: number): boolean {
   const { node } = part;
@@ -481,6 +519,19 @@ function poseFiringPart(part: PartMotion, fire: PartFireSpec, now: number): bool
     node.position.copy(part.restPos);
     node.scale.copy(part.restScale);
     return tf < fire.reload;
+  }
+  // Reloading: over the last stretch before the tube is ready, the next missile slides in from
+  // the back of the tube and seats with a small bump, instead of popping back in.
+  const reloadIn = Math.min(RELOAD_SLIDE_SEC, fire.reload * 0.4);
+  const into = tf - (fire.reload - reloadIn);
+  if (into > 0 && reloadIn > 0) {
+    const k = Math.min(1, into / reloadIn);
+    const seat = 1 - (1 - k) * (1 - k) * (1 - k);
+    const length = missileLength(part);
+    const bump = k > 0.85 ? Math.sin(((k - 0.85) / 0.15) * Math.PI) * 0.06 : 0;
+    node.position.copy(part.restPos).addScaledVector(part.dir, -length * (1 - seat) + length * bump);
+    node.scale.copy(part.restScale).multiplyScalar(0.35 + 0.65 * seat);
+    return true;
   }
   // Gone from the tube until it is reloaded (a zero scale draws nothing in the instanced batch):
   // the game draws the missile in flight from here on.

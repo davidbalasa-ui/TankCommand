@@ -131,6 +131,47 @@ function ease(x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** Ease out with a small overshoot past 1 before settling (for parts locking into place). */
+function backOut(x: number): number {
+  const t = Math.min(1, Math.max(0, x));
+  const c = 1.4;
+  const u = t - 1;
+  return 1 + (c + 1) * u * u * u + c * u * u;
+}
+
+const foldOrders = new WeakMap<UnfoldData, Map<number, { from: number; to: number }>>();
+
+/**
+ * When each part folds out, as a share of the whole unfold: the base first, the gun last, the rest
+ * in between, overlapping so the motion reads as one chain. The packed hull runs the whole way.
+ */
+function foldOrder(data: UnfoldData): Map<number, { from: number; to: number }> {
+  const cached = foldOrders.get(data);
+  if (cached) {
+    return cached;
+  }
+  const rank = (name: string): number => (name === 'Base' ? 0 : name === 'TurretPivot' ? 2 : 1);
+  const moving = data.parts
+    .map((part, index) => ({ part, index }))
+    .filter((entry) => !entry.part.hide)
+    .sort((a, b) => rank(a.part.name) - rank(b.part.name) || a.index - b.index);
+  const result = new Map<number, { from: number; to: number }>();
+  const first = 0.15;
+  const span = 0.5;
+  const step = moving.length > 1 ? (1 - first - span) / (moving.length - 1) : 0;
+  moving.forEach((entry, order) => {
+    const from = first + order * step;
+    result.set(entry.index, { from, to: Math.min(1, from + span) });
+  });
+  data.parts.forEach((part, index) => {
+    if (part.hide) {
+      result.set(index, { from: 0.1, to: 0.8 });
+    }
+  });
+  foldOrders.set(data, result);
+  return result;
+}
+
 const scratchA = new THREE.Quaternion();
 const scratchB = new THREE.Quaternion();
 const scratchYaw = new THREE.Quaternion();
@@ -157,9 +198,9 @@ export function applyUnfold(
   pivotYaw: number,
 ): boolean {
   const done = t >= 1;
-  // The hull settles to the structure's size and facing first, then the parts fold out.
-  const body = done ? 1 : ease(t / 0.4);
-  const fold = done ? 1 : ease((t - 0.2) / 0.8);
+  // The hull settles to the structure's size and facing first, then the parts fold out one after
+  // another (base, then the rest, the gun last) with a little overshoot so each one locks home.
+  const body = done ? 1 : ease(t / 0.35);
 
   const k = start.packedScale + (data.normScale - start.packedScale) * body;
   const yaw = start.yaw * (1 - body);
@@ -171,13 +212,12 @@ export function applyUnfold(
   offset.set(-cx * k, -cy * k, -cz * k).applyAxisAngle(UP, yaw);
   inner.position.copy(offset);
 
-  for (const part of data.parts) {
+  const order = foldOrder(data);
+  for (let index = 0; index < data.parts.length; index += 1) {
+    const part = data.parts[index]!;
     const node = inner.getObjectByName(part.name);
     if (!node) {
       continue;
-    }
-    if (part.hide) {
-      node.visible = !done;
     }
     const isPivot = part.name === 'TurretPivot';
     scratchB.fromArray(part.deployed.q);
@@ -189,20 +229,33 @@ export function applyUnfold(
     if (done) {
       setPose(node, part.deployed);
       node.quaternion.copy(scratchB);
+      if (part.hide) {
+        node.visible = false;
+      }
       continue;
     }
+    const window = order.get(index) ?? { from: 0.15, to: 1 };
+    const local = (t - window.from) / (window.to - window.from);
+    const turn = ease(local);
+    // Parts on top overshoot a touch and settle; the base and the folded hull just slide.
+    const fold = part.hide || part.name === 'Base' ? turn : backOut(local);
     scratchA.fromArray(part.packed.q);
-    node.quaternion.slerpQuaternions(scratchA, scratchB, fold);
+    node.quaternion.slerpQuaternions(scratchA, scratchB, turn);
     node.position.set(
       part.packed.p[0] + (part.deployed.p[0] - part.packed.p[0]) * fold,
       part.packed.p[1] + (part.deployed.p[1] - part.packed.p[1]) * fold,
       part.packed.p[2] + (part.deployed.p[2] - part.packed.p[2]) * fold,
     );
+    // The hull it came in shrinks away over its last stretch instead of popping out at the end.
+    const shrink = part.hide ? 1 - ease((t - 0.7) / 0.3) : 1;
     node.scale.set(
-      part.packed.s[0] + (part.deployed.s[0] - part.packed.s[0]) * fold,
-      part.packed.s[1] + (part.deployed.s[1] - part.packed.s[1]) * fold,
-      part.packed.s[2] + (part.deployed.s[2] - part.packed.s[2]) * fold,
+      (part.packed.s[0] + (part.deployed.s[0] - part.packed.s[0]) * turn) * shrink,
+      (part.packed.s[1] + (part.deployed.s[1] - part.packed.s[1]) * turn) * shrink,
+      (part.packed.s[2] + (part.deployed.s[2] - part.packed.s[2]) * turn) * shrink,
     );
+    if (part.hide) {
+      node.visible = shrink > 0.02;
+    }
   }
   return done;
 }

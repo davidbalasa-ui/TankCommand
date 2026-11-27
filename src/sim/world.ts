@@ -12,7 +12,7 @@ import {
 } from './map';
 import { computePath, followPath, queuedLegs, routeThroughLegs, unitMap } from './motion';
 import { separateUnits } from './avoidance';
-import { obstacleMap, pushOutOfObstacles } from './obstacles';
+import { obstacleMap, pushHullsOutOfStructures, pushOutOfObstacles } from './obstacles';
 import { applyAirCommand, assignHome, isAirborne, unitTargetKind, updateAir, weaponCanHit } from './air';
 import { findPath } from './pathfinding';
 import {
@@ -528,6 +528,55 @@ function applyAttackMoveCommand(
     );
     planMove(world, unit, goal.x, goal.z, command.queue ?? false, 'attackMove');
   }
+}
+
+/** Shortest patrol leg (m). */
+const PATROL_MIN_LEG = 6;
+
+/** Patrol between where each unit is now and the tapped point (in formation), attack-moving. */
+function applyPatrolCommand(
+  world: WorldState,
+  command: Extract<Command, { kind: 'patrol' }>,
+): void {
+  const units = ownedUnits(world, command.issuer, command.unitIds).filter((unit) => {
+    const type = world.unitTypes.get(unit.typeId);
+    return !unit.air && type !== undefined && !type.workerKind && !type.deploysTo && type.weapon !== null;
+  });
+  if (units.length === 0) {
+    return;
+  }
+  const clamped = clampToMap(world.map, command.x, command.z, UNIT_RADIUS);
+  const offsets = formationOffsets(units.length);
+  for (let i = 0; i < units.length; i += 1) {
+    const unit = units[i];
+    const offset = offsets[i];
+    if (!unit || !offset) {
+      continue;
+    }
+    const goal = clampToMap(world.map, clamped.x + offset.x, clamped.z + offset.z, UNIT_RADIUS);
+    unit.deployTarget = null;
+    // Too short a beat to be worth turning round on: just go there.
+    unit.patrol =
+      Math.hypot(goal.x - unit.x, goal.z - unit.z) < PATROL_MIN_LEG
+        ? null
+        : { ax: unit.x, az: unit.z, bx: goal.x, bz: goal.z, toB: true, fails: 0 };
+    planMove(world, unit, goal.x, goal.z, false, 'attackMove');
+  }
+}
+
+/** A patrolling unit that has reached one end (or lost its route) turns round for the other. */
+function updatePatrol(world: WorldState, unit: UnitState): void {
+  const patrol = unit.patrol;
+  if (!patrol || unit.order.kind !== 'idle') {
+    return;
+  }
+  const toB = !patrol.toB;
+  const x = toB ? patrol.bx : patrol.ax;
+  const z = toB ? patrol.bz : patrol.az;
+  planMove(world, unit, x, z, false, 'attackMove');
+  const failed = unit.order.kind === 'idle';
+  const fails = failed ? patrol.fails + 1 : 0;
+  unit.patrol = fails >= 3 ? null : { ...patrol, toB, fails };
 }
 
 function applyAttackCommand(
@@ -1210,6 +1259,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
     }
 
     updateOrderPath(world, unit, type, target);
+    updatePatrol(world, unit);
 
     if (target && type.weapon && unit.reloadLeft <= 0 && (!unit.air || unit.air.ammo > 0)) {
       const weapon = type.weapon;
@@ -1245,6 +1295,7 @@ function updateUnits(world: WorldState, rng: Rng): void {
 
   separateUnits(world, (x, z) => canStand(world, x, z));
   pushOutOfObstacles(world);
+  pushHullsOutOfStructures(world);
   updateStuckUnits(world, startPositions);
 }
 
@@ -1284,6 +1335,12 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
       if (command.tick !== nextTick) {
         continue;
       }
+      // Any other order to a unit ends its patrol.
+      if (command.kind !== 'patrol' && 'unitIds' in command) {
+        for (const unit of ownedUnits(next, command.issuer, command.unitIds)) {
+          unit.patrol = null;
+        }
+      }
       switch (command.kind) {
         case 'debug.addCounter':
           next.counter += command.amount;
@@ -1293,6 +1350,9 @@ export function step(world: WorldState, commands: readonly Command[]): WorldStat
           break;
         case 'attackMove':
           applyAttackMoveCommand(next, command);
+          break;
+        case 'patrol':
+          applyPatrolCommand(next, command);
           break;
         case 'attack':
           applyAttackCommand(next, command);
@@ -1479,6 +1539,7 @@ export function hashWorld(world: WorldState): string {
         upgrades: unit.upgrades,
         transform: unit.transform,
         deployTarget: unit.deployTarget ?? null,
+        ...(unit.patrol ? { patrol: unit.patrol } : {}),
         air: unit.air,
       })),
       structures: world.structures,

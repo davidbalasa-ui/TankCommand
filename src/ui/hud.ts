@@ -23,6 +23,11 @@ import type {
 } from './router';
 import { SELECT_HINT_TEXT } from './textLimits';
 
+/** How long a new mission message keeps the objective line open. */
+const MESSAGE_SHOW_MS = 8000;
+/** How long a changed objective keeps the objective line open. */
+const OBJECTIVE_SHOW_MS = 6000;
+
 export interface HudCamera {
   targetX: number;
   targetZ: number;
@@ -46,10 +51,13 @@ export interface HudContext {
   setQueueMode: (value: boolean) => void;
   isAttackMoveArmed: () => boolean;
   setAttackMoveArmed: (value: boolean) => void;
+  isPatrolArmed?: () => boolean;
+  setPatrolArmed?: (value: boolean) => void;
   assignGroup: (group: number) => void;
   selectGroup: (group: number) => void;
   centerGroup: (group: number) => void;
   groupMembers: (group: number) => number[];
+  clearGroup?: (group: number) => void;
   pause: () => void;
   getBuildItems?: () => BuildItemView[];
   getOwnPads?: () => Array<{ id: number; x: number; z: number }>;
@@ -235,6 +243,8 @@ export class Hud implements HudHandle {
   private readonly unitsValue: HTMLSpanElement;
   private readonly queueStrip: QueueStrip;
   private readonly objectiveLine: HTMLButtonElement;
+  private readonly groupMenu: HTMLDivElement;
+  private readonly groupMenuSave: HTMLButtonElement;
   private readonly objectiveText: HTMLSpanElement;
   private readonly selectModeButton: HTMLButtonElement;
   private readonly allArmyButton: HTMLButtonElement;
@@ -259,12 +269,15 @@ export class Hud implements HudHandle {
   private readonly airInfo: HTMLSpanElement;
   private messageSeq = 0;
   private messageUntil = 0;
+  private expandedUntil = 0;
+  private lastObjectiveText = '';
   private readonly stopButton: HTMLButtonElement;
   private readonly queueButton: HTMLButtonElement;
   private readonly mineButton: HTMLButtonElement;
   private readonly assignButton: HTMLButtonElement;
   private readonly salvageButton: HTMLButtonElement;
   private readonly deployButton: HTMLButtonElement;
+  private readonly patrolButton: HTMLButtonElement;
   private readonly upgradeButton: HTMLButtonElement;
   private readonly buildDrawer: BuildDrawer;
   private readonly basePanel: BasePanel;
@@ -390,6 +403,27 @@ export class Hud implements HudHandle {
       this.groupsStrip.append(element);
     }
 
+    // The hold menu of a filled group tile: save over it, or clear it.
+    this.groupMenu = el('div', 'hud-group-menu panel');
+    this.groupMenu.hidden = true;
+    this.groupMenuSave = button('inGame', 'groupSave', 'Save here', () => {
+      const group = Number(this.groupMenu.dataset.group ?? '0');
+      const element = this.groupButtons[group - 1];
+      this.closeGroupMenu();
+      if (element) {
+        this.assignGroup(group, element);
+      }
+    });
+    const clearGroup = button('inGame', 'groupClear', 'Clear', () => {
+      const group = Number(this.groupMenu.dataset.group ?? '0');
+      this.closeGroupMenu();
+      this.ctx.clearGroup?.(group);
+      this.refresh();
+    });
+    clearGroup.classList.add('danger');
+    this.groupMenu.append(this.groupMenuSave, clearGroup);
+    this.groupsStrip.append(this.groupMenu);
+
     // Bottom-left: minimap.
     const minimapWrap = el('div', 'hud-minimap panel');
     minimapWrap.dataset.hudItem = 'minimap';
@@ -419,6 +453,10 @@ export class Hud implements HudHandle {
     });
     this.stopButton = commandButton('stop', 'Stop', 'stop', () => {
       this.issueStop();
+    });
+    this.patrolButton = commandButton('patrol', 'Patrol', 'patrol', () => {
+      ctx.setPatrolArmed?.(!(ctx.isPatrolArmed?.() ?? false));
+      this.refresh();
     });
     this.holdButton = commandButton('hold', 'Hold', 'hold', () => {
       this.issueHold();
@@ -453,6 +491,7 @@ export class Hud implements HudHandle {
       this.stopButton,
       this.holdButton,
       this.queueButton,
+      this.patrolButton,
       this.salvageButton,
       this.deployButton,
       this.upgradeButton,
@@ -661,6 +700,7 @@ export class Hud implements HudHandle {
     const combat = hasSelection && (kinds.combat || !kinds.any);
     show(this.attackButton, combat);
     show(this.holdButton, combat);
+    show(this.patrolButton, combat);
     show(this.queueButton, combat);
     show(this.stopButton, hasSelection);
     show(this.mineButton, actions.canMine);
@@ -673,6 +713,7 @@ export class Hud implements HudHandle {
     this.queueStrip.refresh();
     this.queueButton.classList.toggle('active', this.ctx.isQueueMode());
     this.attackButton.classList.toggle('active', this.ctx.isAttackMoveArmed());
+    this.patrolButton.classList.toggle('active', this.ctx.isPatrolArmed?.() ?? false);
     const selectMode = this.ctx.isSelectMode?.() ?? false;
     this.selectModeButton.classList.toggle('active', selectMode);
     this.selectModeButton.setAttribute('aria-pressed', selectMode ? 'true' : 'false');
@@ -1206,17 +1247,23 @@ export class Hud implements HudHandle {
     this.minimapRedraws += 1;
   }
 
-  /** Objective line: a new mission message for a few seconds, otherwise the current objective. */
+  /**
+   * Objective line, top right under pause. New information (a mission message or a changed
+   * objective) drops it open for a few seconds; otherwise it folds up to a small list icon so it
+   * never sits over the battlefield. Tapping it always opens the full objectives sheet.
+   */
   private refreshMission(): void {
     const mission = this.ctx.getWorld().mission;
     this.objectiveLine.hidden = !mission;
     if (!mission) {
       return;
     }
+    const now = Date.now();
     const latest = mission.messages[mission.messages.length - 1];
     if (latest && latest.seq > this.messageSeq) {
       this.messageSeq = latest.seq;
-      this.messageUntil = Date.now() + 6000;
+      this.messageUntil = now + MESSAGE_SHOW_MS;
+      this.expandedUntil = Math.max(this.expandedUntil, this.messageUntil);
       const message = el('span', 'hud-toast');
       if (latest.speaker) {
         message.append(el('strong', '', `${latest.speaker}: `));
@@ -1225,19 +1272,25 @@ export class Hud implements HudHandle {
       this.objectiveText.replaceChildren(message);
       this.objectiveLine.classList.add('message');
       this.objectiveText.dataset.showing = 'message';
-      return;
+    } else if (!(this.objectiveText.dataset.showing === 'message' && now <= this.messageUntil)) {
+      const current =
+        mission.objectives.find((objective) => objective.kind === 'primary' && objective.status === 'active') ??
+        mission.objectives.find((objective) => objective.status === 'active');
+      const text = current ? current.text : 'Objectives complete';
+      if (this.objectiveText.dataset.showing !== text) {
+        // A changed objective is new information; going back to the same one after a message is not.
+        if (text !== this.lastObjectiveText) {
+          this.lastObjectiveText = text;
+          this.expandedUntil = Math.max(this.expandedUntil, now + OBJECTIVE_SHOW_MS);
+        }
+        this.objectiveText.dataset.showing = text;
+        this.objectiveText.textContent = text;
+        this.objectiveLine.classList.remove('message');
+      }
     }
-    if (this.objectiveText.dataset.showing === 'message' && Date.now() <= this.messageUntil) {
-      return;
-    }
-    const current =
-      mission.objectives.find((objective) => objective.kind === 'primary' && objective.status === 'active') ??
-      mission.objectives.find((objective) => objective.status === 'active');
-    const text = current ? current.text : 'Objectives complete';
-    if (this.objectiveText.dataset.showing !== text) {
-      this.objectiveText.dataset.showing = text;
-      this.objectiveText.textContent = text;
-      this.objectiveLine.classList.remove('message');
+    const expanded = now < this.expandedUntil;
+    if (this.objectiveLine.classList.contains('expanded') !== expanded) {
+      this.objectiveLine.classList.toggle('expanded', expanded);
     }
   }
 
@@ -1316,6 +1369,35 @@ export class Hud implements HudHandle {
     });
   }
 
+  /**
+   * Holding a filled group tile opens a small menu above it: save the current selection over it,
+   * or clear it. Holding an empty tile still saves straight away.
+   */
+  private openGroupMenu(group: number, element: HTMLButtonElement): void {
+    const hasSelection = this.ctx.getSelection().length > 0;
+    this.groupMenuSave.hidden = !hasSelection;
+    this.groupMenu.dataset.group = String(group);
+    this.groupMenu.hidden = false;
+    // Centre the menu over the tile, inside the strip's box.
+    const left = element.offsetLeft + element.offsetWidth / 2;
+    this.groupMenu.style.left = `${left}px`;
+    window.setTimeout(() => {
+      document.addEventListener('pointerdown', this.onGroupMenuOutside, true);
+    }, 0);
+  }
+
+  private closeGroupMenu(): void {
+    this.groupMenu.hidden = true;
+    document.removeEventListener('pointerdown', this.onGroupMenuOutside, true);
+  }
+
+  private readonly onGroupMenuOutside = (event: PointerEvent): void => {
+    if (event.target instanceof Node && this.groupMenu.contains(event.target)) {
+      return;
+    }
+    this.closeGroupMenu();
+  };
+
   private assignGroup(group: number, element: HTMLButtonElement): void {
     this.ctx.assignGroup(group);
     element.classList.add('assigned');
@@ -1341,7 +1423,12 @@ export class Hud implements HudHandle {
       timer = window.setTimeout(() => {
         timer = null;
         longFired = true;
-        this.assignGroup(group, element);
+        const filled = this.ctx.groupMembers(group).length > 0;
+        if (filled) {
+          this.openGroupMenu(group, element);
+        } else {
+          this.assignGroup(group, element);
+        }
       }, 450);
     });
     element.addEventListener('pointerup', (event) => {

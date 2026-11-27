@@ -100,7 +100,11 @@
 | ORD-03 | Queued waypoints are followed in order and shown on screen. |
 | ORD-04 | Units that cannot hit an attack target (unarmed workers, ground-only guns against aircraft in flight) ignore the order and keep their job; if none can, the order is refused with a reason. |
 | ORD-05 | Repeating an attack order on the same target changes nothing (the unit keeps its speed and route); a new target re-plans without stopping the unit. |
+| ORD-06 | Patrol: combat units drive back and forth between where they were and the tapped point, attack-moving both ways, until given another order. |
+| ORD-07 | Deploy on several packed vehicles at once: each one that has no room where it stands drives to the nearest free spot and unpacks there. |
+| ORD-08 | Tanks keep their long hulls apart (nose to tail as well as side by side) and parked tanks do not sit inside buildings. |
 | GRP-01 | Control groups 1–5 by touch and 1–9 by keyboard: assign, select, double-select centres camera. |
+| GRP-02 | Holding a filled group tile opens a small menu to save the selection over it or clear it; a cleared tile goes back to "hold to save". |
 | DESK-01 | Right/middle-drag pans, Alt+drag and Q/E rotate, wheel zooms to cursor, H/S/A keys work. |
 | GAME-01 | Pause stops the sim tick and refuses orders; backgrounding and the back button auto-pause. |
 | GAME-02 | Speed settings change the sim rate by the stated multipliers. |

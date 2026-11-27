@@ -752,6 +752,10 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             ctx.setQueueMode?.(value);
           },
           isAttackMoveArmed: () => ctx.isAttackMoveArmed?.() ?? false,
+          isPatrolArmed: () => ctx.isPatrolArmed?.() ?? false,
+          setPatrolArmed: (value) => {
+            ctx.setPatrolArmed?.(value);
+          },
           setAttackMoveArmed: (value) => {
             ctx.setAttackMoveArmed?.(value);
           },
@@ -765,6 +769,9 @@ export function createScreens(): Record<ScreenId, ScreenModule> {
             ctx.centerGroup?.(group);
           },
           groupMembers: (group) => ctx.groupMembers?.(group) ?? [],
+          clearGroup: (group) => {
+            ctx.clearGroup?.(group);
+          },
           pause: () => {
             ctx.go('pause');
           },

@@ -320,7 +320,7 @@ describe('combat', () => {
   it('[CMB-07] a skirmish ends, a wipe yields winner 1 and simultaneous kills draw', () => {
     let world = makeSkirmishWorld(1);
     const ids = world.units.filter((unit) => unit.owner === 1).map((unit) => unit.id);
-    world = step(world, [{ kind: 'move', unitIds: ids, x: 50, z: 50, tick: 1, issuer: 1 }]);
+    world = step(world, [{ kind: 'attackMove', unitIds: ids, x: 50, z: 50, tick: 1, issuer: 1 }]);
     for (let i = 0; i < 12000 && !world.result; i += 1) {
       world = step(world, []);
     }

@@ -5,6 +5,7 @@ import { setOutcome } from './drops';
 import { unitTargetKind, weaponCanHit } from './air';
 import { ensureSideStats } from './economy';
 import { addStructure, addUnit, placementValidity, structureRadius } from './spawn';
+import { nearestFreeSpot, setDeployTarget } from './unpack';
 import {
   MUZZLE_HEIGHT,
   RUBBLE_PADDING,
@@ -129,9 +130,19 @@ export function applyDeployCommand(
   }
   const validity = placementValidity(world, command.issuer, target, unit.x, unit.z, unit.id);
   if (!validity.valid) {
-    setOutcome(world, command.tick, 'deploy', false, validity.reason);
+    // Not room right here (often just the other packed vehicles parked beside it, when several
+    // are deployed at once): drive to the nearest free spot and unpack there, so Deploy on any
+    // selection just works without picking the vehicles one at a time.
+    const spot = nearestFreeSpot(world, unit, target, unit.x, unit.z, unit.heading);
+    if (!spot) {
+      setOutcome(world, command.tick, 'deploy', false, validity.reason);
+      return;
+    }
+    setDeployTarget(unit, spot.x, spot.z);
+    setOutcome(world, command.tick, 'deploy', true, 'ok');
     return;
   }
+  unit.deployTarget = null;
   unit.order = { kind: 'idle' };
   unit.path = [];
   unit.speed = 0;

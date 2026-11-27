@@ -2727,22 +2727,23 @@ button.corner-action {
   white-space: nowrap;
 }
 
-/* Objective line, under the queue. It grows to fit its text (never cut short); the word limits in
- * src/ui/textLimits.ts keep it to two or three lines. Its width leaves the side buttons clear. */
+/* Objective line, top right under the pause button. Folded it is a small list icon; new
+ * information drops it open (class "expanded") for a few seconds, growing leftwards to fit its
+ * text (never cut short; the word limits in src/ui/textLimits.ts keep it to two or three lines). */
 .hud-shell button.hud-objective {
   position: absolute;
-  top: 62px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 60px;
+  right: 8px;
   width: max-content;
-  max-width: min(480px, calc(100% - 2 * max(96px, env(safe-area-inset-left), env(safe-area-inset-right))));
-  min-width: 160px;
+  max-width: 44px;
+  min-width: 44px;
   min-height: 44px;
   height: auto;
   padding: 4px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 600;
   color: var(--soft);
@@ -2750,6 +2751,38 @@ button.corner-action {
   border: 1px solid var(--line);
   border-radius: 10px;
   pointer-events: auto;
+  transition: max-width 0.3s ease, padding 0.3s ease, background-color 0.3s ease;
+}
+
+.hud-shell button.hud-objective:not(.expanded) {
+  padding: 0;
+  justify-content: center;
+}
+
+.hud-shell button.hud-objective:not(.expanded) .hud-objective-text {
+  display: none;
+}
+
+.hud-shell button.hud-objective.expanded {
+  max-width: min(400px, calc(50% - 16px));
+  min-width: 160px;
+  animation: hud-objective-drop 0.3s ease-out;
+}
+
+@keyframes hud-objective-drop {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.hud-shell.left-handed button.hud-objective {
+  right: auto;
+  left: 8px;
 }
 
 .hud-objective .ico {
@@ -4320,4 +4353,39 @@ html.quality-low .title-embers {
   .unlock-side {
     flex: none;
   }
+}
+
+/* Hold menu of a filled group tile: "Save here" and "Clear", just above the tile. */
+.hud-group-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(9, 13, 22, 0.94);
+  border: 1px solid var(--line);
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.hud-group-menu[hidden] {
+  display: none;
+}
+
+.hud-shell .hud-group-menu button {
+  min-width: 72px;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  border-radius: 8px;
+}
+
+.hud-shell .hud-group-menu button.danger {
+  color: #fff;
+  background: rgba(160, 40, 40, 0.9);
+  border-color: rgba(255, 110, 110, 0.6);
 }

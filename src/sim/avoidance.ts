@@ -10,11 +10,13 @@
 // Overlaps that still happen are pushed apart afterwards by separateUnits, using each unit's own
 // size.
 import { isBlockedAt, type MapDef } from './map';
-import { UNIT_RADIUS } from './tuning';
+import { TANK_LENGTH, UNIT_RADIUS } from './tuning';
 import type { SimUnitType, UnitState, WorldState } from './types';
 
 const CELL = 8;
 const MAX_RADIUS = UNIT_RADIUS * 1.5;
+/** Longest half hull length of any unit (heavies and artillery are drawn 1.35 tank lengths). */
+const MAX_HULL = (TANK_LENGTH / 2) * 1.4;
 const LOOK_BASE = 2;
 const LOOK_SECONDS = 0.8;
 const CLEAR_MARGIN = 0.6;
@@ -26,6 +28,33 @@ const YIELD_CYCLE = 100;
 
 export function unitRadius(world: WorldState, unit: UnitState): number {
   return world.unitTypes.get(unit.typeId)?.radius ?? UNIT_RADIUS;
+}
+
+/**
+ * Half the hull's length and width, in metres. Models are drawn one tank length long (scaled by
+ * the type's visualScale), which is longer than the round steering radius: a tank is a long box,
+ * not a coin. Used to keep hulls from sinking into each other and into buildings.
+ */
+export function hullHalfExtents(world: WorldState, unit: UnitState): { length: number; width: number } {
+  const type = world.unitTypes.get(unit.typeId);
+  const radius = type?.radius ?? UNIT_RADIUS;
+  const scale = type?.visualScale ?? 1;
+  const length = Math.max(radius, (TANK_LENGTH / 2) * scale * 0.95);
+  // Arcadian hulls are broad (spread legs, fins, round shells), nearly as wide as they are long.
+  const width = type?.faction === 'alien' ? Math.max(radius * 0.9, length * 0.8) : radius * 0.9;
+  return { length, width };
+}
+
+function isWorker(world: WorldState, unit: UnitState): boolean {
+  return unit.job !== null || Boolean(world.unitTypes.get(unit.typeId)?.workerKind);
+}
+
+/** How far a unit's hull reaches from its centre along the unit direction (ux, uz). */
+export function hullReach(world: WorldState, unit: UnitState, ux: number, uz: number): number {
+  const { length, width } = hullHalfExtents(world, unit);
+  const along = ux * Math.cos(unit.heading) + uz * Math.sin(unit.heading);
+  const side = -ux * Math.sin(unit.heading) + uz * Math.cos(unit.heading);
+  return Math.sqrt(length * length * along * along + width * width * side * side);
 }
 
 interface Grid {
@@ -182,7 +211,11 @@ export function steer(
   }
 
   const clearance = r + bestRadius + CLEAR_MARGIN;
-  const gap = bestAlong - r - bestRadius;
+  // Nose to tail the hulls are longer than their round radius: measure the gap hull to hull.
+  const gap =
+    isWorker(world, unit) || isWorker(world, best)
+      ? bestAlong - r - bestRadius
+      : bestAlong - hullReach(world, unit, fx, fz) - hullReach(world, best, -fx, -fz);
   const facing = Math.cos(best.heading - bearing);
   const moving = best.speed > 0.3;
 
@@ -297,16 +330,15 @@ export function separateUnits(world: WorldState, canStand: (x: number, z: number
       if (a.hp <= 0 || a.air) {
         continue;
       }
-      const ra = unitRadius(world, a);
-      for (const b of nearbyUnits(world, a.x, a.z, ra + MAX_RADIUS)) {
+      const ra = hullHalfExtents(world, a).length;
+      for (const b of nearbyUnits(world, a.x, a.z, ra + MAX_HULL)) {
         if (b.id <= a.id || b.hp <= 0 || b.air) {
           continue;
         }
-        const minimum = ra + unitRadius(world, b);
         let dx = b.x - a.x;
         let dz = b.z - a.z;
         let distance = Math.hypot(dx, dz);
-        if (distance >= minimum - 0.001) {
+        if (distance >= Math.max(ra, unitRadius(world, a)) + Math.max(hullHalfExtents(world, b).length, unitRadius(world, b)) - 0.001) {
           continue;
         }
         if (distance < 0.0001) {
@@ -314,6 +346,18 @@ export function separateUnits(world: WorldState, canStand: (x: number, z: number
           dx = Math.cos(angle);
           dz = Math.sin(angle);
           distance = 1;
+        }
+        // Each hull's reach towards the other (long nose to tail, narrow side by side), so tanks
+        // in a column or a parked row stop overlapping, not only their round centres.
+        const ux0 = dx / distance;
+        const uz0 = dz / distance;
+        const round = unitRadius(world, a) + unitRadius(world, b);
+        // Workers keep the round size: they queue nose to tail at docks on purpose.
+        const minimum = isWorker(world, a) || isWorker(world, b)
+          ? round
+          : Math.max(round, hullReach(world, a, ux0, uz0) + hullReach(world, b, -ux0, -uz0));
+        if (distance >= minimum - 0.001) {
+          continue;
         }
         const push = (minimum - distance) / 2;
         const ux = dx / distance;

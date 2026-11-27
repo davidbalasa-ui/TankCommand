@@ -9,6 +9,8 @@
 // in world order, cached for the current tick only.
 import { isBlockedAt, mapFor, type MapDef, type MapObstacles, type MovementClass, type ObstacleShape } from './map';
 import { padShapes } from './pad';
+import { hullHalfExtents } from './avoidance';
+
 import { UNIT_RADIUS } from './tuning';
 import type { UnitState, WorldState } from './types';
 
@@ -193,5 +195,68 @@ export function pushOutOfObstacles(world: WorldState): void {
     }
     unit.x = nextX;
     unit.z = nextZ;
+  }
+}
+
+/**
+ * Parked fighting units whose long hull pokes into a building slide back out, a little each tick.
+ * The obstacle shapes only keep a unit's centre half a hull away from a wall (so workers can reach
+ * stations), which leaves a tank parked nose-on sunk a metre or more into the model. Workers are
+ * left alone: they dock against buildings on purpose. On a landing pad only units standing
+ * outside its square are pushed, so deliveries still drive off the deck.
+ */
+export function pushHullsOutOfStructures(world: WorldState): void {
+  if (world.structures.length === 0) {
+    return;
+  }
+  for (const unit of world.units) {
+    if (unit.hp <= 0 || unit.air || unit.speed > 0.3 || unit.transform || unit.job) {
+      continue;
+    }
+    const type = world.unitTypes.get(unit.typeId);
+    if (!type || type.movement === 'air' || type.workerKind) {
+      continue;
+    }
+    const hull = hullHalfExtents(world, unit);
+    const cos = Math.abs(Math.cos(unit.heading));
+    const sin = Math.abs(Math.sin(unit.heading));
+    const ex = cos * hull.length + sin * hull.width;
+    const ez = sin * hull.length + cos * hull.width;
+    for (const structure of world.structures) {
+      if (structure.hp <= 0) {
+        continue;
+      }
+      const structureType = world.structureTypes.get(structure.typeId);
+      if (!structureType) {
+        continue;
+      }
+      const hx = (structureType.footprint.cellsX * world.map.cellSize) / 2;
+      const hz = (structureType.footprint.cellsZ * world.map.cellSize) / 2;
+      const dx = unit.x - structure.x;
+      const dz = unit.z - structure.z;
+      if (structureType.kind === 'pad' && Math.abs(dx) < hx && Math.abs(dz) < hz) {
+        continue;
+      }
+      const outX = ex + hx - Math.abs(dx);
+      const outZ = ez + hz - Math.abs(dz);
+      if (outX <= 0 || outZ <= 0) {
+        continue;
+      }
+      const alongX = outX < outZ;
+      const depth = alongX ? outX : outZ;
+      const step = Math.min(PUSH_OUT_STEP, depth + 0.01);
+      const nextX = alongX ? unit.x + (dx >= 0 ? step : -step) : unit.x;
+      const nextZ = alongX ? unit.z : unit.z + (dz >= 0 ? step : -step);
+      const half = world.map.size / 2 - UNIT_RADIUS;
+      if (Math.abs(nextX) > half || Math.abs(nextZ) > half) {
+        continue;
+      }
+      if (isBlockedAt(obstacleMap(world, type.movement, true), nextX, nextZ)) {
+        continue;
+      }
+      unit.x = nextX;
+      unit.z = nextZ;
+      break;
+    }
   }
 }

@@ -50,7 +50,7 @@ const LOD_DISTANCE = 60;
 /** From this quality level (shadows off) every unit draws its low-detail model. */
 const LOD_QUALITY_LEVEL = 2;
 /** How long a packed tower takes to fold out into its structure. */
-const TOWER_UNFOLD_MS = 1500;
+const TOWER_UNFOLD_MS = 1400;
 /** Metres covered by one repeat of the ground detail texture. */
 const DETAIL_TILE = 7;
 const TURRET_NODES = [
@@ -672,6 +672,7 @@ export class RenderView {
       offsetY: number;
       offsetZ: number;
       startX: number;
+      startY?: number;
       startZ: number;
       shooterId: number | undefined;
       aim: number;
@@ -3399,7 +3400,9 @@ export class RenderView {
           offsetY,
           offsetZ,
           startX: projectile.x,
+          startY: projectile.y,
           startZ: projectile.z,
+          seed: Math.random() * 6.28,
           shooterId: projectile.shooterId,
           aim: projectile.aimDistance ?? 0,
           alien: !human,
@@ -3423,7 +3426,23 @@ export class RenderView {
       // follow their arc.
       const left = visual.kind === 'bombs' ? 1 - progress * progress : 1 - progress;
       const previous = visual.object.position.clone();
-      if (visual.arc) {
+      if (visual.kind === 'missile' && visual.aim > 0.01 && visual.startY !== undefined) {
+        // A missile leaves the tube slowly, its motor kicks in and it speeds up (it still lands
+        // when the sim's shot does), climbing a little and weaving as it steadies onto target.
+        const f = 0.25 * progress + 0.75 * progress * progress;
+        const ground = Math.hypot(projectile.vx, projectile.vz);
+        const ux = ground > 1e-6 ? projectile.vx / ground : 0;
+        const uz = ground > 1e-6 ? projectile.vz / ground : 0;
+        const along = visual.aim * f;
+        const rise = ground > 1e-6 ? (projectile.vy / ground) * along : 0;
+        const loft = Math.sin(Math.PI * f) * Math.min(2.2, visual.aim * 0.1);
+        const weave = Math.sin(f * 16 + (visual.seed ?? 0)) * 0.22 * (1 - f);
+        visual.object.position.set(
+          visual.startX + ux * along + visual.offsetX * (1 - f) - uz * weave,
+          visual.startY + rise + visual.offsetY * (1 - f) + loft,
+          visual.startZ + uz * along + visual.offsetZ * (1 - f) + ux * weave,
+        );
+      } else if (visual.arc) {
         const point = shellArcPoint(visual.arc, progress);
         visual.object.position.set(point.x, point.y, point.z);
         (visual.simAt ??= new THREE.Vector3()).set(projectile.x, projectile.y, projectile.z);
