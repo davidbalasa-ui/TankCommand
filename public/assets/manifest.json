@@ -86,7 +86,7 @@
       "id": "unit.human.bastion_packed",
       "kind": "model",
       "path": "assets/models/human/bastion_packed.glb",
-      "bytes": 567480,
+      "bytes": 871880,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",
@@ -398,7 +398,7 @@
       "id": "structure.human.turret",
       "kind": "model",
       "path": "assets/models/structures/terran_turret.glb",
-      "bytes": 1023844,
+      "bytes": 1372852,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",
@@ -963,7 +963,7 @@
       "id": "unit.human.bastion_packed.lod",
       "kind": "model",
       "path": "assets/models/human/bastion_packed_lod.glb",
-      "bytes": 142304,
+      "bytes": 150880,
       "faction": "human",
       "credit": {
         "license": "ORIGINAL",

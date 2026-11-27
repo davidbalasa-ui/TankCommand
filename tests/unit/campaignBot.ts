@@ -52,6 +52,8 @@ export interface BotPlan {
 export const CAMPAIGN_PLANS: Record<string, BotPlan> = {
   'mission.human.20_brood_war': { gatherOffEdge: 2 },
   'mission.alien.20_two_banners': { gatherOffEdge: 2 },
+  // Since the Terran towers grew (2026-11-27) this one tips over at the rally point too.
+  'mission.alien.22_vesper_falls': { gatherOffEdge: 2 },
 };
 
 export function botCommands(w: WorldState, plan: BotPlan = {}): Command[] {

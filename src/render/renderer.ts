@@ -346,6 +346,8 @@ interface StructureGun {
   kick: number;
   /** 1 right after a shot, easing back to 0. */
   recoil: number;
+  /** Separate barrel node (GunsPivot) that slides back on its own; the turret then only jolts. */
+  guns: { node: THREE.Object3D; base: THREE.Vector3; kick: number } | null;
 }
 
 /**
@@ -2359,7 +2361,19 @@ export class RenderView {
   private prepareStructureTemplate(model: THREE.Object3D): THREE.Group {
     model.updateMatrixWorld(true);
     const unfold = readUnfold(model);
-    const bounds = unfold ? unfold.bounds : new THREE.Box3().setFromObject(model);
+    // A model can name the part that fills the footprint (fitFootprint, e.g. a gun tower's
+    // footing); the rest, like long barrels, may overhang it. Otherwise the whole model fits.
+    let fitNode: THREE.Object3D | null = null;
+    model.traverse((object) => {
+      if (!fitNode && object.userData?.fitFootprint) {
+        fitNode = object;
+      }
+    });
+    const bounds = fitNode
+      ? new THREE.Box3().setFromObject(fitNode)
+      : unfold
+        ? unfold.bounds
+        : new THREE.Box3().setFromObject(model);
     let normScale = 1;
     if (!bounds.isEmpty()) {
       const size = new THREE.Vector3();
@@ -2368,7 +2382,10 @@ export class RenderView {
       model.scale.multiplyScalar(normScale);
       model.updateMatrixWorld(true);
       // Fold-out bounds come from readUnfold (no Carrier); scaling about the origin scales them too.
-      const scaled = unfold ? bounds.clone().applyMatrix4(new THREE.Matrix4().makeScale(normScale, normScale, normScale)) : new THREE.Box3().setFromObject(model);
+      const scaled =
+        fitNode || unfold
+          ? bounds.clone().applyMatrix4(new THREE.Matrix4().makeScale(normScale, normScale, normScale))
+          : new THREE.Box3().setFromObject(model);
       const centre = new THREE.Vector3();
       scaled.getCenter(centre);
       model.position.x -= centre.x;
@@ -2378,6 +2395,12 @@ export class RenderView {
     const root = new THREE.Group();
     if (unfold) {
       const data: UnfoldData = { ...unfold.data, normScale };
+      if (fitNode && !bounds.isEmpty()) {
+        // Unfold settles on the same centre the template was placed by.
+        const centre = new THREE.Vector3();
+        bounds.getCenter(centre);
+        data.deployedCentre = [centre.x, bounds.min.y, centre.z];
+      }
       root.userData.unfold = data;
     }
     root.add(model);
@@ -2816,6 +2839,9 @@ export class RenderView {
             .multiply(visual.modelPivot.scale)
             .applyQuaternion(visual.modelPivot.quaternion)
             .add(gun.base);
+          if (gun.guns) {
+            gun.guns.node.position.copy(gun.guns.base).setX(gun.guns.base.x - gun.guns.kick * ease);
+          }
         }
       }
       const pivot = visual.barrel?.userData.pivot as THREE.Object3D | undefined;
@@ -3949,10 +3975,43 @@ function measureGun(pivot: THREE.Object3D): StructureGun | null {
     return null;
   }
   const length = box.max.x - box.min.x;
+  const gunsNode = pivot.getObjectByName('GunsPivot');
+  if (gunsNode) {
+    // Long barrels on their own node: they slam back into the mantlet, the turret only jolts.
+    const guns = new THREE.Box3();
+    gunsNode.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.visible) {
+        const geometry = object.geometry as THREE.BufferGeometry;
+        if (!geometry.boundingBox) {
+          geometry.computeBoundingBox();
+        }
+        if (geometry.boundingBox) {
+          part.copy(geometry.boundingBox).applyMatrix4(object.matrixWorld).applyMatrix4(toPivot);
+          guns.union(part);
+        }
+      }
+    });
+    if (!guns.isEmpty()) {
+      const gunLength = guns.max.x - guns.min.x;
+      return {
+        base: pivot.position.clone(),
+        tip: new THREE.Vector3(guns.max.x, (guns.min.y + guns.max.y) / 2, (guns.min.z + guns.max.z) / 2),
+        kick: length * 0.03,
+        recoil: 0,
+        guns: {
+          node: gunsNode,
+          base: gunsNode.position.clone(),
+          // Node units: the pivot space scaled down by the node's own scale (normally 1).
+          kick: (gunLength * 0.12) / Math.max(gunsNode.scale.x, 0.0001),
+        },
+      };
+    }
+  }
   return {
     base: pivot.position.clone(),
     tip: new THREE.Vector3(box.max.x, box.min.y + (box.max.y - box.min.y) * 0.62, (box.min.z + box.max.z) / 2),
     kick: length * 0.14,
     recoil: 0,
+    guns: null,
   };
 }

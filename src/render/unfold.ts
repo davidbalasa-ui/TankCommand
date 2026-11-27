@@ -150,7 +150,9 @@ function foldOrder(data: UnfoldData): Map<number, { from: number; to: number }> 
   if (cached) {
     return cached;
   }
-  const rank = (name: string): number => (name === 'Base' ? 0 : name === 'TurretPivot' ? 2 : 1);
+  // Base first, the gun turret after the rest, and its barrels (GunsPivot) run out last.
+  const rank = (name: string): number =>
+    name === 'Base' ? 0 : name === 'TurretPivot' ? 2 : name === 'GunsPivot' ? 3 : 1;
   const moving = data.parts
     .map((part, index) => ({ part, index }))
     .filter((entry) => !entry.part.hide)

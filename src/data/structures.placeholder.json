@@ -112,8 +112,8 @@
     "deliverySec": 10,
     "hp": 400,
     "footprint": {
-      "cellsX": 2,
-      "cellsZ": 2
+      "cellsX": 3,
+      "cellsZ": 3
     },
     "sightRange": 14,
     "modelId": "structure.human.turret",
@@ -157,8 +157,8 @@
     "deliverySec": 8,
     "hp": 250,
     "footprint": {
-      "cellsX": 1,
-      "cellsZ": 1
+      "cellsX": 2,
+      "cellsZ": 2
     },
     "sightRange": 14,
     "modelId": "structure.human.radar",
@@ -182,8 +182,8 @@
     "deliverySec": 12,
     "hp": 500,
     "footprint": {
-      "cellsX": 2,
-      "cellsZ": 2
+      "cellsX": 3,
+      "cellsZ": 3
     },
     "sightRange": 10,
     "modelId": "structure.human.lab",
