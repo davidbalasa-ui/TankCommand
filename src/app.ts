@@ -8,6 +8,7 @@ import { createKvStore, type KvStore } from './platform/kv';
 import {
   emptyProgress,
   loadProgress,
+  mergeProgress,
   missionStatus,
   recordWin,
   saveProgress,
@@ -97,6 +98,7 @@ import type { BaseAction, BaseView, ResearchNodeView } from './ui/basePanel';
 import type { UpgradeKind } from './sim/types';
 import { needsFullGame, type ContentRef } from './data/fullGame';
 import { PurchaseService } from './platform/purchases';
+import { CloudProgressSync } from './platform/cloudProgress';
 
 export type { IssuedCommand } from './ui/input';
 
@@ -301,6 +303,8 @@ export class App {
   private services: GameServices | null = null;
   /** The "full game unlock" purchase (everything is unlocked on the web). */
   readonly purchases = new PurchaseService();
+  /** Google Play Games cloud saves of the campaign progress (Play build only; optional sign-in). */
+  readonly cloud = new CloudProgressSync();
 
   constructor(root: HTMLElement) {
     this.registry = new AssetRegistry(parseAssetManifest(rawManifest));
@@ -309,6 +313,9 @@ export class App {
     this.kv = createKvStore();
     void loadProgress(this.kv).then((loaded) => {
       this.progress = loaded;
+      void this.cloud.start(() => this.progress).then((merged) => {
+        this.takeCloudProgress(merged);
+      });
     });
     this.mapData = data.mapData;
     this.mapRows = data.mapRows;
@@ -449,7 +456,7 @@ export class App {
       getDifficulty: () => this.progress.difficulty,
       setDifficulty: (difficulty) => {
         this.progress = setCampaignDifficulty(this.progress, difficulty);
-        void saveProgress(this.kv, this.progress).catch(() => undefined);
+        this.persistProgress();
       },
       inMatch: () => this.matchActive,
       getMissionList: () => this.missionList(),
@@ -487,6 +494,20 @@ export class App {
           chosen && this.lockedByPurchase({ kind: 'skirmishMap', mapId: chosen }) ? undefined : chosen;
       },
       purchases: this.purchases,
+      cloudSave: {
+        available: () => this.cloud.available(),
+        state: () => this.cloud.state(),
+        playerName: () => this.cloud.playerName(),
+        signIn: () =>
+          this.cloud.signIn(() => this.progress).then((merged) => {
+            this.takeCloudProgress(merged);
+          }),
+        syncNow: () =>
+          this.cloud.sync(() => this.progress).then((merged) => {
+            this.takeCloudProgress(merged);
+          }),
+        subscribe: (listener) => this.cloud.subscribe(listener),
+      },
       getBaseView: () => this.baseView(),
       baseAction: (action) => this.baseAction(action),
       getWorkerActions: () => this.workerActions(),
@@ -521,6 +542,24 @@ export class App {
       },
     });
     this.leftHandedValue = this.services.settings().leftHanded;
+  }
+
+  /** Saves the campaign progress on the device, then (when signed in) to the cloud. */
+  private persistProgress(): void {
+    void saveProgress(this.kv, this.progress).catch(() => undefined);
+    void this.cloud.push(() => this.progress).then((merged) => {
+      this.takeCloudProgress(merged);
+    });
+  }
+
+  /** The cloud copy added progress this device did not have: keep it here too. */
+  private takeCloudProgress(merged: CampaignProgress | null): void {
+    if (!merged) {
+      return;
+    }
+    // Merge again: a mission may have been won while the cloud call was out.
+    this.progress = mergeProgress(this.progress, merged);
+    void saveProgress(this.kv, this.progress).catch(() => undefined);
   }
 
   start(): void {
@@ -1821,7 +1860,7 @@ export class App {
     this.resultRecorded = true;
     if (this.world.result.winner === mission.humanSide) {
       this.progress = recordWin(this.progress, mission.def.id, this.world.tick / SIM_TICK_HZ, mission.def.difficulty ?? 'normal');
-      void saveProgress(this.kv, this.progress).catch(() => undefined);
+      this.persistProgress();
     }
   }
 

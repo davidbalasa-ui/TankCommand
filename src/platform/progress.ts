@@ -123,3 +123,47 @@ export function missionStatus(
   const before = missions[index - 1];
   return before && progress.completed[before.id] ? 'open' : 'locked';
 }
+
+/**
+ * Combines two copies of the campaign progress (this device and the cloud) so nothing is lost:
+ * every mission won on either side stays won, with the best time, the most wins and the hardest
+ * difficulty of the two. The chosen difficulty follows `preferred` (this device).
+ */
+export function mergeProgress(preferred: CampaignProgress, other: CampaignProgress): CampaignProgress {
+  const completed: Record<string, MissionRecord> = { ...other.completed };
+  for (const [id, mine] of Object.entries(preferred.completed)) {
+    const theirs = completed[id];
+    if (!theirs) {
+      completed[id] = mine;
+      continue;
+    }
+    const best = harder(theirs.bestDifficulty ?? 'normal', mine.bestDifficulty ?? 'normal');
+    completed[id] = {
+      bestTimeSec: Math.min(mine.bestTimeSec, theirs.bestTimeSec),
+      wins: Math.max(mine.wins, theirs.wins),
+      ...(mine.bestDifficulty !== undefined || theirs.bestDifficulty !== undefined ? { bestDifficulty: best } : {}),
+    };
+  }
+  return { version: 1, completed, difficulty: preferred.difficulty };
+}
+
+/** How far the progress goes: missions won (used to settle cloud save conflicts). */
+export function progressScore(progress: CampaignProgress): number {
+  return Object.keys(progress.completed).length;
+}
+
+/** Same progress (order of missions does not matter). */
+export function sameProgress(a: CampaignProgress, b: CampaignProgress): boolean {
+  const ids = new Set([...Object.keys(a.completed), ...Object.keys(b.completed)]);
+  if (a.difficulty !== b.difficulty) {
+    return false;
+  }
+  for (const id of ids) {
+    const x = a.completed[id];
+    const y = b.completed[id];
+    if (!x || !y || x.bestTimeSec !== y.bestTimeSec || x.wins !== y.wins || x.bestDifficulty !== y.bestDifficulty) {
+      return false;
+    }
+  }
+  return true;
+}

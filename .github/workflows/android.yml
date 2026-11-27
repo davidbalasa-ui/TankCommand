@@ -54,10 +54,12 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID }}
         run: ./gradlew --no-daemon assembleDebug bundleRelease
 
       - name: Report signing
         env:
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID }}
           HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -65,6 +67,11 @@ jobs:
             echo "Release AAB for version $VERSION is signed with the upload key." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Release AAB for version $VERSION is UNSIGNED: add the four ANDROID_* secrets to sign it (docs/play-release.md)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$PLAY_GAMES_APP_ID" ]; then
+            echo "Google Play Games cloud saves: on (project $PLAY_GAMES_APP_ID)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Google Play Games cloud saves: OFF. Set the PLAY_GAMES_APP_ID repository variable (docs/play-release.md)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - uses: actions/upload-artifact@v4

@@ -74,7 +74,8 @@ for 14 days in a row** before they can apply for production access.
 - [ ] **Privacy policy URL:** `https://tankcommand.vercel.app/privacy.html`
       (fill in `[contact email]` in `public/privacy.html` first and redeploy the web build).
 - [ ] **Ads:** No, the app contains no ads.
-- [ ] **App access:** all functionality is available without special access (no login).
+- [ ] **App access:** all functionality is available without special access (the Google Play
+      Games sign-in is optional; nothing needs it).
 - [ ] **Target audience:** 13 and over recommended (lower ages bring the Families policy).
 - [ ] **Data safety** (matches the privacy policy):
   - Does the app collect or share user data? **Yes** (bug reports the player chooses to send).
@@ -91,6 +92,11 @@ for 14 days in a row** before they can apply for production access.
       not an ID).
     - Location, personal info, financial info, contacts, photos, messages: **No**. Purchases go
       through Google Play; the app only keeps an on-device flag.
+    - **Google Play Games cloud save** (section 8): the progress goes to Google, not to us, but
+      the Play Games Services SDK in the app counts for the form. Google publishes what that SDK
+      collects ("Play Games Services" in Google's *data disclosure for Google Play services* page);
+      declare those items as Google lists them, marked **optional** (sign-in is optional), purpose
+      **App functionality**.
   - Encrypted in transit: **Yes** (HTTPS).
   - Users can request deletion: **Yes**, via the contact email in the policy.
 - [ ] **Content rating** (IARC questionnaire): category **Game**. Violence: tanks, aircraft and
@@ -102,7 +108,52 @@ for 14 days in a row** before they can apply for production access.
 - [ ] Store listing: short and full description, icon 512x512, feature graphic 1024x500,
       phone screenshots (landscape is fine).
 
-## 8. Bug reports (Vercel)
+## 8. Google Play Games sign-in and cloud saves
+
+The Android app can keep campaign progress in the player's Google Play Games account (Saved
+Games), so it follows them to a new phone. Sign-in is optional: the game always saves on the
+device too, and the button is **Settings → Cloud save**. When both sides have progress, they are
+merged: every mission won on either phone stays won, with the best time and hardest difficulty.
+Google stores the saves; there is no server of ours. The web version keeps local saves only.
+
+The code is in place (`android/app/.../PlayGamesPlugin.java`, `src/platform/cloudProgress.ts`).
+It stays switched off until the build knows the Play Games project id. Steps, after the app
+exists in Play Console (section 3) and one signed AAB is uploaded:
+
+- [ ] Play Console → **Grow users → Play Games Services → Setup and management → Configuration**.
+      Choose **No, my game doesn't use Google APIs** → create a new Play Games Services project
+      (this makes a linked Google Cloud project for you).
+- [ ] **Properties:** display name and category (Action or Strategy). Save.
+- [ ] Turn **Saved games** **on** in the properties and save. (Without it the cloud save fails.)
+- [ ] **Credentials → Add credential → Android**. Pick the app `com.davidbalasa.tankcommand`.
+      Play Console offers to create the OAuth consent screen and OAuth client in the linked Google
+      Cloud project: follow its links.
+  - OAuth consent screen: app name, support email, **External**, publish it (no sensitive scopes,
+    so no Google review).
+  - OAuth client (type **Android**) needs a **package name** and a **SHA-1 fingerprint**. Make
+    **two Android credentials**, one per fingerprint, or sign-in fails on one of the builds:
+    1. **Play app signing key** (what testers and players get from Play): Play Console → **Test
+       and release → App integrity → Play app signing → App signing key certificate → SHA-1**.
+    2. **Upload key** (only if you sideload the release build you sign yourself):
+       `keytool -list -v -keystore tankcommand-upload.jks -alias upload` → SHA-1. The same value
+       is under App integrity → Upload key certificate.
+    The debug APK from the workflow is signed with a throwaway key that changes on each build, so
+    sign-in does not work there; test sign-in with an internal-testing install from Play.
+- [ ] **Testers** (Play Games Services → Testers): add the testers' Google accounts. Until the
+      Play Games Services project is **published**, only these accounts can sign in.
+- [ ] Copy the **project id**: the number shown under the game's name on the Play Games Services
+      Configuration page (e.g. `123456789012`).
+- [ ] GitHub → repository → **Settings → Secrets and variables → Actions → Variables** → New
+      repository variable `PLAY_GAMES_APP_ID` = that number. (A variable, not a secret: it is not
+      sensitive.) Or send me the number and I will set it.
+- [ ] Run the Android workflow. Its summary says **Google Play Games cloud saves: on**.
+- [ ] **Review and publish** the Play Games Services configuration (Play Games Services → Publish)
+      before the production release, so every player can sign in, not only testers.
+- [ ] Check on a phone from the internal test track: open Settings → **Cloud save: sign in**,
+      win a training mission, reinstall the app (or use a second phone with the same account),
+      sign in, and the mission shows as won.
+
+## 9. Bug reports (Vercel)
 
 The game posts reports to `https://tankcommand.vercel.app/api/bug-report` (the `api/` folder of
 this repo, deployed with the web build). Until both variables are set it answers 503 and the game
@@ -118,7 +169,7 @@ saves the report on the device and says it was not sent.
       label `bug-report` should appear (GitHub creates the label on first use). If the repo is
       public, the issues are public too; consider a private repo for reports.
 
-## 9. Before each release
+## 10. Before each release
 
 - [ ] Bump `version` in `package.json`; merge to `main`.
 - [ ] Wait for the Android workflow, check the summary says **signed**, download the AAB.

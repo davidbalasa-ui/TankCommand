@@ -298,6 +298,8 @@ export interface ScreenContext {
   beginSkirmish?: () => void;
   /** The "full game unlock" purchase. */
   purchases?: PurchasesView;
+  /** Google Play Games cloud saves (the Play build only). */
+  cloudSave?: CloudSaveView;
   getBaseView?: () => import('./basePanel').BaseView;
   baseAction?: (action: import('./basePanel').BaseAction) => boolean;
 }
@@ -309,6 +311,16 @@ export interface PurchasesView {
   price(): Promise<string | null>;
   buy(): Promise<{ status: string; message: string }>;
   restore(): Promise<{ status: string; message: string }>;
+  subscribe(listener: () => void): () => void;
+}
+
+export interface CloudSaveView {
+  /** False on the web and in a build without Play Games set up: the button is left out. */
+  available(): boolean;
+  state(): 'unavailable' | 'signedOut' | 'signingIn' | 'syncing' | 'synced' | 'offline';
+  playerName(): string | undefined;
+  signIn(): Promise<void>;
+  syncNow(): Promise<void>;
   subscribe(listener: () => void): () => void;
 }
 
