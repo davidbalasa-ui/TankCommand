@@ -188,15 +188,18 @@ def build_camera(keys, shake=(), seed=7):
             base[f] = (cam.location.copy(), cam.rotation_euler.copy())
         cam.animation_data_clear()
         for f in range(f_lo, f_hi + 1):
-            amp = 0.0
-            for fe, a, n in shake:
+            amp = ramp_ = 0.0
+            for ev in shake:              # (frame, amp, frames[, rotation amp in radians])
+                fe, a, n = ev[:3]
                 if fe <= f < fe + n:
-                    amp += a * (1 - (f - fe) / n) ** 2
+                    k = (1 - (f - fe) / n) ** 2
+                    amp += a * k
+                    ramp_ += (ev[3] if len(ev) > 3 else a * 0.004) * k
             loc, rot = base[f]
             off = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))) * amp
             cam.location = loc + rot.to_matrix() @ off
-            cam.rotation_euler = (rot.x + rnd.uniform(-1, 1) * amp * 0.004, rot.y + rnd.uniform(-1, 1) * amp * 0.004,
-                                  rot.z + rnd.uniform(-1, 1) * amp * 0.004)
+            cam.rotation_euler = (rot.x + rnd.uniform(-1, 1) * ramp_, rot.y + rnd.uniform(-1, 1) * ramp_,
+                                  rot.z + rnd.uniform(-1, 1) * ramp_)
             cam.keyframe_insert('location', frame=f)
             cam.keyframe_insert('rotation_euler', frame=f)
         C.set_interp(cam, 'LINEAR')
