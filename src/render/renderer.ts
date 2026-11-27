@@ -15,6 +15,7 @@ import { isAllied, isHostile } from '../sim/diplomacy';
 import { damageState } from '../sim/structures';
 import { crateOre } from '../sim/economy';
 import { PAD_LAND_SEC, PAD_UNLOAD_SEC, padFacing, padLayout } from '../sim/pad';
+import { packedUnitFor } from '../sim/unpack';
 import { SIM_TICK_HZ } from '../sim/constants';
 import { isArcingWeapon } from '../sim/weaponCycle';
 import { planShellArc, shellArcPoint, type ShellArc } from './shellArc';
@@ -332,6 +333,19 @@ interface StructureVisual {
   core: { node: THREE.Object3D; baseY: number; spin: number; flare: number } | null;
   /** Moving parts from the model's anim extras (radar dishes, spinning crowns). */
   parts: PartMotion[];
+  /** An aimed gun's barrel tip and recoil, measured from the model on its first shot. */
+  gun?: StructureGun | null;
+}
+
+interface StructureGun {
+  /** The pivot's rest position in its parent's space. */
+  base: THREE.Vector3;
+  /** Barrel tip in the pivot's own space (its front, +X, a little above the middle). */
+  tip: THREE.Vector3;
+  /** How far the turret kicks back on a shot, in the pivot's own units. */
+  kick: number;
+  /** 1 right after a shot, easing back to 0. */
+  recoil: number;
 }
 
 /**
@@ -369,6 +383,48 @@ function deckHeightAt(deck: PadDeck, x: number, z: number): number | null {
   const a = deck.heights[i] ?? 0;
   const b = deck.heights[Math.min(deck.heights.length - 1, i + 1)] ?? 0;
   return deck.ground + a + (b - a) * (index - i);
+}
+
+let plateTexture: THREE.CanvasTexture | null = null;
+
+/** White footprint frame (tinted by the material): a soft fill, a solid border and corner brackets. */
+function placementPlateTexture(): THREE.CanvasTexture | null {
+  if (plateTexture) {
+    return plateTexture;
+  }
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  ctx.fillRect(6, 6, 116, 116);
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(6, 6, 116, 116);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'square';
+  for (const [x, y, dx, dy] of [
+    [6, 6, 1, 1],
+    [122, 6, -1, 1],
+    [6, 122, 1, -1],
+    [122, 122, -1, -1],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx * 30, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + dy * 30);
+    ctx.stroke();
+  }
+  plateTexture = new THREE.CanvasTexture(canvas);
+  plateTexture.colorSpace = THREE.SRGBColorSpace;
+  return plateTexture;
 }
 
 function structureHeight(kind: string): number {
@@ -659,7 +715,7 @@ export class RenderView {
   private readonly beamPool: THREE.Mesh[] = [];
   private readonly selectionRings = new Map<number, THREE.Mesh>();
   /** Footprints where your packed buildings are heading to unpack (overhaul step 5). */
-  private readonly unpackSpots = new Map<number, THREE.Mesh>();
+  private readonly unpackSpots = new Map<number, THREE.Group>();
   private readonly flashes: Flash[] = [];
   private readonly projectileVisuals = new Map<
     number,
@@ -728,7 +784,7 @@ export class RenderView {
   private lightTarget: THREE.Object3D;
   private marker: THREE.Mesh | null = null;
   private markerTtl = 0;
-  private placementGhost: THREE.Mesh | null = null;
+  private placementGhost: THREE.Group | null = null;
   private placementType: SimStructureType | null = null;
   private world: WorldState;
   private lastTick = -1;
@@ -1173,31 +1229,101 @@ export class RenderView {
     return result;
   }
 
-  showPlacement(structureTypeId: string, x: number, z: number, valid: boolean): void {
+  /**
+   * The structure being placed, drawn as itself: a see-through copy of its model (green when it
+   * fits, red when it does not) standing on a footprint plate that marks the ground it will take.
+   * `lifted` raises it a little while a finger is dragging it, so it reads as picked up.
+   */
+  showPlacement(structureTypeId: string, x: number, z: number, valid: boolean, lifted = false): void {
     const type = this.world.structureTypes.get(structureTypeId);
     if (!type) {
       return;
     }
-    this.placementType = type;
-    const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize;
-    const height = structureHeight(type.kind);
-    const groundY = heightAt(this.world.map, x, z);
-    if (!this.placementGhost) {
-      const geometry = new THREE.BoxGeometry(size, height, size);
-      const material = new THREE.MeshBasicMaterial({
-        color: PLACEMENT_VALID_COLOR,
-        transparent: true,
-        opacity: 0.55,
-        side: THREE.DoubleSide,
-      });
-      this.placementGhost = new THREE.Mesh(geometry, material);
+    if (!this.placementGhost || this.placementType?.id !== type.id) {
+      this.clearPlacement();
+      this.placementGhost = this.makePlacementGhost(type);
       this.scene.add(this.placementGhost);
     }
-    this.placementGhost.position.set(x, groundY + height / 2, z);
-    const material = this.placementGhost.material;
-    if (material instanceof THREE.MeshBasicMaterial) {
-      material.color.setHex(valid ? PLACEMENT_VALID_COLOR : PLACEMENT_INVALID_COLOR);
+    this.placementType = type;
+    const ghost = this.placementGhost;
+    const groundY = heightAt(this.world.map, x, z);
+    ghost.position.set(x, groundY, z);
+    const model = ghost.getObjectByName('GhostModel');
+    if (model) {
+      model.position.y = lifted ? 0.6 : 0;
+      if (type.kind === 'pad') {
+        model.rotation.y = -padFacing({ x, z });
+      }
     }
+    if (ghost.userData.valid !== valid) {
+      ghost.userData.valid = valid;
+      const colour = new THREE.Color(valid ? PLACEMENT_VALID_COLOR : PLACEMENT_INVALID_COLOR);
+      ghost.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) {
+          return;
+        }
+        const materials: unknown[] = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          if (object.name === 'GhostPlate' && material instanceof THREE.MeshBasicMaterial) {
+            material.color.copy(colour);
+          } else if (material instanceof THREE.MeshStandardMaterial) {
+            material.emissive.copy(colour).multiplyScalar(valid ? 0.28 : 0.6);
+            material.opacity = valid ? 0.82 : 0.6;
+          }
+        }
+      });
+    }
+  }
+
+  private makePlacementGhost(type: SimStructureType): THREE.Group {
+    const ghost = new THREE.Group();
+    ghost.name = 'PlacementGhost';
+    const cell = this.world.map.cellSize;
+    const sizeX = type.footprint.cellsX * cell;
+    const sizeZ = type.footprint.cellsZ * cell;
+    const size = Math.max(sizeX, sizeZ);
+    const template = type.modelId ? this.templates.get(type.modelId) : undefined;
+    let model: THREE.Object3D;
+    if (template) {
+      model = template.clone(true);
+      remapMeshMaterials(model, (material) => {
+        const clone = material.clone();
+        clone.transparent = true;
+        clone.opacity = 0.82;
+        clone.depthWrite = true;
+        return clone;
+      });
+      model.scale.setScalar(size * 0.96);
+    } else {
+      const height = structureHeight(type.kind);
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(sizeX, height, sizeZ),
+        new THREE.MeshStandardMaterial({ color: 0x8a96a3, transparent: true, opacity: 0.7 }),
+      );
+      box.position.y = height / 2;
+      model = new THREE.Group();
+      model.add(box);
+    }
+    model.name = 'GhostModel';
+    ghost.add(model);
+    // The footprint: a bright frame with corner ticks and a faint fill, drawn over the terrain.
+    const plate = new THREE.Mesh(
+      new THREE.PlaneGeometry(sizeX + 0.6, sizeZ + 0.6),
+      new THREE.MeshBasicMaterial({
+        map: placementPlateTexture(),
+        color: PLACEMENT_VALID_COLOR,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      }),
+    );
+    plate.name = 'GhostPlate';
+    plate.rotation.x = -Math.PI / 2;
+    plate.position.y = 0.12;
+    plate.renderOrder = 2;
+    ghost.add(plate);
+    ghost.userData.valid = null;
+    return ghost;
   }
 
   clearPlacement(): void {
@@ -1205,13 +1331,28 @@ export class RenderView {
     if (!this.placementGhost) {
       return;
     }
-    this.scene.remove(this.placementGhost);
-    this.placementGhost.geometry.dispose();
-    const material = this.placementGhost.material;
-    if (material instanceof THREE.Material) {
-      material.dispose();
-    }
+    this.disposeGhost(this.placementGhost);
     this.placementGhost = null;
+  }
+
+  private disposeGhost(ghost: THREE.Object3D): void {
+    this.scene.remove(ghost);
+    ghost.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+      // The model shares its geometry with the template; only the plate and fallback box own theirs.
+      const geometry: unknown = object.geometry;
+      if (geometry instanceof THREE.BufferGeometry && (object.name === 'GhostPlate' || geometry instanceof THREE.BoxGeometry)) {
+        geometry.dispose();
+      }
+      const materials: unknown[] = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        if (material instanceof THREE.Material) {
+          material.dispose();
+        }
+      }
+    });
   }
 
   render(alpha: number, world: WorldState): void {
@@ -2665,6 +2806,17 @@ export class RenderView {
       if (visual.modelPivot && !this.structureFolding.has(structure.id)) {
         // Model weapons point along +X, like the units: same heading convention as unit turrets.
         visual.modelPivot.rotation.y = -structure.turretHeading;
+        const gun = visual.gun;
+        if (gun) {
+          // The whole turret slams back along its barrels and eases forward again.
+          gun.recoil = Math.max(0, gun.recoil - this.motionDt * 3.2);
+          const ease = gun.recoil * gun.recoil;
+          visual.modelPivot.position
+            .set(-gun.kick * ease, 0, 0)
+            .multiply(visual.modelPivot.scale)
+            .applyQuaternion(visual.modelPivot.quaternion)
+            .add(gun.base);
+        }
       }
       const pivot = visual.barrel?.userData.pivot as THREE.Object3D | undefined;
       if (pivot) {
@@ -2724,12 +2876,28 @@ export class RenderView {
   }
 
   private readonly rubbleMeshes: THREE.Mesh[] = [];
+  /**
+   * Destroyed buildings: the building's own model, charred, slumped and tilted, with its turret
+   * knocked askew. It stays as long as the sim's rubble does, then sinks away.
+   */
+  private readonly ruins: Array<{
+    root: THREE.Group;
+    body: THREE.Object3D;
+    x: number;
+    z: number;
+    born: number;
+    restScaleY: number;
+    tiltX: number;
+    tiltZ: number;
+    groundY: number;
+    height: number;
+  }> = [];
 
   private syncRubble(world: WorldState): void {
     while (this.rubbleMeshes.length < world.rubble.length) {
       const mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(1, 1.2, 0.5, 7),
-        new THREE.MeshStandardMaterial({ color: 0x4a4540, roughness: 1 }),
+        new THREE.MeshStandardMaterial({ color: 0x2f2b28, roughness: 1 }),
       );
       this.scene.add(mesh);
       this.rubbleMeshes.push(mesh);
@@ -2742,14 +2910,95 @@ export class RenderView {
         (mesh.material as THREE.Material).dispose();
       }
     }
+    const now = performance.now();
+    for (let i = this.ruins.length - 1; i >= 0; i -= 1) {
+      const ruin = this.ruins[i];
+      if (!ruin) {
+        continue;
+      }
+      const item = world.rubble.find((entry) => Math.hypot(entry.x - ruin.x, entry.z - ruin.z) < 1);
+      if (!item) {
+        this.scene.remove(ruin.root);
+        remapMeshMaterials(ruin.body, (material) => {
+          material.dispose();
+          return material;
+        });
+        this.ruins.splice(i, 1);
+        continue;
+      }
+      // Collapse: a quick slump with a little bounce at the end, then it lies there burning.
+      const t = Math.min(1, (now - ruin.born) / 900);
+      const fall = t < 0.8 ? (t / 0.8) ** 2 : 1 - Math.sin(((t - 0.8) / 0.2) * Math.PI) * 0.06;
+      ruin.body.scale.y = ruin.restScaleY * (1 - 0.52 * fall);
+      ruin.root.rotation.set(ruin.tiltX * fall, 0, ruin.tiltZ * fall);
+      const sink = item.ttl < 4 ? (1 - item.ttl / 4) * ruin.height * 0.6 : 0;
+      ruin.root.position.y = ruin.groundY - 0.15 * fall - sink;
+    }
     for (let i = 0; i < world.rubble.length; i += 1) {
       const item = world.rubble[i];
       const mesh = this.rubbleMeshes[i];
       if (item && mesh) {
+        // The grey heap only stands in where no ruin was made (rubble from a loaded save).
+        mesh.visible = !this.ruins.some((ruin) => Math.hypot(item.x - ruin.x, item.z - ruin.z) < 1);
         mesh.scale.set(item.radius, 1, item.radius);
         mesh.position.set(item.x, heightAt(world.map, item.x, item.z) + 0.2, item.z);
       }
     }
+  }
+
+  private makeRuin(x: number, groundY: number, z: number, visual: StructureVisual): void {
+    const model = visual.model;
+    if (!model) {
+      return;
+    }
+    const body = model.clone(true);
+    // Scorched rather than soot-black (as tank wrecks are): the building's shape and panels still
+    // read, so it is clearly that building, destroyed.
+    remapMeshMaterials(body, (material) => {
+      const clone = material.clone();
+      if (clone instanceof THREE.MeshStandardMaterial) {
+        clone.color.multiplyScalar(0.3).lerp(new THREE.Color(0x1c1814), 0.35);
+        clone.emissive.setRGB(0, 0, 0);
+        clone.emissiveMap = null;
+        clone.roughness = 1;
+        clone.envMapIntensity = 0.3;
+      }
+      return clone;
+    });
+    body.position.set(0, 0, 0);
+    body.scale.setScalar(visual.modelScale);
+    const pivot = body.getObjectByName('TurretPivot');
+    if (pivot) {
+      pivot.rotation.z += 0.35;
+      pivot.rotation.x += 0.2;
+      pivot.position.y -= 0.04;
+    }
+    const core = body.getObjectByName('Core');
+    if (core) {
+      core.visible = false;
+    }
+    body.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+    const root = new THREE.Group();
+    root.position.set(x, groundY, z);
+    root.add(body);
+    this.scene.add(root);
+    this.ruins.push({
+      root,
+      body,
+      x,
+      z,
+      born: performance.now(),
+      restScaleY: visual.modelScale,
+      tiltX: (Math.random() - 0.5) * 0.16,
+      tiltZ: (Math.random() - 0.5) * 0.16,
+      groundY,
+      height: visual.height,
+    });
   }
 
   // ---- Landing pad traffic -------------------------------------------------------------
@@ -2823,8 +3072,12 @@ export class RenderView {
       cloneMaterials(body, isHostile(world, 1, order.owner), this.colorBlind);
       body.userData.ownMaterials = true;
     } else {
-      body = this.cargoMesh('kit', 3);
-      body.position.y = 1.1;
+      body = this.structureDeliveryBody(world, order.itemId) ?? this.cargoMesh('kit', 3);
+      if (body instanceof THREE.Mesh) {
+        body.position.y = 1.1;
+      }
+      cloneMaterials(body, isHostile(world, 1, order.owner), this.colorBlind);
+      body.userData.ownMaterials = true;
     }
     group.add(body);
     const human = world.factions.find((entry) => entry.player === order.owner)?.faction !== 'alien';
@@ -2842,9 +3095,36 @@ export class RenderView {
     flame.rotation.x = Math.PI; // point down
     flame.position.y = -3;
     flame.name = 'LandingFlame';
+    // A big delivery (a whole landing pad) needs a wider burn under it.
+    const width = new THREE.Box3().setFromObject(body).getSize(new THREE.Vector3());
+    flame.userData.width = Math.max(1, Math.max(width.x, width.z) / 4);
     group.add(flame);
     this.scene.add(group);
     return group;
+  }
+
+  /**
+   * What a bought building looks like coming down: the packed vehicle it drives out as, or (a
+   * landing pad, which has none) the building itself at its real size. Null without a model.
+   */
+  private structureDeliveryBody(world: WorldState, structureTypeId: string): THREE.Object3D | null {
+    const packedId = packedUnitFor(world, structureTypeId);
+    if (packedId) {
+      const template = this.templateFor(packedId);
+      if (template) {
+        const body = template.clone(true);
+        body.scale.setScalar(world.unitTypes.get(packedId)?.visualScale ?? 1);
+        return body;
+      }
+    }
+    const type = world.structureTypes.get(structureTypeId);
+    const template = type?.modelId ? this.templates.get(type.modelId) : undefined;
+    if (!type || !template) {
+      return null;
+    }
+    const body = template.clone(true);
+    body.scale.setScalar(Math.max(type.footprint.cellsX, type.footprint.cellsZ) * world.map.cellSize * 0.96);
+    return body;
   }
 
   private disposeLandingVisual(group: THREE.Object3D): void {
@@ -2888,7 +3168,9 @@ export class RenderView {
       visual.rotation.y = -padFacing(pad);
       const flame = visual.getObjectByName('LandingFlame');
       if (flame) {
-        flame.scale.setScalar(Math.max(0.05, 1 - t * 0.8));
+        const fade = Math.max(0.05, 1 - t * 0.8);
+        const wide = (flame.userData.width as number | undefined) ?? 1;
+        flame.scale.set(fade * wide, fade, fade * wide);
         flame.visible = t < 0.98;
       }
     }
@@ -3178,34 +3460,33 @@ export class RenderView {
       live.add(unit.id);
       let spot = this.unpackSpots.get(unit.id);
       if (!spot) {
-        const size = Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize;
-        const geometry = new THREE.PlaneGeometry(size, size);
-        const material = new THREE.MeshBasicMaterial({
-          color: PLACEMENT_VALID_COLOR,
-          transparent: true,
-          opacity: 0.3,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
-        spot = new THREE.Mesh(geometry, material);
-        spot.rotation.x = -Math.PI / 2;
+        spot = this.makePlacementGhost(type);
         this.scene.add(spot);
         this.unpackSpots.set(unit.id, spot);
       }
-      spot.position.set(target.x, heightAt(this.world.map, target.x, target.z) + 0.08, target.z);
-      const material = spot.material;
-      if (material instanceof THREE.MeshBasicMaterial) {
-        material.opacity = selected.has(unit.id) ? 0.55 : 0.25;
+      spot.position.set(target.x, heightAt(this.world.map, target.x, target.z), target.z);
+      const picked = selected.has(unit.id);
+      // Selected: the building itself shows, see-through, where it will stand.
+      spot.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) {
+          return;
+        }
+        const material: unknown = object.material;
+        if (object.name === 'GhostPlate' && material instanceof THREE.MeshBasicMaterial) {
+          material.opacity = picked ? 0.9 : 0.45;
+        } else if (material instanceof THREE.MeshStandardMaterial) {
+          material.opacity = 0.42;
+          material.emissive.setHex(PLACEMENT_VALID_COLOR).multiplyScalar(0.25);
+        }
+      });
+      const model = spot.getObjectByName('GhostModel');
+      if (model) {
+        model.visible = picked;
       }
     }
     for (const [id, spot] of this.unpackSpots) {
       if (!live.has(id)) {
-        this.scene.remove(spot);
-        spot.geometry.dispose();
-        const material = spot.material;
-        if (material instanceof THREE.Material) {
-          material.dispose();
-        }
+        this.disposeGhost(spot);
         this.unpackSpots.delete(id);
       }
     }
@@ -3385,7 +3666,11 @@ export class RenderView {
         // the sim's path the same way.
         // A missile launcher fires the next loaded tube: its missile leaves from that tube.
         const tube = shooter && !airborne ? fireUnit(shooter.firing, shooter.parts, performance.now() / 1000) : null;
-        const muzzle = shooter && !airborne ? (tube ? this.tubePoint(shooter, tube) : this.muzzlePoint(shooter)) : null;
+        const muzzle = shooter && !airborne
+          ? (tube ? this.tubePoint(shooter, tube) : this.muzzlePoint(shooter))
+          : shooter
+            ? null
+            : this.structureMuzzle(projectile.shooterId);
         const offsetX = muzzle ? muzzle.x - projectile.x : 0;
         const offsetY = muzzle ? muzzle.y - projectile.y : airborne ? shooter.root.position.y - 0.25 - projectile.y : 0;
         const offsetZ = muzzle ? muzzle.z - projectile.z : 0;
@@ -3510,6 +3795,28 @@ export class RenderView {
     return box.isEmpty() ? tube.getWorldPosition(new THREE.Vector3()) : box.getCenter(new THREE.Vector3());
   }
 
+  /**
+   * A defence tower fired: its turret kicks back and the shot leaves from the barrel tip. Null for
+   * shooters that aren't aimed towers (the Shard fires from its heart), or before it is unfolded.
+   */
+  private structureMuzzle(structureId: number | undefined): THREE.Vector3 | null {
+    const visual = structureId === undefined ? undefined : this.structureVisuals.get(structureId);
+    const pivot = visual?.modelPivot;
+    if (!visual || !pivot || visual.core || this.structureFolding.has(structureId ?? -1)) {
+      return null;
+    }
+    if (visual.gun === undefined) {
+      visual.gun = measureGun(pivot);
+    }
+    const gun = visual.gun;
+    if (!gun) {
+      return null;
+    }
+    gun.recoil = 1;
+    pivot.updateWorldMatrix(true, false);
+    return pivot.localToWorld(gun.tip.clone());
+  }
+
   /** World position of a Shard structure's heart (its Core node), for the lance to start from. */
   private shardHeart(structureId: number | undefined): THREE.Vector3 | null {
     if (structureId === undefined) {
@@ -3563,7 +3870,9 @@ export class RenderView {
     const gy = heightAt(world.map, rubble.x, rubble.z);
     const width = Math.max(2, rubble.radius * 1.4);
     this.effects.structureDeath(rubble.x, gy, rubble.z, width, alien);
-    this.effects.addBurner(rubble.x, gy + 0.6, rubble.z, Math.min(2.5, width * 0.4), 8, 22);
+    this.makeRuin(rubble.x, gy, rubble.z, visual);
+    // Flames lick up from the top of the slumped ruin, small enough that its shape still shows.
+    this.effects.addBurner(rubble.x, gy + visual.height * 0.45, rubble.z, Math.min(1.6, width * 0.22), 8, 18);
   }
 
   private updateFlashes(): void {
@@ -3615,4 +3924,35 @@ function collectMuzzles(root: THREE.Object3D): THREE.Object3D[] {
     }
   });
   return found.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A tower turret's barrel tip and recoil distance, from its meshes in the pivot's own space. */
+function measureGun(pivot: THREE.Object3D): StructureGun | null {
+  pivot.updateWorldMatrix(true, true);
+  const toPivot = pivot.matrixWorld.clone().invert();
+  const box = new THREE.Box3();
+  const part = new THREE.Box3();
+  pivot.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || !object.visible) {
+      return;
+    }
+    const geometry = object.geometry as THREE.BufferGeometry;
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+    if (geometry.boundingBox) {
+      part.copy(geometry.boundingBox).applyMatrix4(object.matrixWorld).applyMatrix4(toPivot);
+      box.union(part);
+    }
+  });
+  if (box.isEmpty()) {
+    return null;
+  }
+  const length = box.max.x - box.min.x;
+  return {
+    base: pivot.position.clone(),
+    tip: new THREE.Vector3(box.max.x, box.min.y + (box.max.y - box.min.y) * 0.62, (box.min.z + box.max.z) / 2),
+    kick: length * 0.14,
+    recoil: 0,
+  };
 }

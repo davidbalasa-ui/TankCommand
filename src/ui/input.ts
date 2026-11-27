@@ -71,7 +71,14 @@ export interface InputHost {
   /** Tap on one of the player's own structures: opens its panel (pad: Build). */
   onOwnStructureTap?: (structure: StructureHit) => boolean;
   isPlacementActive?: () => boolean;
-  previewPlacement?: (x: number, z: number) => void;
+  /** Moves the structure being placed; `lifted` while a finger or the mouse is carrying it. */
+  previewPlacement?: (x: number, z: number, lifted?: boolean) => void;
+  /** Where the structure being placed stands now (its centre), or null when not placing. */
+  placementCentre?: () => { x: number; z: number } | null;
+  /** True when a screen point is on (or close to) the structure being placed. */
+  placementHit?: (clientX: number, clientY: number) => boolean;
+  confirmPlacement?: () => boolean;
+  cancelPlacement?: () => void;
 }
 
 interface PointerInfo {
@@ -124,6 +131,8 @@ export class InputController {
   private lastGroundPick: { x: number; z: number } | null = null;
   private lastIssued: IssuedCommand | null = null;
   private placementPointerId: number | null = null;
+  /** While carrying the structure: ghost centre minus the ground under the finger when it was picked up. */
+  private placementGrab: { dx: number; dz: number } | null = null;
   private disposed = false;
   /** Recent camera moves from dragging, to carry the pan on after the finger lifts. */
   private panSamples: Array<{ t: number; dx: number; dz: number }> = [];
@@ -279,13 +288,7 @@ export class InputController {
   };
 
   private readonly onPointerDown = (event: PointerEvent): void => {
-    if (this.host.isPlacementActive?.()) {
-      event.preventDefault();
-      this.placementPointerId = event.pointerId;
-      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
-      if (ground) {
-        this.host.previewPlacement?.(ground.x, ground.z);
-      }
+    if (this.host.isPlacementActive?.() && this.startPlacementDrag(event)) {
       return;
     }
     event.preventDefault();
@@ -321,7 +324,10 @@ export class InputController {
       if (this.pointers.size === 1) {
         info.downUnit = this.host.renderView.pickUnit(event.clientX, event.clientY, true, true);
         info.downGround = this.host.renderView.pickGround(event.clientX, event.clientY);
-        this.startLongPress();
+        if (!this.host.isPlacementActive?.()) {
+          // While placing, a held finger is just a slow pan or tap, never a box selection.
+          this.startLongPress();
+        }
       } else if (this.pointers.size === 2) {
         this.multiTouch = true;
         this.suppressSingleUntilAllUp = true;
@@ -345,11 +351,18 @@ export class InputController {
   private readonly onPointerMove = (event: PointerEvent): void => {
     if (this.placementPointerId === event.pointerId) {
       event.preventDefault();
-      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
-      if (ground) {
-        this.host.previewPlacement?.(ground.x, ground.z);
-      }
+      this.carryPlacement(event.clientX, event.clientY, true);
       return;
+    }
+    if (
+      event.pointerType === 'mouse' &&
+      event.buttons === 0 &&
+      this.pointers.size === 0 &&
+      this.host.isPlacementActive?.()
+    ) {
+      // With a mouse the building follows the cursor; a click puts it down.
+      this.placementGrab = null;
+      this.carryPlacement(event.clientX, event.clientY, false);
     }
     const info = this.pointers.get(event.pointerId);
     if (event.pointerType === 'mouse') {
@@ -436,9 +449,11 @@ export class InputController {
     if (this.placementPointerId === event.pointerId) {
       event.preventDefault();
       this.placementPointerId = null;
-      const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
-      if (ground) {
-        this.host.previewPlacement?.(ground.x, ground.z);
+      this.carryPlacement(event.clientX, event.clientY, false);
+      this.placementGrab = null;
+      if (event.pointerType === 'mouse' && event.type === 'pointerup') {
+        // A click (or a short drag) with the mouse puts the building down where it shows.
+        this.host.confirmPlacement?.();
       }
       return;
     }
@@ -478,7 +493,11 @@ export class InputController {
         this.panGrab = null;
         this.startFling();
       } else if (!this.longPressReady && total < TAP_MAX_MOVE && duration < TAP_MAX_MS) {
-        if (this.host.isSelectMode?.()) {
+        if (this.host.isPlacementActive?.()) {
+          // Placing: a tap on the ground moves the building there.
+          this.placementGrab = null;
+          this.carryPlacement(info.startX, info.startY, false);
+        } else if (this.host.isSelectMode?.()) {
           this.toggleTapped(info.startX, info.startY);
         } else {
           this.handleTap(info.startX, info.startY);
@@ -505,6 +524,10 @@ export class InputController {
     }
 
     if (info.button === 2 && !info.dragged && total < BOX_DRAG_THRESHOLD) {
+      if (this.host.isPlacementActive?.()) {
+        this.host.cancelPlacement?.();
+        return;
+      }
       this.handleOrder(info.startX, info.startY, event.shiftKey);
       return;
     }
@@ -516,6 +539,15 @@ export class InputController {
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const key = event.key.toLowerCase();
+    if (this.host.isPlacementActive?.() && (key === 'escape' || key === 'enter')) {
+      event.preventDefault();
+      if (key === 'escape') {
+        this.host.cancelPlacement?.();
+      } else {
+        this.host.confirmPlacement?.();
+      }
+      return;
+    }
     if (key >= '1' && key <= '9') {
       const group = Number(key);
       if (event.ctrlKey || event.metaKey) {
@@ -736,6 +768,53 @@ export class InputController {
       -(rightX * dx + forwardX * dy) * worldPerPixel,
       -(rightZ * dx + forwardZ * dy) * worldPerPixel,
     );
+  }
+
+  /**
+   * Placing a building. Touch: a finger that lands on the building picks it up and carries it
+   * (it keeps its place under the finger instead of jumping to it); a finger anywhere else pans,
+   * pinches and taps as usual, and a tap moves the building there. Mouse: the left button picks
+   * it up wherever the cursor is and puts it down on release. Returns true when it took the event.
+   */
+  private startPlacementDrag(event: PointerEvent): boolean {
+    if (event.pointerType === 'mouse') {
+      if (event.button !== 0 || event.altKey) {
+        return false;
+      }
+      event.preventDefault();
+      this.placementPointerId = event.pointerId;
+      this.placementGrab = null;
+      this.carryPlacement(event.clientX, event.clientY, true);
+      return true;
+    }
+    if (this.pointers.size > 0 || this.placementPointerId !== null) {
+      return false;
+    }
+    if (!(this.host.placementHit?.(event.clientX, event.clientY) ?? false)) {
+      return false;
+    }
+    event.preventDefault();
+    this.fling = null;
+    const ground = this.host.renderView.pickGround(event.clientX, event.clientY);
+    const centre = this.host.placementCentre?.() ?? null;
+    this.placementGrab = ground && centre ? { dx: centre.x - ground.x, dz: centre.z - ground.z } : null;
+    this.placementPointerId = event.pointerId;
+    try {
+      this.host.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is best-effort in synthetic environments.
+    }
+    this.carryPlacement(event.clientX, event.clientY, true);
+    return true;
+  }
+
+  private carryPlacement(clientX: number, clientY: number, lifted: boolean): void {
+    const ground = this.host.renderView.pickGround(clientX, clientY);
+    if (!ground) {
+      return;
+    }
+    const grab = this.placementGrab;
+    this.host.previewPlacement?.(ground.x + (grab?.dx ?? 0), ground.z + (grab?.dz ?? 0), lifted);
   }
 
   private startLongPress(): void {

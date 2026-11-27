@@ -156,6 +156,8 @@ interface PlacementState {
   x: number;
   z: number;
   valid: boolean;
+  /** Why it can't go here (placementValidity's reason), or null when it can. */
+  reason: string | null;
 }
 
 /**
@@ -1234,23 +1236,83 @@ export class App {
     if (!type) {
       return false;
     }
+    // Start where the player is looking (the nearest spot there that fits), so the building shows
+    // up on screen ready to drag, not somewhere off by the pad.
+    const view = this.renderView?.cameraInfo();
     const pad = this.ownPads()[0];
-    const x = pad ? pad.x + 8 : 0;
-    const z = pad ? pad.z - 8 : 0;
+    const around = view ? { x: view.targetX, z: view.targetZ } : pad ? { x: pad.x + 8, z: pad.z - 8 } : { x: 0, z: 0 };
+    const spot = this.nearestPlacementSpot(type, around.x, around.z) ?? around;
     this.placementState = {
       kitId,
       structureTypeId: type.id,
       name: type.name,
-      x,
-      z,
+      x: spot.x,
+      z: spot.z,
       valid: false,
+      reason: null,
     };
-    this.previewPlacement(x, z);
+    this.previewPlacement(spot.x, spot.z);
     this.hud?.refresh();
     return true;
   }
 
-  previewPlacement(x: number, z: number): void {
+  /** Snaps a building's centre so its footprint lines up with the map cells. */
+  private snapToCells(type: SimStructureType, x: number, z: number): { x: number; z: number } {
+    const cell = this.world.map.cellSize;
+    const snap = (value: number, cells: number): number => {
+      const offset = cells % 2 === 0 ? 0 : cell / 2;
+      return Math.round((value - offset) / cell) * cell + offset;
+    };
+    return { x: snap(x, type.footprint.cellsX), z: snap(z, type.footprint.cellsZ) };
+  }
+
+  /** The closest cell-aligned spot to (x, z), within a short search, where the building fits. */
+  private nearestPlacementSpot(type: SimStructureType, x: number, z: number): { x: number; z: number } | null {
+    const cell = this.world.map.cellSize;
+    let best: { x: number; z: number } | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let ring = 0; ring <= 12; ring += 1) {
+      for (let iz = -ring; iz <= ring; iz += 1) {
+        for (let ix = -ring; ix <= ring; ix += 1) {
+          if (Math.max(Math.abs(ix), Math.abs(iz)) !== ring) {
+            continue;
+          }
+          const spot = this.snapToCells(type, x + ix * cell * 2, z + iz * cell * 2);
+          const distance = Math.hypot(spot.x - x, spot.z - z);
+          if (distance < bestDistance && placementValidity(this.world, 1, type, spot.x, spot.z).valid) {
+            best = spot;
+            bestDistance = distance;
+          }
+        }
+      }
+      if (best) {
+        return best;
+      }
+    }
+    return null;
+  }
+
+  /** A screen point on, or within a finger's width of, the building being placed. */
+  private placementHit(clientX: number, clientY: number): boolean {
+    const placement = this.placementState;
+    const view = this.renderView;
+    const type = placement ? this.world.structureTypes.get(placement.structureTypeId) : undefined;
+    if (!placement || !view || !type) {
+      return false;
+    }
+    const half = (Math.max(type.footprint.cellsX, type.footprint.cellsZ) * this.world.map.cellSize) / 2;
+    const centre = view.worldToScreen(placement.x, placement.z);
+    const edge = view.worldToScreen(placement.x + half, placement.z);
+    const edge2 = view.worldToScreen(placement.x, placement.z + half);
+    const radius = Math.max(
+      Math.hypot(edge.x - centre.x, edge.y - centre.y),
+      Math.hypot(edge2.x - centre.x, edge2.y - centre.y),
+    );
+    // Generous: at least a fingertip (36 px) around even a small building, and its full footprint.
+    return Math.hypot(clientX - centre.x, clientY - centre.y) <= Math.max(36, radius * 1.25);
+  }
+
+  previewPlacement(x: number, z: number, lifted = false): void {
     const placement = this.placementState;
     if (!placement) {
       return;
@@ -1259,9 +1321,10 @@ export class App {
     if (!type) {
       return;
     }
-    const validity = placementValidity(this.world, 1, type, x, z);
-    let px = x;
-    let pz = z;
+    const snapped = this.snapToCells(type, x, z);
+    const validity = placementValidity(this.world, 1, type, snapped.x, snapped.z);
+    let px = snapped.x;
+    let pz = snapped.z;
     if (validity.valid && type.buildOnMetalDeposit && validity.depositId !== null) {
       const deposit = this.world.deposits.find((item) => item.id === validity.depositId);
       if (deposit) {
@@ -1269,8 +1332,18 @@ export class App {
         pz = deposit.z;
       }
     }
-    this.placementState = { ...placement, x: px, z: pz, valid: validity.valid };
-    this.renderView?.showPlacement(type.id, px, pz, validity.valid);
+    const changed = placement.valid !== validity.valid || placement.reason !== (validity.valid ? null : validity.reason);
+    this.placementState = {
+      ...placement,
+      x: px,
+      z: pz,
+      valid: validity.valid,
+      reason: validity.valid ? null : validity.reason,
+    };
+    this.renderView?.showPlacement(type.id, px, pz, validity.valid, lifted);
+    if (changed) {
+      this.hud?.refresh();
+    }
   }
 
   confirmPlacement(): boolean {
@@ -2058,8 +2131,18 @@ export class App {
           onAttackStructure: (structureId) => this.attackStructure(structureId),
           onOwnStructureTap: (structure) => this.hud?.openForStructure?.(structure) ?? false,
           isPlacementActive: () => this.placementState !== null,
-          previewPlacement: (x, z) => {
-            this.previewPlacement(x, z);
+          previewPlacement: (x, z, lifted) => {
+            this.previewPlacement(x, z, lifted);
+          },
+          placementCentre: () => (this.placementState ? { x: this.placementState.x, z: this.placementState.z } : null),
+          placementHit: (clientX, clientY) => this.placementHit(clientX, clientY),
+          confirmPlacement: () => {
+            const ok = this.confirmPlacement();
+            this.hud?.refresh();
+            return ok;
+          },
+          cancelPlacement: () => {
+            this.cancelPlacement();
           },
         });
         if (this.services) {
