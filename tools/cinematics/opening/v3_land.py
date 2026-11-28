@@ -247,9 +247,8 @@ def strip_running_gear(hero):
     for o in [hero] + list(hero.children_recursive):
         if o.type != 'MESH':
             continue
-        if o.name.startswith('Tread') or o.name.startswith('Flash'):
-            o.hide_render = True
-            o.keyframe_insert('hide_render', frame=1)
+        if o.name.startswith('Tread'):
+            o.data = bpy.data.meshes.new(o.name + 'Gone')       # removed (show() would un-hide it)
         elif o.name.startswith('Hull'):
             o.data = o.data.copy()
             bm = bmesh.new()
@@ -444,10 +443,13 @@ def build(draft=True):
         return SPEED * (F_HIT - F_ENTER) / FPS + SPEED / FPS * (t - t * t / (2 * T))
     frames = list(range(1, nf + 1))
     locs, quats = [], []
+    SHOTS = [F_ENTER + 12, F_ENTER + 28]          # it fires on the move, twin barrels in turn, as in the game
+    KICK = [0.0, 0.04, 0.03, 0.018, 0.009, 0.003]
     for f in frames:
-        x = x_enter + travel(f)
+        kick = sum(KICK[f - fs] for fs in SHOTS if 0 <= f - fs < len(KICK))
+        x = x_enter + travel(f) - kick * 6
         z = GR.height(x, ty) + detail(x, ty) * 0.3
-        q = Quaternion((0, 0, 1), 0.02 * math.sin(f * 0.07))
+        q = Quaternion((0, 0, 1), 0.02 * math.sin(f * 0.07)) @ Quaternion((0, 1, 0), -kick)
         q = q @ Quaternion((1, 0, 0), 0.012 * math.sin(f * 0.9) * (1 if f < F_HIT else 0))
         if f >= F_HIT:                        # the blow: bucks nose-up, lifts and slams back down
             t = (f - F_HIT) / FPS
@@ -469,6 +471,42 @@ def build(draft=True):
         SP.key_loc(piv, [(F_HIT + 2, p0), (F_HIT + 7, p0 + Vector((0, 0, 0.55))), (F_HIT + 14, p0 + Vector((-0.1, 0.08, 0.08)))], 'BEZIER')
         SP.key_rot(piv, [(F_HIT + 2, tuple(math.degrees(v) for v in r0)),
                          (F_HIT + 14, (math.degrees(r0.x) + 4, math.degrees(r0.y) - 3, math.degrees(r0.z) + 9))], 'BEZIER')
+    if piv:                                   # the turret tracks round onto its target before it fires
+        rz = math.degrees(r0.z)
+        rk = [(1, (math.degrees(r0.x), math.degrees(r0.y), rz - 16)), (F_ENTER - 4, (math.degrees(r0.x), math.degrees(r0.y), rz - 13)),
+              (SHOTS[0] - 2, (math.degrees(r0.x), math.degrees(r0.y), rz - 2)),
+              (SHOTS[1] + 6, (math.degrees(r0.x), math.degrees(r0.y), rz + 3))]
+        for f_, e_ in rk:
+            piv.rotation_euler = [math.radians(v) for v in e_]
+            piv.keyframe_insert('rotation_euler', frame=f_)
+    for i, fs in enumerate(SHOTS):
+        fl = GR.fire(tank, fs, 'LR'[i % 2], recoil=0.6, light=2.5e4)
+        bpy.context.scene.frame_set(fs)
+        bpy.context.view_layer.update()
+        mp = fl.matrix_world.translation.copy()
+        d = (fl.matrix_world.to_3x3() @ Vector((1, 0, 0))).normalized()
+        tg = mp + d * 260
+        trm = SP.emit(SP._uid('TankShotM'), (0.4, 0.85, 1.0), 9.0)
+        tr = C.uv_sphere(SP._uid('TankShot'), 1.0, seg=(8, 5), mat=trm, scale=(2.2, 0.22, 0.22))
+        tr.rotation_mode = 'QUATERNION'
+        tr.rotation_quaternion = d.to_track_quat('X', 'Z')
+        SP.key_loc(tr, [(fs, mp + d * 2.0), (fs + 12, tg)], 'LINEAR')
+        SP.show(tr, fs, fs + 12)
+        tr.visible_shadow = False
+        SP.boom(mp + d * 1.2, fs, 0.9, hot=(0.7, 0.95, 1.0), cool=(0.4, 0.4, 0.45), life=0.45, light=0)
+    # dead: its cyan running lights stutter and go out after the hit
+    hm = {}
+    for o in [tank] + list(tank.children_recursive):
+        if o.type == 'MESH':
+            for sl in o.material_slots:
+                m0 = sl.material
+                if m0 and m0.name not in ('TrackSteel', 'WheelSteel'):
+                    if m0.name not in hm:
+                        hm[m0.name] = m0.copy()
+                    sl.link = 'OBJECT'
+                    sl.material = hm[m0.name]
+    GR.key_emission(list(hm.values()), [(F_HIT, 1.0), (F_HIT + 3, 0.15), (F_HIT + 5, 0.9), (F_HIT + 9, 0.05),
+                                        (F_HIT + 12, 0.5), (F_HIT + 14, 0.0)])
     # links and wheels, both sides
     gear = []
     for side in (-1, 1):

@@ -35,9 +35,12 @@ def build(draft=True):
         if k == 'bship':
             V.key_rot(ob, [(1, (0, 0, 90)), (nf, (0, 0, 90))])     # still broadside after its turn
             continue
+        # v4 pass 3: the gold drives were a blown-out cream blob filling the frame; keep them to crackling
+        # bolts the length of the ship's stern
+        lk = 1.0 if terran else 0.55
         V.engines(ob, f'Eng{k}', BLUE if terran else GOLD, hot=(0.85, 0.95, 1.0) if terran else (1.0, 0.9, 0.7),
-                  thr_keys=[(1, 0.0), (fr(t0) - 1, 0.0), (fr(t0), 3.0), (fr(t0) + 4, 1.4), (nf, 1.6)],
-                  len_keys=[(1, 0.05), (fr(t0) - 1, 0.05), (fr(t0) + 3, 1.6), (fr(t0) + 10, 1.2), (nf, 1.4)])
+                  thr_keys=[(1, 0.0), (fr(t0) - 1, 0.0), (fr(t0), 3.0 if terran else 2.0), (fr(t0) + 4, 1.4), (nf, 1.6)],
+                  len_keys=[(1, 0.05), (fr(t0) - 1, 0.05), (fr(t0) + 3, 1.6 * lk), (fr(t0) + 10, 1.2 * lk), (nf, 1.4 * lk)])
     dw = R.world_at(R.obj['frigate'], (0, 0, 0), fr(T_IGN_T))
     sc.shot('A', 1, fr(2.6) - 1,
             [(1, Vector((-222, 38, 15)), Vector((-130, 62, 4)), 24),

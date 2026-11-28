@@ -22,11 +22,11 @@ FPS = 24
 # v4 cut (2026-11-27, David: "lacks intention and clarity", "a few more seconds per scene", "missing
 # acceleration, things move one speed", "landing looks rushed"). scene id: output seconds (film order).
 SCENES = [('s01', 11.0), ('s02', 10.0), ('s03', 6.0), ('s04', 9.0), ('s05', 9.0), ('s06', 7.5), ('s07', 9.0),
-          ('s08', 17.0), ('s10', 7.0), ('s11', 6.5), ('land', 10.0), ('s12', 15.0), ('s13', 12.5), ('s14', 8.0),
+          ('s08', 17.0), ('s10', 7.0), ('s11', 6.5), ('land', 10.0), ('s12', 19.0), ('s13', 12.5), ('s14', 8.0),
           ('s15', 13.0), ('s16', 11.0)]
 # each scene's own clock length in seconds (what its module animates)
 ORIG = {'s01': 8.0, 's02': 8.0, 's03': 3.0, 's04': 9.0, 's05': 9.0, 's06': 5.0, 's07': 6.0, 's08': 19.0,
-        's10': 5.0, 's11': 5.0, 'land': 10.0, 's12': 12.0, 's13': 10.0, 's14': 6.0, 's15': 13.0, 's16': 11.0}
+        's10': 5.0, 's11': 5.0, 'land': 10.0, 's12': 12.4, 's13': 10.0, 's14': 6.0, 's15': 13.0, 's16': 11.0}
 # scenes kept exactly as approved: frames come from their final mp4 (David's favourites s04, plus s05/s08)
 REUSE = {'s04': 'v3-final-s04.mp4', 's08': 'v3-s08-orb-pass4.mp4'}
 REUSE_UPTO = {'s08': 343}        # s08: approved up to the Orb's kill; its explosion is re-rendered (v4 pass 2)
@@ -34,6 +34,7 @@ REUSE_UPTO = {'s08': 343}        # s08: approved up to the Orb's kill; its explo
 # motion. Each scene: a slow build so the viewer can read what is there, the key moment slowed so it
 # lands, then a hold on the consequence.
 RETIME = {
+    's08': [(0, 0), (17.0, 17.0)],      # shortened by cutting the tail, not sped up
     # dawn and the portal opening read slowly; the ships come out at speed, the last ones ease past
     's01': [(0, 0), (4.2, 2.3), (5.2, 2.8), (9.4, 7.3), (11.0, 8.0)],
     # the three groups climb and converge; they brake into line (decelerate) and the shields come on slowly
@@ -48,7 +49,7 @@ RETIME = {
     's10': [(0, 0), (1.8, 1.1), (3.4, 2.5), (5.2, 3.6), (7.0, 5.0)],
     # pods fall, accelerating as the air thickens
     's11': [(0, 0), (2.5, 1.2), (5.0, 3.5), (6.5, 5.0)],
-    's12': [(0, 0), (3.0, 2.0), (6.5, 4.5), (10.0, 7.5), (12.5, 9.8), (15.0, 12.0)],
+    's12': [(0, 0), (5.5, 4.3), (7.0, 4.9), (10.5, 6.775), (14.0, 9.025), (16.5, 10.75), (19.0, 12.4)],
     # the ground splits slowly; the Shard heaves up (slow start, fast middle, slow settle)
     's13': [(0, 0), (3.5, 2.2), (6.0, 4.6), (9.0, 7.6), (12.5, 10.0)],
     's14': [(0, 0), (2.5, 1.4), (5.0, 3.8), (8.0, 6.0)],

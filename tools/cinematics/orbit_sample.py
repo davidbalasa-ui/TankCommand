@@ -398,6 +398,9 @@ def load_glb(path, length):
     bpy.ops.import_scene.gltf(filepath=path)
     new = [o for o in bpy.data.objects if o not in before]
     meshes = [o for o in new if o.type == 'MESH']
+    for o in [o for o in meshes if o.name.startswith('Flash')]:   # muzzle flashes are not part of the hull
+        meshes.remove(o)
+        bpy.data.objects.remove(o)
     for o in meshes:   # bake parenting into the mesh
         mw = o.matrix_world.copy()
         o.parent = None

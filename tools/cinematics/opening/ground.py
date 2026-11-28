@@ -251,6 +251,9 @@ def load_unit(rel, joined=True, mat_from=None):
             o.hide_render = True
         return root
     others = [o.name for o in new if o.type != 'MESH']
+    for o in [o for o in meshes if o.name.startswith('Flash')]:   # muzzle flash: never part of a static unit
+        meshes.remove(o)
+        bpy.data.objects.remove(o)
     for o in meshes:
         mw = o.matrix_world.copy()
         o.parent = None
@@ -284,7 +287,67 @@ def hero_unit(rel, name):
     c = SP.copy_tree(root, name)
     for o in [c] + list(c.children_recursive):
         o.hide_render = False
+    for o in c.children_recursive:          # muzzle flashes stay shut until the gun fires (see fire())
+        if o.name.startswith('Flash') and o.type == 'EMPTY':
+            o.scale = (0.001,) * 3
+            o.keyframe_insert('scale', frame=1)
     return c
+
+
+def gun_parts(root):
+    """{side: [[barrel pivots], flash pivot]} for a hero unit; side 'L'/'R', or '' for a single gun."""
+    out = {}
+    for o in root.children_recursive:
+        if o.type != 'EMPTY':
+            continue
+        nm = o.name.split('.')[0]
+        if nm.startswith('Barrel') and nm.endswith('Pivot'):
+            sd = nm[6] if nm[6] in 'LR' else ''
+            out.setdefault(sd, [[], None])[0].append(o)
+        elif nm.startswith('Flash') and nm.endswith('Pivot'):
+            sd = nm[5] if nm[5] in 'LR' else ''
+            out.setdefault(sd, [[], None])[1] = o
+    return out
+
+
+def fire(root, f, side='', recoil=0.55, light=None, col=(0.4, 0.85, 1.0)):
+    """One shot as in the game: the muzzle flash pops for two frames, the barrel snaps back and kicks up,
+    then eases home. Shots from one barrel need at least 8 frames between them. Returns the flash pivot."""
+    parts = gun_parts(root)
+    if side not in parts:
+        side = sorted(parts)[0]
+    barrels, flash = parts[side]
+    for k, b in enumerate(sorted(barrels, key=lambda o: o.name)):
+        if 'rest_x' not in b:
+            b.rotation_mode = 'XYZ'
+            b['rest_x'] = b.location.x
+            b['rest_ry'] = b.rotation_euler.y
+        x0, ry0 = b['rest_x'], b['rest_ry']
+        back = recoil * (0.45 + 0.55 * (k + 1) / max(1, len(barrels)))     # the tip slides furthest
+        for fk, dx, ry in ((f - 1, 0.0, 0.0), (f, -back, -0.05), (f + 2, -back * 0.8, -0.035), (f + 7, 0.0, 0.0)):
+            b.location.x = x0 + dx
+            b.keyframe_insert('location', index=0, frame=fk)
+            b.rotation_euler.y = ry0 + ry
+            b.keyframe_insert('rotation_euler', index=1, frame=fk)
+        b.location.x = x0
+        b.rotation_euler.y = ry0
+    if flash is not None:
+        for fk, s_ in ((f - 1, 0.001), (f, 1.35), (f + 1, 0.9), (f + 2, 0.001)):
+            flash.scale = (s_,) * 3
+            flash.keyframe_insert('scale', frame=fk)
+        SP._interp_where(flash, 'scale', 'CONSTANT')
+        flash.scale = (0.001,) * 3
+        if light:
+            L = bpy.data.objects.new(SP._uid('MuzzleL'), bpy.data.lights.new(SP._uid('MuzzleL'), 'POINT'))
+            SP.link(L)
+            L.parent = flash
+            L.data.color = col
+            L.data.shadow_soft_size = 0.4
+            for fk, e in ((1, 0), (f - 1, 0), (f, light), (f + 1, light * 0.4), (f + 3, 0)):
+                L.data.energy = e
+                L.data.keyframe_insert('energy', frame=fk)
+            SP.lin(L.data)
+    return flash
 
 
 def unit_material(tmpl):
@@ -458,44 +521,57 @@ class Ground:
         for o in [self.ds_src] + list(self.ds_src.children_recursive):
             o.hide_render = True
         self.drops = []
-        plan = [(0, T_LAND, Vector((-1250, 260, 520))), (2, T_LAND + 14, Vector((-1150, 330, 480))),
-                (4, T_LAND + 26, Vector((-1250, -300, 520))), (3, T_LAND + 38, Vector((-1350, 120, 560))),
-                (5, T_LAND + 50, Vector((-1300, 40, 500)))]
+        plan = [(0, T_LAND, Vector((-1250, 260, 520))), (2, T_LAND + 34, Vector((-1150, 330, 480))),
+                (4, T_LAND + 58, Vector((-1250, -300, 520))), (3, T_LAND + 80, Vector((-1350, 120, 560))),
+                (5, T_LAND + 100, Vector((-1300, 40, 500)))]
         for k, (pi, f_land, start) in enumerate(plan):
             ds = SP.copy_tree(self.ds_src, f'Drop{k}')
             for o in [ds] + list(ds.children_recursive):
                 o.hide_render = False
             padp = self.pads[pi]
             land = padp + Vector((0, 0, 2.05 * DS_K))
-            f0 = f_land - 50
-            keys = [(f0 - 30, start + (start - land) * 0.6), (f0, start), (f_land - 34, land + Vector((70, 0, 150))),
-                    (f_land - 22, land + Vector((12, 0, 52))), (f_land - 12, land + Vector((2, 0, 16))),
-                    (f_land - 4, land + Vector((0, 0, 3))), (f_land, land), (f_land + 3, land - Vector((0, 0, 0.35 * DS_K))),
-                    (f_land + 9, land), (G_END, land)]
-            frames = list(range(f0 - 30, G_END + 1))
+            # David 2026-11-28: it came down far too fast. Now it arrives at speed, lights its landing jets
+            # high up and brakes hard all the way down: ~4 s of visibly slowing descent, a gentle settle.
+            f0 = f_land - 125
+            fi = f_land - 102                                   # ignition
+            keys = [(f0 - 35, start + (start - land) * 0.6), (f0, start), (f_land - 100, land + Vector((150, 0, 260))),
+                    (f_land - 76, land + Vector((60, 0, 130))), (f_land - 52, land + Vector((18, 0, 58))),
+                    (f_land - 30, land + Vector((4, 0, 22))), (f_land - 13, land + Vector((0.5, 0, 6))),
+                    (f_land - 4, land + Vector((0, 0, 1.2))), (f_land, land),
+                    (f_land + 3, land - Vector((0, 0, 0.15 * DS_K))), (f_land + 9, land), (G_END, land)]
+            frames = list(range(f0 - 35, G_END + 1))
             locs = [catmull(keys, f) for f in frames]
             quats = []
             for i, f in enumerate(frames):
                 v = locs[min(i + 1, len(locs) - 1)] - locs[max(i - 1, 0)]
                 flat = Vector((v.x, v.y, 0))
                 yaw = math.atan2(flat.y, flat.x) if flat.length > 0.05 else 0.0
-                pitch = -math.atan2(v.z, max(flat.length, 1e-3)) * (1 - ramp(f, f_land - 40, f_land - 24))
-                pitch = max(-0.35, min(0.35, pitch)) - 0.12 * math.sin(math.pi * ramp(f, f_land - 40, f_land - 20))
-                yaw = yaw * (1 - ramp(f, f_land - 40, f_land - 20))
-                shake = 0.02 * math.sin(f * 2.3) * (1 - ramp(f, f_land, f_land + 3))
+                pitch = -math.atan2(v.z, max(flat.length, 1e-3)) * (1 - ramp(f, fi - 6, fi + 10))
+                pitch = max(-0.35, min(0.35, pitch))
+                # nose comes up as the jets bite (braking flare), levels off for the last metres
+                pitch -= 0.2 * ramp(f, fi - 4, fi + 12) * (1 - ramp(f, f_land - 40, f_land - 10))
+                yaw = yaw * (1 - ramp(f, fi, f_land - 40))
+                shake = (0.012 + 0.02 * ramp(f, fi, fi + 4) * (1 - ramp(f, fi + 4, fi + 30))) * \
+                    math.sin(f * 2.3) * (1 - ramp(f, f_land, f_land + 3))
                 quats.append(Quaternion((0, 0, 1), yaw) @ Quaternion((0, 1, 0), -pitch + shake))
             bake(ds, frames, locs, quats)
             ds.scale = (DS_K,) * 3
-            SP.show(ds, f0 - 30, G_END)
-            # landing thrusters: four blue jets under the stub-wing pods, burning for the last 1.2 s
+            SP.show(ds, f0 - 35, G_END)
+            # landing thrusters: four blue jets under the stub-wing pods; they light with a burst high up and
+            # burn hard, flickering, all the way down
             jm = SP.emit(f'JetM{k}', (0.45, 0.78, 1.0), 5.0)
             hm = V_soft('JetHalo', (0.3, 0.6, 1.0), 3.0)
+            jr = random.Random(3830 + k)
+            base_ks = [(fi - 2, 0.2), (fi + 2, 3.6), (fi + 8, 3.1), (f_land - 50, 2.9), (f_land - 20, 2.3),
+                       (f_land - 4, 1.5), (f_land + 4, 0.4), (f_land + 10, 0.02)]
+            ks = []
+            for f_ in range(fi - 2, f_land + 11, 2):
+                L_ = catmull([(a_, Vector((b_, 0, 0))) for a_, b_ in base_ks], f_).x
+                ks.append((f_, max(0.02, L_ * (jr.uniform(0.86, 1.1) if f_ < f_land + 4 else 1.0))))
             for (lx, ly) in ((-3.1, 3.2), (-3.1, -3.2), (1.5, 3.2), (1.5, -3.2)):
                 for nm, mat, wk in (('Core', jm, 1.0), ('Halo', hm, 2.4)):
                     j = C.uv_sphere(f'Jet{nm}{k}_{lx}_{ly}', 1.0, seg=(12, 6), mat=mat)
                     j.parent = ds
-                    ks = [(f_land - 40, 0.3), (f_land - 34, 2.6), (f_land - 12, 2.2), (f_land - 2, 1.2),
-                          (f_land + 4, 0.4), (f_land + 10, 0.02)]
                     for f_, L_ in ks:
                         w_ = 0.2 * wk * (0.6 + 0.4 * min(1.0, L_))
                         j.scale = (w_, w_, L_ * (1.0 if wk == 1.0 else 0.7))
@@ -503,15 +579,26 @@ class Ground:
                         j.keyframe_insert('scale', frame=f_)
                         j.keyframe_insert('location', frame=f_)
                     C.set_interp(j, 'LINEAR')
-                    SP.show(j, f_land - 40, f_land + 10)
+                    SP.show(j, fi - 2, f_land + 10)
                     j.visible_shadow = False
+            # their glow on the ground below as it comes down
+            JL = bpy.data.objects.new(f'JetLight{k}', bpy.data.lights.new(f'JetLight{k}', 'POINT'))
+            SP.link(JL)
+            JL.parent = ds
+            JL.location = (-0.8, 0, -5.0)
+            JL.data.color = (0.45, 0.75, 1.0)
+            JL.data.shadow_soft_size = 2.0
+            for f_, L_ in [(1, 0.0)] + ks:
+                JL.data.energy = 6e4 * min(L_, 3.0) / 3.0
+                JL.data.keyframe_insert('energy', frame=f_)
+            SP.lin(JL.data)
             # touchdown: shockwave ring + dust wall
             self.touchdown(land - Vector((0, 0, 2.05 * DS_K)), f_land, big=(k == 0))
             self.drops.append(ds)
         # Lancers rolling off the pads out of the dust (0:40)
         lt = load_unit('human/lancer')
         self.rollers = []
-        for k, (pi, dx) in enumerate([(0, 0), (1, 10), (0, -12), (2, 6)]):
+        for k, (pi, dx) in enumerate([(0, 0), (1, 10), (0, -12), (1, -6)]):
             p = self.pads[pi]
             o = instance(lt, f'Roller{k}')
             f0 = T_ROLL - 14 + 6 * k
@@ -541,7 +628,7 @@ class Ground:
             reach = rnd.uniform(38, 58) * (1.0 if big else 0.6)
             s0 = rnd.uniform(3, 5)
             s1 = rnd.uniform(8, 13) * (1.0 if big else 0.7)
-            fd = f - 10 + rnd.randint(0, 6)
+            fd = f - 22 + rnd.randint(0, 10)
             SP.key_loc(d, [(fd, p + v * 10 + Vector((0, 0, 3))), (fd + 14, p + v * reach * 0.7 + Vector((0, 0, 6))),
                            (fd + 60, p + v * reach + Vector((0, 0, 10)))], 'BEZIER')
             SP.key_scale(d, [(fd, (s0, s0, s0 * 0.6)), (fd + 14, (s1 * 0.8, s1 * 0.8, s1 * 0.45)),
@@ -639,11 +726,14 @@ class Ground:
                 ms = unit_material(t) + unit_material(load_unit(f'{fac}/{nm}'))
                 (self.lancer_mats if side < 0 else self.stinger_mats).extend(ms)
         self.units = {-1: [], 1: []}
-        frames = list(range(T_PODS - 30, G_END + 1, 2))
-        if frames[-1] != G_END:
-            frames.append(G_END)
-        bm = {-1: SP.emit('BeaconT', CYAN, 12.0), 1: SP.emit('BeaconA', GOLD, 12.0)}
+        self.fire_sched = {-1: [], 1: []}       # per unit: [(frame, muzzle world pos)]
+        self.kills = {-1: [], 1: []}            # (unit index, frame, world pos) of units destroyed in the clash
+        base_frames = list(range(T_PODS - 30, G_END + 1, 2))
+        if base_frames[-1] != G_END:
+            base_frames.append(G_END)
+        bm = {-1: SP.emit('BeaconT', CYAN, 4.0), 1: SP.emit('BeaconA', GOLD, 4.0)}
         self.beacon_mats = bm
+        KICK = [0.0, 0.42, 0.33, 0.22, 0.12, 0.05, 0.0]       # recoil shove after a shot, metres
         for side in (-1, 1):
             for row in range(4):
                 for j in range(52):
@@ -656,30 +746,67 @@ class Ground:
                     o = instance(tm, f'{"Lan" if side < 0 else "Sti"}{row}_{j}')
                     ph = rnd.uniform(0, 6.3)
                     lag = rnd.uniform(-5, 5)
-                    locs, quats = [], []
-                    for f in frames:
-                        x = self.front_x(side, f) + side * (back + lag)
-                        yy = y + 2.0 * math.sin(f * 0.02 + ph)
+                    # destroyed in the clash? (front rows, away from the hero's lane)
+                    f_kill = None
+                    if row < 2 and abs(y - HERO_Y) > 30 and rnd.random() < 0.09:
+                        f_kill = rnd.randint(T_FIRE + 8, T_SPLIT - 6)
+                    # its own fire rhythm: each kind of gun keeps its own beat
+                    period = {0: 30, 1: 38, 2: 46, 3: 56}[mix[side].index(tm) % 4] + rnd.randint(-3, 3)
+                    shots = []
+                    if rnd.random() < (0.95 if row < 2 else 0.5):
+                        f = T_FIRE + rnd.randint(0, period)
+                        while f < T_SPLIT + 2 and (f_kill is None or f < f_kill - 3):
+                            if f < T_SPREAD + 6 or rnd.random() < 0.5:
+                                shots.append(f)
+                            f += period + rnd.randint(-4, 4)
+
+                    def pose(f):
+                        fd = min(f, f_kill) if f_kill else f           # a dead unit stops where it died
+                        x = self.front_x(side, fd) + side * (back + lag)
+                        yy = y + 2.0 * math.sin(fd * 0.02 + ph)
                         z = self.zat(x, yy)
                         if side > 0:
-                            hover = 1.6 + 0.4 * math.sin(f * 0.13 + ph)
+                            hover = 1.6 + 0.4 * math.sin(fd * 0.13 + ph)
                             drop = ramp(f, T_STRIKE_A + int(abs(x) / 30) + 2, T_STRIKE_A + int(abs(x) / 30) + 10)
+                            if f_kill and f >= f_kill:
+                                drop = ramp(f, f_kill, f_kill + 8)      # its hover dies, it drops
                             z += hover * (1 - drop) - 0.3 * drop
-                        locs.append(Vector((x, yy, z)))
                         brake = ramp(f, T_SPLIT - 2, T_SPLIT + 4) * math.sin(math.pi * ramp(f, T_SPLIT - 2, T_SPLIT + 10))
                         tilt = (0.06 * brake) * (-side)
                         if side > 0:
                             tilt += 0.12 * ramp(f, T_STRIKE_A + 2, T_STRIKE_A + 12) * math.sin(ph)
+                        roll = 0.0
+                        if f_kill and f >= f_kill:                     # knocked askew by the hit
+                            tilt = 0.10 * math.sin(ph * 3) * ramp(f, f_kill, f_kill + 6)
+                            roll = 0.14 * math.cos(ph * 5) * ramp(f, f_kill, f_kill + 6)
+                        sx = 0.0
+                        for fs in shots:
+                            if 0 <= f - fs < len(KICK):
+                                sx = KICK[f - fs]
+                                tilt -= 0.05 * sx / 0.42                  # nose kicks up
+                        x += side * sx                                    # shoved back along its own axis
                         yaw = 0.0 if side < 0 else math.pi
-                        quats.append(Quaternion((0, 0, 1), yaw) @ Quaternion((0, 1, 0), tilt))
-                    bake(o, frames, locs, quats)
+                        q = Quaternion((0, 0, 1), yaw) @ Quaternion((0, 1, 0), tilt) @ Quaternion((1, 0, 0), roll)
+                        return Vector((x, yy, z)), q
+                    fset = set(base_frames)
+                    for fs in shots:
+                        fset.update(range(fs - 1, fs + len(KICK)))
+                    if f_kill:
+                        fset.update(range(f_kill - 1, f_kill + 8))
+                    frames = sorted(fset)
+                    pq = [pose(f) for f in frames]
+                    bake(o, frames, [p for p, q in pq], [q for p, q in pq])
                     SP.show(o, T_PODS - 30, G_END)
                     # running light, so a line of hundreds reads as a line of cyan or gold lights from afar
-                    bc = C.uv_sphere(f'Beacon{side}_{row}_{j}', 0.55, seg=(8, 4), mat=bm[side])
+                    bc = C.uv_sphere(f'Beacon{side}_{row}_{j}', 0.38, seg=(8, 4), mat=bm[side])
                     bc.parent = o
                     bc.location = (-1.0, 0, 3.4) if side < 0 else (-0.5, 0, 1.6)
                     bc.visible_shadow = False
-                    SP.show(bc, T_PODS - 30, G_END)
+                    SP.show(bc, T_PODS - 30, f_kill or G_END)
+                    mz = Vector((5, 0, 2.6)) if side < 0 else Vector((-5, 0, 2.2))
+                    self.fire_sched[side].append([(fs, pose(fs)[0] + mz) for fs in shots])
+                    if f_kill:
+                        self.kills[side].append((len(self.units[side]), f_kill, pose(f_kill)[0]))
                     self.units[side].append(o)
 
     # ------------------------------------------------------------ our Lancer, its neighbour, its kill
@@ -689,15 +816,31 @@ class Ground:
 
     def hero(self):
         h = hero_unit('human/lancer', 'HeroLancer')
+        fk = fr(45.6)
+        # it fires as in the game: twin barrels in turn, each shot kicking the hull (kill shot at fk - 4)
+        hshots = [f for f in range(T_FIRE + 4, T_SPLIT - 4, 9) if abs(f - (fk - 4)) >= 9] + [fk - 4]
+        hshots.sort()
+        KICK = [0.0, 0.035, 0.026, 0.016, 0.008, 0.003]
         frames = list(range(T_PODS - 30, G_END + 1))
-        locs = [self.hero_path(f) for f in frames]
-        quats = []
+        locs, quats = [], []
         for f in frames:
             jolt = 0.025 * math.sin(f * 1.9) * (1 - ramp(f, T_SPLIT, T_SPLIT + 6))
             brake = 0.07 * math.sin(math.pi * ramp(f, T_SPLIT - 2, T_SPLIT + 10))
-            quats.append(Quaternion((0, 1, 0), jolt + brake))
+            kick = sum(KICK[f - fs] for fs in hshots if 0 <= f - fs < len(KICK))
+            locs.append(self.hero_path(f) - Vector((kick * 9, 0, 0)))
+            quats.append(Quaternion((0, 1, 0), jolt + brake - kick))
         bake(h, frames, locs, quats)
         self.hero_obj = h
+        rs = random.Random(3811)
+        for i, fs in enumerate(hshots):
+            fl = fire(h, fs, 'LR'[i % 2], recoil=0.6, light=3e4 if fs == fk - 4 else 1.2e4)
+            if fs == fk - 4:
+                continue                            # the kill shot's tracer is drawn below
+            bpy.context.scene.frame_set(fs)
+            mp = fl.matrix_world.translation.copy()
+            tg = self.hero_path(fs) + Vector((rs.uniform(70, 130), rs.uniform(-25, 25), 2.0))
+            tg.z = self.zat(tg.x, tg.y) + 1.5
+            self.shot(mp, tg, fs, fs + max(3, int((tg - mp).length / 22)), CYAN, width=0.35)
         piv = next((o for o in h.children_recursive if o.name.startswith('TurretPivot')), None)
         if piv:
             piv.rotation_mode = 'XYZ'
@@ -730,15 +873,15 @@ class Ground:
         self.shot(Vector((60, 20, 3)), hp, f_hit - 5, f_hit, GOLD)
         # our Lancer kills a Stinger at close range (0:45.5)
         st = instance(load_unit('alien/stinger'), 'KillSting')
-        fk = fr(45.6)
         sp0 = Vector((22, HERO_Y + 10, 0))
         frames2 = list(range(T_PODS, fk + 1))
         sl = [Vector((sp0.x - 0.6 * (f - T_MEET) / 2, sp0.y, self.zat(sp0.x, sp0.y) + 1.8)) for f in frames2]
         bake(st, frames2, sl, [Quaternion((0, 0, 1), math.pi)] * len(frames2))
         SP.show(st, T_PODS, fk)
-        muzzle = self.hero_path(fk - 4) + Vector((7.0, 0, 2.6))
+        bpy.context.scene.frame_set(fk - 4)
+        fl = gun_parts(h)['R' if hshots.index(fk - 4) % 2 else 'L'][1]
+        muzzle = fl.matrix_world.translation.copy()
         self.shot(muzzle, sl[-1] + Vector((0, 0, 1.5)), fk - 4, fk, CYAN, width=0.35)
-        SP.blue_boom(muzzle, fk - 4, 2.5, life=0.25, light=4e4)
         SP.gold_boom(sl[-1] + Vector((0, 0, 1.5)), fk, 9.0, life=1.1, light=1.5e5)
         SP.shards(sl[-1] + Vector((0, 0, 1.5)), fk, 24, GOLD, 0.6, 30, seed=3810, life=1.0, strength=5.0)
 
@@ -746,7 +889,7 @@ class Ground:
     def shot(self, p0, p1, f0, f1, col, width=0.25, name=None):
         m = self._shot_mat(col)
         d = p1 - p0
-        o = C.uv_sphere(name or SP._uid('Shot'), 1.0, seg=(8, 5), mat=m, scale=(3.0, width * 0.7, width * 0.7))
+        o = C.uv_sphere(name or SP._uid('Shot'), 1.0, seg=(8, 5), mat=m, scale=(3.2, width * 0.3, width * 0.3))
         o.rotation_mode = 'QUATERNION'
         o.rotation_quaternion = look_quat(d)
         SP.key_loc(o, [(f0, p0), (f1, p1)], 'LINEAR')
@@ -781,25 +924,56 @@ class Ground:
 
         def near(f):
             return min(keys, key=lambda k: abs(k - f))
+        dead = {sd: {i: fk for i, fk, _ in self.kills[sd]} for sd in (-1, 1)}
+
+        def target(sd, f):
+            alive = [i for i in range(len(self.units[sd])) if dead[sd].get(i, 10 ** 6) > f + 4]
+            return (posT if sd < 0 else posA)[near(f)][rnd.choice(alive)]
+        fm = {-1: SP.emit('MuzzleT', (0.4, 0.85, 1.0), 14.0), 1: SP.emit('MuzzleA', (1.0, 0.7, 0.3), 14.0)}
         n = 0
-        for f in range(T_FIRE, T_SPLIT + 6):
-            rate = 6 if f < T_SPREAD + 6 else (3 if f < T_SPLIT else 1)
-            for _ in range(rate):
-                if rnd.random() < 0.5:
-                    a = posT[near(f)][rnd.randrange(nT)] + Vector((5, 0, 2.6))
-                    b = posA[near(f + 7)][rnd.randrange(nA)] + Vector((0, 0, 1.6)) + \
-                        Vector((rnd.uniform(-6, 6), rnd.uniform(-6, 6), 0))
-                    col = CYAN
-                else:
-                    a = posA[near(f)][rnd.randrange(nA)] + Vector((-5, 0, 2.2))
-                    b = posT[near(f + 7)][rnd.randrange(nT)] + Vector((0, 0, 1.5)) + \
-                        Vector((rnd.uniform(-6, 6), rnd.uniform(-6, 6), 0))
-                    col = GOLD
-                fl = max(4, int((b - a).length / 22))
-                self.shot(a, b, f, f + fl, col, width=0.45, name=f'Gun{n}')
-                n += 1
+        # every shot comes from a live unit on its own beat (armies() keeps the schedule and the recoil)
+        for side in (-1, 1):
+            col = CYAN if side < 0 else GOLD
+            for shots in self.fire_sched[side]:
+                for f, a in shots:
+                    b = target(-side, f + 7) + Vector((0, 0, 1.6)) + Vector((rnd.uniform(-6, 6), rnd.uniform(-6, 6), 0))
+                    fl = max(4, int((b - a).length / 22))
+                    self.shot(a, b, f + 1, f + 1 + fl, col, width=0.45, name=f'Gun{n}')
+                    d = (b - a).normalized()
+                    mf = C.uv_sphere(f'Muzzle{n}', 1.0, seg=(12, 8), mat=fm[side])
+                    mf.rotation_mode = 'QUATERNION'
+                    mf.rotation_quaternion = look_quat(d)
+                    mf.location = a + d * 0.5
+                    SP.key_scale(mf, [(f, (1.1, 0.38, 0.38)), (f + 1, (0.6, 0.22, 0.22))], 'CONSTANT')
+                    SP.show(mf, f, f + 1)
+                    mf.visible_shadow = False
+                    n += 1
+        # units destroyed in the clash: a hit, a burst, then a burning wreck that never fires again
+        fire_m = SP.gas_fireball_mat('WreckFire', (1.0, 0.5, 0.1), (0.4, 0.05, 0.01))
+        C.key_value(fire_m, 'S', 1, 3.0)
+        C.key_value(fire_m, 'V', 1, 1.0)
+        for side in (-1, 1):
+            for k, (i, fk, p) in enumerate(self.kills[side]):
+                hp = p + Vector((0, 0, 2.0))
+                (SP.gold_boom if side < 0 else SP.blue_boom)(hp, fk, rnd.uniform(5, 7), life=1.0,
+                                                              light=8e4 if k % 2 == 0 else 0, seed=3900 + k)
+                SP.shards(hp, fk, 12, PINK if side < 0 else (0.6, 0.85, 1.0), 0.4, 18, seed=3940 + k, life=1.0,
+                          strength=2.5)
+                fo = C.uv_sphere(SP._uid('WreckFire'), 1.0, seg=(12, 8), mat=fire_m, scale=(1.3, 1.3, 1.6))
+                fo.location = p + Vector((0, 0, 2.6))
+                SP.show(fo, fk + 2, G_END)
+                fo.visible_shadow = False
+                for q in range(3):                      # dark smoke rolling up off it
+                    f0 = fk + 4 + q * 9
+                    dm = dust_mat(SP._uid('WreckSmokeM'), col=(0.07, 0.06, 0.06))
+                    sm = C.uv_sphere(SP._uid('WreckSmoke'), 1.0, seg=(14, 9), mat=dm)
+                    SP.key_loc(sm, [(f0, p + Vector((0, 0, 3))), (f0 + 50, p + Vector((-4, 2, 16)))], 'BEZIER')
+                    SP.key_scale(sm, [(f0, (1.2,) * 3), (f0 + 50, (5.5, 5.5, 4.5))], 'BEZIER')
+                    SP.key_node(dm, 'V', [(f0, 0.9), (f0 + 30, 0.6), (f0 + 50, 0.0)])
+                    SP.show(sm, f0, f0 + 50)
+                    sm.visible_shadow = False
         # blasts along the meeting zone, dirt and crystal shards
-        for k in range(46):
+        for k in range(30):
             f = rnd.randint(T_FIRE + 6, T_SPLIT - 2)
             side = rnd.choice((-1, 1))
             x = self.front_x(side, f) + side * rnd.uniform(-10, 60)
@@ -1040,10 +1214,12 @@ class Ground:
         if sid == '08b':
             ds = self.drops[0]
             keys = []
-            for f in range(fr(38), fr(39), 2):
+            for f in range(fr(34.6), fr(39), 2):
                 sc.frame_set(f)
                 p = ds.matrix_world.translation.copy()
-                keys.append((f, p + Vector((30, -62, -16)) * (1.0 - 0.2 * ramp(f, fr(38), fr(39))), p + Vector((10, 0, -6)), 28))
+                c = ramp(f, fr(34.6), fr(39))
+                keys.append((f, p + Vector((30, -62, -16)) * (1.25 - 0.45 * c), p + Vector((10, 0, -6 - 4 * (1 - c))),
+                             30 - 2 * c))
             keys.append((fr(39) - 1,) + keys[-1][1:])
             return keys
         if sid == '09a':

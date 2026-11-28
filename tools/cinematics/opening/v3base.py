@@ -259,6 +259,13 @@ def engines(ob, name, col, hot=(0.85, 0.95, 1.0), n=None, length=None, r=None, t
         for nm, mat, rr, ll in (('Mant', mant, r, length), ('Core', core, r * 0.45, length * 0.45),
                                 ('Halo', mant, r * 1.5, length * 0.3)):
             o = C.uv_sphere(f'{name}{nm}{i}', 1.0, seg=(20, 10), mat=mat, scale=(ll / 2, rr, rr))
+            if nm != 'Halo':           # v4 pass 3: a plume tapers away from the nozzle (was a fat egg)
+                o.data = o.data.copy()
+                for v in o.data.vertices:
+                    if v.co.x < 0.3:
+                        t = (0.3 - v.co.x) / 1.3
+                        v.co.y *= 1.0 - 0.8 * t
+                        v.co.z *= 1.0 - 0.8 * t
             o.parent = ob
             o.location = (x0 - ll / 2 + r * 0.3, y, cz)
             o.visible_shadow = False
