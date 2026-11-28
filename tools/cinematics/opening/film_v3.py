@@ -22,13 +22,14 @@ FPS = 24
 # v4 cut (2026-11-27, David: "lacks intention and clarity", "a few more seconds per scene", "missing
 # acceleration, things move one speed", "landing looks rushed"). scene id: output seconds (film order).
 SCENES = [('s01', 11.0), ('s02', 10.0), ('s03', 6.0), ('s04', 9.0), ('s05', 9.0), ('s06', 7.5), ('s07', 9.0),
-          ('s08', 19.0), ('s10', 7.0), ('s11', 6.5), ('land', 10.0), ('s12', 15.0), ('s13', 12.5), ('s14', 8.0),
-          ('s15', 8.0), ('s16', 9.0)]
+          ('s08', 17.0), ('s10', 7.0), ('s11', 6.5), ('land', 10.0), ('s12', 15.0), ('s13', 12.5), ('s14', 8.0),
+          ('s15', 13.0), ('s16', 11.0)]
 # each scene's own clock length in seconds (what its module animates)
 ORIG = {'s01': 8.0, 's02': 8.0, 's03': 3.0, 's04': 9.0, 's05': 9.0, 's06': 5.0, 's07': 6.0, 's08': 19.0,
-        's10': 5.0, 's11': 5.0, 'land': 10.0, 's12': 12.0, 's13': 10.0, 's14': 6.0, 's15': 5.0, 's16': 5.0}
+        's10': 5.0, 's11': 5.0, 'land': 10.0, 's12': 12.0, 's13': 10.0, 's14': 6.0, 's15': 13.0, 's16': 11.0}
 # scenes kept exactly as approved: frames come from their final mp4 (David's favourites s04, plus s05/s08)
-REUSE = {'s04': 'v3-final-s04.mp4', 's05': 'v3-final-s05.mp4', 's08': 'v3-s08-orb-pass4.mp4'}
+REUSE = {'s04': 'v3-final-s04.mp4', 's08': 'v3-s08-orb-pass4.mp4'}
+REUSE_UPTO = {'s08': 343}        # s08: approved up to the Orb's kill; its explosion is re-rendered (v4 pass 2)
 # eased retimes: (output second, scene-clock second) knots, monotone cubic between them. Slope < 1 is slow
 # motion. Each scene: a slow build so the viewer can read what is there, the key moment slowed so it
 # lands, then a hold on the consequence.
@@ -51,10 +52,6 @@ RETIME = {
     # the ground splits slowly; the Shard heaves up (slow start, fast middle, slow settle)
     's13': [(0, 0), (3.5, 2.2), (6.0, 4.6), (9.0, 7.6), (12.5, 10.0)],
     's14': [(0, 0), (2.5, 1.4), (5.0, 3.8), (8.0, 6.0)],
-    # beams rise, slowed at the moment they cut the fleets
-    's15': [(0, 0), (2.0, 1.4), (5.5, 3.4), (8.0, 5.0)],
-    # survivors flee, then a long last hold
-    's16': [(0, 0), (4.0, 2.8), (6.5, 4.4), (9.0, 5.0)],
 }
 # fades baked into frames at stitch time: scene -> [(kind, seconds)]
 FADES = {'s11': [('out_white', 0.6)], 'land': [('in_white', 0.8)]}
@@ -186,12 +183,16 @@ def extract_reuse(out, quality):
     w, h = QUALITY[quality]['res']
     for scene, mp4 in REUSE.items():
         d = os.path.join(out, quality, VER, f'{scene}_R')
-        if os.path.isdir(d) and len(os.listdir(d)) >= out_frames(scene):
+        if os.path.isdir(d) and len(os.listdir(d)) >= min(out_frames(scene), REUSE_UPTO.get(scene, 10 ** 6)):
             continue
         os.makedirs(d, exist_ok=True)
         subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-i', os.path.join(REUSE_DIR, mp4),
                                '-vf', f'scale={w}:{h}:flags=lanczos', '-start_number', '1',
                                os.path.join(d, 'f_%04d.png')])
+        for f in range(REUSE_UPTO.get(scene, 10 ** 6) + 1, 10 ** 4):
+            p = os.path.join(d, f'f_{f:04d}.png')
+            if os.path.exists(p):
+                os.remove(p)
 
 
 def stitch(out, quality='draft', crf=24):

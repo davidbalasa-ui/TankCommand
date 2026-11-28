@@ -279,15 +279,59 @@ def build(draft=True):
             o.hide_render = True
             o.keyframe_insert('hide_render', frame=fr(T_DIE))
             SP._interp_where(o, 'hide_render', 'CONSTANT')
-    rig.keyframe_insert('scale', frame=fr(T_DIE))
-    rig.scale = (ORB_K * 1.8, ORB_K * 1.8, ORB_K * 1.8)
-    rig.keyframe_insert('scale', frame=fr(T_DIE) + 30)
+    # v4 (David 2026-11-28: the explosion needed work): the core flashes white-gold, fire races out along
+    # every arm in a chain of blasts, gold lightning discharges outward, a shock ring spreads, and the
+    # body is consumed: the burning pieces fly apart instead of the old swelling puff
+    f_d = fr(T_DIE)
+    rig.keyframe_insert('scale', frame=f_d)
+    rig.scale = (ORB_K * 1.35, ORB_K * 1.35, ORB_K * 1.35)
+    rig.keyframe_insert('scale', frame=f_d + 8)
     for x in [orb] + list(orb.children_recursive):
         x.hide_render = False
         x.keyframe_insert('hide_render', frame=1) if 'Plume' not in x.name and 'Core' not in x.name else None
         x.hide_render = True
-        x.keyframe_insert('hide_render', frame=fr(T_DIE) + 31)
+        x.keyframe_insert('hide_render', frame=f_d + 9)
         SP._interp_where(x, 'hide_render', 'CONSTANT')
+    sc_.frame_set(f_d)
+    bpy.context.view_layer.update()
+    segs = [o for o in orb.children_recursive if o.type == 'MESH' and 'Plume' not in o.name and 'Core' not in o.name]
+    pts = []
+    for o in segs:
+        bb = [o.matrix_world @ Vector(b) for b in o.bound_box]
+        pts.append(sum(bb, Vector()) / 8)
+    sc_.frame_set(1)
+    rnd_d = random.Random(91)
+    reach = max([(q - pd).length for q in pts] + [1.0])
+    flash = V.C.uv_sphere('OrbFlash', 1.0, seg=(24, 12), mat=V.soft_glow('OrbFlashM', (1.0, 0.9, 0.65), 18.0, 1.6))
+    flash.location = pd
+    flash.visible_shadow = False
+    key_scale(flash, [(f_d - 1, 0.5), (f_d + 1, reach * 0.5), (f_d + 4, reach * 0.8), (f_d + 9, 0.2)])
+    show(flash, f_d - 1, f_d + 9)
+    chain = sorted(rnd_d.sample(pts, min(16, len(pts))), key=lambda q: (q - pd).length)
+    for i, q in enumerate(chain):
+        fq = f_d + 1 + int(8 * (q - pd).length / reach)
+        out = (q - pd).normalized() if (q - pd).length > 1e-3 else Vector((0, 0, 1))
+        SP.gold_boom(q, fq, rnd_d.uniform(2.5, 4.5), life=1.2, follow=out * rnd_d.uniform(6, 12), seed=200 + i)
+    for j in range(8):                     # burning pieces flung outward, trailing fire and smoke
+        out = Vector((rnd_d.gauss(0, 1), rnd_d.gauss(0, 1), rnd_d.gauss(0, 0.6))).normalized()
+        p1 = pd + out * reach * rnd_d.uniform(1.6, 2.6)
+        for k_ in range(5):
+            f_ = f_d + 4 + k_ * 6
+            q = pd.lerp(p1, (k_ + 1) / 5.5)
+            SP.boom(q, f_, 1.6 - k_ * 0.2, life=0.9, seed=300 + j * 7 + k_)
+    SP.flicker_lightning([(pd, pd + Vector((rnd_d.gauss(0, 1), rnd_d.gauss(0, 1), rnd_d.gauss(0, 0.7))).normalized()
+                           * reach * rnd_d.uniform(1.0, 1.7)) for _ in range(7)], 92, f_d, f_d + 16, every=1,
+                         width=0.35, name='OrbDischarge', zone_col=(1.0, 0.75, 0.3), strength=8.0)
+    rm = V.soft_glow('OrbShockM', (1.0, 0.8, 0.45), 1.2, 4.0)
+    SP.add_fade(rm, 'vis', 1.0)
+    ring = V.C.uv_sphere('OrbShock', 1.0, seg=(48, 8), mat=rm, scale=(1, 1, 0.06))
+    ring.location = pd
+    ring.rotation_euler = (math.radians(70), 0, math.radians(30))
+    ring.visible_shadow = False
+    key_scale(ring, [(f_d, (1, 1, 0.06)), (f_d + 14, (reach * 3.0, reach * 3.0, 0.4))])
+    SP.key_node(rm, 'vis', [(f_d, 1.0), (f_d + 14, 0.0)])
+    show(ring, f_d, f_d + 14)
+    SP.shards(pd, f_d + 2, 60, (1.0, 0.6, 0.2), 1.6, 38, seed=79, life=3.0, kind='hex', strength=6.0)
     # ---------------------------------------------------------------- cameras
     def cam_follow(ob, t, off, look_off=Vector((0, 0, 0))):
         p = at(ob, t)

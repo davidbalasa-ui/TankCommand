@@ -214,6 +214,11 @@ def dust_mat(name, col=(0.55, 0.45, 0.38)):
     return m
 
 
+def V_soft(name, col, k):
+    import v3base
+    return v3base.soft_glow(name, col, k, 2.0)
+
+
 # ================================================================== loading game units
 _unit_cache = {}
 
@@ -463,8 +468,10 @@ class Ground:
             padp = self.pads[pi]
             land = padp + Vector((0, 0, 2.05 * DS_K))
             f0 = f_land - 50
-            keys = [(f0 - 30, start + (start - land) * 0.6), (f0, start), (f_land - 14, land + Vector((60, 0, 120))),
-                    (f_land - 5, land + Vector((8, 0, 14))), (f_land, land), (G_END, land)]
+            keys = [(f0 - 30, start + (start - land) * 0.6), (f0, start), (f_land - 34, land + Vector((70, 0, 150))),
+                    (f_land - 22, land + Vector((12, 0, 52))), (f_land - 12, land + Vector((2, 0, 16))),
+                    (f_land - 4, land + Vector((0, 0, 3))), (f_land, land), (f_land + 3, land - Vector((0, 0, 0.35 * DS_K))),
+                    (f_land + 9, land), (G_END, land)]
             frames = list(range(f0 - 30, G_END + 1))
             locs = [catmull(keys, f) for f in frames]
             quats = []
@@ -472,25 +479,32 @@ class Ground:
                 v = locs[min(i + 1, len(locs) - 1)] - locs[max(i - 1, 0)]
                 flat = Vector((v.x, v.y, 0))
                 yaw = math.atan2(flat.y, flat.x) if flat.length > 0.05 else 0.0
-                pitch = -math.atan2(v.z, max(flat.length, 1e-3)) * (1 - ramp(f, f_land - 16, f_land - 4))
-                pitch = max(-0.7, min(0.7, pitch))
-                yaw = yaw * (1 - ramp(f, f_land - 16, f_land - 2))
+                pitch = -math.atan2(v.z, max(flat.length, 1e-3)) * (1 - ramp(f, f_land - 40, f_land - 24))
+                pitch = max(-0.35, min(0.35, pitch)) - 0.12 * math.sin(math.pi * ramp(f, f_land - 40, f_land - 20))
+                yaw = yaw * (1 - ramp(f, f_land - 40, f_land - 20))
                 shake = 0.02 * math.sin(f * 2.3) * (1 - ramp(f, f_land, f_land + 3))
                 quats.append(Quaternion((0, 0, 1), yaw) @ Quaternion((0, 1, 0), -pitch + shake))
             bake(ds, frames, locs, quats)
             ds.scale = (DS_K,) * 3
             SP.show(ds, f0 - 30, G_END)
             # landing thrusters: four blue jets under the stub-wing pods, burning for the last 1.2 s
-            jm = SP.emit(f'JetM{k}', (0.35, 0.7, 1.0), 16.0)
+            jm = SP.emit(f'JetM{k}', (0.45, 0.78, 1.0), 5.0)
+            hm = V_soft('JetHalo', (0.3, 0.6, 1.0), 3.0)
             for (lx, ly) in ((-3.1, 3.2), (-3.1, -3.2), (1.5, 3.2), (1.5, -3.2)):
-                j = C.uv_sphere(f'Jet{k}_{lx}_{ly}', 1.0, seg=(12, 6), mat=jm)
-                j.parent = ds
-                j.location = (lx, ly, -1.6)
-                SP.key_scale(j, [(f_land - 30, (0.2, 0.2, 0.3)), (f_land - 26, (0.35, 0.35, 1.6)),
-                                 (f_land - 2, (0.4, 0.4, 1.2)), (f_land + 4, (0.25, 0.25, 0.4)), (f_land + 10, 0.01)],
-                             'LINEAR')
-                SP.show(j, f_land - 30, f_land + 10)
-                j.visible_shadow = False
+                for nm, mat, wk in (('Core', jm, 1.0), ('Halo', hm, 2.4)):
+                    j = C.uv_sphere(f'Jet{nm}{k}_{lx}_{ly}', 1.0, seg=(12, 6), mat=mat)
+                    j.parent = ds
+                    ks = [(f_land - 40, 0.3), (f_land - 34, 2.6), (f_land - 12, 2.2), (f_land - 2, 1.2),
+                          (f_land + 4, 0.4), (f_land + 10, 0.02)]
+                    for f_, L_ in ks:
+                        w_ = 0.2 * wk * (0.6 + 0.4 * min(1.0, L_))
+                        j.scale = (w_, w_, L_ * (1.0 if wk == 1.0 else 0.7))
+                        j.location = (lx, ly, -1.5 - j.scale.z)
+                        j.keyframe_insert('scale', frame=f_)
+                        j.keyframe_insert('location', frame=f_)
+                    C.set_interp(j, 'LINEAR')
+                    SP.show(j, f_land - 40, f_land + 10)
+                    j.visible_shadow = False
             # touchdown: shockwave ring + dust wall
             self.touchdown(land - Vector((0, 0, 2.05 * DS_K)), f_land, big=(k == 0))
             self.drops.append(ds)
@@ -508,7 +522,7 @@ class Ground:
             SP.show(o, f0 - 4, G_END)
 
     def touchdown(self, p, f, big=False):
-        ring_m = SP.emit(SP._uid('ShockM'), (0.8, 0.9, 1.0), 6.0)
+        ring_m = SP.emit(SP._uid('ShockM'), (0.8, 0.9, 1.0), 3.0)
         base._faction('terran')
         ring = base._join([F.lathe([(0.9, 0.1), (1.0, 0.0), (0.92, -0.05)], 48, 'glow')], SP._uid('Shock'))
         ring.data.materials.clear()
@@ -524,15 +538,15 @@ class Ground:
             d = C.uv_sphere(SP._uid('Dust'), 1.0, seg=(18, 10), mat=dm)
             a = (i + rnd.uniform(-0.4, 0.4)) / n_ * 2 * math.pi
             v = Vector((math.cos(a), math.sin(a), 0))
-            reach = rnd.uniform(70, 110) * (1.0 if big else 0.6)
-            s0 = rnd.uniform(5, 8)
-            s1 = rnd.uniform(16, 26) * (1.0 if big else 0.7)
-            fd = f + rnd.randint(0, 3)
+            reach = rnd.uniform(38, 58) * (1.0 if big else 0.6)
+            s0 = rnd.uniform(3, 5)
+            s1 = rnd.uniform(8, 13) * (1.0 if big else 0.7)
+            fd = f - 10 + rnd.randint(0, 6)
             SP.key_loc(d, [(fd, p + v * 10 + Vector((0, 0, 3))), (fd + 14, p + v * reach * 0.7 + Vector((0, 0, 6))),
                            (fd + 60, p + v * reach + Vector((0, 0, 10)))], 'BEZIER')
             SP.key_scale(d, [(fd, (s0, s0, s0 * 0.6)), (fd + 14, (s1 * 0.8, s1 * 0.8, s1 * 0.45)),
                              (fd + 60, (s1, s1, s1 * 0.6))], 'BEZIER')
-            SP.key_node(dm, 'V', [(fd, 1.0), (fd + 16, 0.7), (fd + 50, 0.0)])
+            SP.key_node(dm, 'V', [(fd, 0.7), (fd + 16, 0.5), (fd + 50, 0.0)])
             SP.show(d, fd, fd + 50)
             d.visible_shadow = False
 
@@ -831,15 +845,15 @@ class Ground:
         rnd = random.Random(3807)
         # the crack across the valley at x = 0
         base._faction('terran')
-        cm = SP.emit('CrackGlowM', (0.35, 0.06, 1.0), 2.5)
+        cm = SP.emit('CrackGlowM', (0.42, 0.1, 1.0), 7.0)
         crack = []
         for i in range(40):
             y = -420 + i * 21
-            w = 1.2 + 3.6 * math.sin(math.pi * i / 39) + rnd.uniform(-0.6, 0.6)
+            w = 0.35 + 1.2 * math.sin(math.pi * i / 39) + rnd.uniform(-0.2, 0.2)
             o = C.uv_sphere(f'Crack{i}', 1.0, seg=(10, 6), mat=cm)
-            o.location = (rnd.uniform(-3, 3), y, self.zat(0, y) - 0.5)
+            o.location = (rnd.uniform(-3, 3), y, self.zat(0, y) - 0.45)
             SP.key_scale(o, [(T_SPLIT - 1 + int(abs(y) / 60), (0.2, 12, 0.5)),
-                             (T_SPLIT + 10 + int(abs(y) / 60), (w, 13, 2.0)), (T_RISE + 10, (w * 1.6, 13, 2.5))], 'BEZIER')
+                             (T_SPLIT + 10 + int(abs(y) / 60), (w, 13, 0.55)), (T_RISE + 10, (w * 1.5, 13, 0.65))], 'BEZIER')
             SP.show(o, T_SPLIT - 1 + int(abs(y) / 60), G_END)
             o.visible_shadow = False
         # rocks lifting out of the crack
@@ -850,10 +864,23 @@ class Ground:
             F.ST['mats'] = {}
             r = F.rock((0, 0, 0), rnd.uniform(1.0, 3.5), 'rock', seed=i)
             r = base._join([r], f'LiftRock{i}')
-            f0 = T_SPLIT + rnd.randint(2, 20)
-            SP.key_loc(r, [(f0, p0), (G_END, p0 + Vector((rnd.uniform(-6, 6), rnd.uniform(-6, 6), rnd.uniform(25, 70))))],
-                       'BEZIER')
-            SP.key_rot(r, [(f0, (0, 0, 0)), (G_END, (rnd.uniform(-90, 90), rnd.uniform(-90, 90), rnd.uniform(-90, 90)))])
+            f0 = T_RISE + rnd.randint(-4, 26)
+            out = Vector((rnd.uniform(4, 12) * (1 if p0.x >= 0 else -1), rnd.uniform(-4, 4), 0))
+            vz = rnd.uniform(9, 20)
+            ks = []
+            for t_ in range(0, 80, 2):
+                tt = t_ / FPS
+                q = p0 + out * tt + Vector((0, 0, vz * tt - 9.8 * tt * tt))
+                gz = self.zat(q.x, q.y)
+                if q.z < gz and t_ > 4:
+                    q.z = gz
+                    ks.append((f0 + t_, q))
+                    break
+                ks.append((f0 + t_, q))
+            SP.key_loc(r, ks + [(G_END, ks[-1][1])], 'LINEAR')
+            SP.key_rot(r, [(f0, (0, 0, 0)), (ks[-1][0], (rnd.uniform(-200, 200), rnd.uniform(-200, 200), rnd.uniform(-90, 90)))],
+                       'LINEAR')
+            SP.boom(ks[-1][1] + Vector((0, 0, 1)), ks[-1][0], 2.0, hot=(0.55, 0.45, 0.4), cool=(0.3, 0.25, 0.22), life=0.8)
             SP.show(r, f0, G_END)
         lt = bpy.data.objects.new('CrackLight', bpy.data.lights.new('CrackLight', 'POINT'))
         SP.link(lt)
@@ -877,6 +904,9 @@ class Ground:
             if o:
                 o.parent = root
         root.scale = (SHARD_K,) * 3
+        spl = bpy.data.objects.get('Shard_Splinters')      # its orbiting splinters only once it stands (v4)
+        if spl:
+            SP.show(spl, T_PULSE, G_END)
         SP.key_loc(root, [(1, (0, 0, -70 * SHARD_K)), (T_RISE - 4, (0, 0, -60 * SHARD_K)), (T_RISE + 12, (0, 0, -30 * SHARD_K)),
                           (T_PULSE - 6, (0, 0, -8 * SHARD_K)), (T_PULSE, (0, 0, -6 * SHARD_K)), (G_END, (0, 0, -5.5 * SHARD_K))],
                    'BEZIER')
@@ -903,7 +933,7 @@ class Ground:
             p = Vector((math.cos(a) * 30, math.sin(a) * 30, 6))
             SP.key_loc(d, [(T_RISE, p), (T_RISE + 60, p * 2.2 + Vector((0, 0, 30)))], 'BEZIER')
             SP.key_scale(d, [(T_RISE, 9.0), (T_RISE + 60, 30.0)], 'BEZIER')
-            SP.key_node(dm, 'V', [(T_RISE, 0.55), (T_RISE + 70, 0.0)])
+            SP.key_node(dm, 'V', [(T_RISE, 0.4), (T_RISE + 70, 0.0)])
             SP.show(d, T_RISE, T_RISE + 70)
             d.visible_shadow = False
         # the fan of violet beams straight up (0:54)
@@ -1013,7 +1043,7 @@ class Ground:
             for f in range(fr(38), fr(39), 2):
                 sc.frame_set(f)
                 p = ds.matrix_world.translation.copy()
-                keys.append((f, p + Vector((-70, 26, 34)) * (1.0 - 0.25 * ramp(f, fr(38), fr(39))), p + Vector((25, 0, -18)), 24))
+                keys.append((f, p + Vector((30, -62, -16)) * (1.0 - 0.2 * ramp(f, fr(38), fr(39))), p + Vector((10, 0, -6)), 28))
             keys.append((fr(39) - 1,) + keys[-1][1:])
             return keys
         if sid == '09a':

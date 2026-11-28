@@ -91,8 +91,10 @@ def build(draft=True):
     muz = R.muzzles
     # ---------------------------------------------------------------- the slow charge
     base._faction('terran')
-    rib_m = SP.emit('ChargeRibM', (0.35, 0.7, 1.0), 6.0)
+    rib_m = SP.emit('ChargeRibM', (0.3, 0.65, 1.0), 3.0)
     f_c0, f_c1 = fr(T_CHARGE0), fr(T_CHARGE1)
+    bpy.context.scene.frame_set(f_c0)
+    bpy.context.view_layer.update()
     for ci, (g, root) in enumerate(guns):
         mz = muz[ci]
         L = abs(mz.y - root.y)
@@ -104,7 +106,7 @@ def build(draft=True):
                 a = t * 3 * 2 * math.pi + b * 1.05
                 y = root.y - (b / 6 + t / 6) * L
                 pts.append((mz.x + 1.9 * math.cos(a), y, mz.z + 1.9 * math.sin(a)))
-            r = F.sweep(pts, [(0.06, 0.06)] * 40, 'glow', sides=4)
+            r = F.sweep(pts, [(0.035, 0.035)] * 40, 'glow', sides=4)
             ro = base._join([r], f'Charge{ci}_{b}')
             ro.data.materials.clear()
             ro.data.materials.append(rib_m)
@@ -112,6 +114,25 @@ def build(draft=True):
             ro.visible_shadow = False
             fa = f_c0 + int((f_c1 - f_c0) * b / 7) + ci * 3
             show(ro, fa, T_SHOTS[ci] * 24 + 1)
+        # blue arcs crawling over the barrel, more and more of them as the charge builds
+        for stage in range(3):
+            pairs = []
+            rr = random.Random(700 + ci * 10 + stage)
+            for q in range(3 + stage * 3):
+                t = rr.uniform(0.05, 0.95)
+                a0 = rr.uniform(0, 2 * math.pi)
+                a1 = a0 + rr.uniform(-1.2, 1.2)
+                y0 = root.y - t * L
+                y1 = y0 - rr.uniform(0.8, 2.6)
+                pairs.append((bs.matrix_world @ Vector((mz.x + 2.15 * math.cos(a0), y0, mz.z + 2.15 * math.sin(a0))),
+                              bs.matrix_world @ Vector((mz.x + 2.15 * math.cos(a1), y1, mz.z + 2.15 * math.sin(a1)))))
+            fa = f_c0 + int((f_c1 - f_c0) * stage / 3) + ci * 2
+            arcs = SP.flicker_lightning(pairs, 720 + ci * 10 + stage, fa, fr(T_SHOTS[ci]), every=1, width=0.05,
+                                        name=f'BarrelArc{ci}_{stage}', zone_col=(0.35, 0.7, 1.0), strength=5.0)
+            mwi = bs.matrix_world.inverted()
+            for a in arcs:                    # ride with the ship
+                a.parent = bs
+                a.matrix_parent_inverse = mwi
         # glow building in the muzzle
         g_ = V.C.uv_sphere(f'MuzGlow{ci}', 1.0, seg=(24, 12), mat=V.soft_glow(f'MuzGlowM{ci}', (0.5, 0.8, 1.0), 2.5, 2.5))
         g_.parent = bs
@@ -154,6 +175,13 @@ def build(draft=True):
         cm.rotation_quaternion = SP.aim_quat(tgt - src)
         key_loc(cm, [(fs, src + fire * 4), (fh, tgt)], 'LINEAR')
         show(cm, fs, fh)
+        # its crackling arcs flicker on their own keys: keep them hidden outside the shot's flight
+        # (they used to hang at the muzzles through the whole charge as big stray white bolts)
+        for a in [c for c in cm.children_recursive if 'Arc' in c.name]:
+            for f in list(range(1, fs)) + list(range(fh + 1, nf + 1)):
+                a.hide_render = True
+                a.keyframe_insert('hide_render', frame=f)
+            SP._interp_where(a, 'hide_render', 'CONSTANT')
         fl = T.muzzle_flash(f'MFlash{ci}', scale=3.6, bolt=False)
         fl.location = src
         fl.rotation_mode = 'QUATERNION'
